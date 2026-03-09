@@ -1,0 +1,39 @@
+{
+  "name": "planora",
+  "version": "1.0.0",
+  "description": "Planora - AI Schedule Analysis for Construction",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.18.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@types/uuid": "^10.0.0",
+    "autoprefixer": "^10.4.19",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.577.0",
+    "next": "14.2.5",
+    "openai": "^6.27.0",
+    "pdf-parse": "^2.4.5",
+    "pg": "^8.20.0",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "uuid": "^10.0.0"
+  },
+  "private": true
+}
