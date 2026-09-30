@@ -103,16 +103,16 @@ function AuthForm() {
               </div>
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-gold-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-gold-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
 
           <p className="text-center text-[13.5px] text-warm-500 mt-6">
             {mode === 'signin' ? (
-              <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-gold-600 font-medium hover:underline">Sign up</button></>
+              <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button></>
             ) : (
-              <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-gold-600 font-medium hover:underline">Sign in</button></>
+              <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign in</button></>
             )}
           </p>
 

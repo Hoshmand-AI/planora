@@ -7,10 +7,10 @@
   --navy-900: #0F2140;
   --navy-800: #162D54;
   --navy-700: #1E3A6A;
-  --gold-500: #C8963E;
-  --gold-400: #D4A94F;
-  --gold-600: #B8862E;
-  --gold-100: #FDF6E9;
+  --accent-600: #2563eb;
+  --accent-500: #3b82f6;
+  --accent-400: #60a5fa;
+  --accent-100: #eff6ff;
   --warm-50:  #FDFCFA;
   --warm-100: #F8F6F3;
   --warm-200: #F0EDE8;
@@ -30,18 +30,14 @@ body {
 }
 
 ::selection {
-  background: var(--gold-100);
+  background: var(--accent-100);
   color: var(--navy-950);
 }
 
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: var(--gold-500);
-  box-shadow: 0 0 0 3px var(--gold-100);
-}
-
-.font-display {
-  font-family: 'DM Serif Display', Georgia, serif;
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 3px var(--accent-100);
 }
 
 .tabular-nums {

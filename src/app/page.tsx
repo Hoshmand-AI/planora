@@ -26,7 +26,7 @@ export default function HomePage() {
 
           <div className="hidden md:flex items-center gap-5">
             <Link href="/auth" className="text-white/65 text-[13px] font-medium hover:text-white transition-colors">Sign In</Link>
-            <Link href="/auth?mode=signup" className="bg-gold-500 text-navy-950 px-4 py-2 rounded-md text-[13px] font-semibold hover:bg-gold-400 transition-colors">Get Started</Link>
+            <Link href="/auth?mode=signup" className="bg-accent-500 text-navy-950 px-4 py-2 rounded-md text-[13px] font-semibold hover:bg-accent-400 transition-colors">Get Started</Link>
           </div>
 
           <button className="md:hidden text-white" onClick={() => setMenuOpen(!menuOpen)}>
@@ -40,14 +40,14 @@ export default function HomePage() {
             <a href="#how-it-works" className="block py-3 text-white/70 text-[14px] font-medium" onClick={() => setMenuOpen(false)}>How It Works</a>
             <a href="#pricing" className="block py-3 text-white/70 text-[14px] font-medium" onClick={() => setMenuOpen(false)}>Pricing</a>
             <Link href="/auth" className="block py-3 text-white/70 text-[14px] font-medium">Sign In</Link>
-            <Link href="/auth?mode=signup" className="block mt-3 bg-gold-500 text-navy-950 text-center py-2.5 rounded-md text-[14px] font-semibold">Get Started</Link>
+            <Link href="/auth?mode=signup" className="block mt-3 bg-accent-500 text-navy-950 text-center py-2.5 rounded-md text-[14px] font-semibold">Get Started</Link>
           </div>
         )}
       </nav>
 
       {/* Hero */}
       <section className="px-6 pt-20 pb-16 text-center">
-        <div className="inline-block text-[11px] font-semibold uppercase tracking-widest text-gold-600 bg-gold-100 px-3 py-1 rounded-md mb-6">
+        <div className="inline-block text-[11px] font-semibold uppercase tracking-widest text-accent-600 bg-accent-100 px-3 py-1 rounded-md mb-6">
           Built by Hoshmand AI
         </div>
         <h1 className="font-display text-[42px] md:text-[50px] text-navy-950 max-w-[700px] mx-auto leading-[1.1] mb-5">
@@ -57,7 +57,7 @@ export default function HomePage() {
           Upload your Primavera P6 or MS Project schedule and get instant AI-powered analysis, delay insights, and executive reports.
         </p>
         <div className="flex gap-3 justify-center flex-wrap">
-          <Link href="/auth?mode=signup" className="bg-gold-500 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-semibold hover:bg-gold-400 transition-colors">
+          <Link href="/auth?mode=signup" className="bg-accent-500 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
             Start Free
           </Link>
           <a href="#how-it-works" className="border border-warm-300 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-medium hover:bg-warm-100 transition-colors">
@@ -142,7 +142,7 @@ export default function HomePage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex gap-4">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Icon size={16} className="text-gold-500" />
+                <Icon size={16} className="text-accent-500" />
               </div>
               <div>
                 <h3 className="text-[15px] font-semibold text-navy-950 mb-1">{title}</h3>
@@ -165,7 +165,7 @@ export default function HomePage() {
               { num: '04', title: 'Report',  desc: 'Get professional reports, or ask questions in plain English.' },
             ].map(({ num, title, desc }) => (
               <div key={num} className="text-center">
-                <div className="text-[30px] font-bold text-gold-500 mb-3 tabular-nums font-display">{num}</div>
+                <div className="text-[30px] font-bold text-accent-500 mb-3 tabular-nums font-display">{num}</div>
                 <div className="text-[15px] font-semibold text-navy-950 mb-2">{title}</div>
                 <div className="text-[13px] text-warm-500 leading-relaxed max-w-[200px] mx-auto">{desc}</div>
               </div>
@@ -187,7 +187,7 @@ export default function HomePage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="bg-warm-100 border border-warm-200 rounded-lg p-5 hover:border-warm-300 transition-colors">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center mb-4">
-                <Icon size={16} className="text-gold-500" />
+                <Icon size={16} className="text-accent-500" />
               </div>
               <h3 className="text-[15px] font-semibold text-navy-950 mb-1.5">{title}</h3>
               <p className="text-[13.5px] text-warm-600 leading-relaxed">{desc}</p>
@@ -224,8 +224,8 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="bg-warm-50 border-2 border-gold-500 rounded-lg p-7 relative">
-              <div className="absolute -top-3 left-6 bg-gold-500 text-navy-950 text-[11px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-md">Most Popular</div>
+            <div className="bg-warm-50 border-2 border-accent-500 rounded-lg p-7 relative">
+              <div className="absolute -top-3 left-6 bg-accent-500 text-navy-950 text-[11px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-md">Most Popular</div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-warm-400 mb-2">Pro</div>
               <div className="text-[36px] font-bold text-navy-950">$49<span className="text-[15px] font-medium text-warm-400">/month</span></div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For PMs and schedulers who need full capabilities.</p>
@@ -236,7 +236,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/auth?mode=signup" className="block text-center bg-gold-500 text-navy-950 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-gold-400 transition-colors">
+              <Link href="/auth?mode=signup" className="block text-center bg-accent-500 text-navy-950 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-400 transition-colors">
                 Get Started
               </Link>
             </div>
@@ -266,7 +266,7 @@ export default function HomePage() {
         <div className="bg-navy-900 rounded-lg px-8 py-16 text-center">
           <h2 className="font-display text-[30px] text-white mb-4">Stop waiting for schedule reports.</h2>
           <p className="text-white/45 mb-8 text-[15px]">Upload your first P6 or MS Project file and get instant AI-powered analysis.</p>
-          <Link href="/auth?mode=signup" className="inline-block bg-gold-500 text-navy-950 px-10 py-3.5 rounded-md text-[15px] font-semibold hover:bg-gold-400 transition-colors">
+          <Link href="/auth?mode=signup" className="inline-block bg-accent-500 text-navy-950 px-10 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
             Get Started Free
           </Link>
           <p className="text-white/30 text-[12px] mt-4">No credit card required.</p>

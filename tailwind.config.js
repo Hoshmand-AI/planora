@@ -10,11 +10,12 @@ module.exports = {
           800: '#162D54',
           700: '#1E3A6A',
         },
-        gold: {
-          600: '#B8862E',
-          500: '#C8963E',
-          400: '#D4A94F',
-          100: '#FDF6E9',
+        // Planora accent (steel blue) per Hoshmand AI brand standard
+        accent: {
+          600: '#2563eb',
+          500: '#3b82f6',
+          400: '#60a5fa',
+          100: '#eff6ff',
         },
         warm: {
           50:  '#FDFCFA',
@@ -36,12 +37,6 @@ module.exports = {
           500: '#8A8178',
           600: '#6B6359',
           700: '#4A443C',
-        },
-        steel: {
-          600: '#B8862E',
-          500: '#C8963E',
-          400: '#D4A94F',
-          100: '#FDF6E9',
         },
         status: {
           'on-track':     '#3D8B6E',

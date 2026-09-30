@@ -154,7 +154,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               onClick={() => setShowScheduleList(true)}
               className="hidden md:flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[260px]"
             >
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedSchedule ? 'bg-gold-500' : 'bg-warm-500'}`} />
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
               <span className="text-white/65 text-[12px] font-medium truncate">
                 {selectedSchedule ? selectedSchedule.name : 'No schedule selected'}
               </span>
@@ -168,7 +168,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setShowScheduleList(true)}
                 className="md:hidden flex items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5"
               >
-                <div className={`w-1.5 h-1.5 rounded-full ${selectedSchedule ? 'bg-gold-500' : 'bg-warm-500'}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
                 <span className="text-white/60 text-[11px] font-medium max-w-[100px] truncate">
                   {selectedSchedule ? selectedSchedule.name : 'No schedule'}
                 </span>
@@ -176,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               <button
                 onClick={() => setShowUpload(true)}
-                className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
               >
                 <Upload size={12} />
                 <span className="hidden sm:inline">Upload</span>
@@ -184,7 +184,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               <button
                 onClick={() => setShowSettings(true)}
-                className="w-7 h-7 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[11px] font-bold text-white/70 hover:border-gold-500/40 transition-colors flex-shrink-0"
+                className="w-7 h-7 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[11px] font-bold text-white/70 hover:border-accent-500/40 transition-colors flex-shrink-0"
               >
                 {user.name?.[0]?.toUpperCase() || 'U'}
               </button>
@@ -201,7 +201,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   href={tab.href}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
                     active
-                      ? 'text-white border-gold-500'
+                      ? 'text-white border-accent-500'
                       : 'text-white/40 border-transparent hover:text-white/70'
                   }`}
                 >
@@ -231,7 +231,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={tab.href}
                   href={tab.href}
                   className={`flex-1 flex flex-col items-center gap-1 py-2.5 transition-colors ${
-                    active ? 'text-gold-400' : 'text-white/35'
+                    active ? 'text-accent-400' : 'text-white/35'
                   }`}
                 >
                   <tab.icon size={18} strokeWidth={active ? 2 : 1.5} />
@@ -274,7 +274,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="w-full bg-gold-500 text-navy-950 py-3 rounded-md text-[14px] font-semibold hover:bg-gold-400 disabled:opacity-50 transition-colors">
+                  className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[14px] font-semibold hover:bg-accent-400 disabled:opacity-50 transition-colors">
                   {uploading ? 'Parsing schedule…' : 'Upload & Parse'}
                 </button>
               </form>
@@ -301,7 +301,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       onClick={() => { setSelectedSchedule(s); setShowScheduleList(false) }}
                       className={`w-full text-left p-3.5 rounded-md border transition-colors ${
                         selectedSchedule?.id === s.id
-                          ? 'border-gold-500 bg-gold-100'
+                          ? 'border-accent-500 bg-accent-100'
                           : 'border-warm-200 hover:border-warm-300 bg-warm-100'
                       }`}
                     >
@@ -337,7 +337,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
                   <div className="text-[15px] font-semibold text-navy-950">{user.name}</div>
                   <div className="text-[13px] text-warm-500">{user.email}</div>
-                  <div className="mt-2 inline-block text-[11px] font-bold uppercase tracking-wider text-gold-600 bg-gold-100 px-2 py-0.5 rounded-md border-l-2 border-gold-500">
+                  <div className="mt-2 inline-block text-[11px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">
                     {user.plan}
                   </div>
                 </div>
@@ -346,8 +346,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="text-[13px] text-warm-600">Planora · Version 1.0</div>
                   <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
                   <div className="flex gap-4 mt-2">
-                    <Link href="/privacy" className="text-[13px] text-gold-600 hover:underline">Privacy</Link>
-                    <Link href="/terms" className="text-[13px] text-gold-600 hover:underline">Terms</Link>
+                    <Link href="/privacy" className="text-[13px] text-accent-600 hover:underline">Privacy</Link>
+                    <Link href="/terms" className="text-[13px] text-accent-600 hover:underline">Terms</Link>
                   </div>
                 </div>
                 <button

@@ -139,7 +139,7 @@ export default function AskPage() {
         <button
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
-          className="w-9 h-9 bg-gold-500 rounded-md flex items-center justify-center text-navy-950 hover:bg-gold-400 transition-colors disabled:opacity-40"
+          className="w-9 h-9 bg-accent-500 rounded-md flex items-center justify-center text-navy-950 hover:bg-accent-400 transition-colors disabled:opacity-40"
         >
           <Send size={15} />
         </button>

@@ -70,7 +70,7 @@ export default function ReportsPage() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
-              <Icon size={14} className="text-gold-500" />
+              <Icon size={14} className="text-accent-500" />
             </div>
             <h2 className="font-display text-[20px] text-navy-950">{rt?.title}</h2>
           </div>
@@ -81,7 +81,7 @@ export default function ReportsPage() {
           <div className="text-[12px] text-warm-500">
             {report.scheduleName} · Generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
           </div>
-          <button onClick={handleExport} className="flex items-center gap-1.5 text-gold-600 text-[12px] font-medium hover:underline">
+          <button onClick={handleExport} className="flex items-center gap-1.5 text-accent-600 text-[12px] font-medium hover:underline">
             <Download size={13} /> Export
           </button>
         </div>
@@ -107,8 +107,8 @@ export default function ReportsPage() {
           >
             <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0">
               {generating === rt.id
-                ? <Loader2 size={15} className="text-gold-500 animate-spin" />
-                : <rt.icon size={15} className="text-gold-500" />
+                ? <Loader2 size={15} className="text-accent-500 animate-spin" />
+                : <rt.icon size={15} className="text-accent-500" />
               }
             </div>
             <div>
