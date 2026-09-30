@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-surface-50">
       <nav className="bg-navy-900 h-14 flex items-center px-6">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-steel-500 rounded-lg flex items-center justify-center text-white font-bold text-[10px] tracking-tight">P</div>
+          <div className="w-8 h-8 bg-accent-500 rounded-lg flex items-center justify-center text-white font-bold text-[10px] tracking-tight">P</div>
           <span className="text-white font-semibold">Planora</span>
         </Link>
       </nav>
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
           <h2 className="text-[18px] font-semibold text-navy-950 mt-8">4. Data Sharing</h2>
           <p>We do not sell your data. We share data only with AI providers (OpenAI) to process queries, and when required by law.</p>
           <h2 className="text-[18px] font-semibold text-navy-950 mt-8">5. Contact</h2>
-          <p>Email: support@hoshmand.ai — Website: <a href="https://www.hoshmand.ai" className="text-steel-500">hoshmand.ai</a></p>
+          <p>Email: support@hoshmand.ai — Website: <a href="https://www.hoshmand.ai" className="text-accent-500">hoshmand.ai</a></p>
         </div>
       </div>
     </div>

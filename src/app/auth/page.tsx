@@ -13,6 +13,7 @@ function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [company, setCompany] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,6 +30,7 @@ function AuthForm() {
           action: mode === 'signin' ? 'signin' : 'signup',
           email, password,
           name: mode === 'signup' ? name : undefined,
+          company: mode === 'signup' ? company : undefined,
         }),
       })
       const data = await res.json()
@@ -81,6 +83,16 @@ function AuthForm() {
                 />
               </div>
             )}
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Firm</label>
+                <input
+                  type="text" value={company} onChange={e => setCompany(e.target.value)}
+                  placeholder="Your company (private workspace)"
+                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
               <input
@@ -103,16 +115,16 @@ function AuthForm() {
               </div>
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-gold-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-gold-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
 
           <p className="text-center text-[13.5px] text-warm-500 mt-6">
             {mode === 'signin' ? (
-              <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-gold-600 font-medium hover:underline">Sign up</button></>
+              <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button></>
             ) : (
-              <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-gold-600 font-medium hover:underline">Sign in</button></>
+              <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign in</button></>
             )}
           </p>
 

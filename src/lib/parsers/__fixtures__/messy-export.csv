@@ -1,0 +1,13 @@
+Warehouse Expansion - Schedule Export,,,,,,
+Data Date: 16-Mar-26,,,,,,
+
+"Act ID","Activity Name","OD","Start","Finish","Total Float","Preds","Phase"
+,"Preconstruction",,,,,,
+A100,Notice to Proceed,0,02-Mar-26 A,,0,,precon
+A110,"Submittals, Shop Drawings",15d,03-Mar-26 A,23-Mar-26,5d,A100,precon
+,"Sitework",,,,,,
+A200,Mobilize,5,Mon 3/2/26,Fri 3/6/26,0,"A100 FS+1d",site
+A210,"Excavate ""Area B""",80h,3/9/2026,3/18/2026,-2,"A200, A110 SS+2d",site
+A220,Foundations,2w,2026-03-19,2026-04-01,0,"A210FF-1d; A200 SS",site
+A230,Backfill,3,02-Apr-26,06-Apr-26,4,"A220 : FS 2, Z999",site
+A300,Substantial Completion,0,,07-Apr-26*,0,A230,closeout

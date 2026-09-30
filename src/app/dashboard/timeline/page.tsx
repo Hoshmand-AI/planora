@@ -111,7 +111,7 @@ export default function TimelinePage() {
               </div>
               <div className="h-1.5 bg-warm-200 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${phase.allComplete ? 'bg-status-complete' : phase.hasCritical ? 'bg-status-attention' : 'bg-gold-500'}`}
+                  className={`h-full rounded-full ${phase.allComplete ? 'bg-status-complete' : phase.hasCritical ? 'bg-status-attention' : 'bg-accent-500'}`}
                   style={{ width: `${phase.percentComplete}%` }}
                 />
               </div>
@@ -143,12 +143,12 @@ export default function TimelinePage() {
                     <div className="w-[200px] flex-shrink-0 text-[12px] text-warm-700 truncate pr-2">{act.name}</div>
                     <div className="flex-1 relative h-5">
                       <div
-                        className={`absolute h-3 top-1 rounded-sm ${act.isCritical ? 'bg-status-attention' : act.status === 'complete' ? 'bg-status-complete' : 'bg-gold-400'}`}
+                        className={`absolute h-3 top-1 rounded-sm ${act.isCritical ? 'bg-status-attention' : act.status === 'complete' ? 'bg-status-complete' : 'bg-accent-400'}`}
                         style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.5, Math.min(width, 100 - left))}%` }}
                       >
                         {act.percentComplete > 0 && (
                           <div
-                            className={`h-full rounded-sm ${act.isCritical ? 'bg-status-attention' : 'bg-gold-600'}`}
+                            className={`h-full rounded-sm ${act.isCritical ? 'bg-status-attention' : 'bg-accent-600'}`}
                             style={{ width: `${act.percentComplete}%` }}
                           />
                         )}
@@ -162,7 +162,7 @@ export default function TimelinePage() {
               )}
             </div>
             <div className="flex gap-5 mt-3 text-[11px] text-warm-400">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-gold-400 rounded-sm inline-block" /> Normal</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-accent-400 rounded-sm inline-block" /> Normal</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-status-attention rounded-sm inline-block" /> Priority</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-status-complete rounded-sm inline-block" /> Complete</span>
             </div>

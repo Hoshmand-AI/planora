@@ -1,9 +1,10 @@
-import OpenAI from 'openai'
 import { Activity, Relationship, Schedule } from '@/lib/db'
+import { chat, llmStatus } from '@/lib/llm/provider'
+import { runDcma } from '@/lib/analysis/dcma'
+import { analyzableFromDb } from '@/lib/planning/service'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+// Model calls go through the provider (cloud, on-prem, or offline). When no model is available,
+// answers and reports fall back to deterministic summaries computed from the schedule itself.
 
 interface ScheduleContext {
   schedule: Schedule
@@ -107,27 +108,34 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
   }
   
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt + extraContext },
-        { role: 'user', content: question },
-      ],
-      temperature: 0.3,
-      max_tokens: 2000,
-    })
-    
-    return completion.choices[0]?.message?.content || 'Unable to generate a response. Please try again.'
+    const answer = await chat([
+      { role: 'system', content: systemPrompt + extraContext },
+      { role: 'user', content: question },
+    ], { temperature: 0.3, maxTokens: 2000 })
+    if (answer) return answer
+    return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext)
   } catch (error: unknown) {
     const err = error as Error
-    console.error('OpenAI error:', err.message)
-    
-    if (err.message?.includes('API key')) {
-      return 'OpenAI API key is not configured. Please add your OPENAI_API_KEY to the environment variables.'
-    }
-    
-    return `AI analysis temporarily unavailable. Error: ${err.message}`
+    console.error('LLM error:', err.message)
+    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext)
   }
+}
+
+function offlineAnswer(stats: Record<string, string | number>, critical: Activity[], nearTerm: Activity[], extra: string): string {
+  const status = llmStatus()
+  const lines = [
+    `_No AI model is available (${status.error || 'offline mode'}), so this is a direct readout of the schedule data._`,
+    '',
+    `**Summary:** ${stats.totalActivities} activities — ${stats.completedCount} complete, ${stats.inProgressCount} in progress, ${stats.notStartedCount} not started. ${stats.criticalCount} critical, ${stats.negativeFloatCount} with negative float. ${stats.missingPredecessors} missing predecessors, ${stats.missingSuccessors} missing successors.`,
+    '',
+    '**Critical path (first 10):**',
+    ...critical.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: ${a.earlyStart} → ${a.earlyFinish}, float ${a.totalFloat}d`),
+    '',
+    '**Next up:**',
+    ...nearTerm.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: starts ${a.earlyStart}${a.isCritical ? ' (critical)' : ''}`),
+  ]
+  if (extra) lines.push('', '```', extra.trim(), '```')
+  return lines.join('\n')
 }
 
 function findMissingPredecessors(activities: Activity[], relationships: Relationship[]): Activity[] {
@@ -199,6 +207,9 @@ Use formal, professional language suitable for presentation to project executive
   }
   
   const prompt = prompts[reportType] || prompts.executive_summary
+  const dcma = runDcma(analyzableFromDb(schedule, activities, relationships))
+  const dcmaText = `DCMA 14-POINT RESULTS (computed, authoritative — do not recompute): ${dcma.passed}/${dcma.applicable} applicable checks pass, score ${dcma.score}.\n` +
+    dcma.checks.map(c => `#${c.id} ${c.name}: ${c.metric} (threshold ${c.threshold}) ${c.result.toUpperCase()}${c.offenders.length ? ' — e.g. ' + c.offenders.slice(0, 5).join(', ') : ''}`).join('\n')
   
   const contextStr = `Schedule: ${schedule.name} | Version: ${schedule.version}
 Data Date: ${schedule.dataDate} | Start: ${schedule.projectStart} | Finish: ${schedule.projectFinish}
@@ -208,27 +219,41 @@ Variance: ${schedule.varianceDays || 'Unknown'} days
 Missing Predecessors: ${stats.missingPred} | Missing Successors: ${stats.missingSucc}
 Negative Float: ${stats.negFloat}
 
+${dcmaText}
+
 Top Critical Activities:
 ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}: ${a.name} (${a.duration}d, float: ${a.totalFloat}d, ${a.earlyStart} to ${a.earlyFinish})`).join('\n')}
 `
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { 
-          role: 'system', 
-          content: `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}` 
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 3000,
-    })
-    
-    return completion.choices[0]?.message?.content || 'Unable to generate report.'
+    const report = await chat([
+      {
+        role: 'system',
+        content: `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
+      },
+      { role: 'user', content: prompt },
+    ], { temperature: 0.3, maxTokens: 3000 })
+    if (report) return report
   } catch (error: unknown) {
-    const err = error as Error
-    return `Report generation failed: ${err.message}`
+    console.error('LLM error:', (error as Error).message)
   }
+  // Deterministic report (offline / air-gapped / model failure).
+  return [
+    `# ${reportType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${schedule.name}`,
+    '',
+    '_Generated from schedule data without an AI model._',
+    '',
+    '## 1. Schedule status',
+    contextStr.split('\n\nTop Critical')[0].replace(dcmaText, '').trim(),
+    '',
+    '## 2. DCMA 14-point assessment',
+    '| # | Check | Metric | Threshold | Result |',
+    '|---|---|---|---|---|',
+    ...dcma.checks.map(c => `| ${c.id} | ${c.name} | ${c.metric} | ${c.threshold} | ${c.result.toUpperCase()} |`),
+    '',
+    ...dcma.checks.filter(c => c.result === 'fail').map(c => `- **#${c.id} ${c.name}:** ${c.explanation}${c.offenders.length ? ` Examples: ${c.offenders.slice(0, 8).join(', ')}.` : ''}`),
+    '',
+    '## 3. Critical activities',
+    ...activities.filter(a => a.isCritical).slice(0, 25).map(a => `- ${a.activityId} ${a.name} (${a.duration}d, float ${a.totalFloat}d, ${a.earlyStart} → ${a.earlyFinish})`),
+  ].join('\n')
 }
