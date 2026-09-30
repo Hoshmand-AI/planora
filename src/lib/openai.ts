@@ -2,6 +2,7 @@ import { Activity, Relationship, Schedule } from '@/lib/db'
 import { chat, llmStatus } from '@/lib/llm/provider'
 import { runDcma } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
+import type { ProjectBrief } from '@/lib/analysis/brief'
 
 // Model calls go through the provider (cloud, on-prem, or offline). When no model is available,
 // answers and reports fall back to deterministic summaries computed from the schedule itself.
@@ -10,6 +11,8 @@ interface ScheduleContext {
   schedule: Schedule
   activities: Activity[]
   relationships: Relationship[]
+  brief?: ProjectBrief
+  hasLogic?: boolean
 }
 
 export async function askScheduleQuestion(
@@ -51,7 +54,10 @@ RULES:
 - Provide actionable recommendations when relevant.
 - Format responses clearly with sections and bullet points when appropriate.
 - If the data doesn't contain enough information to answer, say so clearly.
-
+- Write dates as MM/DD/YYYY.
+- When asked about status, progress, or the project in general, START with a short "About this project" paragraph (2–3 sentences): what the project is, where it is (if known), its start and forecast finish, and what must be achieved next (the next key milestone and the completion milestone). Use the PROJECT OVERVIEW below; do not invent location or type if it is not given. Then give the detailed answer.
+${context.hasLogic === false ? '- IMPORTANT: this file has NO activity relationships, so float and the critical path cannot be determined. Never describe activities as critical or zero-float; say the file lacks logic instead.\n' : ''}
+${context.brief ? context.brief.text + '\n' : ''}
 SCHEDULE: ${schedule.name} (${schedule.version})
 Data Date: ${schedule.dataDate || 'Not specified'}
 Project Start: ${schedule.projectStart || 'Not specified'}
@@ -113,19 +119,20 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
       { role: 'user', content: question },
     ], { temperature: 0.3, maxTokens: 2000 })
     if (answer) return answer
-    return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext)
+    return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   } catch (error: unknown) {
     const err = error as Error
     console.error('LLM error:', err.message)
-    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext)
+    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   }
 }
 
-function offlineAnswer(stats: Record<string, string | number>, critical: Activity[], nearTerm: Activity[], extra: string): string {
+function offlineAnswer(stats: Record<string, string | number>, critical: Activity[], nearTerm: Activity[], extra: string, brief?: ProjectBrief): string {
   const status = llmStatus()
   const lines = [
     `_No AI model is available (${status.error || 'offline mode'}), so this is a direct readout of the schedule data._`,
     '',
+    ...(brief ? ['**About this project:** ' + brief.summary, ''] : []),
     `**Summary:** ${stats.totalActivities} activities — ${stats.completedCount} complete, ${stats.inProgressCount} in progress, ${stats.notStartedCount} not started. ${stats.criticalCount} critical, ${stats.negativeFloatCount} with negative float. ${stats.missingPredecessors} missing predecessors, ${stats.missingSuccessors} missing successors.`,
     '',
     '**Critical path (first 10):**',
@@ -181,7 +188,7 @@ export async function generateReport(
 3. Key Findings (5-7 bullet points)
 4. Near-Term Outlook (activities starting in next 14 days)
 5. Recommendations (3-5 actionable items)
-Use formal, professional language suitable for presentation to project executives.`,
+Use formal, professional language suitable for presentation to project executives. Open with a short project overview (what, where, key dates, what must be achieved).`,
     
     critical_path: `Generate a Critical Path Analysis report for ${schedule.name}. Include:
 1. Critical Path Summary (total critical activities, % of schedule)
@@ -211,7 +218,7 @@ Use formal, professional language suitable for presentation to project executive
   const dcmaText = `DCMA 14-POINT RESULTS (computed, authoritative — do not recompute): ${dcma.passed}/${dcma.applicable} applicable checks pass, score ${dcma.score}.\n` +
     dcma.checks.map(c => `#${c.id} ${c.name}: ${c.metric} (threshold ${c.threshold}) ${c.result.toUpperCase()}${c.offenders.length ? ' — e.g. ' + c.offenders.slice(0, 5).join(', ') : ''}`).join('\n')
   
-  const contextStr = `Schedule: ${schedule.name} | Version: ${schedule.version}
+  const contextStr = `${context.brief ? context.brief.text + '\n\n' : ''}Schedule: ${schedule.name} | Version: ${schedule.version}
 Data Date: ${schedule.dataDate} | Start: ${schedule.projectStart} | Finish: ${schedule.projectFinish}
 Activities: ${stats.total} | Critical: ${stats.critical} | Complete: ${stats.complete}
 In Progress: ${stats.inProgress} | Not Started: ${stats.notStarted}

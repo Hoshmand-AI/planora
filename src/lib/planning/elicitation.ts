@@ -2,7 +2,7 @@
 // instead of guessing. Pure and deterministic; the model can only ADD questions (see suggestQuestions).
 
 import type {
-  Answer, AnswerValue, Assumption, ElicitationResult, InterviewState, ProjectProfile, ProjectType,
+  CanonicalCategory, Answer, AnswerValue, Assumption, ElicitationResult, InterviewState, ProjectProfile, ProjectType,
   Question, SourceRef, WorkScope, DeliveryMethod, Classification, PermitSpec, LongLeadSpec, RegulationSpec,
 } from './types'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from './types'
@@ -224,6 +224,17 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     },
   )
 
+  if (p.projectType) {
+    for (const m of MILESTONE_TARGETS) {
+      qs.push({
+        id: `milestone.${m.key}.target`, section: 'milestones', kind: 'date', impact: m.impact, allowWithheld: true,
+        prompt: `Is there a target or contractual date for “${m.label}”?`,
+        why: `${m.why} We hold the date as a finish-no-later-than target, check it against your other dates, and show how late the plan is against it.`,
+        fallback: { value: '', explanation: 'No target; the date is whatever the logic produces.' },
+      })
+    }
+  }
+
   if (ctx.history && ctx.history.projectCount > 0) {
     qs.push({
       id: 'history.use', section: 'history', kind: 'boolean', impact: 40, allowWithheld: false,
@@ -298,6 +309,66 @@ function regulationQuestions(regs: RegulationSpec[], p: ProjectProfile): Questio
   }))
 }
 
+/* ─── Milestone targets & date logic ─────────────────── */
+
+export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string }[] = [
+  { key: 'foundations', label: 'Foundations complete', category: 'foundations', rank: 1, impact: 22, why: 'Foundations gate the structure.' },
+  { key: 'structure', label: 'Structure complete (topped out)', category: 'structure_steel', rank: 2, impact: 22, why: 'Topping out gates the envelope and roof.' },
+  { key: 'dry_in', label: 'Building dried-in', category: 'dry_in', rank: 3, impact: 24, why: 'Interior finishes and sensitive equipment wait for a watertight building.' },
+  { key: 'electrical_service', label: 'Permanent power available', category: 'electrical_service', rank: 3, impact: 24, why: 'Commissioning cannot start without permanent power.' },
+  { key: 'commissioning', label: 'Commissioning complete', category: 'commissioning', rank: 4, impact: 20, why: 'Commissioning is the last major step before turnover.' },
+  { key: 'substantial_completion', label: 'Substantial completion', category: 'substantial_completion', rank: 5, impact: 30, why: 'The owner can occupy at substantial completion; it is usually the contractual date.' },
+]
+
+/** Which milestone a gated category must precede, for delivery/permit vs target checks. */
+const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
+  earthwork: 'foundations', deep_foundations: 'foundations', foundations: 'foundations',
+  structure_steel: 'structure', structure_concrete: 'structure', structure_wood: 'structure',
+  roofing: 'dry_in', exterior_skin: 'dry_in', windows_curtainwall: 'dry_in',
+  electrical_service: 'electrical_service', mechanical_equipment: 'commissioning', fire_protection: 'commissioning',
+  elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
+}
+
+export interface DateIssue { questionIds: string[]; text: string; severity: 'error' | 'warning' }
+
+/** Pure date checks on the answers themselves — run as soon as dates are entered. */
+export function checkAnswerDates(answers: Record<string, Answer>, permits: PermitSpec[], longLead: LongLeadSpec[]): DateIssue[] {
+  const out: DateIssue[] = []
+  const d = (id: string) => { const v = known(answers, id); return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined }
+  const f = (x: string) => `${x.slice(5, 7)}/${x.slice(8, 10)}/${x.slice(0, 4)}`
+  const start = d('project.target_start')
+  const finish = d('project.required_finish')
+  type Pt = { id: string; label: string; date: string; rank: number }
+  const pts: Pt[] = []
+  if (start) pts.push({ id: 'project.target_start', label: 'Notice to Proceed', date: start, rank: 0 })
+  for (const m of MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
+  if (finish) pts.push({ id: 'project.required_finish', label: 'Required completion', date: finish, rank: 6 })
+  for (const a of pts) for (const b of pts) {
+    if (a.rank < b.rank && b.date <= a.date) {
+      out.push({ questionIds: [a.id, b.id], severity: 'error', text: `“${b.label}” (${f(b.date)}) is on or before “${a.label}” (${f(a.date)}). ${b.label} can't happen until ${a.label.toLowerCase()} — one of these dates needs to change.` })
+    }
+  }
+  const targetOf = (key: string) => pts.find(p => p.id === `milestone.${key}.target`)
+  for (const it of longLead) {
+    const del = d(`procure.${it.id}.delivery`)
+    if (!del) continue
+    const mk = GATE_TO_MILESTONE[it.gates]
+    const t = mk ? targetOf(mk) : undefined
+    if (t && del >= t.date) out.push({ questionIds: [`procure.${it.id}.delivery`, t.id], severity: 'error', text: `${it.name} arrives ${f(del)}, but “${t.label}” is targeted for ${f(t.date)}. It has to be delivered and installed before that milestone.` })
+    if (finish && del >= finish) out.push({ questionIds: [`procure.${it.id}.delivery`, 'project.required_finish'], severity: 'error', text: `${it.name} arrives ${f(del)}, after the required completion (${f(finish)}).` })
+    if (start && del < start) out.push({ questionIds: [`procure.${it.id}.delivery`], severity: 'warning', text: `${it.name} arrives ${f(del)}, before Notice to Proceed (${f(start)}). Plan protected storage, or confirm the date.` })
+  }
+  for (const pm of permits) {
+    const exp = d(`permit.${pm.id}.expected`)
+    if (!exp) continue
+    const mk = GATE_TO_MILESTONE[pm.gates]
+    const t = mk ? targetOf(mk) : undefined
+    if (t && exp >= t.date) out.push({ questionIds: [`permit.${pm.id}.expected`, t.id], severity: 'error', text: `The ${pm.name} is expected ${f(exp)}, but it gates work needed for “${t.label}” (${f(t.date)}). The target can't be met unless the permit comes first.` })
+    if (start && exp < start) out.push({ questionIds: [`permit.${pm.id}.expected`], severity: 'warning', text: `The ${pm.name} is expected ${f(exp)}, before Notice to Proceed (${f(start)}). If it's already issued, mark it “Issued”.` })
+  }
+  return out
+}
+
 /* ─── Main entry ─────────────────────────────────────── */
 
 export function questionBank(state: InterviewState, ctx: ElicitationContext = {}): { all: Question[]; permits: PermitSpec[]; longLead: LongLeadSpec[]; regulations: RegulationSpec[]; profile: ProjectProfile } {
@@ -324,6 +395,7 @@ const WEIGHT: Record<Answer['status'], number> = { known: 1, withheld: 0.6, unkn
 export function elicit(state: InterviewState, ctx: ElicitationContext = {}): ElicitationResult {
   const { all, permits, longLead, profile } = questionBank(state, ctx)
   const answers = state.answers
+  const dateIssues = checkAnswerDates(answers, permits, longLead)
   let total = 0, got = 0
   const open: Question[] = []
   const assumptions: Assumption[] = []
@@ -338,7 +410,7 @@ export function elicit(state: InterviewState, ctx: ElicitationContext = {}): Eli
   }
 
   // Ask the highest-impact gaps first; keep sections together for ties so the interview reads naturally.
-  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'history']
+  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'milestones', 'history']
   open.sort((a, b) => b.impact - a.impact || order.indexOf(a.section) - order.indexOf(b.section))
 
   return {
@@ -346,7 +418,8 @@ export function elicit(state: InterviewState, ctx: ElicitationContext = {}): Eli
     readiness: total ? Math.round((got / total) * 100) : 0,
     assumptions,
     profile,
-    conflicts: findConflicts(answers, profile, permits, ctx),
+    conflicts: [...findConflicts(answers, profile, permits, ctx), ...dateIssues.map(i => i.text)],
+    dateIssues,
   }
 }
 

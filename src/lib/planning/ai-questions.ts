@@ -18,7 +18,7 @@ export function redactedBrief(answers: Record<string, Answer>, bank: Question[])
     const label = q ? q.prompt : id
     const value = a.status === 'unknown' ? 'unknown' : Array.isArray(a.value) ? a.value.join(', ') : String(a.value)
     const shown = q?.options?.find(o => o.value === a.value)?.label || value
-    lines.push(`- ${label} ${shown}`)
+    lines.push(`- ${label} ${shown}${a.note ? ` (team note: ${a.note})` : ''}`)
   }
   if (withheld) lines.push(`- (${withheld} answers withheld for security reasons — do not ask about them)`)
   return lines.join('\n')

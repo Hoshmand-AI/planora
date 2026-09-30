@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2 } from 'lucide-react'
+import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
+import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
@@ -12,6 +13,8 @@ interface Quality {
   dcma: DcmaReport
   dataQuestions: QuestionRow[]
   classification: { counts: Record<string, number>; classifiedPct: number }
+  guidance: (CheckGuidance & { decision: { response: string; note: string | null } | null })[]
+  brief: { summary: string } | null
 }
 
 const SEV_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
@@ -42,6 +45,18 @@ export default function QualityPage() {
     if (res.ok) setData(d => d && ({ ...d, dataQuestions: d.dataQuestions.map(x => x.id === q.id ? { ...x, response: { response, note } } : x) }))
   }
 
+  const decide = async (id: number, response: 'intentional' | 'will_fix', note: string) => {
+    const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: `dcma:${id}`, response, note }) })
+    if (res.ok) setData(d => d && ({ ...d, guidance: d.guidance.map(g => g.id === id ? { ...g, decision: { response, note } } : g) }))
+  }
+  const [stickyTop, setStickyTop] = useState(0)
+  useEffect(() => {
+    const measure = () => setStickyTop(document.querySelector('header')?.getBoundingClientRect().height ?? 0)
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
   if (!selectedSchedule) {
     return <div className="px-6 py-16 text-center text-[14px] text-warm-500"><ShieldCheck size={22} className="mx-auto mb-2 text-warm-400" />Upload or select a schedule to run quality checks.</div>
   }
@@ -53,19 +68,40 @@ export default function QualityPage() {
   const shown = hideAnswered ? open : data.dataQuestions
   const resultStyle = (r: string) => r === 'pass' ? 'text-status-on-track' : r === 'fail' ? 'text-status-at-risk' : r === 'warn' ? 'text-status-attention' : 'text-warm-400'
 
+  const failing = data.dcma.checks.filter(c => c.result === 'fail').length
   return (
-    <div className="px-4 md:px-6 py-6 md:py-8 space-y-5">
-      <div>
-        <h1 className="font-display text-[26px] md:text-[30px] text-navy-950 leading-tight">Schedule quality</h1>
-        <p className="text-[13.5px] text-warm-500 mt-1">{data.schedule.name} · {data.schedule.version}. Planora checks the logic (DCMA 14-point) and questions its own inputs before trusting them.</p>
+    <div className="px-4 md:px-6 pb-8 space-y-5">
+      {/* Frozen summary: the schedule and its key quality numbers stay visible while scrolling */}
+      <div style={{ top: stickyTop }} className="sticky z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
+            <p className="text-[12.5px] text-warm-500 truncate">{data.schedule.name} · {data.schedule.version}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+          <Card label="DCMA 14-point" value={`${data.dcma.passed}/${data.dcma.applicable}`} sub={failing ? `${failing} to fix — see below` : 'all applicable checks pass'} />
+          <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
+          <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
+          <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card label="DCMA score" value={`${data.dcma.score}`} sub={`${data.dcma.passed}/${data.dcma.applicable} checks pass`} />
-        <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
-        <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
-        <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
-      </div>
+      {data.brief && (
+        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">About this project</div>
+          <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
+        </div>
+      )}
+
+      {data.guidance.length > 0 && (
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What to fix — {data.guidance.filter(g => !g.decision).length} of {data.guidance.length} open. Fix in P6 / MS Project, then re-upload.</div>
+          <div className="space-y-3">
+            {data.guidance.map(g => <QualityGuide key={g.id} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} />)}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-3 space-y-3">
@@ -135,6 +171,38 @@ export default function QualityPage() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function QualityGuide({ g, check, onDecide }: { g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void }) {
+  const [open, setOpen] = useState(!g.decision)
+  const [note, setNote] = useState('')
+  return (
+    <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
+        <span className={`text-[10.5px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
+        <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
+        {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
+        {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
+      </button>
+      {open && (
+        <div className="px-5 pb-4 space-y-2.5">
+          <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">What it means: </span>{g.meaning}</p>
+          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">Why it matters: </span>{g.whyItMatters}</p>}
+          {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
+          {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
+          {g.decision ? (
+            <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 items-center">
+              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 disabled:opacity-40">Accept with justification</button>
+              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

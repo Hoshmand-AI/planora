@@ -269,7 +269,7 @@ export interface Answer {
 }
 
 export type QuestionKind = 'choice' | 'multi' | 'number' | 'date' | 'text' | 'boolean'
-export type QuestionSection = 'project' | 'design' | 'permits' | 'procurement' | 'site' | 'regulatory' | 'calendar' | 'security' | 'history'
+export type QuestionSection = 'project' | 'design' | 'permits' | 'procurement' | 'site' | 'regulatory' | 'calendar' | 'security' | 'history' | 'milestones'
 
 export interface Question {
   id: string
@@ -313,6 +313,8 @@ export interface ElicitationResult {
   profile: ProjectProfile
   /** Warnings where answers contradict each other or catalog data */
   conflicts: string[]
+  /** Date-sequence problems among the answers, tied to the questions involved */
+  dateIssues?: { questionIds: string[]; text: string; severity: 'error' | 'warning' }[]
 }
 
 /* ─── Generated schedule ─────────────────────────────── */
@@ -355,6 +357,10 @@ export interface GeneratedSchedule {
   removed?: { id: string; kind: 'activity' | 'link'; name: string; override: Override }[]
   /** Regional notes the scheduler should see (climate, AHJ verification reminders) */
   notes?: string[]
+  /** Answers the team qualified in their own words ("issued, but only for foundations") */
+  qualifications?: { questionId: string; prompt: string; answer: string; note: string; activityIds: string[] }[]
+  /** Owner/contract milestone targets from the interview, with the plan's forecast against each */
+  milestoneTargets?: { key: string; label: string; target: string; activityId: string }[]
   cpm?: CpmResult
 }
 

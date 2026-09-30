@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
     case 'md': {
       const view = await planView(plan, ctx.orgId)
-      body = basisOfSchedule({ teamNotes, planName: plan.name, profile: profileFrom(plan.answers), schedule: g, evaluation: view.evaluation!, reviews: plan.reviews, generatedBy: ctx.name, aiMode: view.llm.mode })
+      body = basisOfSchedule({ decisions: plan.decisions, teamNotes, planName: plan.name, profile: profileFrom(plan.answers), schedule: g, evaluation: view.evaluation!, reviews: plan.reviews, generatedBy: ctx.name, aiMode: view.llm.mode })
       type = 'text/markdown; charset=utf-8'; file = `${slug}-basis-of-schedule.md`; break
     }
     default:

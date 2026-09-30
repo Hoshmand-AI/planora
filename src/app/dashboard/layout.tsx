@@ -93,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!selectedSchedule) { setMetrics(null); return }
     const res  = await fetch(`/api/schedules?id=${selectedSchedule.id}`)
     const data = await res.json()
-    setMetrics(data.metrics || null)
+    setMetrics(data.metrics ? { ...data.metrics, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
   }, [selectedSchedule])
 
   useEffect(() => { if (user) refreshSchedules() }, [user, refreshSchedules])
@@ -234,7 +234,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Main content ────────────────────────────────────── */}
         {/* pb-16 on mobile = space for bottom tab bar */}
-        <main className="flex-1 overflow-auto pb-16 md:pb-0">
+        <main className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0">
           <div className="max-w-5xl mx-auto">
             {children}
           </div>
