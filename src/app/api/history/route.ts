@@ -1,0 +1,25 @@
+import { NextResponse } from 'next/server'
+import { getAuthContext } from '@/lib/auth'
+import { getOrgHistory, getOrganization, getSchedules } from '@/lib/db'
+import { computeFirmHistory } from '@/lib/planning/history'
+import { backtest } from '@/lib/planning/evaluation'
+import type { ProjectType } from '@/lib/planning/types'
+
+/** The firm's private knowledge base: what its own projects actually did, plus a leave-one-out backtest. */
+export async function GET() {
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const [org, schedules, { rows, calendars }] = await Promise.all([getOrganization(ctx.orgId), getSchedules(ctx.orgId), getOrgHistory(ctx.orgId)])
+  const history = computeFirmHistory(rows, calendars)
+  const uploaded = schedules.filter(s => s.sourceType !== 'generated')
+  const bt = backtest(uploaded.map(s => ({ scheduleId: s.id, name: `${s.name} (${s.version})`, projectType: s.projectType as ProjectType | null, state: s.region, grossSqft: s.grossSqft })), rows, calendars)
+  return NextResponse.json({
+    organization: org,
+    privacy: 'Only schedules uploaded by your organization are used. Nothing is shared with or learned from other firms.',
+    schedules: uploaded.map(s => ({ id: s.id, name: s.name, version: s.version, projectType: s.projectType, region: s.region, grossSqft: s.grossSqft, activityCount: s.activityCount })),
+    categories: Object.values(history.byCategory).sort((a, b) => b!.samples - a!.samples),
+    overallOverrunMedian: history.overallOverrunMedian,
+    overallOverrunP80: history.overallOverrunP80,
+    backtest: bt,
+  })
+}

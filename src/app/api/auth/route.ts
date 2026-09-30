@@ -4,7 +4,7 @@ import { getUserByEmail, createUser } from '@/lib/db'
 import { hashPassword, verifyPassword, createToken } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  const { action, email, password, name } = await req.json()
+  const { action, email, password, name, company } = await req.json()
 
   if (!email || !password) {
     return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
       passwordHash,
       plan: 'free',
       createdAt: new Date().toISOString(),
+      // Each firm gets its own private organization; its data never mixes with other firms'.
+      orgName: typeof company === 'string' && company.trim() ? company.trim() : undefined,
     })
     const token = createToken(user.id, user.email)
     const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, plan: user.plan } })

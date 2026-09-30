@@ -3,15 +3,7 @@
 
 import { Activity } from '@/lib/db'
 import { v4 as uuid } from 'uuid'
-
-interface ParsedSchedule {
-  projectName: string
-  dataDate: string | null
-  projectStart: string | null
-  projectFinish: string | null
-  activities: Activity[]
-  relationships: never[]
-}
+import type { ParsedSchedule } from './types'
 
 export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<ParsedSchedule> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -104,6 +96,13 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
     projectFinish: dates[dates.length - 1] ? parseFlexDate(dates[dates.length - 1]) : null,
     activities,
     relationships: [],
+    calendars: [],
+    defaultCalendarId: null,
+    warnings: [
+      'PDF has no logic/calendars; relationships are not available',
+      'Activities were extracted heuristically from PDF text; verify IDs, durations and dates',
+    ],
+    sourceType: 'pdf',
   }
 }
 

@@ -13,6 +13,7 @@ function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [company, setCompany] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,6 +30,7 @@ function AuthForm() {
           action: mode === 'signin' ? 'signin' : 'signup',
           email, password,
           name: mode === 'signup' ? name : undefined,
+          company: mode === 'signup' ? company : undefined,
         }),
       })
       const data = await res.json()
@@ -77,6 +79,16 @@ function AuthForm() {
                 <input
                   type="text" value={name} onChange={e => setName(e.target.value)} required
                   placeholder="Your name"
+                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
+                />
+              </div>
+            )}
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Firm</label>
+                <input
+                  type="text" value={company} onChange={e => setCompany(e.target.value)}
+                  placeholder="Your company (private workspace)"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
                 />
               </div>

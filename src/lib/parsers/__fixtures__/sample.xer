@@ -1,0 +1,36 @@
+ERMHDR	19.12	2026-03-02	Project	admin	admin	dbxDatabaseNoName	Project Management	USD
+%T	CALENDAR
+%F	clndr_id	default_flag	clndr_name	proj_id	base_clndr_id	last_chng_date	clndr_type	day_hr_cnt	week_hr_cnt	month_hr_cnt	year_hr_cnt	rsrc_private	clndr_data
+%R	100	Y	5 Day x 8h (US Holidays)				CA_Base	8	40	172	2000	N	(0||CalendarData()(  (0||DaysOfWeek()(    (0||1()())    (0||2()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||3()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||4()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||5()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||6()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||7()())))  (0||VIEW(ShowTotal|Y)())  (0||Exceptions()(    (0||0(d|46206)())    (0||1(d|46095)(      (0||0(s|08:00|f|12:00)())))    (0||2(d|46102)())))))
+%R	200	N	7 Day x 10h Earthwork				CA_Base	10	70	300	3650	N	(0||CalendarData()(  (0||DaysOfWeek()(    (0||1()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||2()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||3()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||4()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||5()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||6()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    (0||7()(      (0||0(s|07:00|f|12:00)())      (0||1(s|12:30|f|17:30)())))    ))  (0||Exceptions()())))
+%T	PROJECT
+%F	proj_id	proj_short_name	clndr_id	plan_start_date	plan_end_date	scd_end_date	last_recalc_date
+%R	1	Riverside Warehouse	100	2026-03-02 00:00		2026-06-30 17:00	2026-03-16 00:00
+%T	PROJWBS
+%F	wbs_id	proj_id	obs_id	seq_num	proj_node_flag	status_code	wbs_short_name	wbs_name	parent_wbs_id
+%R	10	1			Y		RW	Riverside Warehouse	
+%R	11	1			N		SITE	Sitework	10
+%R	12	1			N		FDN	Foundations	11
+%R	13	1			N		STR	Structure	10
+%T	TASK
+%F	task_id	proj_id	wbs_id	clndr_id	phys_complete_pct	complete_pct_type	task_type	status_code	task_code	task_name	total_float_hr_cnt	free_float_hr_cnt	remain_drtn_hr_cnt	target_drtn_hr_cnt	cstr_date	act_start_date	act_end_date	late_start_date	late_end_date	early_start_date	early_end_date	target_start_date	target_end_date	cstr_type	driving_path_flag
+%R	1001	1	10	100	100	CP_Phys	TT_Mile	TK_Complete	A1000	Notice to Proceed			0	0		2026-03-02 08:00				2026-03-02 08:00	2026-03-02 08:00				
+%R	1002	1	11	100	100	CP_Phys	TT_Task	TK_Complete	A1010	Mobilize & Site Setup			0	40		2026-03-02 08:00	2026-03-06 17:00					2026-03-02 08:00	2026-03-06 17:00		
+%R	1003	1	11	200	40	CP_Phys	TT_Task	TK_Active	A1020	Mass Excavation	0	0	60	100		2026-03-09 07:00		2026-03-16 07:00	2026-03-21 17:30	2026-03-16 07:00	2026-03-21 17:30				Y
+%R	1004	1	12	100	0	CP_Phys	TT_Task	TK_NotStart	A1030	Spread Footings	16	8	64	64				2026-03-17 08:00	2026-03-26 17:00	2026-03-13 08:00	2026-03-24 17:00				
+%R	1005	1	12	100		CP_Phys	TT_Task	TK_NotStart	A1040	Slab on Grade	-8	0	40	40	2026-04-01 00:00					2026-04-01 08:00	2026-04-07 17:00			CS_MSOA	
+%R	1006	1	13	100		CP_Phys	TT_Task	TK_NotStart	A1050	Erect Structural Steel	0		120	120						2026-04-08 08:00	2026-04-28 17:00				
+%R	1007	1	12	200		CP_Phys	TT_Task	TK_NotStart	A1060	Cure Footings	50		70	70	2026-04-15 17:00					2026-03-25 07:00	2026-03-31 17:30			CS_MEOB	
+%R	1008	1	10	100		CP_Phys	TT_FinMile	TK_NotStart	A1070	Substantial Completion	0		0	0	2026-06-30 17:00					2026-06-30 17:00	2026-06-30 17:00			CS_MEO	
+%T	TASKPRED
+%F	task_pred_id	task_id	pred_task_id	proj_id	pred_proj_id	pred_type	lag_hr_cnt
+%R	1	1002	1001	1	1	PR_FS	0
+%R	2	1003	1002	1	1	PR_FS	0
+%R	3	1004	1003	1	1	PR_SS	16
+%R	4	1005	1004	1	1	PR_FS	0
+%R	5	1006	1005	1	1	PR_FS	0
+%R	6	1007	1004	1	1	PR_FF	20
+%R	7	1008	1006	1	1	PR_FS	0
+%R	8	1008	1007	1	1	PR_FS	0
+%R	9	1006	9999	1	1	PR_FS	0
+%E

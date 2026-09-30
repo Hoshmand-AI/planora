@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
-import { getAuthUser } from '@/lib/auth'
-import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, getActivities, getRelationships } from '@/lib/db'
-import { parseXER } from '@/lib/parsers/xer-parser'
-import { parseMSProjectXML } from '@/lib/parsers/xml-parser'
-import { parsePDF } from '@/lib/parsers/pdf-parser'
+import { getAuthContext } from '@/lib/auth'
+import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, getActivities, getRelationships, deleteSchedule, updateScheduleProfile } from '@/lib/db'
+import { parseScheduleFile } from '@/lib/parsers'
+import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
+import { checkInputs } from '@/lib/analysis/input-checks'
+import { analyzableFromDb } from '@/lib/planning/service'
+import { PROJECT_TYPES } from '@/lib/planning/types'
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 export async function GET(req: NextRequest) {
-  const auth = await getAuthUser()
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const scheduleId = req.nextUrl.searchParams.get('id')
 
   if (scheduleId) {
-    const schedule = await getScheduleById(scheduleId)
+    // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
+    const schedule = await getScheduleById(scheduleId, ctx.orgId)
     if (!schedule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const activities = await getActivities(scheduleId)
@@ -45,36 +50,46 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const schedules = await getSchedules(auth.userId)
+  const schedules = await getSchedules(ctx.orgId)
   return NextResponse.json({ schedules })
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await getAuthUser()
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const formData = await req.formData()
-    const file = formData.get('file') as File
-    const versionLabel = formData.get('version') as string || 'v1.0'
+    const file = formData.get('file') as File | null
+    const versionLabel = (formData.get('version') as string) || 'v1.0'
+    const projectType = formData.get('projectType') as string | null
+    const region = formData.get('region') as string | null
+    const grossSqft = Number(formData.get('grossSqft')) || null
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
 
-    const fileName = file.name.toLowerCase()
     const scheduleId = uuid()
     let parsed
+    try {
+      parsed = await parseScheduleFile(file.name, Buffer.from(await file.arrayBuffer()), scheduleId)
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 400 })
+    }
 
-    if (fileName.endsWith('.xer')) {
-      const text = await file.text()
-      parsed = parseXER(text, scheduleId)
-    } else if (fileName.endsWith('.xml')) {
-      const text = await file.text()
-      parsed = parseMSProjectXML(text, scheduleId)
-    } else if (fileName.endsWith('.pdf')) {
-      const buffer = Buffer.from(await file.arrayBuffer())
-      parsed = await parsePDF(buffer, scheduleId)
-    } else {
-      return NextResponse.json({ error: 'Unsupported file format. Please upload .xer (P6), .xml (MS Project), or .pdf files.' }, { status: 400 })
+    // Semantic normalization: firms label activities and calendars differently; map them to shared meaning.
+    let classified = 0
+    for (const a of parsed.activities) {
+      const c = classifyActivity(a.name, a.wbs)
+      a.category = c.category
+      if (c.category !== 'other') classified++
+    }
+    const warnings = [...parsed.warnings]
+    for (const cal of parsed.calendars) {
+      const n = normalizeCalendar({ name: cal.name, workDays: cal.workDays, hoursPerDay: cal.hoursPerDay })
+      cal.sourceName = cal.sourceName || cal.name
+      cal.canonical = n.canonical
+      if (n.conflict) warnings.push(`Calendar "${cal.name}": ${n.conflict}`)
     }
 
     let varianceDays: number | null = null
@@ -91,10 +106,11 @@ export async function POST(req: NextRequest) {
 
     const schedule = await createSchedule({
       id: scheduleId,
-      userId: auth.userId,
+      userId: ctx.userId,
+      orgId: ctx.orgId,
       name: parsed.projectName,
       version: versionLabel,
-      sourceType: fileName.endsWith('.xer') ? 'p6_xer' : fileName.endsWith('.xml') ? 'ms_xml' : 'pdf',
+      sourceType: parsed.sourceType,
       fileName: file.name,
       uploadedAt: new Date().toISOString(),
       activityCount: parsed.activities.length,
@@ -107,24 +123,57 @@ export async function POST(req: NextRequest) {
       percentComplete: parsed.activities.length > 0
         ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
         : 0,
+      calendars: parsed.calendars,
+      defaultCalendarId: parsed.defaultCalendarId,
+      warnings,
+      planId: null,
+      projectType: projectType && (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : null,
+      region: region ? region.toUpperCase().slice(0, 12) : null,
+      grossSqft,
     })
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
+
+    const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
 
     return NextResponse.json({
       success: true, schedule,
       summary: {
         activitiesImported: parsed.activities.length,
         relationshipsImported: parsed.relationships.length,
+        calendarsImported: parsed.calendars.length,
         criticalCount: parsed.activities.filter(a => a.isCritical).length,
         projectStart: parsed.projectStart,
         projectFinish: parsed.projectFinish,
+        classifiedPct: parsed.activities.length ? Math.round((classified / parsed.activities.length) * 100) : 0,
+        dataQuestions: dataQuestions.length,
+        warnings,
       },
     })
   } catch (error: unknown) {
     const err = error as Error
     console.error('Upload error:', err)
-    return NextResponse.json({ error: `Failed to parse file: ${err.message}` }, { status: 500 })
+    return NextResponse.json({ error: `Failed to import file: ${err.message}` }, { status: 500 })
   }
+}
+
+/** Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft } */
+export async function PATCH(req: NextRequest) {
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const body = await req.json().catch(() => ({}))
+  const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
+  if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
+  await updateScheduleProfile(s.id, ctx.orgId, { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null })
+  return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
+}
+
+export async function DELETE(req: NextRequest) {
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id || !(await deleteSchedule(id, ctx.orgId))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ success: true })
 }

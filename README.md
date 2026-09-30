@@ -1,102 +1,79 @@
-# Planora — Web App
+# Planora
 
-Full-stack AI-powered construction schedule analysis platform.
+AI construction scheduling that **asks before it builds**. Built by [Hoshmand AI](https://www.hoshmand.ai).
 
-**Built by [Hoshmand AI](https://www.hoshmand.ai)**
+Planora works in three stages: **build** a schedule, **analyze** it, then **monitor** it.
 
-## Features
+1. **Build.** Planora interviews the scheduler the way a senior scheduler would. It asks how complete the drawings are, which permits this facility type needs in this jurisdiction, which long-lead equipment is involved, and about site, calendar and security constraints. Then it generates a CPM schedule and explains every duration and link.
+2. **Analyze.** It runs DCMA 14-point quality checks, a critical-path and float review, and asks questions about the input data itself (for example, "your calendar is 5-day but this activity runs on a Saturday — intentional?").
+3. **Monitor.** Publishing a plan creates a baseline. Dashboards, the timeline, Ask AI and reports all run on it.
 
-- **Schedule Parsing**: Upload Primavera P6 (.xer), MS Project (.xml), or PDF files
-- **AI Q&A**: Ask questions about your schedule in plain English (GPT-4o)
-- **Reports**: Generate Executive Summary, Critical Path, Variance, and QA/QC reports
-- **Dashboard**: Real-time metrics — variance, critical activities, near-term outlook
-- **Timeline**: Phase view and Gantt chart visualization
-- **Auth**: Sign up / sign in with email and password
+## What makes it different
 
-## Tech Stack
+| Capability | Where |
+|---|---|
+| **Elicitation.** It works out what is missing and asks targeted questions, ordered by how much each answer can move the finish date. Follow-up questions depend on earlier answers, contradictions are flagged, and "don't know" or "can't share" answers become explicit assumptions with visible contingency. | `src/lib/planning/elicitation.ts` |
+| **Grounding.** Durations and logic come from regional permit and regulation catalogs (10 regions, 50 permits, 20 regulations), long-lead equipment lead times (27 items), activity templates for 9 facility types, and **the firm's own completed projects** (actual vs. planned). | `src/lib/knowledge/*`, `src/lib/planning/history.ts` |
+| **Evaluation.** Each plan gets a DCMA 14-point score, benchmarks against the firm's actual outcomes, risk-adjusted P50/P80 finish dates, a check that every grounded requirement is covered, recorded expert review, and a **leave-one-out backtest** against the firm's completed projects. | `src/lib/planning/evaluation.ts` |
+| **Private data.** Every firm is an organization, and every query is scoped by `org_id`. Firm history only ever reads that firm's own schedules. | `src/lib/db.ts` |
+| **Any file format.** Imports P6 XER (including calendars, constraints and WBS), MS Project XML, Excel/CSV (messy headers are handled) and PDF. Activity names and calendars are normalized to shared meanings (for example "SOG", "F/R/P footings" and "Hang/Tape/Finish GWB" each map to a standard category). Exports MS Project XML, CSV and a **Basis of Schedule** narrative. | `src/lib/parsers/*`, `src/lib/semantic/taxonomy.ts`, `src/lib/export/*` |
+| **Self-checking inputs.** Flags weekend or holiday work, out-of-sequence progress, invalid dates, dangling logic and other data issues. The scheduler answers each one inline. | `src/lib/analysis/input-checks.ts` |
+| **Secure / air-gapped use.** Runs with no model, with an on-prem model, or with a cloud model. In air-gapped mode it refuses any model host that is not private. Withheld answers are never sent to a model; withheld constraints become placeholders with reserved time. Small models get narrow, JSON-only tasks that are validated and retried. | `src/lib/llm/provider.ts`, `src/lib/planning/ai-questions.ts` |
+| **Human control.** Every activity and link shows why it exists and where that came from. Overrides require a reason, report their impact on the finish date and critical path, survive regeneration, and are recorded in the audit trail and the narrative. | `src/lib/planning/overrides.ts` |
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend**: Next.js API routes (serverless)
-- **AI**: OpenAI GPT-4o
-- **Database**: JSON file storage (replace with PostgreSQL for production)
-- **Parsing**: Custom XER, XML, and PDF parsers
-- **Hosting**: Vercel
+The scheduling core is deterministic TypeScript and runs without any model:
+- multi-calendar CPM with FS/SS/FF/SF links, lags, constraints, progress and negative float
+- DCMA checks
+- a generator that details field work into segments of 44 days or less
+
+## Tech stack
+
+Next.js 14 (App Router), TypeScript strict, Tailwind v3, Postgres (`pg`, raw SQL, schema created automatically), JWT in httpOnly cookies, Vitest.
 
 ## Setup
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/Hoshmand-AI/planora.git
-cd planora
-
-# 2. Install dependencies
 npm install
-
-# 3. Set up environment variables
-cp .env.example .env.local
-# Edit .env.local and add your OpenAI API key
-
-# 4. Run locally
+cp .env.example .env.local   # set DATABASE_URL, JWT_SECRET, and optionally AI settings
 npm run dev
-
-# Open http://localhost:3000
 ```
 
-## Environment Variables
+### Checks
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | Your OpenAI API key for AI features |
-| `JWT_SECRET` | Yes | Secret for JWT token signing (change in production) |
-
-## Deploy to Vercel
-
-1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables (OPENAI_API_KEY, JWT_SECRET)
-4. Deploy
-
-**Important**: The JSON file storage works for development but resets on Vercel serverless deployments. For production, connect a PostgreSQL database (Vercel Postgres, Supabase, or Neon).
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── page.tsx              # Marketing landing page
-│   ├── auth/page.tsx         # Sign in / Sign up
-│   ├── privacy/page.tsx      # Privacy Policy
-│   ├── terms/page.tsx        # Terms of Service
-│   ├── dashboard/
-│   │   ├── layout.tsx        # App shell (header, tabs, schedule selector)
-│   │   ├── page.tsx          # Dashboard (metrics, near-term, driving tasks)
-│   │   ├── ask/page.tsx      # AI Q&A chat
-│   │   ├── reports/page.tsx  # Report generation
-│   │   └── timeline/page.tsx # Phases & Gantt
-│   └── api/
-│       ├── auth/route.ts     # Authentication
-│       ├── schedules/route.ts # Upload & parse schedules
-│       ├── ask/route.ts      # AI question answering
-│       └── reports/route.ts  # Report generation
-├── lib/
-│   ├── auth.ts               # JWT & password utilities
-│   ├── db.ts                 # Data storage layer
-│   ├── openai.ts             # OpenAI integration
-│   └── parsers/
-│       ├── xer-parser.ts     # Primavera P6 XER parser
-│       ├── xml-parser.ts     # MS Project XML parser
-│       └── pdf-parser.ts     # PDF schedule parser
+```bash
+npm run typecheck
+npm test                                            # 300+ unit tests
+BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs   # end-to-end against a running server
 ```
 
-## Pages
+### Air-gapped deployment
 
-| Route | Type | Description |
-|-------|------|-------------|
-| `/` | Public | Marketing landing page |
-| `/auth` | Public | Sign in / Sign up |
-| `/privacy` | Public | Privacy Policy |
-| `/terms` | Public | Terms of Service |
-| `/dashboard` | Protected | Main dashboard |
-| `/dashboard/ask` | Protected | AI Q&A chat |
-| `/dashboard/reports` | Protected | Report generation |
-| `/dashboard/timeline` | Protected | Timeline & Gantt |
+```bash
+PLANORA_AIRGAPPED=true \
+LLM_BASE_URL=http://gpu01.enclave.internal:11434/v1 LLM_MODEL=llama3.1:8b \
+DATABASE_URL=postgres://planora@db.enclave.internal/planora PGSSLMODE=disable \
+npm start
+```
+
+Fonts are bundled at build time, so at runtime the app makes no external network calls other than to the configured model host.
+
+## Structure
+
+```
+src/lib/
+  planning/   types (shared contract), calendar, cpm, elicitation, ai-questions, generator,
+              overrides, history, evaluation, service
+  knowledge/  regions (permits, regulations, climate), long-lead, templates, applicability
+  semantic/   taxonomy (activity + calendar normalization)
+  analysis/   dcma, input-checks
+  parsers/    xer, xml, excel/csv, pdf, index
+  export/     msp-xml, csv, narrative (Basis of Schedule)
+  llm/        provider (cloud / local / offline, air-gap guard)
+src/app/
+  dashboard/plan        Build: interview → schedule → evaluation & review → audit
+  dashboard/quality     DCMA + the tool's questions about uploaded data
+  dashboard/history     Firm data: private history, tagging, backtest
+  api/plans/[id]/...    generate, edit, review, export, publish, suggest
+```
+
+Reference ranges for permits, regulations and lead times are planning defaults. Verify them with the Authority Having Jurisdiction and suppliers before baselining.
