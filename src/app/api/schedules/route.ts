@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getAuthContext } from '@/lib/auth'
-import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, getActivities, getRelationships, deleteSchedule, updateScheduleProfile } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, deleteSchedule, updateScheduleProfile } from '@/lib/db'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
-import { analyzableFromDb } from '@/lib/planning/service'
+import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
+import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES } from '@/lib/planning/types'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -18,11 +19,9 @@ export async function GET(req: NextRequest) {
 
   if (scheduleId) {
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
-    const schedule = await getScheduleById(scheduleId, ctx.orgId)
-    if (!schedule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    const activities = await getActivities(scheduleId)
-    const relationships = await getRelationships(scheduleId)
+    const data = await loadScheduleData(scheduleId, ctx.orgId)
+    if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const { schedule, activities, relationships, brief } = data
 
     const criticalActivities = activities.filter(a => a.isCritical)
     const nearTermTasks = activities
@@ -35,7 +34,7 @@ export async function GET(req: NextRequest) {
       : 0
 
     return NextResponse.json({
-      schedule, activities, relationships,
+      schedule, activities, relationships, brief,
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
@@ -91,6 +90,16 @@ export async function POST(req: NextRequest) {
       cal.canonical = n.canonical
       if (n.conflict) warnings.push(`Calendar "${cal.name}": ${n.conflict}`)
     }
+
+    // Fill in dates/float when the file arrived without calculated results.
+    const completed = completeSchedule({
+      activities: parsed.activities, relationships: parsed.relationships, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
+      projectStart: parsed.projectStart, projectFinish: parsed.projectFinish, dataDate: parsed.dataDate,
+    })
+    parsed.activities = completed.activities
+    parsed.projectStart = completed.projectStart
+    parsed.projectFinish = completed.projectFinish
+    if (completed.note) warnings.unshift(completed.note)
 
     let varianceDays: number | null = null
     if (parsed.projectFinish) {

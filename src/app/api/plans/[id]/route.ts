@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { deletePlan, savePlan } from '@/lib/db'
-import { coerceAnswer, questionBank, validateAnswer } from '@/lib/planning/elicitation'
+import { coerceAnswer, elicit, questionBank, validateAnswer } from '@/lib/planning/elicitation'
 import type { Answer } from '@/lib/planning/types'
 import { elicitationContext, loadPlanContext, planView } from './context'
 
@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const now = new Date().toISOString()
 
   // Apply answers one at a time so dependent questions (e.g. design % after "drawings: yes") validate.
+  const originalAnswers = plan.answers
   let answers = { ...plan.answers }
   let { ectx } = await elicitationContext(plan, ctx.orgId)
   for (const [qid, raw] of Object.entries(incoming)) {
@@ -31,7 +32,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const q = bank.find(x => x.id === qid)
     if (!q) { errors[qid] = 'Unknown or no longer relevant question.'; continue }
     const status = raw.status === 'withheld' || raw.status === 'unknown' ? raw.status : 'known'
-    const a = coerceAnswer(q, { status, value: raw.value, note: typeof raw.note === 'string' ? raw.note.slice(0, 1000) : undefined, answeredAt: now, source: 'user' })
+    // A note qualifies the answer in the team's own words; never kept on withheld answers.
+    const note = status !== 'withheld' && typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 1000) : undefined
+    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: 'user' })
     const err = validateAnswer(q, a)
     if (err) { errors[qid] = err; continue }
     answers = { ...answers, [qid]: a }
@@ -52,8 +55,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   plan.answers = answers
   if (typeof body.name === 'string' && body.name.trim()) plan.name = body.name.trim().slice(0, 120)
+  const before = new Set(elicit({ answers: originalAnswers }, ectx).dateIssues?.map(i => i.text) || [])
   const saved = await savePlan(plan)
-  return NextResponse.json({ ...(await planView(saved, ctx.orgId)), errors })
+  const view = await planView(saved, ctx.orgId)
+  // Date problems introduced by this change, so the UI can flag them right away.
+  const newDateIssues = (view.elicitation.dateIssues || []).filter(i => !before.has(i.text))
+  return NextResponse.json({ ...view, errors, newDateIssues })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

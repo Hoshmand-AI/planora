@@ -20,6 +20,7 @@ export function basisOfSchedule(opts: {
   generatedBy: string
   aiMode: string
   teamNotes?: string[]
+  decisions?: Record<string, { decision: string; note: string; by: string; at: string }>
 }): string {
   const { planName, profile, schedule: s, evaluation: ev, reviews } = opts
   const t = s.cpm?.times || {}
@@ -69,6 +70,13 @@ export function basisOfSchedule(opts: {
   if (inferred.length) { L.push('', 'Resolved items:'); for (const a of inferred) L.push(`- ${esc(a.text)}`) }
   L.push('')
 
+  if (s.qualifications?.length) {
+    L.push('### Qualified answers (in the team\'s own words)', '')
+    L.push('| Question | Answer | Team note |', '|---|---|---|')
+    for (const q of s.qualifications) L.push(`| ${esc(q.prompt)} | ${esc(q.answer)} | ${esc(q.note)} |`)
+    L.push('')
+  }
+
   if (opts.teamNotes?.length) {
     L.push('### Additional information from the project team', '')
     for (const n of opts.teamNotes) L.push(`- ${esc(n)}`)
@@ -98,6 +106,15 @@ export function basisOfSchedule(opts: {
     L.push(`Benchmark against firm actuals (${ev.benchmark.basis}):`, '')
     L.push('| ID | Activity | Planned | Firm P20–P80 | Verdict |', '|---|---|---|---|---|')
     for (const r of ev.benchmark.rows) L.push(`| ${r.code} | ${esc(r.name)} | ${r.planned} | ${r.firmP20}–${r.firmP80} | ${r.verdict.replace('_', ' ')} |`)
+    L.push('')
+  }
+  const dec = Object.entries(opts.decisions || {}).filter(([k]) => k.startsWith('dcma:'))
+  if (dec.length) {
+    L.push('Scheduler decisions on quality checks:', '')
+    for (const [k, v] of dec) {
+      const c = ev.dcma.checks.find(x => `dcma:${x.id}` === k)
+      L.push(`- DCMA #${k.slice(5)} ${c?.name ?? ''}: **${v.decision === 'accept' ? 'accepted' : 'to be fixed'}** by ${esc(v.by)} (${v.at.slice(0, 10)})${v.note ? ` — ${esc(v.note)}` : ''}`)
+    }
     L.push('')
   }
   if (ev.findings.length) { L.push('Findings:', ''); for (const f of ev.findings) L.push(`- ${esc(f)}`); L.push('') }

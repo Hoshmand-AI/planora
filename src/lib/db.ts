@@ -122,6 +122,7 @@ async function createSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     ALTER TABLE plans ADD COLUMN IF NOT EXISTS extra_questions JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS decisions JSONB NOT NULL DEFAULT '{}';
     CREATE INDEX IF NOT EXISTS plans_org_idx ON plans(org_id);
     CREATE TABLE IF NOT EXISTS data_question_responses (
       schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
@@ -401,6 +402,8 @@ export interface ExpertReview {
   at: string
 }
 
+export interface PlanDecision { decision: 'accept' | 'fix'; note: string; by: string; at: string }
+
 export interface AuditEntry { at: string; by: string; action: string; detail?: string }
 
 export interface Plan {
@@ -411,6 +414,8 @@ export interface Plan {
   generated: GeneratedSchedule | null
   reviews: ExpertReview[]
   audit: AuditEntry[]
+  /** Scheduler decisions on quality findings, e.g. { "dcma:6": { decision: 'accept', note, by, at } } */
+  decisions: Record<string, PlanDecision>
   scheduleId: string | null
   createdAt: string; updatedAt: string
 }
@@ -419,7 +424,7 @@ function rowToPlan(r: Record<string, unknown>): Plan {
   return {
     id: r.id as string, orgId: r.org_id as string, userId: r.user_id as string, name: r.name as string,
     answers: (r.answers as Record<string, Answer>) || {}, extraQuestions: (r.extra_questions as Question[]) || [], generated: (r.generated as GeneratedSchedule) || null,
-    reviews: (r.reviews as ExpertReview[]) || [], audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
+    reviews: (r.reviews as ExpertReview[]) || [], decisions: (r.decisions as Record<string, PlanDecision>) || {}, audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
     createdAt: String(r.created_at), updatedAt: String(r.updated_at),
   }
 }
@@ -444,9 +449,9 @@ export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name
 
 export async function savePlan(p: Plan): Promise<Plan> {
   await initSchema()
-  const res = await query(`UPDATE plans SET name=$3, answers=$4, generated=$5, reviews=$6, audit=$7, schedule_id=$8, extra_questions=$9, updated_at=NOW()
+  const res = await query(`UPDATE plans SET name=$3, answers=$4, generated=$5, reviews=$6, audit=$7, schedule_id=$8, extra_questions=$9, decisions=$10, updated_at=NOW()
     WHERE id=$1 AND org_id=$2 RETURNING *`,
-    [p.id, p.orgId, p.name, JSON.stringify(p.answers), p.generated ? JSON.stringify(p.generated) : null, JSON.stringify(p.reviews), JSON.stringify(p.audit.slice(-500)), p.scheduleId, JSON.stringify(p.extraQuestions)])
+    [p.id, p.orgId, p.name, JSON.stringify(p.answers), p.generated ? JSON.stringify(p.generated) : null, JSON.stringify(p.reviews), JSON.stringify(p.audit.slice(-500)), p.scheduleId, JSON.stringify(p.extraQuestions), JSON.stringify(p.decisions || {})])
   if (!res.rows[0]) throw new Error('Plan not found')
   return rowToPlan(res.rows[0])
 }

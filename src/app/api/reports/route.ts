@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth'
-import { getScheduleById, getActivities, getRelationships } from '@/lib/db'
+import { loadScheduleData } from '@/lib/planning/service'
 import { generateReport } from '@/lib/openai'
 
 export async function POST(req: NextRequest) {
@@ -10,12 +10,11 @@ export async function POST(req: NextRequest) {
   const { reportType, scheduleId } = await req.json()
   if (!reportType || !scheduleId) return NextResponse.json({ error: 'reportType and scheduleId required' }, { status: 400 })
 
-  const schedule = await getScheduleById(scheduleId, auth.orgId)
-  if (!schedule) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+  const data = await loadScheduleData(scheduleId, auth.orgId)
+  if (!data) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+  const { schedule, activities, relationships, brief, hasLogic } = data
 
-  const activities = await getActivities(scheduleId)
-  const relationships = await getRelationships(scheduleId)
-  const report = await generateReport(reportType, { schedule, activities, relationships })
+  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic })
 
   return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: report })
 }

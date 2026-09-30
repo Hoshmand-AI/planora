@@ -7,8 +7,8 @@ import type {
   ProjectProfile, Rationale, SourceRef, TemplateActivity, WorkCalendar, Weekday,
 } from './types'
 import { runCpm } from './cpm'
-import { usFederalHolidaysRange, addCalendarDays } from './calendar'
-import { elicit, known, profileFrom, questionBank, unansweredAssumption } from './elicitation'
+import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
+import { elicit, known, profileFrom, questionBank, unansweredAssumption, MILESTONE_TARGETS } from './elicitation'
 import { historyDuration, type FirmHistory } from './history'
 import { templatesFor, computeTemplateDuration, mapToSelected } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
@@ -83,15 +83,17 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const useHistory = known(answers, 'history.use') !== false && !!history
 
   /* ── Calendars ── */
-  const start = (known(answers, 'project.target_start') as string) || addCalendarDays(today, 30)
+  const requestedStart = (known(answers, 'project.target_start') as string) || addCalendarDays(today, 30)
   const wwKey = (known(answers, 'calendar.workweek') as string) || '5x8'
   const ww = WORKWEEKS[wwKey] || WORKWEEKS['5x8']
-  const startYear = Number(start.slice(0, 4))
+  const startYear = Number(requestedStart.slice(0, 4))
   const holidays = known(answers, 'calendar.holidays') === false ? [] : usFederalHolidaysRange(startYear, startYear + 6)
   const calendars: WorkCalendar[] = [
     { id: FIELD, name: `Field work — ${ww.label}`, workDays: ww.days, hoursPerDay: ww.hours, holidays, canonical: ww.label },
     { id: CAL7, name: 'Calendar days (agency reviews, fabrication, delivery)', workDays: [0, 1, 2, 3, 4, 5, 6], hoursPerDay: 8, holidays: [], canonical: '7-day calendar' },
   ]
+  // NTP must fall on a working day, otherwise it displays before the data date (DCMA #9).
+  const start = nextWorkDay(requestedStart, calendars[0])
   // Template productivity assumes 8-hour days.
   const hoursFactor = 8 / ww.hours
   const calNote = ww.hours !== 8 ? ` Scaled ×${hoursFactor.toFixed(2)} for ${ww.hours}-hour days.` : ''
@@ -99,12 +101,13 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const b = new Builder()
   // Questions not answered yet are planned with their defaults, and said so explicitly (with the same
   // buffers as "don't know") so generating early never hides guesses.
-  const notYet = elic.questions.filter(q => q.section !== 'history' && !q.id.startsWith('ai.') && !q.id.startsWith('note.'))
+  const notYet = elic.questions.filter(q => q.section !== 'history' && q.section !== 'milestones' && !q.id.startsWith('ai.') && !q.id.startsWith('note.'))
   const assumptions: Assumption[] = [...elic.assumptions, ...notYet.map(q => notAnsweredAssumption(q, bank))]
   const notes: string[] = [
     'Permit review times and lead times are reference ranges. Verify with the Authority Having Jurisdiction and suppliers before baselining.',
   ]
   if (regional.climate.adverseMonths.length) notes.push(`Regional climate: ${regional.climate.adverseNote}`)
+  if (start !== requestedStart) notes.push(`The target start ${requestedStart} is not a working day, so Notice to Proceed is set to the next working day, ${start}.`)
 
   /* ── NTP ── */
   const ntp = b.add({
@@ -433,6 +436,42 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     b.insertBefore(c.id, scId, { summary: 'Contingency is held at the end of the path, before substantial completion.', sources: [src('template', 'AACE-style project buffer')], confidence: 'medium' })
   }
 
+  /* ── Milestone targets: held as finish-no-later-than so lateness shows as negative float ── */
+  const milestoneTargets: NonNullable<GeneratedSchedule['milestoneTargets']> = []
+  for (const m of MILESTONE_TARGETS) {
+    const target = known(answers, `milestone.${m.key}.target`)
+    if (typeof target !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target)) continue
+    const cat = mapToSelected(m.category, profile)
+    // The last segment of the category's work package is where the milestone is reached.
+    const candidates = [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-'))
+    const endAct = candidates.sort((x, y) => x.id.localeCompare(y.id, undefined, { numeric: true })).pop()
+    if (!endAct) continue
+    endAct.constraint = { type: 'FNLT', date: target }
+    endAct.rationale = { ...endAct.rationale, assumptions: [...(endAct.rationale.assumptions || []), `Must finish by the “${m.label}” target of ${target} (from the interview).`] }
+    milestoneTargets.push({ key: m.key, label: m.label, target, activityId: endAct.id })
+  }
+
+  /* ── Qualified answers: the team's own words travel with the activities they affect ── */
+  const qualifications: NonNullable<GeneratedSchedule['qualifications']> = []
+  for (const [qid, a] of Object.entries(answers)) {
+    const note = a.note?.trim()
+    if (!note || qid.startsWith('note.')) continue
+    const q = bank.all.find(x => x.id === qid)
+    const shown = a.status !== 'known' ? (a.status === 'withheld' ? 'Withheld' : "Don't know")
+      : q?.options?.find(o => o.value === a.value)?.label ?? String(a.value)
+    const m = qid.match(/^(permit|procure)\.([^.]+)\./)
+    const prefix = m ? (m[1] === 'permit' ? `permit-${m[2]}` : `ll-${m[2]}`) : null
+    const affected: string[] = []
+    if (prefix) {
+      for (const act of b.acts.values()) {
+        if (act.id !== prefix && !act.id.startsWith(prefix + '-')) continue
+        act.rationale = { ...act.rationale, confidence: 'low', assumptions: [...(act.rationale.assumptions || []), `Team note: “${note}” — review whether this duration and logic reflect it.`] }
+        affected.push(act.id)
+      }
+    }
+    qualifications.push({ questionId: qid, prompt: q?.prompt ?? qid, answer: shown, note, activityIds: affected })
+  }
+
   /* ── Re-apply the scheduler's overrides from the previous version ── */
   const removed = reapplyOverrides(b, input.previous)
 
@@ -450,6 +489,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     assumptions,
     removed,
     notes,
+    qualifications,
+    milestoneTargets,
     cpm,
   }
 }

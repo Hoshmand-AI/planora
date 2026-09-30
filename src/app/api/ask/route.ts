@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth'
-import { getScheduleById, getActivities, getRelationships, createChatMessage, getChatMessages } from '@/lib/db'
+import { getScheduleById, createChatMessage, getChatMessages } from '@/lib/db'
+import { loadScheduleData } from '@/lib/planning/service'
 import { askScheduleQuestion } from '@/lib/openai'
 import { v4 as uuid } from 'uuid'
 
@@ -11,14 +12,13 @@ export async function POST(req: NextRequest) {
   const { question, scheduleId } = await req.json()
   if (!question || !scheduleId) return NextResponse.json({ error: 'Question and scheduleId required' }, { status: 400 })
 
-  const schedule = await getScheduleById(scheduleId, auth.orgId)
-  if (!schedule) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+  const data = await loadScheduleData(scheduleId, auth.orgId)
+  if (!data) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+  const { schedule, activities, relationships, brief, hasLogic } = data
 
   await createChatMessage({ id: uuid(), scheduleId, userId: auth.userId, role: 'user', content: question, createdAt: new Date().toISOString() })
 
-  const activities = await getActivities(scheduleId)
-  const relationships = await getRelationships(scheduleId)
-  const answer = await askScheduleQuestion(question, { schedule, activities, relationships })
+  const answer = await askScheduleQuestion(question, { schedule, activities, relationships, brief, hasLogic })
 
   await createChatMessage({ id: uuid(), scheduleId, userId: auth.userId, role: 'assistant', content: answer, createdAt: new Date().toISOString() })
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useApp } from './layout'
+import { StickyBar } from '@/components/StickyBar'
 import { Upload } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
 
@@ -27,12 +28,15 @@ export default function DashboardPage() {
   const percentComplete = Number(m?.percentComplete ?? 0)
   const nearTermTasks = (m?.nearTermTasks as ActivityRow[]) ?? []
   const drivingTasks  = (m?.drivingTasks as ActivityRow[])  ?? []
+  const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean }[] } | null) ?? null
+  const warnings = (((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculate|relationships/i.test(w))
 
   return (
     <div className="p-5 md:p-6 space-y-6">
 
-      {/* Schedule summary strip */}
-      <div className="flex items-center justify-between border-b border-warm-200 pb-4">
+      {/* Schedule summary strip — frozen while scrolling */}
+      <StickyBar className="-mx-5 md:-mx-6 -mt-5 md:-mt-6 px-5 md:px-6 py-3">
+      <div className="flex items-center justify-between">
         <div>
           <div className="text-[17px] font-semibold text-navy-950">{selectedSchedule.name}</div>
           <div className="text-[12px] text-warm-400 mt-0.5">
@@ -50,6 +54,28 @@ export default function DashboardPage() {
           {varianceDays > 14 ? 'At Risk' : varianceDays > 0 ? 'Attention' : 'On Track'}
         </span>
       </div>
+      </StickyBar>
+
+      {/* About this project — what, where, when, what must be achieved */}
+      {brief && (
+        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">About this project</div>
+          <p className="text-[14px] text-warm-700 leading-relaxed">{brief.summary}</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
+            {brief.facts.map(f => (
+              <div key={f.label} className="text-[12px]"><span className="text-warm-400">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
+            ))}
+          </div>
+          {brief.nextMilestones.length > 0 && (
+            <div className="mt-3 text-[12.5px] text-warm-600">
+              <span className="font-semibold text-navy-950">Next milestones: </span>
+              {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
+            </div>
+          )}
+          {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-2 text-[12px] text-warm-500 border-l-2 border-status-info pl-2">{w}</p>)}
+        </div>
+      )}
+
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

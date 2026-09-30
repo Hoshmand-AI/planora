@@ -44,6 +44,48 @@ export interface BenchmarkRow {
   verdict: 'optimistic' | 'in_range' | 'conservative'
 }
 
+export interface ScheduleDateCheck { text: string; severity: 'error' | 'warning' | 'info'; activityIds: string[]; questionIds: string[] }
+
+const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
+const us = (x: string) => `${x.slice(5, 7)}/${x.slice(8, 10)}/${x.slice(0, 4)}`
+
+/** Checks the dates the team gave against what the logic can actually achieve. */
+export function scheduleDateChecks(s: GeneratedSchedule): ScheduleDateCheck[] {
+  const t = s.cpm?.times
+  if (!t) return []
+  const out: ScheduleDateCheck[] = []
+  const byId = new Map(s.activities.map(a => [a.id, a]))
+  for (const m of s.milestoneTargets || []) {
+    const tm = t[m.activityId]
+    if (!tm) continue
+    const late = days(m.target, tm.earlyFinish)
+    if (late > 0) {
+      // What drives it: the longest critical activities that finish before this milestone.
+      const drivers = s.activities.filter(a => t[a.id]?.critical && t[a.id].earlyFinish <= tm.earlyFinish && a.id !== m.activityId && a.type === 'task')
+        .sort((x, y) => y.duration - x.duration).slice(0, 3)
+      out.push({
+        severity: 'error', activityIds: [m.activityId, ...drivers.map(d => d.id)], questionIds: [`milestone.${m.key}.target`],
+        text: `“${m.label}” is forecast for ${us(tm.earlyFinish)}, ${late} days after your target of ${us(m.target)}. It is driven by ${drivers.map(d => `${d.code} ${d.name} (${d.duration}d)`).join(', ') || 'the activities before it'}. Shorten one of those, change the sequence, or move the target.`,
+      })
+    } else {
+      out.push({ severity: 'info', activityIds: [m.activityId], questionIds: [`milestone.${m.key}.target`], text: `“${m.label}” is forecast for ${us(tm.earlyFinish)}, ${-late} days ahead of your target of ${us(m.target)}.` })
+    }
+  }
+  for (const a of s.activities) {
+    if (!a.id.endsWith('-delivered') || !a.constraint) continue
+    const tm = t[a.id]
+    if (!tm) continue
+    const itemId = a.id.replace(/^ll-/, '').replace(/-delivered$/, '')
+    if (tm.totalFloat <= 0) {
+      out.push({ severity: 'warning', activityIds: [a.id], questionIds: [`procure.${itemId}.delivery`], text: `The committed delivery of ${a.name.replace(/ delivered.*$/, '')} (${us(a.constraint.date)}) now drives the finish date — any slip moves completion day for day. Ask the supplier for an earlier date or a partial shipment.` })
+    } else if (tm.freeFloat > 60) {
+      const succ = s.links.filter(l => l.from === a.id).map(l => byId.get(l.to)).find(Boolean)
+      out.push({ severity: 'info', activityIds: [a.id], questionIds: [`procure.${itemId}.delivery`], text: `${a.name.replace(/ delivered.*$/, '')} arrives ${us(a.constraint.date)}, about ${tm.freeFloat} days before it's needed${succ ? ` for ${succ.code} ${succ.name}` : ''}. Plan protected storage and insurance, or push the delivery later.` })
+    }
+  }
+  return out
+}
+
 export interface Evaluation {
   score: number
   grade: 'A' | 'B' | 'C' | 'D'
@@ -55,6 +97,7 @@ export interface Evaluation {
   coverage: { item: string; kind: 'permit' | 'long_lead'; status: 'scheduled' | 'resolved' | 'missing'; detail: string }[]
   review: { status: 'none' | 'approved' | 'changes_requested' | 'stale'; latest?: ExpertReview; reviewedVersion?: string }
   findings: string[]
+  dateChecks: ScheduleDateCheck[]
 }
 
 export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, reviews: ExpertReview[]): Evaluation {
@@ -141,6 +184,8 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
     const field = s.activities.filter(a => a.calendarId !== 'cal-7d' && a.type === 'task' && a.phase !== 'design' && (s.cpm?.times[a.id]?.totalFloat ?? 0) > 20).length
     findings.push(`The critical path runs through ${drivers.map(d => `${d.code} ${d.name}`).slice(0, 3).join(' → ')}. ${field ? `${field} field activities have 20+ days of float waiting on it — ` : ''}expediting it (early release, alternate supplier, or temporary equipment) moves the finish; accelerating field work does not.`)
   }
+  const qualified = (s.qualifications || []).filter(q => q.activityIds.length)
+  if (qualified.length) findings.push(`${qualified.length} answer(s) were qualified in the team's own words (e.g. “${qualified[0].note.slice(0, 80)}”). The related activities are marked low-confidence — open them on the Schedule tab and adjust durations or logic if needed.`)
   const placeholders = s.activities.filter(a => a.placeholder)
   if (placeholders.length) findings.push(`${placeholders.length} placeholder(s) reserve time for withheld constraints; a cleared scheduler should position them on-site.`)
 
@@ -151,7 +196,10 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
   const score = Math.round(dcma.score * 0.35 + elic.readiness * 0.2 + realism * 0.2 + cov * 0.15 + rev * 0.1)
   const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D'
 
+  const dateChecks = scheduleDateChecks(s)
+  for (const c of dateChecks.filter(c => c.severity !== 'info')) findings.unshift(c.text)
   return {
+    dateChecks,
     score, grade, dcma, readiness: elic.readiness,
     openAssumptions: s.assumptions.filter(a => a.kind !== 'inferred').length,
     benchmark: { rows, basis: history ? `${history.projectCount} of your firm's past schedules (${history.similarCount} same type). Private to your firm.` : 'No firm history uploaded yet — upload past schedules with actual dates to benchmark durations.' },
