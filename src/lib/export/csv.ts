@@ -1,6 +1,7 @@
 // RFC 4180 CSV export (CRLF line endings, fields quoted when needed).
 
 import type { GeneratedSchedule } from '@/lib/planning/types'
+import { fmtDate, fmtDates } from '@/lib/format'
 
 function cellString(v: unknown): string {
   if (v === null || v === undefined) return ''
@@ -58,14 +59,15 @@ export function exportScheduleCsv(s: GeneratedSchedule): string {
       phase: a.phase,
       category: a.category,
       duration: a.duration,
-      es: t?.earlyStart ?? '',
-      ef: t?.earlyFinish ?? '',
-      ls: t?.lateStart ?? '',
-      lf: t?.lateFinish ?? '',
+      // MM/DD/YYYY, as US schedulers read them (the spreadsheet importer understands this form).
+      es: t?.earlyStart ? fmtDate(t.earlyStart) : '',
+      ef: t?.earlyFinish ? fmtDate(t.earlyFinish) : '',
+      ls: t?.lateStart ? fmtDate(t.lateStart) : '',
+      lf: t?.lateFinish ? fmtDate(t.lateFinish) : '',
       tf: t ? t.totalFloat : '',
       critical: t ? t.critical : '',
       preds,
-      rationale: a.rationale?.summary ?? '',
+      rationale: fmtDates(a.rationale?.summary ?? ''),
       sources: (a.rationale?.sources ?? []).map(r => (r.detail ? `${r.label} (${r.detail})` : r.label)).join('; '),
     }
   })

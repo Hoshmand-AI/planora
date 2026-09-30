@@ -264,6 +264,8 @@ export interface Answer {
   answeredAt: string
   /** Who supplied it: the user directly, or inferred from an uploaded file */
   source?: 'user' | 'file'
+  /** The user typed their own answer instead of picking a listed option */
+  custom?: boolean
 }
 
 export type QuestionKind = 'choice' | 'multi' | 'number' | 'date' | 'text' | 'boolean'
@@ -284,6 +286,10 @@ export interface Question {
   groundedBy?: SourceRef[]
   /** Default used if the user says "I don't know" */
   fallback?: { value: AnswerValue; explanation: string }
+  /** Choice questions: the user may type an answer that is not listed */
+  allowOther?: boolean
+  /** Label for the free-text box, e.g. "Enter your country and state or location" */
+  otherPrompt?: string
 }
 
 export interface Assumption {
@@ -291,7 +297,7 @@ export interface Assumption {
   text: string
   /** Extra schedule contingency (work days) added because this is unknown/withheld */
   bufferDays: number
-  kind: 'unknown' | 'withheld' | 'inferred'
+  kind: 'unknown' | 'withheld' | 'inferred' | 'custom'
 }
 
 export interface InterviewState {

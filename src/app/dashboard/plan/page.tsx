@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ClipboardList, Plus, ArrowRight, Loader2 } from 'lucide-react'
+import { fmtDate, fmtDay } from '@/lib/format'
 
 interface PlanRow {
   id: string; name: string; updatedAt: string; readiness: number
@@ -67,7 +68,7 @@ export default function PlansPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[15px] font-semibold text-navy-950 truncate">{p.name}</div>
-                  <div className="text-[12px] text-warm-400 mt-0.5">Updated {new Date(p.updatedAt).toLocaleDateString()}</div>
+                  <div className="text-[12px] text-warm-400 mt-0.5">Updated {fmtDay(p.updatedAt)}</div>
                 </div>
                 <ArrowRight size={15} className="text-warm-400 flex-shrink-0 mt-1" />
               </div>
@@ -78,7 +79,7 @@ export default function PlansPage() {
                 <div className="h-1.5 bg-warm-200 rounded-sm overflow-hidden"><div className="h-full bg-accent-500" style={{ width: `${p.readiness}%` }} /></div>
               </div>
               <div className="mt-3 text-[12.5px] text-warm-600">
-                {p.generated ? <>{p.activityCount} activities · finish <span className="font-medium text-navy-950 tabular-nums">{p.finish}</span>{p.scheduleId ? ' · published' : ''}</> : 'Not generated yet'}
+                {p.generated ? <>{p.activityCount} activities · finish <span className="font-medium text-navy-950 tabular-nums">{fmtDate(p.finish)}</span>{p.scheduleId ? ' · published' : ''}</> : 'Not generated yet'}
               </div>
             </Link>
           ))}

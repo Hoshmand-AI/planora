@@ -3,6 +3,7 @@
 // and every human override, which is what reviewers and claims consultants look for.
 
 import type { GeneratedSchedule } from '@/lib/planning/types'
+import { fmtDates } from '@/lib/format'
 import type { Evaluation } from '@/lib/planning/evaluation'
 import type { ExpertReview } from '@/lib/db'
 import { PROJECT_TYPE_LABELS } from '@/lib/planning/types'
@@ -18,6 +19,7 @@ export function basisOfSchedule(opts: {
   reviews: ExpertReview[]
   generatedBy: string
   aiMode: string
+  teamNotes?: string[]
 }): string {
   const { planName, profile, schedule: s, evaluation: ev, reviews } = opts
   const t = s.cpm?.times || {}
@@ -67,6 +69,12 @@ export function basisOfSchedule(opts: {
   if (inferred.length) { L.push('', 'Resolved items:'); for (const a of inferred) L.push(`- ${esc(a.text)}`) }
   L.push('')
 
+  if (opts.teamNotes?.length) {
+    L.push('### Additional information from the project team', '')
+    for (const n of opts.teamNotes) L.push(`- ${esc(n)}`)
+    L.push('')
+  }
+
   const placeholders = s.activities.filter(a => a.placeholder)
   if (placeholders.length) {
     L.push('## 6. Withheld constraints', '')
@@ -112,5 +120,5 @@ export function basisOfSchedule(opts: {
   for (const r of reviews) L.push(`- ${r.at.slice(0, 10)} — ${esc(r.reviewer)}: **${r.verdict.replace(/_/g, ' ')}**. ${esc(r.comment)}`)
   L.push('')
   L.push('---', 'Reference ranges for permits, regulations and lead times must be verified with the Authority Having Jurisdiction and suppliers. This narrative was generated from the schedule data without an AI model.')
-  return L.join('\n')
+  return fmtDates(L.join('\n'))
 }

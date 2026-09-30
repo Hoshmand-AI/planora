@@ -12,6 +12,7 @@ import type {
 } from '@/lib/planning/types'
 import type { Evaluation } from '@/lib/planning/evaluation'
 import type { EditImpact } from '@/lib/planning/overrides'
+import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Review { id: string; reviewer: string; verdict: string; comment: string; at: string }
 interface Plan {
@@ -72,6 +73,11 @@ export default function PlanPage() {
     }
   }
 
+  const addNote = async (text: string) => {
+    const data = await call('note', `/api/plans/${id}`, { method: 'PATCH', body: JSON.stringify({ addNote: text }) })
+    if (data) setNotice(view?.plan.generated ? 'Added. Click Regenerate to include it in the Basis of Schedule; add it as an activity on the Schedule tab if it is work.' : 'Added to the project brief.')
+    return !!data
+  }
   const saveAnswer = async (qid: string, a: Partial<Answer>) => {
     const data = await call(`answer:${qid}`, `/api/plans/${id}`, { method: 'PATCH', body: JSON.stringify({ answers: { [qid]: a } }) })
     const errs = data?.errors as Record<string, string> | undefined
@@ -111,7 +117,7 @@ export default function PlanPage() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-[12.5px] text-warm-500">
             <span>Readiness <span className="font-semibold text-navy-950 tabular-nums">{el.readiness}%</span></span>
             <span>{el.questions.length} open question{el.questions.length === 1 ? '' : 's'}</span>
-            {g?.cpm && <span>Finish <span className="font-semibold text-navy-950 tabular-nums">{g.cpm.projectFinish}</span></span>}
+            {g?.cpm && <span>Finish <span className="font-semibold text-navy-950 tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></span>}
             {ev && <span>Quality <span className="font-semibold text-navy-950">{ev.grade}</span> ({ev.score})</span>}
             <span className="flex items-center gap-1">{llm.airgapped && <Lock size={11} />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'AI offline — rules only'}</span>
           </div>
@@ -131,7 +137,7 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{notice}</Banner>}
+      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}</Banner>}
       {error && <Banner kind="error" onClose={() => setError('')}>{error}</Banner>}
 
       <div className="flex gap-1.5 mb-5 overflow-x-auto">
@@ -143,7 +149,14 @@ export default function PlanPage() {
         ))}
       </div>
 
-      {tab === 'interview' && <InterviewTab view={view} busy={busy} onAnswer={saveAnswer} onSuggest={suggest} onGenerate={() => generate(false)} />}
+      {g && tab !== 'interview' && tab !== 'audit' && el.questions.length > 0 && (
+        <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2.5 rounded-md mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="flex-1 min-w-[240px]">This schedule was built with <span className="font-semibold text-navy-950">{el.questions.length} questions still open</span> (readiness {el.readiness}%). Answer any of them or add information, then regenerate — your overrides are kept.</span>
+          <button onClick={() => setTab('interview')} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium">Answer remaining questions</button>
+        </div>
+      )}
+
+      {tab === 'interview' && <InterviewTab view={view} busy={busy} onAnswer={saveAnswer} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />}
       {tab === 'schedule' && g && <ScheduleTab plan={plan} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
@@ -185,16 +198,30 @@ function Sources({ sources }: { sources: SourceRef[] }) {
 
 function ExportMenu({ id }: { id: string }) {
   const [open, setOpen] = useState(false)
+  const item = (format: string, label: string, sub: string) => (
+    <a key={format} href={`/api/plans/${id}/export?format=${format}`} onClick={() => setOpen(false)} className="block px-3 py-2 hover:bg-warm-100">
+      <div className="text-navy-950">{label}</div><div className="text-[11.5px] text-warm-400">{sub}</div>
+    </a>
+  )
+  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-medium transition-colors">
         <Download size={13} /> Export <ChevronDown size={12} />
       </button>
+      {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
       {open && (
-        <div className="absolute right-0 mt-1 w-64 bg-warm-50 border border-warm-200 rounded-md shadow-lg z-20 py-1 text-[13px]">
-          <a href={`/api/plans/${id}/export?format=md`} className="block px-3 py-2 hover:bg-warm-100">Basis of Schedule narrative (.md)</a>
-          <a href={`/api/plans/${id}/export?format=xml`} className="block px-3 py-2 hover:bg-warm-100">MS Project XML (P6 can import)</a>
-          <a href={`/api/plans/${id}/export?format=csv`} className="block px-3 py-2 hover:bg-warm-100">Activity table (.csv / Excel)</a>
+        <div className="absolute right-0 mt-1 w-80 bg-warm-50 border border-warm-200 rounded-md shadow-lg z-20 py-1 text-[13px]">
+          {group('Scheduling software')}
+          {item('xer', 'Primavera P6 (.xer)', 'Native P6 file: WBS, calendars, logic, constraints')}
+          {item('xml', 'MS Project (.xml)', 'Opens in MS Project; P6 can import it too')}
+          {group('Excel')}
+          {item('xlsx-p6', 'Excel — P6-style layout', 'WBS bands, colors, indentation, Gantt bars')}
+          {item('xlsx-import', 'Excel — for import into P6 / MS Project', 'Import-ready sheets and instructions')}
+          {item('csv', 'CSV activity table', 'Flat table with rationale and sources')}
+          {group('Documents')}
+          {item('pdf', 'PDF schedule report', 'Summary page + P6-style Gantt, 11×17')}
+          {item('md', 'Basis of Schedule narrative (.md)', 'Assumptions, sources, overrides, review')}
         </div>
       )}
     </div>
@@ -203,21 +230,29 @@ function ExportMenu({ id }: { id: string }) {
 
 /* ─── Interview ──────────────────────────────────────── */
 
-function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate }: {
+function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate, onAddNote }: {
   view: View; busy: string | null
   onAnswer: (qid: string, a: Partial<Answer>) => Promise<void>
   onSuggest: () => void; onGenerate: () => void
+  onAddNote: (text: string) => Promise<boolean>
 }) {
   const { elicitation: el, plan, llm, history } = view
   const [showAll, setShowAll] = useState(false)
   const [showAnswered, setShowAnswered] = useState(false)
   const visible = showAll ? el.questions : el.questions.slice(0, 6)
   const answered = view.answered
+  const [note, setNote] = useState('')
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <div className="lg:col-span-2 space-y-3">
-        {el.conflicts.map((c, i) => <Banner key={i} kind="warn"><span className="font-semibold">Check this: </span>{c}</Banner>)}
+        {plan.generated && (
+          <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2.5 rounded-md flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex-1 min-w-[240px]">A schedule already exists. You can keep answering questions or add information at any time, then regenerate — your overrides are kept.</span>
+            <button onClick={onGenerate} disabled={!!busy} className="bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12.5px] font-semibold transition-colors disabled:opacity-50">Regenerate with my answers</button>
+          </div>
+        )}
+        {el.conflicts.map((c, i) => <Banner key={i} kind="warn"><span className="font-semibold">Check this: </span>{fmtDates(c)}</Banner>)}
 
         {el.questions.length === 0 ? (
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[14px] text-warm-600">
@@ -248,7 +283,7 @@ function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate }: {
                   <div key={a.id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-[13px]">
                     <span className="text-warm-600 min-w-0"><span className="text-[10.5px] font-bold uppercase tracking-wider text-warm-400 mr-2">{SECTION_LABEL[a.section] || a.section}</span>{a.prompt}</span>
                     <span className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-navy-950 font-medium flex items-center gap-1">{a.status === 'withheld' && <Lock size={11} />}{a.label}</span>
+                      <span className="text-navy-950 font-medium flex items-center gap-1">{a.status === 'withheld' && <Lock size={11} />}{fmtDates(a.label)}</span>
                       <button onClick={() => onAnswer(a.id, null as unknown as Partial<Answer>)} title="Clear and ask again" className="text-warm-400 hover:text-status-at-risk"><X size={13} /></button>
                     </span>
                   </div>
@@ -276,6 +311,16 @@ function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate }: {
           </ul>
         </div>
 
+        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Add something I didn&apos;t ask</div>
+          <p className="text-[12px] text-warm-500 mb-2">Owner requirements, site constraints, phasing, anything that affects the schedule. It goes into the Basis of Schedule.</p>
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000}
+            placeholder="e.g. Utility will only energize the substation after the owner's commissioning agent signs off"
+            className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px] text-warm-700 placeholder:text-warm-400" />
+          <button disabled={!!busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }}
+            className="mt-2 w-full bg-navy-900 text-white rounded-md text-[13px] font-medium py-2 disabled:opacity-40">Add to brief</button>
+        </div>
+
         {llm.mode !== 'offline' ? (
           <button onClick={onSuggest} disabled={!!busy} className="w-full flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
             {busy === 'suggest' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Ask AI for project-specific follow-ups
@@ -290,7 +335,7 @@ function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate }: {
             <ul className="space-y-2">
               {el.assumptions.slice(0, 12).map((a: Assumption) => (
                 <li key={a.questionId} className="text-[12px] text-warm-600">
-                  {a.kind === 'withheld' && <Lock size={10} className="inline mr-1" />}{a.text}{a.bufferDays ? <span className="text-warm-400"> (+{a.bufferDays}d)</span> : null}
+                  {a.kind === 'withheld' && <Lock size={10} className="inline mr-1" />}{fmtDates(a.text)}{a.bufferDays ? <span className="text-warm-400"> (+{a.bufferDays}d)</span> : null}
                 </li>
               ))}
             </ul>
@@ -303,7 +348,18 @@ function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate }: {
 
 function QuestionCard({ q, busy, onAnswer }: { q: Question; busy: boolean; onAnswer: (qid: string, a: Partial<Answer>) => Promise<void> }) {
   const [value, setValue] = useState<string>('')
+  const [other, setOther] = useState('')
+  const [showOther, setShowOther] = useState(false)
   const submit = (v: unknown) => onAnswer(q.id, { status: 'known', value: v as Answer['value'] })
+  const dropdown = q.kind === 'choice' && (q.options?.length || 0) > 5
+  const otherBox = (
+    <form onSubmit={e => { e.preventDefault(); if (other.trim().length >= 2) submit(other.trim()) }} className="flex gap-2 flex-wrap items-center w-full">
+      <input value={other} onChange={e => setOther(e.target.value)} maxLength={200} autoFocus={!dropdown}
+        placeholder={q.id === 'project.state' ? 'e.g. Toronto, Ontario, Canada' : dropdown ? 'Type your answer' : (q.otherPrompt || 'Type your answer')}
+        className="flex-1 min-w-[240px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 placeholder:text-warm-400" />
+      <button disabled={busy || other.trim().length < 2} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-40">Save</button>
+    </form>
+  )
 
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
@@ -312,14 +368,29 @@ function QuestionCard({ q, busy, onAnswer }: { q: Question; busy: boolean; onAns
         {q.id.startsWith('ai.') && <span className="text-[10.5px] text-warm-400 flex items-center gap-0.5"><Sparkles size={10} /> AI follow-up</span>}
       </div>
       <div className="text-[15px] font-semibold text-navy-950">{q.prompt}</div>
-      <div className="text-[12.5px] text-warm-500 mt-1 flex gap-1.5"><HelpCircle size={13} className="flex-shrink-0 mt-0.5" /><span><span className="font-medium text-warm-600">Why I ask:</span> {q.why}</span></div>
+      <div className="text-[12.5px] text-warm-500 mt-1 flex gap-1.5"><HelpCircle size={13} className="flex-shrink-0 mt-0.5" /><span><span className="font-medium text-warm-600">Why I ask:</span> {fmtDates(q.why)}</span></div>
       {q.groundedBy && <Sources sources={q.groundedBy} />}
 
+      {dropdown && q.allowOther && (
+        <div className="mt-3">
+          <div className="text-[12px] text-warm-600 mb-1.5">{q.otherPrompt ? `${q.otherPrompt}:` : 'Not in the list? Type your answer:'}</div>
+          {otherBox}
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mt-3">Or choose from the list</div>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {q.kind === 'choice' && q.options && (
-          q.options.length <= 5 ? q.options.map(o => (
-            <button key={o.value} disabled={busy} onClick={() => submit(o.value)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[13px] text-navy-950 transition-colors disabled:opacity-50">{o.label}</button>
-          )) : (
+          q.options.length <= 5 ? (
+            <>
+              {q.options.map(o => (
+                <button key={o.value} disabled={busy} onClick={() => submit(o.value)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[13px] text-navy-950 transition-colors disabled:opacity-50">{o.label}</button>
+              ))}
+              {q.allowOther && (
+                <button disabled={busy} onClick={() => setShowOther(x => !x)} className={`px-3 py-1.5 rounded-md border text-[13px] transition-colors ${showOther ? 'border-navy-900 bg-navy-900 text-white' : 'border-dashed border-warm-400 bg-warm-50 text-warm-600 hover:border-navy-900'}`}>Other…</button>
+              )}
+              {showOther && otherBox}
+            </>
+          ) : (
             <>
               <select value={value} onChange={e => setValue(e.target.value)} className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 min-w-[200px]">
                 <option value="">Choose…</option>
@@ -352,7 +423,7 @@ function QuestionCard({ q, busy, onAnswer }: { q: Question; busy: boolean; onAns
           <button disabled={busy} onClick={() => onAnswer(q.id, { status: 'withheld' })} title="Plan around it without sharing the detail" className="text-[12.5px] text-warm-500 hover:text-navy-950 flex items-center gap-1"><Lock size={11} /> Can&apos;t share</button>
         )}
       </div>
-      {q.fallback && <div className="text-[11.5px] text-warm-400 mt-2">If unknown: {q.fallback.explanation}</div>}
+      {q.fallback && <div className="text-[11.5px] text-warm-400 mt-2">If unknown: {fmtDates(q.fallback.explanation)}</div>}
     </div>
   )
 }
@@ -378,7 +449,7 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy }: { plan: Plan; on
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        {[['Start', g.projectStart], ['Finish', g.cpm?.projectFinish || '—'], ['Activities', `${g.activities.length} (${criticalCount} critical)`], ['Your overrides', String(overrides)]].map(([k, v]) => (
+        {[['Start', fmtDate(g.projectStart)], ['Finish', fmtDate(g.cpm?.projectFinish)], ['Activities', `${g.activities.length} (${criticalCount} critical)`], ['Your overrides', String(overrides)]].map(([k, v]) => (
           <div key={k} className="bg-warm-100 border border-warm-200 rounded-lg p-4">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{k}</div>
             <div className="text-[16px] font-semibold text-navy-950 tabular-nums mt-1">{v}</div>
@@ -386,10 +457,12 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy }: { plan: Plan; on
         ))}
       </div>
       {g.mustFinishBy && g.cpm && g.cpm.projectFinish > g.mustFinishBy && (
-        <Banner kind="warn">The plan finishes {g.cpm.projectFinish}, after the required {g.mustFinishBy}. Critical activities show negative float.</Banner>
+        <Banner kind="warn">The plan finishes {fmtDate(g.cpm.projectFinish)}, after the required {fmtDate(g.mustFinishBy)}. Critical activities show negative float.</Banner>
       )}
       {(g.cpm?.warnings?.length ?? 0) > 0 && <Banner kind="warn">{g.cpm!.warnings.slice(0, 3).join(' · ')}</Banner>}
-      {(g.notes || []).map((n, i) => <p key={i} className="text-[12px] text-warm-500 mb-2">{n}</p>)}
+      {(g.notes || []).map((n, i) => <p key={i} className="text-[12px] text-warm-500 mb-2">{fmtDates(n)}</p>)}
+
+      <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         {(['all', 'critical', 'low', 'overridden'] as const).map(f => (
@@ -433,6 +506,46 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy }: { plan: Plan; on
   )
 }
 
+function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[]; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [dur, setDur] = useState('10')
+  const [after, setAfter] = useState('')
+  const [before, setBefore] = useState('')
+  const [reason, setReason] = useState('')
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mb-3 text-[13px] font-medium text-accent-600 hover:underline">+ Add an activity the tool doesn&apos;t know about</button>
+    )
+  }
+  const opt = (a: PlanActivity) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>
+  return (
+    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 mb-4">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Add an activity</div>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+        <div className="md:col-span-2 flex items-center gap-2">
+          <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} className="w-20 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+          <span className="text-[12px] text-warm-500">work days (0 = milestone)</span>
+        </div>
+        <select value={after} onChange={e => setAfter(e.target.value)} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+          <option value="">Starts after…</option>{activities.map(opt)}
+        </select>
+        <select value={before} onChange={e => setBefore(e.target.value)} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+          <option value="">Must finish before… (default: substantial completion)</option>{activities.map(opt)}
+        </select>
+        <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+        <div className="md:col-span-2 flex gap-2">
+          <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
+            if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); setOpen(false) }
+          }} className="flex-1 bg-navy-900 text-white rounded-md text-[13px] font-medium py-1.5 disabled:opacity-40">Add</button>
+          <button onClick={() => setOpen(false)} className="px-3 border border-warm-300 rounded-md text-[13px] text-warm-600">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit, busy }: {
   a: PlanActivity; tm?: { earlyStart: string; earlyFinish: string; lateStart: string; lateFinish: string; totalFloat: number; freeFloat: number; critical: boolean }
   left: number; width: number; open: boolean; onToggle: () => void
@@ -459,8 +572,8 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           </div>
         </td>
         <td className="px-2 py-2 text-right tabular-nums">{a.type === 'milestone' ? '◆' : a.duration}{a.calendarId === 'cal-7d' && a.type !== 'milestone' ? <span className="text-warm-400">cd</span> : ''}</td>
-        <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{tm?.earlyStart}</td>
-        <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{tm?.earlyFinish}</td>
+        <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyStart)}</td>
+        <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyFinish)}</td>
         <td className={`px-2 py-2 text-right tabular-nums ${tm && tm.totalFloat < 0 ? 'text-status-at-risk font-semibold' : tm?.critical ? 'text-status-attention font-semibold' : 'text-warm-600'}`}>{tm?.totalFloat}</td>
         <td className="px-2 py-2"><span className={`text-[10.5px] font-semibold uppercase border-l-2 pl-1 ${CONF_STYLE[a.rationale.confidence]}`}>{a.rationale.confidence}</span></td>
         <td className="px-3 py-2">
@@ -476,10 +589,10 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Why this duration</div>
-                <p className="text-[13px] text-warm-700">{a.rationale.summary}</p>
+                <p className="text-[13px] text-warm-700">{fmtDates(a.rationale.summary)}</p>
                 <Sources sources={a.rationale.sources} />
-                {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-[12px] text-warm-500 mt-1.5">Assumes: {x}</p>)}
-                {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {tm.lateStart} · late finish {tm.lateFinish} · free float {tm.freeFloat}d</p>}
+                {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-[12px] text-warm-500 mt-1.5">Assumes: {fmtDates(x)}</p>)}
+                {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
 
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
                 {preds.length === 0 && <p className="text-[12.5px] text-warm-500">No predecessors (project start).</p>}
@@ -517,7 +630,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                     className="flex items-center gap-1 text-[12.5px] text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
                 )}
                 {a.overrides?.map((o, i) => (
-                  <p key={i} className="text-[12px] text-warm-500">{new Date(o.at).toLocaleString()} — {o.by}: {o.field} {o.from !== undefined ? `${String(o.from)} → ` : ''}{String(o.to ?? '')} · “{o.reason}”</p>
+                  <p key={i} className="text-[12px] text-warm-500">{fmtDateTime(o.at)} — {o.by}: {o.field} {o.from !== undefined ? `${String(o.from)} → ` : ''}{String(o.to ?? '')} · “{o.reason}”</p>
                 ))}
               </div>
             </div>
@@ -536,7 +649,7 @@ function LinkRow({ l, other, dir, onEdit, busy }: { l: PlanLink; other?: PlanAct
   return (
     <div className="text-[12.5px] text-warm-600 py-1 flex gap-2 items-start">
       <span className="font-mono text-[11px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
-      <span className="flex-1"><span className="font-medium text-navy-950">{other?.code} {other?.name}</span> — {l.rationale.summary}</span>
+      <span className="flex-1"><span className="font-medium text-navy-950">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
       <button disabled={!!busy} onClick={remove} title="Remove relationship" className="text-warm-400 hover:text-status-at-risk flex-shrink-0"><X size={12} /></button>
     </div>
   )
@@ -555,15 +668,15 @@ function EvaluationTab({ ev, plan, busy, onReview }: { ev: Evaluation; plan: Pla
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Overall" value={`${ev.grade} · ${ev.score}`} sub="DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%" />
         <Stat label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} sub="applicable checks passing" />
-        <Stat label="P50 finish" value={ev.forecast.p50} sub={`deterministic ${ev.forecast.deterministic}`} />
-        <Stat label="P80 finish" value={ev.forecast.p80} sub={ev.forecast.requiredFinish ? `required ${ev.forecast.requiredFinish}${ev.forecast.p80MeetsRequired ? ' ✓' : ' ✗'}` : 'risk-adjusted'} />
+        <Stat label="P50 finish" value={fmtDate(ev.forecast.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
+        <Stat label="P80 finish" value={fmtDate(ev.forecast.p80)} sub={ev.forecast.requiredFinish ? `required ${fmtDate(ev.forecast.requiredFinish)}${ev.forecast.p80MeetsRequired ? ' ✓' : ' ✗'}` : 'risk-adjusted'} />
       </div>
       <p className="text-[12px] text-warm-500 -mt-2">Risk basis: {ev.forecast.basis}</p>
 
       {ev.findings.length > 0 && (
         <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Findings</div>
-          <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} className="text-status-attention flex-shrink-0 mt-0.5" />{f}</li>)}</ul>
+          <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
         </div>
       )}
 
@@ -625,7 +738,7 @@ function EvaluationTab({ ev, plan, busy, onReview }: { ev: Evaluation; plan: Pla
         <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Expert review {ev.review.status !== 'none' && <span className="normal-case tracking-normal font-normal">— {ev.review.status.replace('_', ' ')}</span>}</div>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
-            <span className="font-semibold text-navy-950">{r.reviewer}</span> · {new Date(r.at).toLocaleString()} · <span className="uppercase text-[11px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
+            <span className="font-semibold text-navy-950">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[11px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
@@ -661,9 +774,9 @@ function AuditTab({ plan, onDelete }: { plan: Plan; onDelete: () => void }) {
         {plan.audit.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
         {[...plan.audit].reverse().map((e, i) => (
           <div key={i} className="px-4 py-2.5 text-[12.5px] flex gap-3">
-            <span className="text-warm-400 tabular-nums w-36 flex-shrink-0">{new Date(e.at).toLocaleString()}</span>
+            <span className="text-warm-400 tabular-nums w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
             <span className="text-navy-950 w-28 flex-shrink-0 truncate">{e.by}</span>
-            <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${e.detail}` : ''}</span>
+            <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
           </div>
         ))}
       </div>

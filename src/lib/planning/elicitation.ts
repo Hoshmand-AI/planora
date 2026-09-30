@@ -6,10 +6,12 @@ import type {
   Question, SourceRef, WorkScope, DeliveryMethod, Classification, PermitSpec, LongLeadSpec, RegulationSpec,
 } from './types'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from './types'
-import { resolveRegional, listRegions } from '@/lib/knowledge/regions'
+import { resolveRegional, SUPPORTED_STATES } from '@/lib/knowledge/regions'
+import { US_STATES } from '@/lib/knowledge/us-states'
 import { listLongLeadItems } from '@/lib/knowledge/long-lead'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
+import { midSentence } from '@/lib/format'
 
 export interface HistorySummary {
   /** Firm's own past schedules with categorized activities */
@@ -45,7 +47,8 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const classification = str(known(answers, 'security.classification')) as Classification | undefined
   return {
     projectType: type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined,
-    state: str(known(answers, 'project.state'))?.toUpperCase(),
+    // A typed location ("Ontario, Canada") is kept for the record but uses generic permitting.
+    state: answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase(),
     city: str(known(answers, 'project.city')),
     grossSqft: sqft,
     stories,
@@ -80,8 +83,9 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     {
       id: 'project.state', section: 'project', kind: 'choice', impact: 90, allowWithheld: true,
       prompt: 'Which state is the project in?',
-      why: 'Permits, review times, and regional regulations are jurisdiction-specific. We pull the permit list for this project type in this region.',
-      options: [...listRegions().filter(r => /^[A-Z]{2}$/.test(r.code)).map(r => ({ value: r.code, label: r.name })), { value: 'OTHER', label: 'Other / not listed' }],
+      why: `Permits, review times, and regional regulations are jurisdiction-specific. We pull the permit list for this project type in this region (detailed catalogs for ${SUPPORTED_STATES.join(', ')}; other states use generic US permitting).`,
+      options: US_STATES.map(st => ({ value: st.code, label: `${st.name}${(SUPPORTED_STATES as readonly string[]).includes(st.code) ? '' : ' (generic US permitting)'}` })),
+      otherPrompt: "If you don't see your state or the project is outside the US, enter your country and state or location",
       fallback: { value: 'OTHER', explanation: 'Generic US local permitting durations are used.' },
     },
     {
@@ -240,7 +244,7 @@ function permitQuestions(permits: PermitSpec[], answers: Record<string, Answer>)
     qs.push({
       id: `permit.${pm.id}.status`, section: 'permits', kind: 'choice', impact: 70, allowWithheld: true,
       prompt: `Do you have the ${pm.name} (${pm.authority})?`,
-      why: `Typical review ${rw.low}–${rw.high} weeks (usually ~${rw.typical}). It can't be submitted until ${categoryLabel(pm.submitAfter).toLowerCase()} and it gates ${categoryLabel(pm.gates).toLowerCase()}.${pm.notes ? ' ' + pm.notes : ''}`,
+      why: `Typical review ${rw.low}–${rw.high} weeks (usually ~${rw.typical}). It can't be submitted until ${midSentence(categoryLabel(pm.submitAfter))} and it gates ${midSentence(categoryLabel(pm.gates))}.${pm.notes ? ' ' + pm.notes : ''}`,
       options: [{ value: 'issued', label: 'Issued' }, { value: 'submitted', label: 'Submitted, in review' }, { value: 'not_submitted', label: 'Not submitted yet' }, { value: 'not_required', label: 'Not required for this project' }],
       groundedBy: grounded,
       fallback: { value: 'not_submitted', explanation: `Assumed not yet submitted; typical ${rw.typical}-week review with a buffer toward the ${rw.high}-week high end.` },
@@ -264,8 +268,8 @@ function procurementQuestions(items: LongLeadSpec[], answers: Record<string, Ans
     const grounded = [src('catalog', it.name, it.source)]
     qs.push({
       id: `procure.${it.id}.status`, section: 'procurement', kind: 'choice', impact: 60, allowWithheld: true,
-      prompt: `Is ${it.name.toLowerCase()} in scope, and has it been ordered?`,
-      why: `Current lead times run ${lw.low}–${lw.high} weeks after an approved submittal (~${it.submittalWeeks} weeks to prepare and approve). It gates ${categoryLabel(it.gates).toLowerCase()}.${it.notes ? ' ' + it.notes : ''}`,
+      prompt: `Is ${midSentence(it.name)} in scope, and has it been ordered?`,
+      why: `Current lead times run ${lw.low}–${lw.high} weeks after an approved submittal (~${it.submittalWeeks} weeks to prepare and approve). It gates ${midSentence(categoryLabel(it.gates))}.${it.notes ? ' ' + it.notes : ''}`,
       options: [{ value: 'not_released', label: 'In scope, not ordered' }, { value: 'released', label: 'Ordered (PO released)' }, { value: 'owner_furnished', label: 'Owner-furnished' }, { value: 'not_in_scope', label: 'Not in scope' }],
       groundedBy: grounded,
       fallback: { value: 'not_released', explanation: `Assumed in scope and not yet ordered; typical ${lw.typical}-week lead time.` },
@@ -274,7 +278,7 @@ function procurementQuestions(items: LongLeadSpec[], answers: Record<string, Ans
     if (st === 'released' || st === 'owner_furnished') {
       qs.push({
         id: `procure.${it.id}.delivery`, section: 'procurement', kind: 'date', impact: 45, allowWithheld: true,
-        prompt: `What is the committed delivery date for ${it.name.toLowerCase()}?`,
+        prompt: `What is the committed delivery date for ${midSentence(it.name)}?`,
         why: 'A committed delivery date becomes a start-no-earlier-than constraint on installation.',
         groundedBy: grounded,
       })
@@ -309,7 +313,9 @@ export function questionBank(state: InterviewState, ctx: ElicitationContext = {}
     ...procurementQuestions(longLead, answers),
     ...regulationQuestions(regulations, profile),
     ...(ctx.extraQuestions || []),
-  ]
+  ].map(q => (q.kind === 'choice' || q.kind === 'multi') && q.allowOther === undefined
+    ? { ...q, allowOther: true, otherPrompt: q.otherPrompt || 'Not listed? Type your answer' }
+    : q)
   return { all, permits, longLead, regulations, profile }
 }
 
@@ -328,6 +334,7 @@ export function elicit(state: InterviewState, ctx: ElicitationContext = {}): Eli
     if (!a) { open.push(q); continue }
     got += q.impact * WEIGHT[a.status]
     if (a.status !== 'known') assumptions.push(assumptionFor(q, a, permits, longLead, answers))
+    else if (a.custom) assumptions.push(customAssumption(q, a))
   }
 
   // Ask the highest-impact gaps first; keep sections together for ties so the interview reads naturally.
@@ -370,6 +377,22 @@ function assumptionFor(q: Question, a: Answer, permits: PermitSpec[], longLead: 
   return { questionId: q.id, text, bufferDays, kind }
 }
 
+/** An open question at generation time: planned with its default, buffered like "don't know". */
+export function unansweredAssumption(q: Question, permits: PermitSpec[], longLead: LongLeadSpec[]): Assumption {
+  const a = assumptionFor(q, { status: 'unknown', answeredAt: '' }, permits, longLead, {})
+  return { ...a, text: `Not answered yet: ${q.prompt} ${q.fallback?.explanation || 'Planora uses its default for this item.'}` }
+}
+
+/** A typed answer outside the catalog: recorded verbatim, planned with the default, flagged for review. */
+function customAssumption(q: Question, a: Answer): Assumption {
+  const fallback = q.id === 'project.state'
+    ? 'Generic US permitting and climate are used — add local permits as activities if needed.'
+    : q.id === 'project.type'
+      ? 'A generic building template is used; review the activity list for this facility type.'
+      : q.fallback?.explanation || 'Planora plans with its default for this item.'
+  return { questionId: q.id, text: `${q.prompt} — you entered “${String(a.value)}”, which is not in Planora's catalog. ${fallback}`, bufferDays: q.impact >= 60 ? 10 : q.impact >= 40 ? 5 : 0, kind: 'custom' }
+}
+
 function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permits: PermitSpec[], ctx: ElicitationContext): string[] {
   const out: string[] = []
   const drawings = bool(known(answers, 'design.drawings'))
@@ -407,7 +430,10 @@ export function validateAnswer(q: Question, a: Answer): string | null {
     }
     case 'date': return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? null : 'Enter a date (yyyy-mm-dd).'
     case 'boolean': return bool(v) === undefined ? 'Answer yes or no.' : null
-    case 'choice': return q.options?.some(o => o.value === v) ? null : 'Pick one of the options.'
+    case 'choice':
+      if (q.options?.some(o => o.value === v)) return null
+      if (q.allowOther && typeof v === 'string' && v.trim().length >= 2) return v.length > 200 ? 'Keep it under 200 characters.' : null
+      return q.allowOther ? 'Pick an option or type your own answer.' : 'Pick one of the options.'
     case 'multi': return Array.isArray(v) ? null : 'Pick one or more options.'
     default: return typeof v === 'string' && v.trim() ? null : 'Enter an answer.'
   }
@@ -418,5 +444,11 @@ export function coerceAnswer(q: Question, a: Answer): Answer {
   if (a.status !== 'known') return { ...a, value: undefined }
   if (q.kind === 'number') return { ...a, value: num(a.value) ?? a.value }
   if (q.kind === 'boolean') return { ...a, value: bool(a.value) ?? a.value }
+  if (q.kind === 'choice' && typeof a.value === 'string' && !q.options?.some(o => o.value === a.value)) {
+    // Match a typed answer to a listed option when it clearly is one (e.g. "virginia" → VA).
+    const t = a.value.trim().toLowerCase()
+    const hit = q.options?.find(o => o.value.toLowerCase() === t || o.label.toLowerCase() === t || o.label.toLowerCase().replace(/ \(.*\)$/, '') === t)
+    return hit ? { ...a, value: hit.value, custom: undefined } : { ...a, value: a.value.trim(), custom: true }
+  }
   return a
 }
