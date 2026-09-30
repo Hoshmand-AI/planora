@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../layout'
 import { Upload } from 'lucide-react'
+import { fmtDate } from '@/lib/format'
 
 interface ActivityData {
   name: string; activityId: string; duration: number; remainingDuration: number
@@ -106,8 +107,8 @@ export default function TimelinePage() {
               </div>
               <div className="text-[12px] text-warm-400 mb-3">
                 {phase.activityCount} activities
-                {phase.start  && ` · ${new Date(phase.start).toLocaleDateString()}`}
-                {phase.finish && ` — ${new Date(phase.finish).toLocaleDateString()}`}
+                {phase.start  && ` · ${fmtDate(phase.start)}`}
+                {phase.finish && ` — ${fmtDate(phase.finish)}`}
               </div>
               <div className="h-1.5 bg-warm-200 rounded-full overflow-hidden">
                 <div
@@ -129,7 +130,7 @@ export default function TimelinePage() {
             <div className="flex items-center h-8 bg-warm-200 rounded-t-md px-3 text-[11px] font-semibold uppercase tracking-wider text-warm-500">
               <div className="w-[200px] flex-shrink-0">Activity</div>
               <div className="flex-1 text-center text-[10px]">
-                {new Date(ganttStart).toLocaleDateString()} — {new Date(ganttEnd).toLocaleDateString()}
+                {fmtDate(new Date(ganttStart).toISOString())} — {fmtDate(new Date(ganttEnd).toISOString())}
               </div>
             </div>
             <div className="border border-warm-200 border-t-0 rounded-b-md overflow-hidden">

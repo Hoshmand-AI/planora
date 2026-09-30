@@ -8,12 +8,13 @@ import type {
 } from './types'
 import { runCpm } from './cpm'
 import { usFederalHolidaysRange, addCalendarDays } from './calendar'
-import { elicit, known, profileFrom, questionBank } from './elicitation'
+import { elicit, known, profileFrom, questionBank, unansweredAssumption } from './elicitation'
 import { historyDuration, type FirmHistory } from './history'
 import { templatesFor, computeTemplateDuration, mapToSelected } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel, phaseOf } from '@/lib/semantic/taxonomy'
+import { midSentence } from '@/lib/format'
 
 export interface GenerateInput {
   answers: Record<string, Answer>
@@ -96,7 +97,10 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const calNote = ww.hours !== 8 ? ` Scaled ×${hoursFactor.toFixed(2)} for ${ww.hours}-hour days.` : ''
 
   const b = new Builder()
-  const assumptions: Assumption[] = [...elic.assumptions]
+  // Questions not answered yet are planned with their defaults, and said so explicitly (with the same
+  // buffers as "don't know") so generating early never hides guesses.
+  const notYet = elic.questions.filter(q => q.section !== 'history' && !q.id.startsWith('ai.') && !q.id.startsWith('note.'))
+  const assumptions: Assumption[] = [...elic.assumptions, ...notYet.map(q => notAnsweredAssumption(q, bank))]
   const notes: string[] = [
     'Permit review times and lead times are reference ranges. Verify with the Authority Having Jurisdiction and suppliers before baselining.',
   ]
@@ -144,7 +148,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       duration = hist.days
       const s = hist.stats
       rationale = {
-        summary: `${duration} work days = median ACTUAL duration of ${categoryLabel(t.category).toLowerCase()} on ${s.projects} of your firm's past${s.sameType ? ' ' + labelType(profile) : ''} projects${profile.grossSqft ? `, scaled to ${profile.grossSqft.toLocaleString()} sf` : ''} (your P20–P80: ${Math.round(s.actualP20)}–${Math.round(s.actualP80)} days at 100k sf). Template would give ${Math.round(tmplDays * hoursFactor)}.`,
+        summary: `${duration} work days = median ACTUAL duration of ${midSentence(categoryLabel(t.category))} on ${s.projects} of your firm's past${s.sameType ? ' ' + labelType(profile) : ''} projects${profile.grossSqft ? `, scaled to ${profile.grossSqft.toLocaleString()} sf` : ''} (your P20–P80: ${Math.round(s.actualP20)}–${Math.round(s.actualP80)} days at 100k sf). Template would give ${Math.round(tmplDays * hoursFactor)}.`,
         sources: [src('firm_history', "Your firm's completed projects", `${s.samples} activities across ${s.projects} projects; private to your firm`), src('template', 'Planora template (for comparison)')],
         confidence: s.projects >= 3 && s.sameType ? 'high' : 'medium',
       }
@@ -202,8 +206,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   /* ── Template logic ── */
   const tmplLogic = (t: TemplateActivity, predCat: CanonicalCategory, type: LinkType, lag: number): Rationale => ({
     summary: type === 'FS' && !lag
-      ? `${categoryLabel(predCat)} must finish before ${t.name.toLowerCase()} starts.`
-      : `${t.name} overlaps ${categoryLabel(predCat).toLowerCase()} (${type}${lag ? ` +${lag}d` : ''}) — standard trade stacking.`,
+      ? `${categoryLabel(predCat)} must finish before ${midSentence(t.name)} starts.`
+      : `${t.name} overlaps ${midSentence(categoryLabel(predCat))} (${type}${lag ? ` +${lag}d` : ''}) — standard trade stacking.`,
     sources: [src('template', 'Planora activity template logic')],
     confidence: 'high',
   })
@@ -268,7 +272,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       first = b.add({
         id: `permit-${pm.id}-submit`, name: `Prepare & submit ${pm.name}`, category: categoryForPermit(pm.gates), phase: 'permitting', type: 'task',
         duration: 5, calendarId: FIELD,
-        rationale: { summary: `Application package after ${submitAfterDD ? 'design development (early package, ' + known(answers, 'project.delivery') + ')' : categoryLabel(pm.submitAfter).toLowerCase()}.`, sources: [catalogSrc], confidence: 'medium' },
+        rationale: { summary: `Application package after ${submitAfterDD ? 'design development (early package, ' + known(answers, 'project.delivery') + ')' : midSentence(categoryLabel(pm.submitAfter))}.`, sources: [catalogSrc], confidence: 'medium' },
       }).id
       const rev = b.add({
         id: `permit-${pm.id}`, name: `${pm.name} — ${pm.authority} review & issuance`, category: categoryForPermit(pm.gates), phase: 'permitting', type: 'task',
@@ -280,7 +284,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
           assumptions: pm.notes ? [pm.notes] : undefined,
         },
       })
-      b.link(submitFrom, first, 'FS', 0, { summary: `Cannot submit until ${submitAfterDD ? 'design development' : categoryLabel(pm.submitAfter).toLowerCase()} is complete.`, sources: [catalogSrc], confidence: 'high' })
+      b.link(submitFrom, first, 'FS', 0, { summary: `Cannot submit until ${submitAfterDD ? 'design development' : midSentence(categoryLabel(pm.submitAfter))} is complete.`, sources: [catalogSrc], confidence: 'high' })
       b.link(first, rev.id, 'FS', 0, { summary: 'Agency review starts on submission.', sources: [catalogSrc], confidence: 'high' })
       first = rev.id
     }
@@ -305,7 +309,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
         rationale: { summary: `Committed delivery ${delivery}; held as a start-no-earlier-than constraint.`, sources: [src('user', 'Delivery date from interview'), catalogSrc], confidence: 'high' },
       })
       b.link(ntp.id, ms.id, 'FS', 0, { summary: 'Delivery tracked from NTP.', sources: [src('user', 'Delivery date')], confidence: 'high' })
-      b.link(ms.id, gate, 'FS', 0, { summary: `Installation needs ${it.name.toLowerCase()} on site.`, sources: [catalogSrc], confidence: 'high' })
+      b.link(ms.id, gate, 'FS', 0, { summary: `Installation needs ${midSentence(it.name)} on site.`, sources: [catalogSrc], confidence: 'high' })
       continue
     }
     if (status === 'released' || status === 'owner_furnished') {
@@ -315,7 +319,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
         rationale: { summary: `Ordered, but no delivery date given — conservatively carried the full typical ${it.leadWeeks.typical}-week lead from NTP.`, sources: [src('user', 'Order status: released'), catalogSrc], confidence: 'medium' },
       })
       b.link(ntp.id, fab.id, 'FS', 0, { summary: 'Order already placed.', sources: [src('user', 'Order status')], confidence: 'high' })
-      b.link(fab.id, gate, 'FS', 0, { summary: `Installation needs ${it.name.toLowerCase()} on site.`, sources: [catalogSrc], confidence: 'high' })
+      b.link(fab.id, gate, 'FS', 0, { summary: `Installation needs ${midSentence(it.name)} on site.`, sources: [catalogSrc], confidence: 'high' })
       continue
     }
     const sub = b.add({
@@ -335,7 +339,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     })
     b.link(submittalStart, sub.id, 'FS', 0, { summary: `Submittals need ${earlyPackages ? 'design development drawings (early release under ' + known(answers, 'project.delivery') + ')' : 'the construction documents'}.`, sources: [catalogSrc], confidence: 'high' })
     b.link(sub.id, fab.id, 'FS', 0, { summary: 'Fabrication is released on submittal approval.', sources: [catalogSrc], confidence: 'high' })
-    b.link(fab.id, gate, 'FS', 0, { summary: `Installation needs ${it.name.toLowerCase()} on site.`, sources: [catalogSrc], confidence: 'high' })
+    b.link(fab.id, gate, 'FS', 0, { summary: `Installation needs ${midSentence(it.name)} on site.`, sources: [catalogSrc], confidence: 'high' })
   }
 
   /* ── Regulations that add activities ── */
@@ -351,9 +355,9 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       rationale: { summary: `${r.scheduleImpact} Typical ${ad.days.low}–${ad.days.high} work days.`, sources: [src('catalog', r.name, r.source)], confidence: tri === 'yes' ? 'medium' : 'low' },
     })
     const after = resolveCat(mapToSelected(ad.after, profile)) || ntp.id
-    b.link(after, act.id, 'FS', 0, { summary: `Follows ${categoryLabel(ad.after).toLowerCase()}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
+    b.link(after, act.id, 'FS', 0, { summary: `Follows ${midSentence(categoryLabel(ad.after))}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
     const before = ad.before ? resolveCat(mapToSelected(ad.before, profile)) : undefined
-    if (before) b.link(act.id, before, 'FS', 0, { summary: `Must be complete before ${categoryLabel(ad.before!).toLowerCase()}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
+    if (before) b.link(act.id, before, 'FS', 0, { summary: `Must be complete before ${midSentence(categoryLabel(ad.before!))}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
   }
 
   /* ── Withheld (classified) constraints: plan around what we can't see ── */
@@ -448,6 +452,10 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     notes,
     cpm,
   }
+}
+
+function notAnsweredAssumption(q: import('./types').Question, bank: ReturnType<typeof questionBank>): Assumption {
+  return unansweredAssumption(q, bank.permits, bank.longLead)
 }
 
 function labelType(p: ProjectProfile): string {
@@ -612,6 +620,8 @@ function assignCodes(b: Builder, cpm: CpmResult) {
 function reapplyOverrides(b: Builder, prev: GeneratedSchedule | null | undefined): NonNullable<GeneratedSchedule['removed']> {
   if (!prev) return []
   const removed = [...(prev.removed || [])]
+  // Activities the scheduler added survive regeneration (their links are carried below as user: links).
+  for (const pa of prev.activities) if (pa.id.startsWith('user:act:') && !b.acts.has(pa.id)) b.acts.set(pa.id, { ...pa })
   for (const pa of prev.activities) {
     const cur = b.acts.get(pa.id)
     if (!cur || !pa.overrides?.length) continue

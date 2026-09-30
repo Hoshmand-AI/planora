@@ -97,7 +97,37 @@ describe('elicitation', () => {
     expect(validateAnswer(pct, coerceAnswer(pct, k('60')))).toBeNull()
     const type = bank.find(q => q.id === 'project.type')!
     expect(validateAnswer(type, withheld)).toMatch(/cannot be withheld/)
-    expect(validateAnswer(type, k('spaceport'))).toMatch(/options/)
+    // Anything not listed can be typed in; it is kept verbatim and flagged.
+    const spaceport = coerceAnswer(type, k('Spaceport launch facility'))
+    expect(validateAnswer(type, spaceport)).toBeNull()
+    expect(spaceport.custom).toBe(true)
+    expect(validateAnswer(type, coerceAnswer(type, k('x')))).toMatch(/type your own/)
+  })
+
+  it('lists all 50 states + DC and accepts a typed location outside the list', () => {
+    const state = questionBank({ answers: {} }).all.find(q => q.id === 'project.state')!
+    expect(state.options).toHaveLength(51)
+    expect(state.allowOther).toBe(true)
+    expect(state.otherPrompt).toMatch(/country and state or location/)
+    const va = coerceAnswer(state, k('virginia'))
+    expect(va).toMatchObject({ value: 'VA' })
+    expect(va.custom).toBeUndefined()
+    const abroad = coerceAnswer(state, k('Ontario, Canada'))
+    expect(abroad.custom).toBe(true)
+    const r = elicit({ answers: { 'project.type': k('data_center'), 'project.state': abroad } })
+    expect(r.profile.state).toBeUndefined()
+    const a = r.assumptions.find(x => x.questionId === 'project.state')!
+    expect(a.kind).toBe('custom')
+    expect(a.text).toMatch(/Ontario, Canada/)
+    // Every choice question offers "Other".
+    for (const q of questionBank({ answers: healthcareCA() }).all.filter(x => x.kind === 'choice')) expect(q.allowOther).toBe(true)
+  })
+
+  it('generates with custom answers and records how they were interpreted', () => {
+    const a = { ...healthcareCA(), 'project.state': { ...k('Alberta, Canada'), custom: true }, 'calendar.workweek': { ...k('5 x 9h'), custom: true } }
+    const g = generateSchedule({ answers: a, today: '2026-01-15' })
+    checkNetwork(g)
+    expect(g.assumptions.filter(x => x.kind === 'custom').map(x => x.questionId).sort()).toEqual(['calendar.workweek', 'project.state'])
   })
 })
 
@@ -216,6 +246,20 @@ describe('overrides (human in control)', () => {
     expect(a.overrides![0]).toMatchObject({ field: 'duration', from: crit.duration, to: crit.duration + 20, by: 'Ana', reason: 'Sub has one crew' })
     expect(a.rationale.summary).toMatch(/Overridden by Ana/)
     expect(a.rationale.sources[0].kind).toBe('override')
+  })
+
+  it('lets the scheduler add missing work, which survives regeneration', () => {
+    const after = g0.activities.find(a => a.category === 'finishes')!
+    const { schedule, impact } = applyEdit(g0, { kind: 'add_activity', name: 'Owner kitchen equipment install', duration: 30, after: after.id, reason: 'Owner scope added late' }, 'Ana')
+    const added = schedule.activities.find(a => a.name === 'Owner kitchen equipment install')!
+    expect(added.id.startsWith('user:act:')).toBe(true)
+    expect(added.rationale.summary).toMatch(/Added by Ana/)
+    checkNetwork(schedule)
+    expect(impact.finishAfter >= impact.finishBefore).toBe(true)
+    const again = generateSchedule({ answers: healthcareCA(), previous: schedule, today: '2026-01-15' })
+    expect(again.activities.some(a => a.id === added.id)).toBe(true)
+    checkNetwork(again)
+    expect(() => applyEdit(g0, { kind: 'add_activity', name: '', duration: 3, after: after.id, reason: 'x y z' }, 'Ana')).toThrow(/name/)
   })
 
   it('rejects logic loops', () => {

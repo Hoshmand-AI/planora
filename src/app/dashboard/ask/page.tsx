@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../layout'
 import { Send, Upload } from 'lucide-react'
+import { fmtDates } from '@/lib/format'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: string }
 
@@ -107,7 +108,7 @@ export default function AskPage() {
                   ? 'bg-navy-900 text-white'
                   : 'bg-warm-100 border border-warm-200 text-warm-700'
               }`}>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div>
               </div>
               <div className="text-[10px] text-warm-400 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

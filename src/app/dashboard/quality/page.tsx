@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2 } from 'lucide-react'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
+import { fmtDates } from '@/lib/format'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
 interface Quality {
@@ -80,8 +81,8 @@ export default function QualityPage() {
                 <div className="flex gap-2">
                   <Icon size={15} className="flex-shrink-0 mt-0.5 text-warm-500" />
                   <div className="flex-1">
-                    <div className="text-[13.5px] text-navy-950">{q.question}</div>
-                    <div className="text-[12px] text-warm-500 mt-1">{q.detail}</div>
+                    <div className="text-[13.5px] text-navy-950">{fmtDates(q.question)}</div>
+                    <div className="text-[12px] text-warm-500 mt-1">{fmtDates(q.detail)}</div>
                     {q.response ? (
                       <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
                     ) : (

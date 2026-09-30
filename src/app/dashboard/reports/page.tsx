@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useApp } from '../layout'
 import { BarChart3, Activity, FileText, CheckCircle, Download, X, Loader2, Upload } from 'lucide-react'
+import { fmtDates, fmtDateTime } from '@/lib/format'
 
 const REPORT_TYPES = [
   { id: 'executive_summary', icon: BarChart3,   title: 'Executive Schedule Summary',    desc: 'High-level narrative with status, variance, key findings, and recommendations.' },
@@ -79,7 +80,7 @@ export default function ReportsPage() {
 
         <div className="bg-warm-100 border border-warm-200 rounded-md p-3 mb-4 flex items-center justify-between">
           <div className="text-[12px] text-warm-500">
-            {report.scheduleName} · Generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
+            {report.scheduleName} · Generated {report.generatedAt ? fmtDateTime(report.generatedAt) : ''}
           </div>
           <button onClick={handleExport} className="flex items-center gap-1.5 text-accent-600 text-[12px] font-medium hover:underline">
             <Download size={13} /> Export
@@ -87,7 +88,7 @@ export default function ReportsPage() {
         </div>
 
         <div className="bg-warm-50 border border-warm-200 rounded-lg p-6 md:p-8">
-          <div className="text-[14px] text-warm-700 leading-relaxed whitespace-pre-wrap">{report.content}</div>
+          <div className="text-[14px] text-warm-700 leading-relaxed whitespace-pre-wrap">{fmtDates(report.content)}</div>
         </div>
       </div>
     )

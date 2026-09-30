@@ -2,6 +2,7 @@
 
 import { useApp } from './layout'
 import { Upload } from 'lucide-react'
+import { fmtDate, fmtDay } from '@/lib/format'
 
 export default function DashboardPage() {
   const { selectedSchedule, metrics } = useApp()
@@ -35,8 +36,8 @@ export default function DashboardPage() {
         <div>
           <div className="text-[17px] font-semibold text-navy-950">{selectedSchedule.name}</div>
           <div className="text-[12px] text-warm-400 mt-0.5">
-            {selectedSchedule.version} · {selectedSchedule.activityCount} activities · uploaded {new Date(selectedSchedule.uploadedAt).toLocaleDateString()}
-            {selectedSchedule.dataDate && ` · data date ${new Date(selectedSchedule.dataDate).toLocaleDateString()}`}
+            {selectedSchedule.version} · {selectedSchedule.activityCount} activities · uploaded {fmtDay(selectedSchedule.uploadedAt)}
+            {selectedSchedule.dataDate && ` · data date ${fmtDate(selectedSchedule.dataDate)}`}
           </div>
         </div>
         <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 ${
@@ -89,7 +90,7 @@ export default function DashboardPage() {
                     <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[11px] text-warm-400">
-                        {task.earlyStart ? new Date(task.earlyStart).toLocaleDateString() : 'TBD'}
+                        {task.earlyStart ? fmtDate(task.earlyStart) : 'TBD'}
                       </span>
                       {task.isCritical && (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
@@ -115,8 +116,8 @@ export default function DashboardPage() {
                     <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
                     <div className="text-[11px] text-warm-400 mt-0.5">
                       Float: {task.totalFloat}d
-                      {task.earlyStart && ` · ${new Date(task.earlyStart).toLocaleDateString()}`}
-                      {task.earlyFinish && ` → ${new Date(task.earlyFinish).toLocaleDateString()}`}
+                      {task.earlyStart && ` · ${fmtDate(task.earlyStart)}`}
+                      {task.earlyFinish && ` → ${fmtDate(task.earlyFinish)}`}
                     </div>
                   </div>
                   <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0">{task.duration}d</div>

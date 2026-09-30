@@ -140,6 +140,12 @@ async function main() {
   ok(permitQs.some(q => /HCAI/.test(q.prompt)), `Pulled ${permitQs.length} CA healthcare permits, e.g. "${permitQs.find(q => /HCAI/.test(q.prompt))?.prompt}"`)
   const llQs = r.data.elicitation.questions.filter(q => q.section === 'procurement')
   ok(llQs.length > 5, `Asked about ${llQs.length} long-lead items, e.g. "${llQs[0].prompt}"`)
+  const stateQ = (await A.get(`/api/plans/${planId}`)).data
+  r = await A.post('/api/plans', { name: 'Toronto check' })
+  const p2 = r.data.plan.id
+  r = await A.patch(`/api/plans/${p2}`, { answers: { 'project.type': { value: 'data_center' }, 'project.state': { value: 'Ontario, Canada' } } })
+  ok(!r.data.errors['project.state'] && r.data.elicitation.assumptions.some(a => a.questionId === 'project.state' && a.kind === 'custom'), 'Location outside the US typed in and planned with generic permitting')
+  void stateQ
   r = await A.patch(`/api/plans/${planId}`, { answers: { 'design.percent': { value: '140' } } })
   ok(r.data.errors['design.percent'], `Invalid answer rejected: ${r.data.errors['design.percent']}`)
   r = await A.patch(`/api/plans/${planId}`, { answers: { 'project.type': { status: 'withheld' } } })
@@ -208,12 +214,40 @@ async function main() {
   x = await A.req('GET', `/api/plans/${planId}/export?format=xml`, undefined, true)
   ok(x.status === 200 && /<Project xmlns="http:\/\/schemas.microsoft.com\/project"/.test(x.text), 'MS Project XML export')
   const xml = x.text
+  const xmlCount = g.activities.length
   x = await A.req('GET', `/api/plans/${planId}/export?format=csv`, undefined, true)
   ok(x.status === 200 && /Activity ID/.test(x.text), 'CSV export')
 
+  /* ── Every export format ── */
+  for (const [fmt, sig, ctype] of [['xer', 'ERMHDR', 'octet-stream'], ['pdf', '%PDF', 'pdf'], ['xlsx-p6', 'PK', 'spreadsheetml'], ['xlsx-import', 'PK', 'spreadsheetml']]) {
+    const res = await fetch(`${BASE}/api/plans/${planId}/export?format=${fmt}`, { headers: { cookie: A.cookie } })
+    const buf = Buffer.from(await res.arrayBuffer())
+    ok(res.status === 200 && buf.subarray(0, sig.length).toString('latin1') === sig && res.headers.get('content-type').includes(ctype), `${fmt} export (${(buf.length / 1024).toFixed(0)} KB, ${res.headers.get('content-disposition').match(/filename="(.+)"/)[1]})`)
+    if (fmt === 'xer') {
+      r = await upload(A, 'roundtrip.xer', buf)
+      ok(r.status === 200 && r.data.summary.activitiesImported === g.activities.length, `Exported XER re-imports (${r.data.summary?.activitiesImported} activities, ${r.data.summary?.relationshipsImported} links)`, r.data)
+    }
+  }
+  x = await A.req('GET', `/api/plans/${planId}/export?format=csv`, undefined, true)
+  ok(/\d{2}\/\d{2}\/\d{4}/.test(x.text) && !/,20\d\d-\d\d-\d\d,/.test(x.text), 'CSV dates are MM/DD/YYYY')
+
+  /* ── Custom answers, notes and added work, after generation ── */
+  r = await A.patch(`/api/plans/${planId}`, { answers: { 'site.conditions': { value: 'Karst limestone with sinkholes' } } })
+  ok(!r.data.errors['site.conditions'] && r.data.elicitation.assumptions.some(a => a.kind === 'custom'), 'Typed "Other" answer accepted and flagged as a custom assumption')
+  r = await A.patch(`/api/plans/${planId}`, { addNote: 'Utility energizes the substation only after owner Cx sign-off.' })
+  ok(r.status === 200 && r.data.answered.some(a => /substation/.test(a.label)), 'Team note added to the brief')
+  const lastFin = r.data.plan.generated.activities.find(a => a.category === 'finishes')
+  r = await A.post(`/api/plans/${planId}/edit`, { edit: { kind: 'add_activity', name: 'Owner IT fit-out', duration: 15, after: lastFin.id, reason: 'Owner scope' } })
+  ok(r.status === 200 && r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), `Activity added: ${r.data.summary}`)
+  r = await A.post(`/api/plans/${planId}/generate`)
+  ok(r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), 'Added activity survives regeneration')
+  x = await A.req('GET', `/api/plans/${planId}/export?format=md`, undefined, true)
+  ok(/substation only after owner Cx/.test(x.text) && /Karst limestone/.test(x.text), 'Basis of Schedule includes the team note and the custom answer')
+  g = r.data.plan.generated
+
   /* ── Round trip: re-import our own XML ── */
   r = await upload(A, 'roundtrip.xml', xml)
-  ok(r.status === 200 && r.data.summary.activitiesImported === g.activities.length, `Exported XML re-imports (${r.data.summary?.activitiesImported} activities)`, r.data)
+  ok(r.status === 200 && r.data.summary.activitiesImported === xmlCount, `Exported XML re-imports (${r.data.summary?.activitiesImported} activities)`, r.data)
   r = await B.get(`/api/plans/${planId}`)
   ok(r.status === 404, "Firm B cannot open Firm A's plan")
 

@@ -12,6 +12,8 @@ export type Edit =
   | { kind: 'add_link'; from: string; to: string; type: LinkType; lag: number; reason: string }
   | { kind: 'remove_link'; linkId: string; reason: string }
   | { kind: 'link'; linkId: string; type?: LinkType; lag?: number; reason: string }
+  /** Add work the tool didn't know about, e.g. "Owner-furnished kitchen equipment install" */
+  | { kind: 'add_activity'; name: string; duration: number; after: string; before?: string; reason: string }
 
 export interface EditImpact {
   finishBefore: string
@@ -75,6 +77,30 @@ export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { sched
       removeActivityBridging({ acts, links }, a.id, o)
       removed.push({ id: a.id, kind: 'activity', name: `${a.code} ${a.name}`, override: o })
       summary = `Removed ${a.code} ${a.name} (logic bridged)`
+      break
+    }
+    case 'add_activity': {
+      const after = getAct(edit.after)
+      const name = String(edit.name || '').trim().slice(0, 200)
+      if (!name) throw new EditError('Give the new activity a name.')
+      const v = Math.round(Number(edit.duration))
+      if (!Number.isFinite(v) || v < 0 || v > 2000) throw new EditError('Duration must be between 0 and 2000 work days.')
+      const before = edit.before ? getAct(edit.before) : [...acts.values()].find(a => a.category === 'substantial_completion') || [...acts.values()].find(a => a.category === 'final_completion')
+      if (before && before.id === after.id) throw new EditError('Pick different activities for "after" and "before".')
+      const id = `user:act:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+      const o: Override = { field: 'name', to: name, reason, by, at }
+      const src = [{ kind: 'override' as const, label: `Added by ${by}`, detail: at }]
+      acts.set(id, {
+        id, code: `U${String(acts.size).padStart(4, '0')}`, name, duration: v, type: v === 0 ? 'milestone' : 'task',
+        calendarId: s.defaultCalendarId, category: 'other', phase: after.phase,
+        rationale: { summary: `Added by ${by}: ${reason}`, sources: src, confidence: 'high' }, overrides: [o],
+      })
+      const lk = (from: string, to: string, why: string) => links.set(`user:${from}>${to}`, {
+        id: `user:${from}>${to}`, from, to, type: 'FS', lag: 0, rationale: { summary: why, sources: src, confidence: 'high' }, overrides: [o],
+      })
+      lk(after.id, id, `Follows ${after.code} ${after.name} (set by ${by}).`)
+      if (before) lk(id, before.id, `Must finish before ${before.code} ${before.name} (set by ${by}).`)
+      summary = `Added “${name}” (${v} days) after ${after.code}${before ? ` and before ${before.code}` : ''}`
       break
     }
     case 'add_link': {

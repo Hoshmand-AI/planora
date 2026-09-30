@@ -37,6 +37,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     answers = { ...answers, [qid]: a }
     plan.audit.push({ at: now, by: ctx.name, action: 'answer', detail: `${qid} = ${status === 'known' ? JSON.stringify(a.value) : status}` })
   }
+  // Free-form information the interview didn't ask about ("add something").
+  if (typeof body.addNote === 'string' && body.addNote.trim()) {
+    const text = body.addNote.trim().slice(0, 2000)
+    const id = `note.${Date.now().toString(36)}`
+    plan.extraQuestions = [...plan.extraQuestions, {
+      id, section: 'project', kind: 'text', impact: 20, allowWithheld: true,
+      prompt: 'Additional information from the project team',
+      why: 'Added by the team; recorded in the Basis of Schedule and considered by the scheduler.',
+      groundedBy: [{ kind: 'user', label: `Added by ${ctx.name}` }],
+    }]
+    answers = { ...answers, [id]: { status: 'known', value: text, answeredAt: now, source: 'user' } }
+    plan.audit.push({ at: now, by: ctx.name, action: 'note', detail: text.slice(0, 200) })
+  }
   plan.answers = answers
   if (typeof body.name === 'string' && body.name.trim()) plan.name = body.name.trim().slice(0, 120)
   const saved = await savePlan(plan)
