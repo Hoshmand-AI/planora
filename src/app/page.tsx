@@ -208,7 +208,7 @@ export default function HomePage() {
               <div className="text-[36px] font-bold text-navy-950">$0<span className="text-[15px] font-medium text-warm-400">/month</span></div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For individual PMs trying AI schedule analysis.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Up to 3 schedules', 'Executive Summary report', '10 AI questions/day', 'P6, MS Project, PDF import', 'Roles, 2-step verification & audit log'].map(f => (
+                {['Up to 3 schedules', 'Executive Summary report', '10 AI questions/day', 'P6, MS Project, PDF import', 'Roles, 2-step verification & audit log', 'API keys & signed webhooks'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>

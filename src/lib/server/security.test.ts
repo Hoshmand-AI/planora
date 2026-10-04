@@ -169,3 +169,29 @@ describe('withheld answers never reach a model', () => {
     expect(JSON.stringify(g)).not.toContain(SECRET)
   })
 })
+
+describe('webhooks and API keys', () => {
+  it('refuses private, loopback, link-local and metadata destinations', async () => {
+    const { isPrivateAddress, urlProblem } = await import('./webhooks')
+    for (const ip of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.5.4', '192.168.1.1', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '224.0.0.1'])
+      expect(isPrivateAddress(ip), ip).toBe(true)
+    for (const ip of ['8.8.8.8', '172.32.0.1', '2606:4700:4700::1111']) expect(isPrivateAddress(ip), ip).toBe(false)
+    expect(await urlProblem('http://example.com/hook')).toMatch(/HTTPS/)
+    expect(await urlProblem('https://169.254.169.254/latest/meta-data')).toMatch(/private/)
+    expect(await urlProblem('https://[::1]/x')).toMatch(/private/)
+    expect(await urlProblem('https://user:pw@example.com/x')).toMatch(/user name/)
+    expect(await urlProblem('not a url')).toMatch(/full URL/)
+  })
+  it('signs deliveries with a timestamped HMAC the receiver can recompute', async () => {
+    const { sign } = await import('./webhooks')
+    const { createHmac } = await import('crypto')
+    const sig = sign('whsec_test', '{"a":1}', 1_790_000_000)
+    expect(sig).toBe(`t=1790000000,v1=${createHmac('sha256', 'whsec_test').update('1790000000.{"a":1}').digest('hex')}`)
+  })
+  it('recognizes only well-formed API keys', async () => {
+    const { looksLikeApiKey, KEY_PREFIX } = await import('./api-keys')
+    expect(looksLikeApiKey(KEY_PREFIX + 'a'.repeat(43))).toBe(true)
+    expect(looksLikeApiKey('pk_live_short')).toBe(false)
+    expect(looksLikeApiKey('Bearer ' + KEY_PREFIX + 'a'.repeat(43))).toBe(false)
+  })
+})

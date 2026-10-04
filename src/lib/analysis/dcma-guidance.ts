@@ -29,6 +29,9 @@ interface Ctx {
 
 export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
   const where = ctx.generated ? 'on the Schedule tab (open the activity → Override)' : 'in P6 / MS Project, then re-upload'
+  // Thresholds come from the check itself, so organization-specific limits read correctly.
+  const pct = /(\d+(?:\.\d+)?)%/.exec(c.threshold)?.[1] ?? '5'
+  const days = /> (\d+)d/.exec(c.threshold)?.[1] ?? '44'
   const filter: GuidanceAction[] = c.offenders.length ? [{ kind: 'filter', label: `Show the ${c.offenders.length} activities`, codes: c.offenders }] : []
   switch (c.id) {
     case 1: return {
@@ -44,7 +47,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
       actions: [...filter],
     }
     case 3: return {
-      id: 3, meaning: 'More than 5% of relationships carry a lag.',
+      id: 3, meaning: `More than ${pct}% of relationships carry a lag.`,
       whyItMatters: 'Lags are invisible time: they can\'t be statused or assigned to anyone.',
       steps: ['Replace long lags (cure time, review periods) with real activities.', 'Keep short lags only where they reflect a physical wait.', `Edit the relationships ${where}.`],
       actions: [...filter],
@@ -56,7 +59,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
       actions: [...filter],
     }
     case 5: return {
-      id: 5, meaning: 'Hard date constraints (mandatory, start-no-later / finish-no-later) on more than 5% of activities.',
+      id: 5, meaning: `Hard date constraints (mandatory, start-no-later / finish-no-later) on more than ${pct}% of activities.`,
       whyItMatters: 'Hard constraints override logic, so the schedule can show dates the work can\'t actually achieve.',
       steps: ['Keep constraints only for true contractual dates.', ctx.hasTargets ? 'Milestone targets from the interview are held as finish-no-later-than; remove targets you don\'t need contractually.' : 'Replace others with logic.'],
       actions: [...filter, ...(ctx.hasTargets ? [{ kind: 'interview' as const, label: 'Review milestone targets' }] : [])],
@@ -64,7 +67,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
     case 6: {
       const mostlyOff = (ctx.offCalendarShare ?? 0) >= 0.5
       return {
-        id: 6, meaning: 'More than 5% of activities have over 44 working days of total float.',
+        id: 6, meaning: `More than ${pct}% of activities have over ${days} working days of total float.`,
         whyItMatters: 'Very high float usually means a missing successor: the activity could slip for months without showing an impact.',
         steps: [
           'Check each flagged activity\'s successors — does it really have nothing waiting on it?',
@@ -82,13 +85,13 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
     case 8: {
       const mostlyOff = (ctx.offCalendarShare ?? 0) >= 0.5
       return {
-        id: 8, meaning: 'More than 5% of activities last longer than 44 working days.',
+        id: 8, meaning: `More than ${pct}% of activities last longer than ${days} working days.`,
         whyItMatters: 'Long activities are hard to status: progress is a guess until they finish.',
         steps: [
-          mostlyOff ? 'Flagged items are mostly design phases, agency reviews and fabrication. Their length is set by others and is normal — accept with a justification, or break design into submission packages.' : 'Split long field activities by floor or area so each piece is 44 days or less.',
+          mostlyOff ? 'Flagged items are mostly design phases, agency reviews and fabrication. Their length is set by others and is normal — accept with a justification, or break design into submission packages.' : `Split long field activities by floor or area so each piece is ${days} days or less.`,
           `Edit durations ${where}.`,
         ],
-        actions: [...filter, ...(ctx.generated && mostlyOff ? [{ kind: 'accept' as const, label: 'Accept as justified', suggestedNote: 'Long durations are design phases, agency reviews and supplier fabrication, which are controlled by others; field work is detailed to 44 days or less.' }] : [])],
+        actions: [...filter, ...(ctx.generated && mostlyOff ? [{ kind: 'accept' as const, label: 'Accept as justified', suggestedNote: `Long durations are design phases, agency reviews and supplier fabrication, which are controlled by others; field work is detailed to ${days} days or less.` }] : [])],
       }
     }
     case 9: return {

@@ -53,7 +53,7 @@ const TABS = [
   { href: '/dashboard/history',  icon: Database,        label: 'Firm data' },
 ]
 
-const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href || pathname.startsWith('/dashboard/portfolio') : pathname.startsWith(href)
 
 interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; host: string | null; error?: string }
 const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
@@ -78,6 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [org,              setOrg]              = useState<{ id: string; name: string } | null>(null)
   const [permissions,      setPermissions]      = useState<string[]>([])
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
+  const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
 
   /* ── Auth ── */
@@ -88,6 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setOrg(data.org ?? null)
       setPermissions(data.permissions ?? [])
       setMfaSetupRequired(!!data.security?.mfaSetupRequired)
+      setEmailUnconfirmed(!!data.security?.emailDelivery && !data.security?.emailVerified)
     })
   }, [router])
 
@@ -258,6 +260,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* ── Main content ────────────────────────────────────── */}
         {/* pb-16 on mobile = space for bottom tab bar */}
         <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0 focus:outline-none">
+          {emailUnconfirmed && pathname !== '/dashboard/account' && (
+            <div role="status" className="bg-status-attention-bg border-b border-status-attention/40 px-4 md:px-6 py-2 text-[13px] text-warm-700">
+              Confirm your email address with the link we sent you. Until then, inviting people, API keys and data export are paused. <Link href="/dashboard/account" className="font-medium text-accent-600 hover:underline">Resend the link</Link>
+            </div>
+          )}
           <div className="max-w-5xl mx-auto">
             {children}
           </div>

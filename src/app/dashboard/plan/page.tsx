@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ClipboardList, Plus, ArrowRight, Loader2 } from 'lucide-react'
+import { ClipboardList, Plus, ArrowRight, Loader2, Sparkles } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
 
 interface PlanRow {
@@ -29,6 +29,15 @@ export default function PlansPage() {
     const data = await res.json()
     setCreating(false)
     if (!res.ok) { setError(data.error || 'Could not create plan.'); return }
+    router.push(`/dashboard/plan/${data.plan.id}`)
+  }
+
+  const trySample = async () => {
+    setCreating(true); setError('')
+    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sample: true }) })
+    const data = await res.json().catch(() => ({}))
+    setCreating(false)
+    if (!res.ok) { setError(data.error || 'Could not create the sample project.'); return }
     router.push(`/dashboard/plan/${data.plan.id}`)
   }
 
@@ -60,6 +69,10 @@ export default function PlansPage() {
         <div className="border border-dashed border-warm-300 rounded-lg p-10 text-center">
           <ClipboardList size={22} className="mx-auto text-warm-400 mb-2" />
           <p className="text-[14px] text-warm-500">No plans yet. Name your project above to start the interview.</p>
+          <p className="text-[14px] text-warm-500 mt-3">New to Planora? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
+          <button onClick={trySample} disabled={creating} className="mt-3 inline-flex items-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 px-4 py-2 rounded-md text-[13.5px] font-medium disabled:opacity-50">
+            {creating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Open a sample project
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: planora
           POSTGRES_PASSWORD: planora
@@ -63,6 +63,10 @@ jobs:
       PLANORA_AI_MODE: offline
       PLANORA_DEFAULT_PLAN: pro
       PLANORA_ALLOW_INSECURE_OIDC: '1'
+      # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
+      PLANORA_ALLOW_INSECURE_WEBHOOKS: '1'
+      PLANORA_EMAIL_OUTBOX: /tmp/planora-outbox
+      WEBHOOK_RECEIVER_PORT: '4020'
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
     steps:
@@ -72,6 +76,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: PostgreSQL 17 client tools (same major version as production)
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
       - run: npm run build
       - name: Start test identity provider and app
         run: |

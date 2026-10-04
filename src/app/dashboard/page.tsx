@@ -4,18 +4,26 @@ import { useApp } from './layout'
 import { StickyBar } from '@/components/StickyBar'
 import { Upload } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
+import Link from 'next/link'
+import { Portfolio } from '@/components/Portfolio'
 
 export default function DashboardPage() {
   const { selectedSchedule, metrics } = useApp()
 
   if (!selectedSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+      <div className="p-5 md:p-6 space-y-6">
+        <section aria-labelledby="portfolio-h">
+          <h1 id="portfolio-h" className="text-[17px] font-semibold text-navy-950 mb-3">Portfolio</h1>
+          <Portfolio compact />
+        </section>
+      <div className="flex flex-col items-center justify-center py-12 text-center px-6">
         <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
           <Upload size={20} className="text-warm-400" />
         </div>
         <div className="text-[17px] font-semibold text-navy-950 mb-2">Upload a schedule to get started</div>
         <p className="text-[14px] text-warm-500 max-w-[360px]">Upload a Primavera P6 (.xer), MS Project (.xml), or PDF file to see your project dashboard.</p>
+      </div>
       </div>
     )
   }
@@ -55,6 +63,7 @@ export default function DashboardPage() {
         </span>
       </div>
       </StickyBar>
+      <Link href="/dashboard/portfolio" className="inline-block text-[13px] font-medium text-accent-600 hover:underline">All projects and alerts (portfolio) →</Link>
 
       {/* About this project — what, where, when, what must be achieved */}
       {brief && (

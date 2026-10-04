@@ -101,7 +101,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const b = new Builder()
   // Questions not answered yet are planned with their defaults, and said so explicitly (with the same
   // buffers as "don't know") so generating early never hides guesses.
-  const notYet = elic.questions.filter(q => q.section !== 'history' && q.section !== 'milestones' && !q.id.startsWith('ai.') && !q.id.startsWith('note.'))
+  const notYet = elic.questions.filter(q => q.section !== 'history' && q.section !== 'milestones' && q.section !== 'cost' && !q.id.startsWith('ai.') && !q.id.startsWith('note.'))
   const assumptions: Assumption[] = [...elic.assumptions, ...notYet.map(q => notAnsweredAssumption(q, bank))]
   const notes: string[] = [
     'Permit review times and lead times are reference ranges. Verify with the Authority Having Jurisdiction and suppliers before baselining.',

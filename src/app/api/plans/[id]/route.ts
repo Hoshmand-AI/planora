@@ -6,13 +6,13 @@ import { coerceAnswer, elicit, questionBank, validateAnswer } from '@/lib/planni
 import type { Answer } from '@/lib/planning/types'
 import { elicitationContext, loadPlanContext, planView } from './context'
 
-export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   return NextResponse.json(await planView(r.plan, r.ctx.orgId))
 })
 
 /** Record interview answers: { answers: { [questionId]: { status, value?, note? } }, name? } */
-export const PATCH = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+export const PATCH = api<{ id: string }>({ permission: 'plan.write', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const body = await req.json().catch(() => ({}))

@@ -357,6 +357,8 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const finish = parseDateCell(get(row, 'finish'))
     // WBS band / grouping row (P6 & MSP exports): a label with no id, duration or dates
     if (F.has('code') && !code && cellText(durCell) === '' && !start && !finish) { group = name; return }
+    // Outline/summary row (MS Project "Outline Level" sheets number every row): no duration, dates or logic.
+    if (F.has('duration') && cellText(durCell) === '' && !start && !finish && !txt(row, 'preds') && !txt(row, 'succs')) { group = name; return }
 
     let duration = parseDurationDays(durCell)
     if (duration === null && !F.has('duration') && start && finish) {

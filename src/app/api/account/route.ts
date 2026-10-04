@@ -5,13 +5,16 @@ import { passwordProblem } from '@/lib/server/password'
 import { audit, listAudit } from '@/lib/server/audit'
 import { beginEnrollment, confirmEnrollment, consumeSecondFactor, disableMfa, regenerateRecoveryCodes } from '@/lib/server/mfa'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
+import { sendVerificationEmail } from '@/lib/server/email-verification'
+import { appOrigin, emailConfigured } from '@/lib/server/email'
 
 /** Your account: profile, active sessions and two-step verification status. */
 export const GET = api({ permission: 'read', allowMfaSetup: true }, async (_req, { auth }) => {
   const user = await getUserById(auth.userId)
   if (!user) throw new ApiError(404, 'Account not found')
   return json({
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt, emailVerifiedAt: user.emailVerifiedAt },
+    emailDelivery: emailConfigured(),
     org: { id: auth.orgId, name: auth.orgName },
     mfa: { enabled: !!user.mfaEnabledAt, enabledAt: user.mfaEnabledAt, recoveryCodesLeft: user.mfaRecovery.length, required: auth.settings.requireMfa },
     sessions: (await listSessions(user.id)).map(s => ({ ...s, current: s.id === auth.sessionId })),
@@ -35,6 +38,15 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
   }
 
   switch (b.action) {
+    case 'resend_verification': {
+      if (user.emailVerifiedAt) return json({ success: true, alreadyVerified: true })
+      if (!emailConfigured()) throw new ApiError(400, 'Email delivery is not set up on this Planora installation yet.', 'email_unavailable')
+      const rl = await hit(`verify:resend:${user.id}`, 3, 60 * 60)
+      if (!rl.ok) throw new ApiError(429, 'We already sent a few links. Check your inbox and spam folder, or try again in an hour.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
+      const sent = await sendVerificationEmail(user, appOrigin(req))
+      if (!sent) throw new ApiError(502, 'We could not send the email right now. Try again shortly.')
+      return json({ success: true })
+    }
     case 'update_profile': {
       const name = typeof b.name === 'string' ? b.name.trim().slice(0, 120) : ''
       if (!name) throw new ApiError(400, 'Name required.')

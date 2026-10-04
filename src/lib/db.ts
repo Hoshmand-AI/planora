@@ -129,6 +129,7 @@ export interface User {
   mfaEnabledAt: string | null
   mfaLastStep: number | null
   mfaRecovery: string[]
+  emailVerifiedAt: string | null
 }
 
 function rowToUser(row: Record<string, unknown>): User {
@@ -139,6 +140,7 @@ function rowToUser(row: Record<string, unknown>): User {
     role: (row.role as string) || 'viewer', disabledAt: ts(row.disabled_at), failedLogins: Number(row.failed_logins || 0), lockedUntil: ts(row.locked_until),
     mfaSecret: (row.mfa_secret as string) || null, mfaEnabledAt: ts(row.mfa_enabled_at),
     mfaLastStep: row.mfa_last_step != null ? Number(row.mfa_last_step) : null, mfaRecovery: (row.mfa_recovery as string[]) || [],
+    emailVerifiedAt: ts(row.email_verified_at),
   }
 }
 
@@ -423,12 +425,14 @@ export interface Plan {
 /** Audit entries already persisted when the plan was loaded (new ones are appended to the audit log on save). */
 const loadedAuditLength = new WeakMap<Plan, number>()
 
+const isoTs = (v: unknown) => { const d = v instanceof Date ? v : new Date(String(v)); return isNaN(d.getTime()) ? String(v) : d.toISOString() }
+
 function rowToPlan(r: Record<string, unknown>): Plan {
   return {
     id: r.id as string, orgId: r.org_id as string, userId: r.user_id as string, name: r.name as string,
     answers: (r.answers as Record<string, Answer>) || {}, extraQuestions: (r.extra_questions as Question[]) || [], generated: (r.generated as GeneratedSchedule) || null,
     reviews: (r.reviews as ExpertReview[]) || [], decisions: (r.decisions as Record<string, PlanDecision>) || {}, audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
-    createdAt: String(r.created_at), updatedAt: String(r.updated_at), version: Number(r.version ?? 1),
+    createdAt: isoTs(r.created_at), updatedAt: isoTs(r.updated_at), version: Number(r.version ?? 1),
   }
 }
 

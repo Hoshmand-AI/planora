@@ -82,6 +82,11 @@ All endpoints below require an authenticated session except `POST /api/auth` (lo
 | `GET/POST /api/schedules/[id]/quality` | DCMA results, data questions, decisions |
 | `GET/POST /api/history` | Firm history and tagging |
 | `POST /api/ask`, `POST /api/reports` | Ask AI, narrative reports |
+| `GET /api/portfolio` | Portfolio: every plan and uploaded schedule with alerts |
+| `GET/POST /api/org/integrations` | API keys and webhooks (admins) |
+| `GET /api/auth/verify` | Email confirmation link (public) |
+
+Selected read endpoints (and answering/generating, for scheduler keys) also accept an organization API key. See [docs/API.md](API.md).
 
 ---
 
@@ -182,6 +187,18 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | REC-01 | Set a required finish earlier than the calculated finish | The header shows "Required finish N days late". A recovery panel explains the gap in calendar and work days, the negative float and the top drivers |
 | REC-02 | Review the options (6-day week, early packages, expedite, add crews, answer questions, move date) | Each shows its new finish, days saved, whether it meets the date, and its trade-off. A combined result is shown |
 | REC-03 | Apply one option | The schedule recalculates, the finish matches the modeled date, and an audit entry is written |
+| REC-04 | Answer the Cost basis questions (field labor per day, cost of each late day) | Each option shows its resources, an added-cost range and the delay cost avoided; without the answers it says "not priced" |
+| REC-05 | Build → "Open a sample project" (new organization) | A fully answered sample opens with a schedule, a missed required date and priced recovery options |
+
+### 5.5a Portfolio, integrations and email
+
+| ID | Steps | Expected result |
+|---|---|---|
+| POR-01 | Overview → "All projects and alerts (portfolio)" | Every plan and uploaded schedule, most urgent first, with status and alerts (late, milestone late, date conflict, review, stale data date) |
+| INT-01 | Organization → Integrations → create a read-only API key; call `GET /api/portfolio` with it | Works; the key is shown once; calling `/api/org` with it returns 403; after revoking it returns 401 |
+| INT-02 | Add a webhook to an HTTPS endpoint (e.g. a request-bin), "Send test", then create a plan | Signed deliveries arrive; `http://` and private addresses are refused |
+| EML-01 | With an email provider configured, sign up a new organization | A confirmation email arrives; inviting people is blocked until the link is clicked; the link works once |
+| QRL-01 | Organization → Policies → raise "High duration above" to 60 | Quality results state "remaining > 60d" and re-judge check 8 |
 
 ### 5.6 Quality (DCMA 14-point) and evaluation
 
@@ -272,7 +289,7 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | 6 | No role-based permissions | **Fixed:** owner, admin, scheduler, reviewer and viewer roles, enforced on every route |
 | 7 | Reference ranges | Unchanged by design (shown as ranges; verify with the AHJ and suppliers). Now also drive the Monte Carlo ranges |
 | 8 | `pg` SSL-mode warning | **Fixed:** verified TLS, and `sslmode` is stripped from the URL |
-| 9 | Recovery options are what-if models | Unchanged; the Monte Carlo analysis now gives the probability of meeting the date |
+| 9 | Recovery options are what-if models | Still what-if models; the Monte Carlo analysis gives the probability of meeting the date, and (round 2) each option shows resources, an added-cost range and the delay cost avoided |
 | 10 | DCMA checks 10–14 need extra data | Unchanged (N/A when the data is absent) |
 
 ## 8. Deliverables requested from QA/QC and audit

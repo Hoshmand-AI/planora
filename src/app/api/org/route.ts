@@ -9,6 +9,8 @@ import { aiQuotaKey, peek } from '@/lib/server/rate-limit'
 import { consumeSecondFactor } from '@/lib/server/mfa'
 import { normalizeSso, publicSso, saveSsoConfig, ssoConfigFor } from '@/lib/server/sso'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
+import { requireVerifiedEmail } from '@/lib/server/email-verification'
+import { appOrigin, sendEmail } from '@/lib/server/email'
 
 /** Organization overview: members are visible to every member; invitations and settings to admins. */
 export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
@@ -48,10 +50,16 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
     case 'invite': {
       if (!isRole(b.role)) throw new ApiError(400, 'Pick a role.')
       if (!canAssign(actorRole, b.role)) throw new ApiError(403, 'Only an owner can invite owners or admins.')
+      requireVerifiedEmail(auth)
       const { invitation, token } = await createInvitation(auth.orgId, String(b.email || ''), b.role, auth.userId)
-      await audit({ action: 'member.invited', targetType: 'invitation', targetId: invitation.id, detail: { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt } })
-      const origin = new URL(req.url).origin
-      return json({ invitation, link: `${origin}/auth?invite=${encodeURIComponent(token)}`, expiresInDays: INVITE_DAYS })
+      const link = `${appOrigin(req)}/auth?invite=${encodeURIComponent(token)}`
+      // Emailed when a provider is configured; the link is always shown to the admin as well.
+      const emailed = (await sendEmail({
+        to: invitation.email, subject: `${auth.name} invited you to ${auth.orgName} on Planora`,
+        text: `${auth.name} (${auth.email}) invited you to join ${auth.orgName} on Planora as ${ROLE_LABELS[b.role]}.\n\nAccept the invitation:\n\n${link}\n\nThe link works once, only for this email address, and expires in ${INVITE_DAYS} days.\n\n— Planora by Hoshmand AI`,
+      })).sent
+      await audit({ action: 'member.invited', targetType: 'invitation', targetId: invitation.id, detail: { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt, emailed } })
+      return json({ invitation, link, emailed, expiresInDays: INVITE_DAYS })
     }
     case 'revoke_invite': {
       if (!b.invitationId || !(await revokeInvitation(auth.orgId, String(b.invitationId)))) throw new ApiError(404, 'Invitation not found.')
@@ -108,7 +116,8 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       const turningOnMfa = after.requireMfa && !before.requireMfa
       if (turningOnMfa && !auth.mfaEnabled) throw new ApiError(400, 'Turn on two-step verification for your own account first (Account → Security), so you are not locked out.')
       await query('UPDATE organizations SET settings=$2 WHERE id=$1', [auth.orgId, JSON.stringify(after)])
-      const changed = Object.fromEntries(Object.keys(after).filter(k => after[k as keyof OrgSettings] !== before[k as keyof OrgSettings]).map(k => [k, { before: before[k as keyof OrgSettings], after: after[k as keyof OrgSettings] }]))
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+      const changed = Object.fromEntries(Object.keys(after).filter(k => !same(after[k as keyof OrgSettings], before[k as keyof OrgSettings])).map(k => [k, { before: before[k as keyof OrgSettings], after: after[k as keyof OrgSettings] }]))
       if (Object.keys(changed).length) await audit({ action: 'org.settings_changed', targetType: 'organization', targetId: auth.orgId, detail: changed })
       return json({ success: true, settings: after })
     }
@@ -127,6 +136,7 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       return json({ success: true, sso: after })
     }
     case 'export_data': {
+      requireVerifiedEmail(auth)
       const data = await exportOrganization(auth.orgId)
       await audit({ action: 'privacy.organization_exported', targetType: 'organization', targetId: auth.orgId, detail: { plans: data.plans.length, schedules: data.schedules.length, auditEvents: data.auditEvents.length } })
       return new Response(JSON.stringify(data, null, 2), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="planora-organization-export-${new Date().toISOString().slice(0, 10)}.json"` } })

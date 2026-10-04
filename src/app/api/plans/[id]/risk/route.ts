@@ -8,7 +8,7 @@ import { loadPlanContext } from '../context'
 const cache = new Map<string, SraResult>()
 
 /** Monte Carlo schedule risk analysis of the plan's current schedule. */
-export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const { plan } = await loadPlanContext(req, params.id, auth)
   if (!plan.generated?.cpm) throw new ApiError(400, 'Generate the schedule first.')
   const key = `${plan.id}:${plan.version}:${plan.generated.generatedAt}`

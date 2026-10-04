@@ -14,7 +14,7 @@ import { PROJECT_TYPES } from '@/lib/planning/types'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
-export const GET = api({ permission: 'read' }, async (req, { auth: ctx }) => {
+export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth: ctx }) => {
   const scheduleId = req.nextUrl.searchParams.get('id')
 
   if (scheduleId) {

@@ -235,6 +235,23 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     }
   }
 
+  // Cost basis: only matters once there is a date to protect. Never changes the schedule; it prices
+  // the recovery options (overtime, added crews) against delay costs. Commercial data, so withholdable.
+  if (known(answers, 'project.required_finish')) {
+    qs.push(
+      {
+        id: 'cost.labor_per_day', section: 'cost', kind: 'number', unit: 'USD per work day', impact: 10, allowWithheld: true,
+        prompt: 'Roughly what does field labor cost per work day on this project (all trades on site)?',
+        why: 'Prices the recovery options: overtime and added crews are a premium on this figure.',
+      },
+      {
+        id: 'cost.delay_per_day', section: 'cost', kind: 'number', unit: 'USD per calendar day', impact: 10, allowWithheld: true,
+        prompt: 'What does each day of late completion cost (liquidated damages plus extended general conditions)?',
+        why: 'Shows whether accelerating pays for itself: days saved × this figure versus the cost of the recovery option.',
+      },
+    )
+  }
+
   if (ctx.history && ctx.history.projectCount > 0) {
     qs.push({
       id: 'history.use', section: 'history', kind: 'boolean', impact: 40, allowWithheld: false,
@@ -410,7 +427,7 @@ export function elicit(state: InterviewState, ctx: ElicitationContext = {}): Eli
   }
 
   // Ask the highest-impact gaps first; keep sections together for ties so the interview reads naturally.
-  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'milestones', 'history']
+  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'milestones', 'cost', 'history']
   open.sort((a, b) => b.impact - a.impact || order.indexOf(a.section) - order.indexOf(b.section))
 
   return {

@@ -1,6 +1,7 @@
 import type { AuthContext } from '@/lib/auth'
 import { ApiError, ConflictError } from '@/lib/server/api'
-import { getPlan, type Plan } from '@/lib/db'
+import { getOrganization, getPlan, type Plan } from '@/lib/db'
+import { normalizeSettings } from '@/lib/server/settings'
 import { elicit, questionBank, type ElicitationContext } from '@/lib/planning/elicitation'
 import { evaluatePlan } from '@/lib/planning/evaluation'
 import { recoveryPlan } from '@/lib/planning/recovery'
@@ -45,7 +46,8 @@ export async function planView(plan: Plan, orgId: string) {
       : q?.options?.find(o => o.value === a.value)?.label ?? (typeof a.value === 'boolean' ? (a.value ? 'Yes' : 'No') : `${a.value}${q?.unit && q.unit !== 'sf' ? ' ' + q.unit : q?.unit === 'sf' ? ' sf' : ''}`)
     return { id, prompt: q?.prompt ?? id, section: q?.section ?? 'project', label, status: a.status, value: a.value ?? null, note: a.note ?? null, custom: !!a.custom }
   })
-  const evaluation = plan.generated ? evaluatePlan(plan.generated, plan.answers, history, plan.reviews) : null
+  const rules = normalizeSettings((await getOrganization(orgId))?.settings).quality
+  const evaluation = plan.generated ? evaluatePlan(plan.generated, plan.answers, history, plan.reviews, rules) : null
   const recovery = plan.generated ? recoveryPlan(plan.generated, plan.answers, history) : null
   const offCal = new Set((plan.generated?.activities || []).filter(a => a.calendarId === 'cal-7d' || a.phase === 'design').map(a => a.code))
   const guidance = evaluation ? evaluation.dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({

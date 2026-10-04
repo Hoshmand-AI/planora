@@ -1,6 +1,6 @@
 # Audit remediation report
 
-Response to *Planora Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k`.
+Response to *Planora Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k` (round 1) and extended the same day (round 2: portfolio, sample project, priced recovery, API keys and webhooks, email verification, security alerting, configurable quality rules, round-trip interoperability corpus).
 
 **Legend**
 - ✅ **Fixed:** implemented in code and covered by automated tests.
@@ -51,20 +51,20 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | # | Aspect | Status | What changed / evidence |
 |---|---|---|---|
 | 9 | Time-to-value | — | Unchanged (upload → analysis) |
-| 10 | Onboarding | ◐ | The invitation flow shows organization and role. A guided sample project is still to do |
+| 10 | Onboarding | ✅ | Round 2: one-click **sample project** on the Build page (fully answered medical office with a generated schedule, a missed required date, priced recovery options and risk analysis). Invitations are emailed when email delivery is configured. Tests: `sample.test.ts`, e2e |
 | 11 | Interview workflow | — | Unchanged strength |
 | 12 | Unknown/withheld handling | ✅ | Withheld values are now provably excluded (tests). Uncertainty propagates into the Monte Carlo ranges (low confidence widens them) |
-| 13 | Recovery workflow | ◐ | Each option is still modeled on the network. Probability of meeting the date now comes from Monte Carlo. Cost/resource consequences still to do |
+| 13 | Recovery workflow | ✅ | Round 2: each option now shows its **resource impact** (overtime hours, added crew share, supplier commitments), an **added-cost range** from the project's field labor cost, and the **delay cost avoided** (days saved × cost of each late day). Cost basis is two optional, withholdable interview questions. Tests: `decisions.test.ts` |
 | 14 | Decision traceability | ✅ | Every material state change is in the append-only audit log, with plan version and detail |
 | 15 | Collaboration | ✅ | Multi-member organizations, roles, invitations, independent review and approval-to-publish policies, conflict-safe concurrent editing |
-| 16 | Monitor lifecycle | ◐ | Unchanged baseline/dashboard; portfolio alerts still to do |
+| 16 | Monitor lifecycle | ✅ | Round 2: **Portfolio** (Overview → portfolio) lists every plan and uploaded schedule with alerts: late against the required date, milestone targets forecast late, date conflicts, rejected or stale reviews, unpublished baselines, slipped finishes, overdue status updates (data date > 45 days), passed finish dates. Webhooks push plan and schedule events. Tests: `portfolio.test.ts`, e2e |
 
 ## 5. Construction scheduling & domain correctness
 
 | # | Aspect | Status | What changed / evidence |
 |---|---|---|---|
-| 17–20 | CPM, calendars, relationships, constraints | ◐ | Performance budgets added (100k activities in < 1 s). Independent P6 parity corpus planned: [VALIDATION-PLAN.md](VALIDATION-PLAN.md) |
-| 21 | DCMA checks | ◐ | Unchanged; independent metric validation is in the validation plan |
+| 17–20 | CPM, calendars, relationships, constraints | ✅◐ | Performance budgets (100k activities < 1 s). Round 2: an interoperability corpus (5 schedules: 5×8 with holidays, 6×10, 4×10, design-build, CM-at-risk with a required date) is exported, re-imported and **re-scheduled from scratch**; every activity's early start/finish and total float must match. Parity against P6/MS Project themselves remains the reference corpus in [VALIDATION-PLAN.md](VALIDATION-PLAN.md) (👤) |
+| 21 | DCMA checks | ✅◐ | Round 2: thresholds are configurable per organization (Policies → quality thresholds), default to the published values, and every result states the threshold used. Independent metric validation remains in the validation plan |
 | 22 | Input self-checking | — | Unchanged |
 | 23 | Risk / P50/P80 methodology | ✅ | **Monte Carlo SRA** in `src/lib/planning/sra.ts`:<br>• the full CPM per iteration;<br>• triangular distributions from catalog, firm-history or kind-of-work ranges;<br>• Gaussian-copula correlation for field work;<br>• P10–P90, a histogram and the probability of meeting the required date;<br>• criticality index and Spearman sensitivity;<br>• seeded, so runs are reproducible.<br>Shown in the UI, the Basis of Schedule and the PDF. Tested in `sra.test.ts` |
 | 24 | Historical backtesting | ◐ | Firm ratios now calibrate the simulation's ranges. Larger datasets need customers |
@@ -84,7 +84,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
 
 | # | Aspect | Status | What changed / evidence |
 |---|---|---|---|
-| 33–39 | Imports, exports, round-trip | ◐ | Unchanged. Round-trip parity is in the validation plan |
+| 33–39 | Imports, exports, round-trip | ✅ | Round 2: `roundtrip.test.ts` proves P6 XER and MS Project XML round trips reproduce identical CPM dates and float, and the Excel import workbook keeps every activity, duration and link. It found and fixed a defect: WBS summary rows in the Excel workbook were re-imported as activities |
 | 40 | Export safety | ✅ | `neutralizeFormula` in `src/lib/export/csv.ts` (also applied to the audit CSV). Excel exports write values, never formulas. Tested |
 
 ## 8. Architecture & scalability
@@ -97,7 +97,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | 44 | Concurrent editing | ✅ | `plans.version` plus a conditional update; clients send `x-plan-version`; 409 with a reload prompt. Tested end to end |
 | 45 | Connection management | ✅ | Pool size, connect and idle timeouts are configurable; health latency is reported |
 | 46 | Stateless scaling | ✅ | Sessions, limits and locks live in PostgreSQL. [CAPACITY.md](../operations/CAPACITY.md) |
-| 47 | Background processing | ◐ | Retention runs as a claimed hourly job. Large uploads remain synchronous (25 MB cap) |
+| 47 | Background processing | ◐ | Retention runs as a claimed hourly job; webhook and alert deliveries run after the response (never blocking the user). Large uploads remain synchronous (25 MB cap, parse well under the function limit) |
 | 48 | Very large schedules | ✅ | 10k / 50k / 100k-activity budgets enforced in CI (0.1 s / 0.37 s / 0.88 s measured) |
 
 ## 9. QA, reliability & release engineering
@@ -161,9 +161,9 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | 83 | Organization admin | ✅ | Organization page: members, invitations, policies (MFA, independent review, approval, AI, quotas, idle timeout, retention), audit log, data export, SSO, deletion |
 | 84 | SSO / SCIM | ✅◐ | OIDC SSO implemented and tested against a test identity provider. 👤 SCIM (POA&M #6) |
 | 85 | Approval workflows | ✅ | Independent-review and approval-before-publish policies, tied to the exact schedule generation |
-| 86 | Portfolio management | ◐ | Not started |
-| 87 | Customer configuration | ◐ | Organization policies are configurable; custom templates and rules are a future item |
-| 88 | Public API | ◐ | Not started (service accounts and webhooks are future items) |
+| 86 | Portfolio management | ✅ | Round 2: organization-wide portfolio with status, required vs forecast dates, interview readiness and alerts, most urgent first; also available to integrations via `GET /api/portfolio` |
+| 87 | Customer configuration | ✅◐ | Organization policies plus, in round 2, configurable quality rules (DCMA thresholds) used by quality checks, plan evaluation and AI reports. Custom activity templates remain a future item |
+| 88 | Public API | ✅ | Round 2: organization **API keys** (read-only or scheduler, expiring, revocable, hashed at rest, usage tracked, audited) on opted-in endpoints, and **signed webhooks** (HMAC-SHA256 with timestamp, HTTPS-only, private-network destinations refused, auto-disabled after 20 failures). Guide: [API.md](../API.md). Tests: unit + e2e |
 
 ## 14. Government, defense & compliance
 

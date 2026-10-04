@@ -1,3 +1,5 @@
+import { DEFAULT_DCMA_RULES, normalizeDcmaRules, type DcmaRules } from '@/lib/analysis/dcma'
+
 // Organization-level policy, editable by admins. Stored as JSON on the organization; always read
 // through normalizeSettings so missing or invalid values fall back to safe defaults.
 
@@ -18,6 +20,8 @@ export interface OrgSettings {
   chatRetentionDays: number
   /** Delete plans and uploaded schedules not changed in this many days (0 = keep until deleted). */
   projectRetentionDays: number
+  /** Quality-check thresholds (DCMA 14-point), defaulting to the published values */
+  quality: DcmaRules
 }
 
 export const DEFAULT_SETTINGS: OrgSettings = {
@@ -29,6 +33,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   sessionIdleHours: 12,
   chatRetentionDays: 365,
   projectRetentionDays: 0,
+  quality: DEFAULT_DCMA_RULES,
 }
 
 const clamp = (v: unknown, lo: number, hi: number, d: number) => {
@@ -38,7 +43,7 @@ const clamp = (v: unknown, lo: number, hi: number, d: number) => {
 
 export function normalizeSettings(raw: unknown): OrgSettings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  const b = (k: keyof OrgSettings) => typeof r[k] === 'boolean' ? r[k] as boolean : DEFAULT_SETTINGS[k] as boolean
+  const b = (k: keyof OrgSettings) => typeof r[k] === 'boolean' ? r[k] as boolean : DEFAULT_SETTINGS[k] as unknown as boolean
   return {
     requireMfa: b('requireMfa'),
     requireIndependentReview: b('requireIndependentReview'),
@@ -48,5 +53,6 @@ export function normalizeSettings(raw: unknown): OrgSettings {
     sessionIdleHours: clamp(r.sessionIdleHours, 1, 24, DEFAULT_SETTINGS.sessionIdleHours),
     chatRetentionDays: clamp(r.chatRetentionDays, 0, 3650, DEFAULT_SETTINGS.chatRetentionDays),
     projectRetentionDays: clamp(r.projectRetentionDays, 0, 3650, DEFAULT_SETTINGS.projectRetentionDays),
+    quality: normalizeDcmaRules(r.quality),
   }
 }

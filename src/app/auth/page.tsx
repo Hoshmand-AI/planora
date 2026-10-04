@@ -24,6 +24,7 @@ function AuthForm() {
   const [code, setCode] = useState('')
   const [ssoMode, setSsoMode] = useState(false)
   useEffect(() => { const e = searchParams.get('sso_error'); if (e) { setError(e); setSsoMode(true) } }, [searchParams])
+  useEffect(() => { if (searchParams.get('verified') === '0') setError('That confirmation link is invalid or has expired. Sign in and resend it from Account → Profile.') }, [searchParams])
 
   const handleSso = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -49,6 +49,7 @@ export async function appendAudit(inputs: AuditInput[]): Promise<void> {
     byOrg.set(org, [...(byOrg.get(org) || []), i])
   }
   for (const [orgId, list] of byOrg) {
+    const written: { id: string; action: string; at: string; targetType: string | null; targetId: string | null; detail: Record<string, unknown>; actorEmail: string | null }[] = []
     await withTransaction(async q => {
       await q('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey(orgId)])
       const last = await q('SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1', [orgId])
@@ -68,8 +69,14 @@ export async function appendAudit(inputs: AuditInput[]): Promise<void> {
                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
           [e.id, e.orgId, e.at, e.actorId, e.actorEmail, e.action, e.targetType, e.targetId, JSON.stringify(e.detail), e.ip, e.userAgent, e.requestId, prev, hash])
         prev = hash
+        written.push(e)
       }
     })
+    // Webhooks and security alerts go out after the record is committed, never blocking the request.
+    if (orgId !== SYSTEM_ORG) {
+      const { dispatchEvents } = await import('./webhooks')
+      dispatchEvents(orgId, written)
+    }
   }
 }
 

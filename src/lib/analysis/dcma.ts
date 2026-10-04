@@ -24,6 +24,34 @@ import { defaultCalendar, isValidDate, toDayNumber, workDaysBetween } from '@/li
 export const HIGH_FLOAT_DAYS = 44
 export const HIGH_DURATION_DAYS = 44
 export const CP_TEST_DAYS = 600
+
+/**
+ * Thresholds an organization may tune to its own standard (Organization → Policies). Defaults are
+ * the published DCMA 14-point values; every report states the threshold it was judged against.
+ */
+export interface DcmaRules {
+  /** Checks 1, 3, 5, 6, 8, 11: maximum share of offending activities (%) */
+  maxPct: number
+  /** Check 4: minimum share of finish-to-start relationships (%) */
+  minFsPct: number
+  /** Check 6: total float above this many work days counts as high */
+  highFloatDays: number
+  /** Check 8: remaining duration above this many work days counts as high */
+  highDurationDays: number
+  /** Checks 13 and 14: minimum CPLI and BEI */
+  indexTarget: number
+}
+
+export const DEFAULT_DCMA_RULES: DcmaRules = { maxPct: 5, minFsPct: 90, highFloatDays: HIGH_FLOAT_DAYS, highDurationDays: HIGH_DURATION_DAYS, indexTarget: 0.95 }
+
+export function normalizeDcmaRules(raw: unknown): DcmaRules {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const n = (k: keyof DcmaRules, lo: number, hi: number, step = 1) => {
+    const v = Number(r[k])
+    return Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v / step) / Math.round(1 / step))) : DEFAULT_DCMA_RULES[k]
+  }
+  return { maxPct: n('maxPct', 1, 25), minFsPct: n('minFsPct', 50, 100), highFloatDays: n('highFloatDays', 10, 260), highDurationDays: n('highDurationDays', 5, 260), indexTarget: n('indexTarget', 0.8, 1, 0.01) }
+}
 const MAX_OFFENDERS = 25
 const CONSTRAINT_TYPES: ConstraintType[] = ['SNET', 'SNLT', 'FNET', 'FNLT', 'MSO', 'MFO']
 const HARD_CONSTRAINTS = new Set(['MSO', 'MFO', 'SNLT', 'FNLT'])
@@ -96,7 +124,8 @@ function plural(n: number, one: string, many = one + 's'): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-export function runDcma(s: AnalyzableSchedule): DcmaReport {
+export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): DcmaReport {
+  const R = normalizeDcmaRules(rules)
   const all = s.activities.filter(isScheduled)
   const byId = new Map(all.map((a) => [a.id, a]))
   const pop = all.filter((a) => !isCompleteActivity(a))
@@ -147,11 +176,11 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
     const exemptStart = noPred.length ? noPred.reduce((m, a) => (byStart(a) < byStart(m) ? a : m)) : null
     const exemptFinish = noSucc.length ? noSucc.reduce((m, a) => (byFinish(a) >= byFinish(m) ? a : m)) : null
     const offenders = pop.filter((a) => (!hasPred.has(a.id) && a !== exemptStart) || (!hasSucc.has(a.id) && a !== exemptFinish))
-    if (!pop.length) add(na(1, 'Logic', '≤ 5%', 'There are no open activities to test for missing logic.'))
+    if (!pop.length) add(na(1, 'Logic', `≤ ${R.maxPct}%`, 'There are no open activities to test for missing logic.'))
     else {
-      const ok = offenders.length / pop.length <= 0.05
+      const ok = offenders.length / pop.length <= R.maxPct / 100
       add({
-        id: 1, name: 'Logic', metric: pct(offenders.length, pop.length), threshold: '≤ 5%', result: ok ? 'pass' : 'fail',
+        id: 1, name: 'Logic', metric: pct(offenders.length, pop.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
         offenders: cap(offenders.map((a) => a.code)),
         explanation: offenders.length === 0
           ? 'Every open activity has both a predecessor and a successor, so delays will flow through the network.'
@@ -174,21 +203,21 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
         : `${plural(leads.length, 'relationship')} ${leads.length === 1 ? 'uses' : 'use'} a negative lag (lead), which hides overlap assumptions and distorts the critical path; model the overlap with SS/FF logic instead.`,
     })
     const lags = openLinks.filter((l) => l.lag > 0)
-    if (!openLinks.length) add(na(3, 'Lags', '≤ 5%', 'There are no relationships into open activities to test for lags.'))
+    if (!openLinks.length) add(na(3, 'Lags', `≤ ${R.maxPct}%`, 'There are no relationships into open activities to test for lags.'))
     else add({
-      id: 3, name: 'Lags', metric: pct(lags.length, openLinks.length), threshold: '≤ 5%',
-      result: lags.length / openLinks.length <= 0.05 ? 'pass' : 'fail',
+      id: 3, name: 'Lags', metric: pct(lags.length, openLinks.length), threshold: `≤ ${R.maxPct}%`,
+      result: lags.length / openLinks.length <= R.maxPct / 100 ? 'pass' : 'fail',
       offenders: cap(lags.map((l) => codeOf(l.to))),
-      explanation: lags.length / openLinks.length <= 0.05
+      explanation: lags.length / openLinks.length <= R.maxPct / 100
         ? 'Lags are used sparingly, so waiting time is mostly shown as real activities.'
         : `${pct(lags.length, openLinks.length)} of relationships carry a positive lag; replace lags like cure time or review periods with explicit activities so they can be statused.`,
     })
     const fsCount = openLinks.filter((l) => l.type === 'FS').length
-    if (!openLinks.length) add(na(4, 'Relationship types', '≥ 90% FS', 'There are no relationships into open activities to test.'))
+    if (!openLinks.length) add(na(4, 'Relationship types', `≥ ${R.minFsPct}% FS`, 'There are no relationships into open activities to test.'))
     else {
-      const ok = fsCount / openLinks.length >= 0.9
+      const ok = fsCount / openLinks.length >= R.minFsPct / 100
       add({
-        id: 4, name: 'Relationship types', metric: `${pct(fsCount, openLinks.length)} FS`, threshold: '≥ 90% FS', result: ok ? 'pass' : 'fail',
+        id: 4, name: 'Relationship types', metric: `${pct(fsCount, openLinks.length)} FS`, threshold: `≥ ${R.minFsPct}% FS`, result: ok ? 'pass' : 'fail',
         offenders: cap(openLinks.filter((l) => l.type !== 'FS').map((l) => codeOf(l.to))),
         explanation: ok
           ? 'Most logic is finish-to-start, which keeps the sequence easy to read and the critical path reliable.'
@@ -203,11 +232,11 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
       const t = normalizeConstraintType(a.constraint?.type)
       return !!t && HARD_CONSTRAINTS.has(t)
     })
-    if (!pop.length) add(na(5, 'Hard constraints', '≤ 5%', 'There are no open activities to test for constraints.'))
+    if (!pop.length) add(na(5, 'Hard constraints', `≤ ${R.maxPct}%`, 'There are no open activities to test for constraints.'))
     else {
-      const ok = hard.length / pop.length <= 0.05
+      const ok = hard.length / pop.length <= R.maxPct / 100
       add({
-        id: 5, name: 'Hard constraints', metric: pct(hard.length, pop.length), threshold: '≤ 5%', result: ok ? 'pass' : 'fail',
+        id: 5, name: 'Hard constraints', metric: pct(hard.length, pop.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
         offenders: cap(hard.map((a) => a.code)),
         explanation: ok
           ? 'Few activities are pinned by hard constraints, so dates are driven by logic rather than typed in.'
@@ -220,17 +249,17 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
   {
     const withTf = pop.map((a) => ({ a, tf: tfOf(a) })).filter((x): x is { a: AnalyzableActivity; tf: number } => x.tf !== null)
     if (!withTf.length) {
-      add(na(6, 'High float', `≤ 5% with TF > ${HIGH_FLOAT_DAYS}d`, 'Total float is not available (no stored float and no project start to compute it).'))
+      add(na(6, 'High float', `≤ ${R.maxPct}% with TF > ${R.highFloatDays}d`, 'Total float is not available (no stored float and no project start to compute it).'))
       add(na(7, 'Negative float', '0', 'Total float is not available (no stored float and no project start to compute it).'))
     } else {
-      const high = withTf.filter((x) => x.tf > HIGH_FLOAT_DAYS)
-      const okH = high.length / withTf.length <= 0.05
+      const high = withTf.filter((x) => x.tf > R.highFloatDays)
+      const okH = high.length / withTf.length <= R.maxPct / 100
       add({
-        id: 6, name: 'High float', metric: pct(high.length, withTf.length), threshold: `≤ 5% with TF > ${HIGH_FLOAT_DAYS}d`, result: okH ? 'pass' : 'fail',
+        id: 6, name: 'High float', metric: pct(high.length, withTf.length), threshold: `≤ ${R.maxPct}% with TF > ${R.highFloatDays}d`, result: okH ? 'pass' : 'fail',
         offenders: cap(high.map((x) => x.a.code)),
         explanation: okH
-          ? `Few activities have more than ${HIGH_FLOAT_DAYS} days of float, which suggests the logic is reasonably complete.`
-          : `${plural(high.length, 'activity', 'activities')} ${high.length === 1 ? 'has' : 'have'} more than ${HIGH_FLOAT_DAYS} work days of float, usually a sign of missing successors or unrealistic logic.`,
+          ? `Few activities have more than ${R.highFloatDays} days of float, which suggests the logic is reasonably complete.`
+          : `${plural(high.length, 'activity', 'activities')} ${high.length === 1 ? 'has' : 'have'} more than ${R.highFloatDays} work days of float, usually a sign of missing successors or unrealistic logic.`,
       })
       const neg = withTf.filter((x) => x.tf < 0)
       add({
@@ -246,16 +275,16 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
   /* 8. High duration */
   {
     const tasks = pop.filter((a) => a.type === 'task')
-    const long = tasks.filter((a) => (a.remaining ?? a.duration) > HIGH_DURATION_DAYS)
-    if (!tasks.length) add(na(8, 'High duration', `≤ 5% with remaining > ${HIGH_DURATION_DAYS}d`, 'There are no open tasks to test for duration.'))
+    const long = tasks.filter((a) => (a.remaining ?? a.duration) > R.highDurationDays)
+    if (!tasks.length) add(na(8, 'High duration', `≤ ${R.maxPct}% with remaining > ${R.highDurationDays}d`, 'There are no open tasks to test for duration.'))
     else {
-      const ok = long.length / tasks.length <= 0.05
+      const ok = long.length / tasks.length <= R.maxPct / 100
       add({
-        id: 8, name: 'High duration', metric: pct(long.length, tasks.length), threshold: `≤ 5% with remaining > ${HIGH_DURATION_DAYS}d`,
+        id: 8, name: 'High duration', metric: pct(long.length, tasks.length), threshold: `≤ ${R.maxPct}% with remaining > ${R.highDurationDays}d`,
         result: ok ? 'pass' : 'fail', offenders: cap(long.map((a) => a.code)),
         explanation: ok
-          ? `Open tasks are broken down finely enough (few exceed ${HIGH_DURATION_DAYS} work days) to status and manage.`
-          : `${plural(long.length, 'task')} ${long.length === 1 ? 'runs' : 'run'} longer than ${HIGH_DURATION_DAYS} work days; break them into smaller pieces so progress and slips are visible.`,
+          ? `Open tasks are broken down finely enough (few exceed ${R.highDurationDays} work days) to status and manage.`
+          : `${plural(long.length, 'task')} ${long.length === 1 ? 'runs' : 'run'} longer than ${R.highDurationDays} work days; break them into smaller pieces so progress and slips are visible.`,
       })
     }
   }
@@ -302,12 +331,12 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
   const due = dataDate ? withBaseline.filter((a) => toDayNumber(a.baselineFinish!) <= toDayNumber(dataDate)) : []
   if (!dataDate || !withBaseline.length || !due.length) {
     const why = !dataDate ? 'No data date is set.' : !withBaseline.length ? 'The schedule has no baseline dates.' : 'No baselined work was due by the data date.'
-    add(na(11, 'Missed tasks', '≤ 5%', `${why} Missed tasks cannot be measured.`))
+    add(na(11, 'Missed tasks', `≤ ${R.maxPct}%`, `${why} Missed tasks cannot be measured.`))
   } else {
     const missed = due.filter((a) => !isValidDate(a.actualFinish) || toDayNumber(a.actualFinish) > toDayNumber(a.baselineFinish!))
-    const ok = missed.length / due.length <= 0.05
+    const ok = missed.length / due.length <= R.maxPct / 100
     add({
-      id: 11, name: 'Missed tasks', metric: pct(missed.length, due.length), threshold: '≤ 5%', result: ok ? 'pass' : 'fail',
+      id: 11, name: 'Missed tasks', metric: pct(missed.length, due.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
       offenders: cap(missed.map((a) => a.code)),
       explanation: ok
         ? 'Work baselined to finish by the data date has essentially all finished on time.'
@@ -365,12 +394,12 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
     const tf = finishAct ? tfOf(finishAct.a) : null
     const cpl = dataDate && projectFinish ? workDaysBetween(dataDate, projectFinish, defaultCal) : 0
     if (!dataDate || !projectFinish || tf === null || cpl <= 0) {
-      add(na(13, 'CPLI', '≥ 0.95', 'The data date, project finish or finish-activity float is missing, so the critical path length index cannot be computed.'))
+      add(na(13, 'CPLI', `≥ ${R.indexTarget.toFixed(2)}`, 'The data date, project finish or finish-activity float is missing, so the critical path length index cannot be computed.'))
     } else {
       const cpli = (cpl + tf) / cpl
-      const ok = cpli >= 0.95
+      const ok = cpli >= R.indexTarget
       add({
-        id: 13, name: 'CPLI', metric: cpli.toFixed(2), threshold: '≥ 0.95', result: ok ? 'pass' : 'fail',
+        id: 13, name: 'CPLI', metric: cpli.toFixed(2), threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
         offenders: ok ? [] : [finishAct!.a.code],
         explanation: ok
           ? `With ${cpl} work days left on the critical path and ${tf} days of float at the finish, the schedule is realistically achievable.`
@@ -381,13 +410,13 @@ export function runDcma(s: AnalyzableSchedule): DcmaReport {
 
   /* 14. BEI */
   if (!dataDate || !withBaseline.length || !due.length) {
-    add(na(14, 'BEI', '≥ 0.95', 'Without baselines due by the data date, the baseline execution index cannot be computed.'))
+    add(na(14, 'BEI', `≥ ${R.indexTarget.toFixed(2)}`, 'Without baselines due by the data date, the baseline execution index cannot be computed.'))
   } else {
     const completed = all.filter(isCompleteActivity).length
     const bei = completed / due.length
-    const ok = bei >= 0.95
+    const ok = bei >= R.indexTarget
     add({
-      id: 14, name: 'BEI', metric: bei.toFixed(2), threshold: '≥ 0.95', result: ok ? 'pass' : 'fail',
+      id: 14, name: 'BEI', metric: bei.toFixed(2), threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
       offenders: ok ? [] : cap(due.filter((a) => !isCompleteActivity(a)).map((a) => a.code)),
       explanation: ok
         ? `${completed} activities are complete against ${due.length} baselined to finish by the data date, so the team is keeping pace with the plan.`

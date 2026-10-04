@@ -269,7 +269,7 @@ export interface Answer {
 }
 
 export type QuestionKind = 'choice' | 'multi' | 'number' | 'date' | 'text' | 'boolean'
-export type QuestionSection = 'project' | 'design' | 'permits' | 'procurement' | 'site' | 'regulatory' | 'calendar' | 'security' | 'history' | 'milestones'
+export type QuestionSection = 'project' | 'design' | 'permits' | 'procurement' | 'site' | 'regulatory' | 'calendar' | 'security' | 'history' | 'milestones' | 'cost'
 
 export interface Question {
   id: string

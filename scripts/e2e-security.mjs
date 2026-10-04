@@ -54,6 +54,23 @@ function totp(secret, offsetSteps = 0) {
 }
 
 const PW = 'correct horse battery staple'
+const OUTBOX = process.env.PLANORA_EMAIL_OUTBOX
+
+/** Latest link matching re in the test outbox for this recipient. */
+async function mailLink(to, re) {
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  for (let i = 0; i < 30; i++) {
+    const files = (await fs.readdir(OUTBOX).catch(() => [])).sort().reverse()
+    for (const f of files) {
+      const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
+      const hit = m.to === to && re.exec(m.text)
+      if (hit) return hit[0]
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  throw new Error(`no email to ${to}`)
+}
 
 async function main() {
   const stamp = Date.now()
@@ -80,6 +97,23 @@ async function main() {
   r = await owner.post('/api/auth', { action: 'signup', email: email('owner'), password: PW, name: 'Olive Owner', company: 'Gamma Builders' })
   ok(r.status === 200 && r.data.user.role === 'owner', 'Founder becomes the organization owner')
 
+  /* ── Email verification (needs PLANORA_EMAIL_OUTBOX on the server and here) ── */
+  if (OUTBOX) {
+    r = await owner.get('/api/auth')
+    ok(r.data.security.emailDelivery === true && r.data.security.emailVerified === false, 'Self sign-up starts with an unconfirmed email')
+    r = await owner.post('/api/org', { action: 'invite', email: email('early'), role: 'viewer' })
+    ok(r.status === 403 && r.data.code === 'email_unverified', 'Inviting people waits for a confirmed email')
+    const link = await mailLink(email('owner'), /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/)
+    r = await new Client().get(new URL(link).pathname + '?token=nope')
+    ok(r.status === 303 && r.headers.get('location').includes('verified=0'), 'A bad confirmation token is refused')
+    r = await owner.get(new URL(link).pathname + new URL(link).search)
+    ok(r.status === 303 && r.headers.get('location').includes('/dashboard/account?verified=1'), 'The emailed link confirms the address')
+    r = await owner.get(new URL(link).pathname + new URL(link).search)
+    ok(r.headers.get('location').includes('verified=0'), 'A confirmation link works only once')
+    r = await owner.get('/api/auth')
+    ok(r.data.security.emailVerified === true, 'Email now shows as confirmed')
+  }
+
   /* ── CSRF ── */
   r = await owner.post('/api/plans', { name: 'Evil' }, { origin: 'https://evil.example' })
   ok(r.status === 403 && r.data.code === 'csrf', 'Cross-site write is blocked')
@@ -96,6 +130,7 @@ async function main() {
   /* ── Invitations and roles ── */
   r = await owner.post('/api/org', { action: 'invite', email: email('viewer'), role: 'viewer' })
   ok(r.status === 200 && r.data.link.includes('/auth?invite='), 'Owner creates an invitation link')
+  if (OUTBOX) ok(r.data.emailed === true && (await mailLink(email('viewer'), /https?:\/\/\S+\/auth\?invite=\S+/)) === r.data.link, 'The invitation is emailed to the invitee')
   const viewerInvite = new URL(r.data.link).searchParams.get('invite')
   r = await owner.post('/api/org', { action: 'invite', email: email('rev'), role: 'reviewer' })
   const reviewerInvite = new URL(r.data.link).searchParams.get('invite')
@@ -358,6 +393,71 @@ async function main() {
       ok(r.data.events.length >= 2 && !JSON.stringify(r.data.events).includes('test-secret'), 'SSO configuration changes are audited without the secret')
     }
   }
+
+  /* ── Portfolio, sample project, priced recovery, quality thresholds ── */
+  r = await owner2.post('/api/plans', { sample: true })
+  ok(r.status === 200 && /^Sample:/.test(r.data.plan.name), 'A sample project is created in one click')
+  const sampleId = r.data.plan.id
+  r = await owner2.get(`/api/plans/${sampleId}`)
+  ok(r.data.plan.generated && r.data.recovery && r.data.recovery.options.find(o => o.id === 'workweek').impact.cost.low > 0, 'The sample has a schedule and recovery options priced from its cost basis')
+  r = await owner2.get('/api/portfolio')
+  const row = r.data.rows?.find(x => x.id === sampleId)
+  ok(r.status === 200 && row && row.status === 'at_risk' && row.alerts.some(a => a.code === 'late'), 'Portfolio lists the sample as at risk with a "late" alert')
+  r = await owner2.post('/api/org', { action: 'update_settings', settings: { quality: { maxPct: 10, minFsPct: 85, highFloatDays: 60, highDurationDays: 60, indexTarget: 0.9 } } })
+  ok(r.status === 200 && r.data.settings.quality.highDurationDays === 60, 'Admins set the organization quality thresholds')
+  r = await owner2.get(`/api/plans/${sampleId}`)
+  ok(r.data.evaluation.dcma.checks.find(c => c.id === 8).threshold === '≤ 10% with remaining > 60d', 'Quality checks use the organization thresholds')
+
+  /* ── API keys ── */
+  r = await reviewer.post('/api/org/integrations', { action: 'create_key', name: 'Nope', role: 'viewer' })
+  ok(r.status === 403, 'Only admins can create API keys', r)
+  r = await owner2.post('/api/org/integrations', { action: 'create_key', name: 'Owner key', role: 'admin' })
+  ok(r.status === 400, 'API keys cannot have admin rights')
+  r = await owner2.post('/api/org/integrations', { action: 'create_key', name: 'BI dashboard', role: 'viewer', expiresInDays: 30 })
+  ok(r.status === 200 && /^pk_live_/.test(r.data.secret) && r.data.key.prefix && !JSON.stringify(r.data.key).includes(r.data.secret), 'Read-only API key created; secret shown once')
+  const keyId = r.data.key.id, keySecret = r.data.secret
+  const bearer = { authorization: `Bearer ${keySecret}`, origin: '' }
+  r = await new Client().get('/api/portfolio', bearer)
+  ok(r.status === 200 && r.data.rows.some(x => x.id === sampleId), 'The API key reads the portfolio')
+  r = await new Client().get(`/api/plans/${sampleId}/export?format=xer`, bearer)
+  ok(r.status === 200 && String(r.data.raw || '').startsWith('ERMHDR'), 'The API key exports a P6 schedule')
+  r = await new Client().patch(`/api/plans/${sampleId}`, { answers: {} }, bearer)
+  ok(r.status === 403 && r.data.code === 'forbidden', 'A read-only key cannot change plans')
+  r = await new Client().get('/api/org', bearer)
+  ok(r.status === 403 && r.data.code === 'api_key_not_allowed', 'API keys only work on the endpoints that allow them')
+  r = await new Client().get('/api/portfolio', { authorization: 'Bearer pk_live_' + 'x'.repeat(43), origin: '' })
+  ok(r.status === 401 && r.data.code === 'invalid_api_key', 'An unknown key is refused')
+  r = await owner2.get('/api/org/integrations')
+  ok(r.data.keys.find(k => k.id === keyId).lastUsedAt, 'Key usage is tracked')
+  r = await owner2.post('/api/org/integrations', { action: 'revoke_key', id: keyId })
+  r = await new Client().get('/api/portfolio', bearer)
+  ok(r.status === 401, 'A revoked key stops working immediately')
+
+  /* ── Webhooks (signed) ── */
+  if (process.env.WEBHOOK_RECEIVER_PORT) {
+    const { createServer } = await import('node:http')
+    const got = []
+    const srv = createServer((req, res) => { let b = ''; req.on('data', c => { b += c }); req.on('end', () => { got.push({ headers: req.headers, body: b }); res.end('ok') }) })
+    await new Promise(r2 => srv.listen(Number(process.env.WEBHOOK_RECEIVER_PORT), r2))
+    r = await owner2.post('/api/org/integrations', { action: 'create_webhook', url: 'ftp://example.com/x', events: ['plan.created'] })
+    ok(r.status === 400, 'Non-HTTP webhook URLs are refused')
+    r = await owner2.post('/api/org/integrations', { action: 'create_webhook', url: `http://localhost:${process.env.WEBHOOK_RECEIVER_PORT}/hook`, events: ['plan.created', 'plan.generate'] })
+    ok(r.status === 200 && /^whsec_/.test(r.data.secret), 'Webhook added; signing secret shown once')
+    const whSecret = r.data.secret, hookId = r.data.webhook.id
+    r = await owner2.post('/api/org/integrations', { action: 'test_webhook', id: hookId })
+    ok(r.status === 200 && r.data.ok, 'Test delivery succeeds')
+    await owner2.post('/api/plans', { name: `Webhook plan ${stamp}` })
+    for (let i = 0; i < 50 && !got.some(g => g.headers['x-planora-event'] === 'plan.created'); i++) await new Promise(r2 => setTimeout(r2, 100))
+    const d = got.find(g => g.headers['x-planora-event'] === 'plan.created')
+    ok(!!d && JSON.parse(d.body).data.detail.plan === `Webhook plan ${stamp}`, 'Creating a plan delivers a plan.created webhook')
+    const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(d.headers['x-planora-signature']) || []
+    ok(t && v1 === createHmac('sha256', whSecret).update(`${t}.${d.body}`).digest('hex'), 'The delivery signature verifies with the secret')
+    srv.close()
+    r = await owner2.post('/api/org/integrations', { action: 'delete_webhook', id: hookId })
+    ok(r.status === 200, 'Webhook removed')
+  }
+  r = await owner2.get('/api/audit?action=apikey.')
+  ok(r.data.events.some(e => e.action === 'apikey.created') && r.data.events.some(e => e.action === 'apikey.revoked') && !JSON.stringify(r.data.events).includes(keySecret), 'API key creation and revocation are audited without the secret')
 
   /* ── Privacy ── */
   r = await reviewer.post('/api/account', { action: 'export_my_data' })

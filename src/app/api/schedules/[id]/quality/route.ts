@@ -8,13 +8,13 @@ import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
 
 /** DCMA 14-point assessment + the tool's own questions about the imported data. */
-export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { params, auth: ctx }) => {
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth: ctx }) => {
   const data = await loadScheduleData(params.id, ctx.orgId)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
   const responses = await getDataQuestionResponses(schedule.id)
   const a = analyzableFromDb(schedule, activities, relationships)
-  const dcma = runDcma(a)
+  const dcma = runDcma(a, ctx.settings.quality)
   const questions = checkInputs(a)
   const byId = new Map(responses.map(r => [r.questionId, r]))
   const guidance = dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({

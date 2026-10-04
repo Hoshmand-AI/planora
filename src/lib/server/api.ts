@@ -1,6 +1,6 @@
 // Every API route is wrapped by api(): one place that assigns a request id, rejects cross-site
 // writes, authenticates, enforces the organization's MFA policy and the route's RBAC permission,
-// applies per-user rate limits, logs a structured access line and turns unexpected errors into a
+// applies per-user (or per-API-key) rate limits, logs a structured access line and turns unexpected errors into a
 // safe response that carries the request id (no stack traces leave the server).
 
 import { randomUUID } from 'crypto'
@@ -13,6 +13,7 @@ import { log, errorFields } from './log'
 import { maybeRunMaintenance } from './maintenance'
 import { StalePlanError } from '@/lib/db'
 import { entitlementsFor } from './entitlements'
+import { resolveApiKey } from './api-keys'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string, public extra?: Record<string, unknown>) { super(message) }
@@ -34,6 +35,8 @@ interface Options {
   permission: Permission
   /** Allow members who still need to enroll in MFA (only the enrollment endpoints). */
   allowMfaSetup?: boolean
+  /** Also accept an organization API key (Authorization: Bearer pk_live_…). Off unless a route opts in. */
+  apiKey?: boolean
 }
 
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -95,7 +98,15 @@ export function api<P = Record<string, string>>(opts: Options, handler: (req: Ne
     const started = Date.now()
     return runWithRequest(info, () => finish(info, started, async () => {
       if (crossSiteWrite(req)) throw new ApiError(403, 'Cross-site request blocked.', 'csrf')
-      const auth = await getAuthContext()
+      const bearer = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') || '')?.[1]
+      let auth: AuthContext | null
+      if (bearer) {
+        if (!opts.apiKey) throw new ApiError(403, 'API keys can\'t be used on this endpoint. See docs/API.md for the endpoints that accept them.', 'api_key_not_allowed')
+        auth = await resolveApiKey(bearer)
+        if (!auth) throw new ApiError(401, 'Invalid, expired or revoked API key.', 'invalid_api_key')
+      } else {
+        auth = await getAuthContext()
+      }
       if (!auth) throw new ApiError(401, 'Unauthorized', 'unauthenticated')
       Object.assign(info, { userId: auth.userId, email: auth.email, name: auth.name, orgId: auth.orgId, role: auth.role, aiEnabled: auth.settings.aiEnabled, aiDailyLimit: Math.min(auth.settings.aiDailyLimit, entitlementsFor(auth.plan).aiPerDay), plan: auth.plan })
       if (auth.mfaSetupRequired && !opts.allowMfaSetup) {
