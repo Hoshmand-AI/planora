@@ -50,14 +50,19 @@ npm run dev
 
 ```bash
 npm run typecheck
-npm test                                            # 380+ unit tests (incl. route guard, security, CPM performance budgets)
+npm test                                            # 410+ unit tests (incl. route guard, security, CPM performance budgets, export/import round trips)
 BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs   # end-to-end against a running server
 # Security & governance suite (use DATABASE_URL for the audit-immutability checks; OIDC_ISSUER for SSO,
 # with `PORT=4010 node scripts/mock-oidc.mjs` running and the app started with PLANORA_ALLOW_INSECURE_OIDC=1)
-BASE_URL=… DATABASE_URL=… OIDC_ISSUER=http://localhost:4010 node scripts/e2e-security.mjs
+# PLANORA_EMAIL_OUTBOX + PLANORA_ALLOW_INSECURE_WEBHOOKS=1 on the server enable the email and webhook checks
+BASE_URL=… DATABASE_URL=… OIDC_ISSUER=http://localhost:4010 PLANORA_EMAIL_OUTBOX=/tmp/outbox WEBHOOK_RECEIVER_PORT=4020 node scripts/e2e-security.mjs
 BASE_URL=… node scripts/a11y-check.mjs                     # WCAG 2.2 AA (axe-core) on the main screens
 DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node scripts/restore-drill.mjs backups/*.dump
 ```
+
+### Integrations, email and alerts
+
+API keys, signed webhooks and the operator settings for email (`RESEND_API_KEY`/`POSTMARK_TOKEN`, `EMAIL_FROM`) and security alerts (`PLANORA_ALERT_WEBHOOK_URL`) are described in [docs/API.md](docs/API.md).
 
 ### Air-gapped deployment
 

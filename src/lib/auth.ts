@@ -113,6 +113,8 @@ export interface AuthContext {
   mfaEnabled: boolean
   /** The organization requires two-step verification and this member hasn't enrolled yet. */
   mfaSetupRequired: boolean
+  /** The member confirmed their email address (undefined for API keys) */
+  emailVerified?: boolean
 }
 
 function sessionIdFromToken(token: string): string | null {
@@ -137,7 +139,7 @@ export async function resolveSession(token: string): Promise<AuthContext | null>
   const sid = sessionIdFromToken(token)
   if (!sid) return null
   await initSchema()
-  const res = await query(`SELECT s.id AS sid, s.last_seen_at, s.method, u.id, u.email, u.name, u.role, u.org_id, u.mfa_enabled_at, u.disabled_at, o.name AS org_name, o.settings, o.plan
+  const res = await query(`SELECT s.id AS sid, s.last_seen_at, s.method, u.id, u.email, u.name, u.role, u.org_id, u.mfa_enabled_at, u.disabled_at, u.email_verified_at, o.name AS org_name, o.settings, o.plan
     FROM sessions s JOIN users u ON u.id = s.user_id JOIN organizations o ON o.id = u.org_id
     WHERE s.id=$1 AND s.revoked_at IS NULL AND s.expires_at > NOW()`, [sid])
   const row = res.rows[0]
@@ -153,7 +155,7 @@ export async function resolveSession(token: string): Promise<AuthContext | null>
   const sessionMethod = row.method || 'password'
   return {
     userId: row.id, email: row.email, name: row.name, orgId: row.org_id, orgName: row.org_name, role: row.role, sessionId: sid,
-    settings, plan: row.plan || 'free', sessionMethod, mfaEnabled,
+    settings, plan: row.plan || 'free', sessionMethod, mfaEnabled, emailVerified: !!row.email_verified_at || sessionMethod === 'sso',
     // Single sign-on sessions rely on the identity provider's own MFA policy.
     mfaSetupRequired: settings.requireMfa && !mfaEnabled && sessionMethod !== 'sso',
   }

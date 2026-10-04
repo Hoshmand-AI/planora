@@ -12,7 +12,7 @@ export const GET = api({ permission: 'audit.read' }, async (req, { auth }) => {
   const sp = new URL(req.url).searchParams
   if (sp.get('verify')) {
     const result = await verifyAuditChain(auth.orgId)
-    await audit({ action: 'audit.verified', targetType: 'organization', targetId: auth.orgId, detail: { ok: result.ok, count: result.count, brokenAt: result.brokenAt?.seq ?? null } })
+    await audit({ action: result.ok ? 'audit.verified' : 'audit.chain_broken', targetType: 'organization', targetId: auth.orgId, detail: { ok: result.ok, count: result.count, brokenAt: result.brokenAt?.seq ?? null } })
     return json(result)
   }
   const filters = {

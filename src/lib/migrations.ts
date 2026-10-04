@@ -243,6 +243,53 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS method TEXT;
     `,
   },
+  {
+    id: 4, name: 'api_keys_webhooks_email_verification',
+    sql: `
+    -- Organization API keys for integrations (read-only or scheduler); only a SHA-256 of the key is stored.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ,
+      last_used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS api_keys_org_idx ON api_keys(org_id);
+
+    -- Outbound webhooks; the signing secret is stored encrypted.
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      events JSONB NOT NULL DEFAULT '[]',
+      secret_enc TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      disabled_at TIMESTAMPTZ,
+      last_delivery_at TIMESTAMPTZ,
+      last_status TEXT,
+      consecutive_failures INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS webhooks_org_idx ON webhooks(org_id);
+
+    -- Email verification for self sign-up (single-use, hashed, expiring tokens).
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+    CREATE TABLE IF NOT EXISTS email_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS email_tokens_user_idx ON email_tokens(user_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

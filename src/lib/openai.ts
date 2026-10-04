@@ -1,7 +1,7 @@
 import { Activity, Relationship, Schedule } from '@/lib/db'
 import { chat, llmStatus } from '@/lib/llm/provider'
 import { log } from '@/lib/server/log'
-import { runDcma } from '@/lib/analysis/dcma'
+import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import type { ProjectBrief } from '@/lib/analysis/brief'
 
@@ -14,6 +14,8 @@ interface ScheduleContext {
   relationships: Relationship[]
   brief?: ProjectBrief
   hasLogic?: boolean
+  /** The organization's quality thresholds */
+  rules?: Partial<DcmaRules>
 }
 
 export async function askScheduleQuestion(
@@ -215,7 +217,7 @@ Use formal, professional language suitable for presentation to project executive
   }
   
   const prompt = prompts[reportType] || prompts.executive_summary
-  const dcma = runDcma(analyzableFromDb(schedule, activities, relationships))
+  const dcma = runDcma(analyzableFromDb(schedule, activities, relationships), context.rules)
   const dcmaText = `DCMA 14-POINT RESULTS (computed, authoritative — do not recompute): ${dcma.passed}/${dcma.applicable} applicable checks pass, score ${dcma.score}.\n` +
     dcma.checks.map(c => `#${c.id} ${c.name}: ${c.metric} (threshold ${c.threshold}) ${c.result.toUpperCase()}${c.offenders.length ? ' — e.g. ' + c.offenders.slice(0, 5).join(', ') : ''}`).join('\n')
   

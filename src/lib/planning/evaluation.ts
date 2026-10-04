@@ -8,7 +8,7 @@
 
 import type { Answer, AnalyzableSchedule, DcmaReport, GeneratedSchedule, ProjectType, WorkCalendar } from './types'
 import { runCpm } from './cpm'
-import { runDcma } from '@/lib/analysis/dcma'
+import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { computeFirmHistory, scaleForSize, type FirmHistory } from './history'
 import { questionBank, elicit, profileFrom } from './elicitation'
 import { generateSchedule } from './generator'
@@ -86,6 +86,14 @@ export function scheduleDateChecks(s: GeneratedSchedule): ScheduleDateCheck[] {
   return out
 }
 
+/** Latest expert review against the current schedule; any regeneration or override after it makes it stale. */
+export function reviewStatusOf(s: GeneratedSchedule, reviews: ExpertReview[]): Evaluation['review']['status'] {
+  const latest = reviews[reviews.length - 1]
+  if (!latest) return 'none'
+  if (latest.at < lastOverrideAt(s)) return 'stale'
+  return latest.verdict === 'reject' ? 'changes_requested' : 'approved'
+}
+
 export interface Evaluation {
   score: number
   grade: 'A' | 'B' | 'C' | 'D'
@@ -100,9 +108,9 @@ export interface Evaluation {
   dateChecks: ScheduleDateCheck[]
 }
 
-export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, reviews: ExpertReview[]): Evaluation {
+export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, reviews: ExpertReview[], rules?: Partial<DcmaRules>): Evaluation {
   const profile = profileFrom(answers)
-  const dcma = runDcma(toAnalyzable(s))
+  const dcma = runDcma(toAnalyzable(s), rules)
   const elic = elicit({ answers })
   const findings: string[] = []
 
@@ -160,12 +168,7 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
 
   /* Expert review */
   const latest = reviews[reviews.length - 1]
-  let reviewStatus: Evaluation['review']['status'] = 'none'
-  if (latest) {
-    // Any regeneration or override after the review makes it stale.
-    const stale = latest.at < lastOverrideAt(s)
-    reviewStatus = stale ? 'stale' : latest.verdict === 'reject' ? 'changes_requested' : 'approved'
-  }
+  const reviewStatus = reviewStatusOf(s, reviews)
   if (reviewStatus === 'none') findings.push('No expert review recorded yet. A senior scheduler should review before baselining.')
   if (reviewStatus === 'stale') findings.push('The schedule changed after the last expert review.')
 

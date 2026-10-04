@@ -36,7 +36,7 @@ type Tab = 'interview' | 'schedule' | 'evaluation' | 'audit'
 
 const SECTION_LABEL: Record<string, string> = {
   project: 'Project', design: 'Design', permits: 'Permits', procurement: 'Long-lead', site: 'Site', milestones: 'Milestone targets',
-  regulatory: 'Regulatory', calendar: 'Calendar', security: 'Security', history: 'Firm history',
+  regulatory: 'Regulatory', calendar: 'Calendar', security: 'Security', history: 'Firm history', cost: 'Cost basis',
 }
 const SOURCE_LABEL: Record<SourceRef['kind'], string> = {
   user: 'Your answer', file: 'Uploaded file', catalog: 'Regional catalog', firm_history: 'Firm history', template: 'Template',
@@ -612,6 +612,8 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
   )
 }
 
+const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
+
 function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: RecoveryPlan; busy: string | null; onRecover: (id: string) => void; onInterview: () => void }) {
   const [open, setOpen] = useState(true)
   return (
@@ -636,6 +638,19 @@ function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: RecoveryPlan; b
                 </div>
                 <p className="text-[12.5px] text-warm-600 mt-1">{o.description}</p>
                 <p className="text-[12px] text-warm-500 mt-1"><span className="font-medium">Trade-off:</span> {o.tradeoff}</p>
+                {o.impact && (
+                  <dl className="text-[12px] text-warm-600 mt-2 border-t border-warm-200 pt-2 space-y-1">
+                    <div><dt className="inline font-medium text-warm-700">Resources: </dt><dd className="inline">{o.impact.resources}</dd></div>
+                    <div>
+                      <dt className="inline font-medium text-warm-700">Added cost: </dt>
+                      <dd className="inline">
+                        {o.impact.cost ? <span className="font-semibold text-navy-950 tabular-nums">{o.impact.cost.high === 0 ? '$0' : `${usd(o.impact.cost.low)}–${usd(o.impact.cost.high)}`}</span> : 'not priced'}
+                        <span className="text-warm-500"> · {o.impact.costBasis}</span>
+                      </dd>
+                    </div>
+                    {o.impact.delaySavings != null && <div><dt className="inline font-medium text-warm-700">Delay cost avoided: </dt><dd className="inline font-semibold text-status-on-track tabular-nums">{usd(o.impact.delaySavings)}</dd></div>}
+                  </dl>
+                )}
                 <div className="flex items-center justify-between mt-auto pt-3">
                   <span className="text-[12px] text-warm-500">New finish <span className="font-semibold text-navy-950 tabular-nums">{fmtDate(o.newFinish)}</span></span>
                   {o.apply.type === 'navigate'

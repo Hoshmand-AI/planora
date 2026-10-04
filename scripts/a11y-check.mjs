@@ -30,18 +30,23 @@ const answers = {
 }
 await page.request.patch(`${BASE}/api/plans/${plan.id}`, { data: { answers }, headers: { origin } })
 await post(`/api/plans/${plan.id}/generate`, {})
+// The sample project misses its required date, so its schedule tab shows the priced recovery options.
+const sample = (await (await post('/api/plans', { sample: true })).json()).plan
 
 const PAGES = [
   ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
   ['Overview', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
+  ['Portfolio', '/dashboard/portfolio'],
+  ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
 ]
 
 let failed = 0
-for (const [name, url] of PAGES) {
+for (const [name, url, prepare] of PAGES) {
   await page.goto(BASE + url, { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
+  if (prepare) await prepare()
   await page.addScriptTag({ content: axeSource })
   const result = await page.evaluate(async () => {
     // eslint-disable-next-line no-undef
@@ -57,7 +62,7 @@ for (const [name, url] of PAGES) {
     const r = el.getBoundingClientRect()
     return { tag: el.tagName, visible: r.width > 0 && r.height > 0, outline: getComputedStyle(el).outlineStyle !== 'none' || getComputedStyle(el).boxShadow !== 'none' }
   })
-  if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `${name.replace(/\W+/g, '-').toLowerCase()}.png`), fullPage: false }) }
+  if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `${name.replace(/\W+/g, '-').toLowerCase()}.png`), fullPage: !!process.env.FULL_PAGE }) }
   const kbOk = !!focus?.visible
   console.log(`${blocking.length || !kbOk ? '✗' : '✓'} ${name}: ${result.length} issue types (${blocking.length} serious/critical); keyboard focus ${kbOk ? `on ${focus.tag}${focus.outline ? ' (visible indicator)' : ''}` : 'NOT reachable'}`)
   for (const v of result) console.log(`    [${v.impact}] ${v.id}: ${v.help} (${v.count}) e.g. ${v.nodes[0]}`)

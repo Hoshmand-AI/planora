@@ -14,7 +14,7 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   if (!data) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
   const { schedule, activities, relationships, brief, hasLogic } = data
 
-  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic })
+  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality })
 
   await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType } })
   return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: report })

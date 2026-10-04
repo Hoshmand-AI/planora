@@ -27,7 +27,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  *   ?format=csv          flat activity table
  *   ?format=md           Basis of Schedule narrative
  */
-export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const g = plan.generated

@@ -7,7 +7,7 @@ import type { ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
 
 /** Build (or rebuild) the schedule from the interview. Scheduler overrides are carried forward. */
-export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+export const POST = api<{ id: string }>({ permission: 'plan.write', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const body = await req.json().catch(() => ({}))

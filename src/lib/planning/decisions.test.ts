@@ -90,6 +90,30 @@ describe('recovery options', () => {
     for (const o of r.options) expect(o.newFinish).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(recoveryPlan(generateSchedule({ answers: base(), today: '2026-09-30' }), base(), null)).toBeNull()
   })
+
+  it('prices each option from the cost basis and leaves it unpriced without one', () => {
+    const a = { ...base(), 'project.required_finish': k('2028-06-30') }
+    const g = generateSchedule({ answers: a, today: '2026-09-30' })
+    const unpriced = recoveryPlan(g, a, null)!
+    const ww0 = unpriced.options.find(o => o.id === 'workweek')!
+    expect(ww0.impact.cost).toBeNull()
+    expect(ww0.impact.costBasis).toMatch(/Cost basis/)
+    expect(ww0.impact.resources).toMatch(/60 hours a week instead of 40/)
+    // The cost questions are asked once there is a required date, and they don't move the schedule.
+    expect(questionBank({ answers: a }).all.map(q => q.id)).toEqual(expect.arrayContaining(['cost.labor_per_day', 'cost.delay_per_day']))
+    expect(questionBank({ answers: base() }).all.some(q => q.section === 'cost')).toBe(false)
+    const priced = { ...a, 'cost.labor_per_day': k(20000), 'cost.delay_per_day': k(15000) }
+    const g2 = generateSchedule({ answers: priced, today: '2026-09-30' })
+    expect(g2.cpm!.projectFinish).toBe(g.cpm!.projectFinish)
+    const r = recoveryPlan(g2, priced, null)!
+    const ww = r.options.find(o => o.id === 'workweek')!
+    expect(ww.impact.cost!.low).toBeGreaterThan(0)
+    expect(ww.impact.cost!.high).toBeCloseTo(ww.impact.cost!.low * 2, -2)
+    expect(ww.impact.delaySavings).toBe(ww.daysSaved * 15000)
+    const crash = r.options.find(o => o.id === 'crash')
+    if (crash) expect(crash.impact.cost!.high).toBeGreaterThan(crash.impact.cost!.low)
+    expect(r.options.find(o => o.id === 'move_date')!.impact.costBasis).toMatch(new RegExp(`${r.gapDays} days`))
+  })
 })
 
 describe('DCMA guidance', () => {

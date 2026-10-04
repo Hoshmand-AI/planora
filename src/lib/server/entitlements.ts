@@ -1,5 +1,5 @@
 // Subscription plans and what each includes. Enforced on the server (uploads, AI, reports,
-// exports, SSO); the pricing page and the Organization page read the same table, so what is sold
+// exports, SSO, integrations); the pricing page and the Organization page read the same table, so what is sold
 // and what is enforced cannot drift apart.
 
 import { ApiError } from './api'
@@ -16,15 +16,17 @@ export interface Entitlements {
   reports: string[]
   exports: string[]
   sso: boolean
+  /** API keys and outbound webhooks */
+  integrations: boolean
 }
 
 const ALL_REPORTS = ['executive_summary', 'critical_path', 'variance', 'qa_qc']
 const ALL_EXPORTS = ['xer', 'xml', 'pdf', 'xlsx-p6', 'xlsx-import', 'csv', 'md']
 
 export const PLANS: Record<PlanId, Entitlements> = {
-  free: { label: 'Free', maxUploadedSchedules: 3, aiPerDay: 10, reports: ['executive_summary'], exports: ['xer', 'xml', 'csv', 'md'], sso: false },
-  pro: { label: 'Pro', maxUploadedSchedules: null, aiPerDay: 1000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: false },
-  enterprise: { label: 'Enterprise', maxUploadedSchedules: null, aiPerDay: 10_000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: true },
+  free: { label: 'Free', maxUploadedSchedules: 3, aiPerDay: 10, reports: ['executive_summary'], exports: ['xer', 'xml', 'csv', 'md'], sso: false, integrations: false },
+  pro: { label: 'Pro', maxUploadedSchedules: null, aiPerDay: 1000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: false, integrations: true },
+  enterprise: { label: 'Enterprise', maxUploadedSchedules: null, aiPerDay: 10_000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: true, integrations: true },
 }
 
 export const isPlanId = (p: unknown): p is PlanId => typeof p === 'string' && (PLAN_IDS as readonly string[]).includes(p)

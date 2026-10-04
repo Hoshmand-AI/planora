@@ -5,7 +5,7 @@ import path from 'node:path'
 // Continuous access-control check: every API handler must be built with api() (authenticated, with
 // an explicit RBAC permission) or publicApi() (only the endpoints listed here). A new route that
 // skips the wrapper, or a new public endpoint, fails the build.
-const PUBLIC = new Set(['auth/route.ts', 'health/route.ts', 'auth/sso/route.ts', 'auth/sso/callback/route.ts'])
+const PUBLIC = new Set(['auth/route.ts', 'health/route.ts', 'auth/sso/route.ts', 'auth/sso/callback/route.ts', 'auth/verify/route.ts'])
 const API_DIR = path.join(process.cwd(), 'src/app/api')
 
 function routes(dir: string): string[] {

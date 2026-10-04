@@ -7,7 +7,8 @@ import { Section, Field, Button, Alert, inputClass, postJson, downloadJson } fro
 import { fmtDateTime } from '@/lib/format'
 
 interface AccountData {
-  user: { id: string; email: string; name: string; role: string; createdAt: string }
+  user: { id: string; email: string; name: string; role: string; createdAt: string; emailVerifiedAt: string | null }
+  emailDelivery: boolean
   org: { id: string; name: string }
   mfa: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number; required: boolean }
   sessions: { id: string; createdAt: string; lastSeenAt: string; ip: string | null; userAgent: string | null; current: boolean }[]
@@ -147,6 +148,18 @@ function AccountPage() {
 
       <Section title="Profile">
         {note('profile')}
+        <div className="mb-3 text-[13px] text-warm-700">
+          <span className="font-medium text-navy-950">{data.user.email}</span>{' · '}
+          {data.user.emailVerifiedAt
+            ? <span className="text-status-on-track font-medium">Email confirmed</span>
+            : data.emailDelivery
+              ? <>
+                  <span className="text-status-attention font-medium">Email not confirmed yet</span>{' · '}
+                  <Button variant="ghost" disabled={busy === 'profile'} onClick={() => act('profile', { action: 'resend_verification' }, 'Confirmation link sent. Check your inbox.')}>Resend the confirmation link</Button>
+                </>
+              : <span className="text-warm-500">Email confirmation isn&apos;t set up on this installation.</span>}
+          {params.get('verified') === '1' && <div className="mt-2"><Alert tone="success">Thanks, your email address is confirmed.</Alert></div>}
+        </div>
         <div className="flex gap-2 items-end">
           <div className="flex-1"><Field label="Name">{p => <input {...p} autoComplete="name" className={inputClass} value={name} onChange={e => setName(e.target.value)} />}</Field></div>
           <Button variant="secondary" disabled={busy === 'profile' || name === data.user.name} onClick={async () => { if (await act('profile', { action: 'update_profile', name }, 'Saved.')) load() }}>Save</Button>

@@ -230,3 +230,23 @@ describe('helpers', () => {
     expect(scheduleToCpmInput({ activities: [], links: [], calendars: [] })).toBeNull()
   })
 })
+
+describe('organization quality thresholds', () => {
+  it('normalizes rules and clamps out-of-range values', async () => {
+    const { normalizeDcmaRules, DEFAULT_DCMA_RULES } = await import('./dcma')
+    expect(normalizeDcmaRules(null)).toEqual(DEFAULT_DCMA_RULES)
+    expect(normalizeDcmaRules({ maxPct: 99, minFsPct: 10, highFloatDays: 'x', indexTarget: 0.953 })).toEqual({ ...DEFAULT_DCMA_RULES, maxPct: 25, minFsPct: 50, indexTarget: 0.95 })
+  })
+})
+
+describe('custom thresholds change the verdict', () => {
+  it('a 70-day duration limit lets a 60-day task pass and reports the threshold used', () => {
+    const s = goodSchedule()
+    s.activities[3].duration = 60
+    expect(check(runDcma(s), 8).result).toBe('fail')
+    const r = runDcma(s, { highDurationDays: 70, maxPct: 10 })
+    expect(check(r, 8).result).toBe('pass')
+    expect(check(r, 8).threshold).toBe('≤ 10% with remaining > 70d')
+    expect(check(runDcma(s, { minFsPct: 100 }), 4).threshold).toBe('≥ 100% FS')
+  })
+})

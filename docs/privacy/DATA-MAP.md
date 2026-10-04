@@ -13,6 +13,10 @@
 | AI request metadata | model, purpose, sizes, latency, SHA-256 of prompt | Technical | AI governance and spend control | `audit_events` (`ai.request`) | Customer org | As audit log | — |
 | Invitations | email, role, hashed token | Personal – business contact | Onboarding | `invitations` | Customer org | 30 days after expiry/revocation | Neon |
 | SSO configuration | issuer, client id, encrypted client secret, domains | Customer confidential / secret | Federation | `organizations.sso`, `sso_domains` | Customer org | Until changed or org deleted | Neon |
+| API keys | name, role, key prefix, SHA-256 of the key, creator, last use | Secret (hash only) | Integrations | `api_keys` | Customer org | Until revoked and the org is deleted | Neon |
+| Webhooks | endpoint URL, events, encrypted signing secret, delivery status | Customer confidential / secret | Integrations | `webhooks` | Customer org | Until removed or org deleted | Neon; event payloads go to the customer's own endpoint |
+| Email tokens | SHA-256 of single-use confirmation tokens | Secret (hash only) | Email verification | `email_tokens` | Hoshmand AI | 48 hours (single use) | Neon |
+| Transactional email | recipient address, confirmation or invitation link | Personal – business contact | Email verification, invitations | Email provider | Hoshmand AI | Provider retention | Resend or Postmark (if configured) |
 | Rate-limit counters | keys with IP/email/org id, counts | Technical | Abuse prevention | `rate_limits` | Hoshmand AI | 2 days | Neon |
 | Platform logs | request lines (JSON) with request id, user id, path, status | Technical | Operations | Vercel | Hoshmand AI | Vercel plan retention | Vercel |
 | Backups | full database | As above (highest class) | Recovery | Neon PITR; optional encrypted GitHub artifact | Hoshmand AI | Neon window; artifacts 35 days | Neon, GitHub (encrypted) |

@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import path from 'node:path'
 import pg from 'pg'
 
 const dump = process.argv[2]
@@ -28,7 +29,7 @@ const target = new URL(admin); target.pathname = `/${scratch}`
 
 const started = Date.now()
 try {
-  execFileSync('pg_restore', ['--no-owner', '--no-privileges', '--exit-on-error', `--dbname=${target}`, dump], { stdio: 'inherit' })
+  execFileSync(process.env.PG_BIN ? path.join(process.env.PG_BIN, 'pg_restore') : 'pg_restore', ['--no-owner', '--no-privileges', '--exit-on-error', `--dbname=${target}`, dump], { stdio: 'inherit' })
   const seconds = (Date.now() - started) / 1000
   const db = new pg.Client({ connectionString: target.toString() })
   await db.connect()

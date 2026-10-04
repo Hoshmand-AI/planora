@@ -24,6 +24,9 @@ The scheduling engine (interview, CPM, DCMA checks, Monte Carlo risk analysis, r
   - Sign-in errors are generic and timing-equalized.
 - **Roles (least privilege):** Owner, Admin, Scheduler, Reviewer, Viewer. Every API route declares the permission it needs. An automated test fails the build if a route skips the check or a new public endpoint appears.
 - **Separation of duties (optional policies):** the person who built a plan can't approve it, and publishing a baseline requires an independent approving review of that exact version.
+- **Email verification:** self sign-ups confirm their address with a single-use, 48-hour link (token stored as SHA-256). Until then they can't invite people, create API keys or webhooks, or export organization data. Invited and SSO members are confirmed on creation. Active when an email provider is configured.
+- **API keys (integrations):** organization keys with a viewer or scheduler role (never admin), optional expiry, revocable, stored as SHA-256 only, last use tracked, accepted only by endpoints that opt in, rate-limited per key, and audited. See [docs/API.md](../API.md).
+- **Webhooks:** HTTPS only; destinations that resolve to private, loopback, link-local or metadata addresses are refused (SSRF); redirects are not followed; 5-second timeout; deliveries signed with HMAC-SHA256 over a timestamp and the body; endpoints auto-disable after 20 consecutive failures. Signing secrets are encrypted at rest.
 - **Membership lifecycle:** single-use invitations bound to an email address (7-day expiry), role changes, offboarding (account disabled and signed out immediately; data stays with the firm), ownership transfer, account unlock.
 
 ## Tenant isolation
@@ -71,8 +74,8 @@ Every material event is appended to `audit_events`: sign-ins (and failures), mem
 
 ## Operations
 
-Health endpoint and 15-minute uptime probe that opens an incident issue; structured JSON logs with request ids; documented incident response, runbooks, backup/restore and RTO/RPO. See [docs/operations](../operations).
+Health endpoint and 15-minute uptime probe that opens an incident issue; security events (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) pushed to an operator alert channel (`PLANORA_ALERT_WEBHOOK_URL`); structured JSON logs with request ids; documented incident response, runbooks, backup/restore and RTO/RPO. See [docs/operations](../operations).
 
 ## Not yet in place (honest status)
 
-See [docs/security/POAM.md](POAM.md): an independent penetration test, SCIM provisioning, a SOC 2 / CMMC assessment, and an email-verification service.
+See [docs/security/POAM.md](POAM.md): an independent penetration test, SCIM provisioning, a SOC 2 / CMMC assessment, configuring the email provider and alert channel in production, and central log retention.

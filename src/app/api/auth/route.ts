@@ -13,6 +13,8 @@ import { currentRequest } from '@/lib/server/context'
 import { permissionsOf, isRole } from '@/lib/server/permissions'
 import { consumeSecondFactor } from '@/lib/server/mfa'
 import { ssoConfigFor } from '@/lib/server/sso'
+import { markEmailVerified, sendVerificationEmail } from '@/lib/server/email-verification'
+import { emailConfigured, appOrigin } from '@/lib/server/email'
 
 const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.'
 
@@ -79,7 +81,13 @@ export const POST = publicApi(async req => {
       passwordHash: await hashPassword(password), plan: 'free', createdAt: new Date().toISOString(),
       ...(invite ? { orgId: invite.orgId, role: invite.role } : { orgName: typeof b.company === 'string' && b.company.trim() ? b.company.trim().slice(0, 160) : undefined }),
     })
-    if (invite) await markInvitationAccepted(invite.id)
+    if (invite) {
+      await markInvitationAccepted(invite.id)
+      // The invitation link was delivered to this address.
+      await markEmailVerified(user.id)
+    } else {
+      await sendVerificationEmail(user, appOrigin(req))
+    }
     Object.assign(currentRequest() || {}, { userId: user.id, email: user.email, orgId: user.orgId })
     await audit({ orgId: user.orgId, action: invite ? 'member.joined' : 'org.created', targetType: 'user', targetId: user.id, detail: { role: user.role, ...(invite ? { invitationId: invite.id, invitedBy: invite.invitedBy } : {}) } })
     return startSession(user, 'password')
@@ -130,7 +138,7 @@ export const GET = publicApi(async req => {
     user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: user?.plan ?? 'free', role: ctx.role },
     org: { id: ctx.orgId, name: ctx.orgName },
     permissions: isRole(ctx.role) ? permissionsOf(ctx.role) : [],
-    security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired },
+    security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired, emailVerified: !!ctx.emailVerified, emailDelivery: emailConfigured() },
     ...(inviteInfo ? { invitation: inviteInfo } : {}),
   })
 })

@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: drill
           POSTGRES_PASSWORD: drill
@@ -40,6 +40,13 @@ jobs:
           cache: npm
       - if: env.HAS_SECRETS == 'true'
         run: npm ci
+      - if: env.HAS_SECRETS == 'true'
+        name: PostgreSQL 17 client tools
+        # pg_dump refuses to dump a server newer than itself; production (Neon) runs PostgreSQL 17.
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
       - if: env.HAS_SECRETS == 'true'
         name: Back up production
         env:

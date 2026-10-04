@@ -12,9 +12,10 @@ Maps Planora's controls to common frameworks, with the evidence an assessor can 
 | A04 Cryptographic failures | TLS to DB with verification; bcrypt; AES-256-GCM for MFA/SSO secrets; hashed recovery codes and invitation tokens | `databaseTlsConfig` in `src/lib/db.ts`, `src/lib/server/crypto.ts`, `security.test.ts` | Implemented |
 | A05 Injection | Parameterized SQL only (`pg`), formula-injection neutralization in CSV, no dynamic code | `src/lib/db.ts`, `src/lib/export/csv.ts`, Semgrep in CI | Implemented |
 | A06 Insecure design | Deterministic scheduling core separated from AI; optimistic locking; separation-of-duties policies | `src/lib/planning/*`, `savePlan`, review/publish routes | Implemented |
-| A07 Authentication failures | Password policy, lockout, rate limits, TOTP MFA, OIDC SSO, revocable sessions, generic errors | `src/lib/auth.ts`, `src/app/api/auth/*`, `e2e-security.mjs` | Implemented (email verification: Owner action) |
+| A07 Authentication failures | Password policy, lockout, rate limits, TOTP MFA, OIDC SSO, revocable sessions, generic errors | `src/lib/auth.ts`, `src/app/api/auth/*`, `src/lib/server/email-verification.ts`, `e2e-security.mjs` | Implemented (email verification built; provider key: Owner action) |
 | A08 Software/data integrity | Hash-chained, DB-enforced append-only audit log; backup manifests with SHA-256 | `src/lib/server/audit.ts`, migration 2 trigger, `scripts/restore-drill.mjs` | Implemented |
-| A09 Logging & alerting failures | Structured JSON logs with request ids; audit log; uptime probe → incident issue | `src/lib/server/log.ts`, `.github/workflows/uptime.yml` | Implemented (central log retention: Owner action) |
+| A09 Logging & alerting failures | Structured JSON logs with request ids; audit log; uptime probe → incident issue | `src/lib/server/log.ts`, `src/lib/server/webhooks.ts` (security alerts), `.github/workflows/uptime.yml` | Implemented (alert channel URL and central log retention: Owner action) |
+| A01/A10 Server-side request forgery (webhooks) | HTTPS only, DNS resolution checked against private/loopback/link-local/metadata ranges, no redirects, timeout | `src/lib/server/webhooks.ts`, `security.test.ts` | Implemented |
 | A10 Mishandling exceptional conditions | Central error handling; JSON-body validation; 409/429/402 semantics; retries only for idempotent model calls | `api.ts`, `provider.ts` | Implemented |
 
 ## NIST Cybersecurity Framework 2.0

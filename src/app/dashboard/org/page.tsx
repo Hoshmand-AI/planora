@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
+import { Integrations } from '@/components/Integrations'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
@@ -11,6 +12,7 @@ interface Invitation { id: string; email: string; role: string; expiresAt: strin
 interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
+  quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
 }
 interface OrgData {
   org: { id: string; name: string; createdAt: string }
@@ -33,7 +35,7 @@ const ACTION_LABELS: Record<string, string> = {
   'plan.review': 'Reviewed', 'plan.publish': 'Published baseline', 'plan.decision': 'Quality decision', 'plan.recovery': 'Applied recovery option', 'plan.export': 'Exported', 'plan.ai_suggest': 'AI follow-up questions',
   'schedule.upload': 'Uploaded schedule', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
-  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
 }
 // Download links come from this fixed table, never from page text.
 const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'ai.', 'privacy.'] as const
@@ -206,6 +208,17 @@ export default function OrgPage() {
               <Field label="Keep Ask AI history (days)" hint="0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.chatRetentionDays} onChange={e => setSettings({ ...settings, chatRetentionDays: Number(e.target.value) })} />}</Field>
               <Field label="Delete inactive projects after (days)" hint="Plans and uploaded schedules unchanged this long are deleted. 0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.projectRetentionDays} onChange={e => setSettings({ ...settings, projectRetentionDays: Number(e.target.value) })} />}</Field>
             </div>
+            <fieldset className="pt-2">
+              <legend className="text-[13.5px] font-medium text-navy-950">Quality check thresholds (DCMA 14-point)</legend>
+              <p className="text-[12.5px] text-warm-500 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Field label="Max share of offenders (%)" hint="Logic, lags, hard constraints, high float, high duration, missed tasks. 1–25.">{p => <input {...p} type="number" min={1} max={25} className={inputClass} value={settings.quality.maxPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, maxPct: Number(e.target.value) } })} />}</Field>
+                <Field label="Min finish-to-start links (%)" hint="Relationship types. 50–100.">{p => <input {...p} type="number" min={50} max={100} className={inputClass} value={settings.quality.minFsPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, minFsPct: Number(e.target.value) } })} />}</Field>
+                <Field label="High float above (work days)" hint="10–260.">{p => <input {...p} type="number" min={10} max={260} className={inputClass} value={settings.quality.highFloatDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highFloatDays: Number(e.target.value) } })} />}</Field>
+                <Field label="High duration above (work days)" hint="5–260.">{p => <input {...p} type="number" min={5} max={260} className={inputClass} value={settings.quality.highDurationDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highDurationDays: Number(e.target.value) } })} />}</Field>
+                <Field label="Min CPLI and BEI" hint="0.80–1.00.">{p => <input {...p} type="number" min={0.8} max={1} step={0.01} className={inputClass} value={settings.quality.indexTarget} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, indexTarget: Number(e.target.value) } })} />}</Field>
+              </div>
+            </fieldset>
             <Button disabled={busy === 'settings'} onClick={async () => { const d = await act('settings', { action: 'update_settings', settings }, 'Policies saved.'); if (d) load() }}>Save policies</Button>
           </div>
         </Section>
@@ -244,6 +257,8 @@ export default function OrgPage() {
           )}
         </Section>
       )}
+
+      {manage && <Integrations />}
 
       {can('audit.read') && (
         <Section title="Audit log" description="Every sign-in, change, review, export and AI request, with who, when and from where. Records are chained by hash and the database refuses edits or deletions, so tampering is both blocked and detectable.">

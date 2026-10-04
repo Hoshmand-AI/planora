@@ -4,6 +4,7 @@ import { publicApi, ApiError } from '@/lib/server/api'
 import { finishSso } from '@/lib/server/sso'
 import { createSession, setSessionCookie, hashPassword } from '@/lib/auth'
 import { createUser, getUserByEmail } from '@/lib/db'
+import { markEmailVerified } from '@/lib/server/email-verification'
 import { audit, auditQuietly } from '@/lib/server/audit'
 import { currentRequest } from '@/lib/server/context'
 import { randomToken } from '@/lib/server/crypto'
@@ -29,6 +30,7 @@ export const GET = publicApi(async req => {
       // Just-in-time provisioning with the organization's default role. The password is random and
       // unusable: these members sign in through the identity provider.
       user = await createUser({ id: randomUUID(), email: id.email, name: id.name, passwordHash: await hashPassword(randomToken(32)), plan: 'free', createdAt: new Date().toISOString(), orgId: id.orgId, role: id.config.defaultRole })
+      await markEmailVerified(user.id)
       if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
       await audit({ orgId: id.orgId, action: 'member.joined', targetType: 'user', targetId: user.id, detail: { via: 'sso', role: user.role, issuer: id.config.issuer } })
     }

@@ -12,6 +12,17 @@
 1. **Primary: Neon point-in-time recovery.** Neon keeps a write-ahead log history; restore to any second inside the plan's history window, as a new branch. Confirm the window in the Neon console (Settings → Storage).
 2. **Secondary: nightly logical backup** (`.github/workflows/backup.yml`). It runs `scripts/backup.mjs` (pg_dump with a SHA-256 manifest, row counts and audit-chain heads), **restores it into a scratch database and verifies it** (`scripts/restore-drill.mjs`), then encrypts it (AES-256) and keeps it for 35 days.
    - To enable it, add the repository secrets `BACKUP_DATABASE_URL` (a read-only role) and `BACKUP_PASSPHRASE`.
+   - Production runs on Neon **PostgreSQL 17** (project `planora-db`, region us-east-1 / iad1, created through the Vercel Neon integration under support@hoshmand.ai on 10/04/2026). `pg_dump` refuses to dump a newer server than itself, so the workflow installs the PostgreSQL 17 client tools (`PG_BIN`) and restores into a `postgres:17` scratch server. CI uses the same version.
+   - Create the read-only role in the Neon SQL Editor (replace the password; never commit it):
+     ```sql
+     CREATE ROLE backup_reader WITH LOGIN PASSWORD '<long random password>';
+     GRANT CONNECT ON DATABASE neondb TO backup_reader;
+     GRANT USAGE ON SCHEMA public TO backup_reader;
+     GRANT SELECT ON ALL TABLES IN SCHEMA public TO backup_reader;
+     GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO backup_reader;
+     ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public GRANT SELECT ON TABLES TO backup_reader;
+     ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO backup_reader;
+     ```
 3. **Every pull request** runs the same backup and restore drill against the CI database, so the procedure itself can't silently break.
 
 ## Restore procedures
