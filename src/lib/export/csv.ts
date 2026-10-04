@@ -13,10 +13,22 @@ function cellString(v: unknown): string {
   return String(v)
 }
 
+/**
+ * Spreadsheet formula injection (CWE-1236): text from uploaded files or users that starts with
+ * = + - @ or a tab/CR would run as a formula when the CSV is opened in Excel/Sheets. Such text is
+ * prefixed with an apostrophe so it displays as text. Real numbers are left alone.
+ */
+export function neutralizeFormula(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s) ? `'${s}` : s
+}
+
 export function csvField(v: unknown): string {
-  const s = cellString(v)
+  const raw = cellString(v)
+  const s = typeof v === 'number' ? raw : neutralizeFormula(raw)
   return /[",\r\n]|^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
+
+export const csvCell = csvField
 
 export function exportCsv(rows: Record<string, unknown>[], columns: { key: string; label: string }[]): string {
   const lines = [columns.map(c => csvField(c.label)).join(',')]

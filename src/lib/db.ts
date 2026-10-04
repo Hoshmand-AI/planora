@@ -1,19 +1,44 @@
 import { Pool } from 'pg'
+import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
 
-const connectionString = process.env.DATABASE_URL
-const isLocalDb = !!connectionString && /@(localhost|127\.0\.0\.1|\[::1\]|[^/]*\.local)(:\d+)?\//.test(connectionString)
+/**
+ * TLS for remote databases always verifies the server certificate and host name (verify-full).
+ * sslmode in the URL is stripped so it can't silently weaken this; the CA can be supplied with
+ * PGSSLROOTCERT for on-prem databases with a private CA. PGSSLMODE=disable turns TLS off
+ * (local / enclave databases on a trusted network only).
+ */
+export function databaseTlsConfig(env: Record<string, string | undefined> = process.env): { connectionString?: string; ssl: false | { rejectUnauthorized: true; ca?: string } } {
+  const raw = env.DATABASE_URL
+  const local = !!raw && /@(localhost|127\.0\.0\.1|\[::1\]|[^/]*\.local)(:\d+)?\//.test(raw)
+  let connectionString = raw
+  if (raw) {
+    try {
+      const u = new URL(raw)
+      for (const k of ['sslmode', 'uselibpqcompat', 'sslrootcert', 'sslcert', 'sslkey']) u.searchParams.delete(k)
+      connectionString = u.toString()
+    } catch { /* leave as-is */ }
+  }
+  if (local || env.PGSSLMODE === 'disable') return { connectionString, ssl: false }
+  let ca: string | undefined
+  if (env.PGSSLROOTCERT) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ca = require('fs').readFileSync(env.PGSSLROOTCERT, 'utf8') as string
+  }
+  return { connectionString, ssl: ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized: true } }
+}
 
+const tls = databaseTlsConfig()
 const pool = new Pool({
-  connectionString,
-  // Neon requires TLS; local/on-prem Postgres (air-gapped installs) usually doesn't.
-  ssl: isLocalDb || process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
-  max: 10,
+  connectionString: tls.connectionString,
+  ssl: tls.ssl,
+  max: Number(process.env.PG_POOL_MAX) || 10,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
 })
-
 export const query = (text: string, params?: unknown[]) => pool.query(text, params)
 
 let schemaReady: Promise<void> | null = null
@@ -25,124 +50,66 @@ export function initSchema(): Promise<void> {
   return schemaReady
 }
 
+const MIGRATION_LOCK = 727_001
+
+/** Applies pending migrations in order, each in its own transaction, under a cluster-wide advisory lock. */
 async function createSchema() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      plan TEXT NOT NULL DEFAULT 'free',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id TEXT REFERENCES organizations(id);
-    CREATE TABLE IF NOT EXISTS schedules (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      version TEXT,
-      source_type TEXT,
-      file_name TEXT,
-      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      activity_count INTEGER DEFAULT 0,
-      relationship_count INTEGER DEFAULT 0,
-      project_start TEXT,
-      project_finish TEXT,
-      data_date TEXT,
-      variance_days INTEGER,
-      critical_count INTEGER DEFAULT 0,
-      percent_complete NUMERIC DEFAULT 0
-    );
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS org_id TEXT REFERENCES organizations(id);
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS calendars JSONB NOT NULL DEFAULT '[]';
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS default_calendar_id TEXT;
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS plan_id TEXT;
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS project_type TEXT;
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS region TEXT;
-    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS gross_sqft NUMERIC;
-    CREATE INDEX IF NOT EXISTS schedules_org_idx ON schedules(org_id);
-    CREATE TABLE IF NOT EXISTS activities (
-      id TEXT PRIMARY KEY,
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      activity_id TEXT,
-      name TEXT,
-      wbs TEXT,
-      duration NUMERIC DEFAULT 0,
-      remaining_duration NUMERIC DEFAULT 0,
-      percent_complete NUMERIC DEFAULT 0,
-      early_start TEXT, early_finish TEXT,
-      late_start TEXT, late_finish TEXT,
-      actual_start TEXT, actual_finish TEXT,
-      baseline_start TEXT, baseline_finish TEXT,
-      total_float NUMERIC DEFAULT 0,
-      free_float NUMERIC DEFAULT 0,
-      is_critical BOOLEAN DEFAULT false,
-      status TEXT DEFAULT 'not_started',
-      activity_type TEXT DEFAULT 'task'
-    );
-    ALTER TABLE activities ADD COLUMN IF NOT EXISTS calendar_id TEXT;
-    ALTER TABLE activities ADD COLUMN IF NOT EXISTS constraint_type TEXT;
-    ALTER TABLE activities ADD COLUMN IF NOT EXISTS constraint_date TEXT;
-    ALTER TABLE activities ADD COLUMN IF NOT EXISTS category TEXT;
-    ALTER TABLE activities ADD COLUMN IF NOT EXISTS source_id TEXT;
-    CREATE INDEX IF NOT EXISTS activities_schedule_idx ON activities(schedule_id);
-    CREATE TABLE IF NOT EXISTS relationships (
-      id TEXT PRIMARY KEY,
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      predecessor_id TEXT, successor_id TEXT,
-      type TEXT DEFAULT 'FS',
-      lag NUMERIC DEFAULT 0
-    );
-    CREATE INDEX IF NOT EXISTS relationships_schedule_idx ON relationships(schedule_id);
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS plans (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      answers JSONB NOT NULL DEFAULT '{}',
-      generated JSONB,
-      reviews JSONB NOT NULL DEFAULT '[]',
-      audit JSONB NOT NULL DEFAULT '[]',
-      schedule_id TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    ALTER TABLE plans ADD COLUMN IF NOT EXISTS extra_questions JSONB NOT NULL DEFAULT '[]';
-    ALTER TABLE plans ADD COLUMN IF NOT EXISTS decisions JSONB NOT NULL DEFAULT '{}';
-    CREATE INDEX IF NOT EXISTS plans_org_idx ON plans(org_id);
-    CREATE TABLE IF NOT EXISTS data_question_responses (
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      question_id TEXT NOT NULL,
-      response TEXT NOT NULL,
-      note TEXT,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (schedule_id, question_id)
-    );
-  `)
-  // Backfill: legacy users (pre-tenancy) each get their own organization.
-  await pool.query(`
-    INSERT INTO organizations (id, name)
-      SELECT 'org_' || u.id, u.name FROM users u WHERE u.org_id IS NULL
-      ON CONFLICT (id) DO NOTHING;
-    UPDATE users SET org_id = 'org_' || id WHERE org_id IS NULL;
-    UPDATE schedules s SET org_id = u.org_id FROM users u WHERE s.user_id = u.id AND s.org_id IS NULL;
-  `)
+  const client = await pool.connect()
+  try {
+    await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK])
+    try {
+      await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
+      const done = new Map<number, string>((await client.query('SELECT id, checksum FROM schema_migrations')).rows.map(r => [Number(r.id), String(r.checksum)]))
+      for (const m of MIGRATIONS) {
+        const sum = checksum(m)
+        if (done.has(m.id)) {
+          if (done.get(m.id) !== sum) console.warn(JSON.stringify({ level: 'warn', msg: 'migration checksum drift', migration: m.id, name: m.name }))
+          continue
+        }
+        await client.query('BEGIN')
+        try {
+          await client.query(m.sql)
+          await client.query('INSERT INTO schema_migrations (id, name, checksum) VALUES ($1,$2,$3)', [m.id, m.name, sum])
+          await client.query('COMMIT')
+          console.log(JSON.stringify({ level: 'info', msg: 'migration applied', migration: m.id, name: m.name }))
+        } catch (err) {
+          await client.query('ROLLBACK')
+          throw new Error(`Migration ${m.id} (${m.name}) failed: ${(err as Error).message}`)
+        }
+      }
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK])
+    }
+  } finally {
+    client.release()
+  }
 }
+
+export async function schemaStatus(): Promise<{ latest: number; applied: number[] }> {
+  await initSchema()
+  const res = await query('SELECT id FROM schema_migrations ORDER BY id')
+  return { latest: LATEST_MIGRATION, applied: res.rows.map(r => Number(r.id)) }
+}
+
+/** Runs fn inside a transaction on a dedicated client. */
+export async function withTransaction<T>(fn: (q: (text: string, params?: unknown[]) => Promise<import('pg').QueryResult>) => Promise<T>): Promise<T> {
+  await initSchema()
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn((text, params) => client.query(text, params as unknown[]))
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+export async function closePool() { await pool.end() }
 
 /* ─── Organizations & users ─────────────────────────── */
 
@@ -154,10 +121,25 @@ export interface User {
   plan: 'free' | 'pro' | 'enterprise'
   createdAt: string
   orgId: string
+  role: string
+  disabledAt: string | null
+  failedLogins: number
+  lockedUntil: string | null
+  mfaSecret: string | null
+  mfaEnabledAt: string | null
+  mfaLastStep: number | null
+  mfaRecovery: string[]
 }
 
-function rowToUser(row: Record<string, string>): User {
-  return { id: row.id, email: row.email, name: row.name, passwordHash: row.password_hash, plan: row.plan as User['plan'], createdAt: row.created_at, orgId: row.org_id }
+function rowToUser(row: Record<string, unknown>): User {
+  const ts = (v: unknown) => v ? new Date(v as string).toISOString() : null
+  return {
+    id: row.id as string, email: row.email as string, name: row.name as string, passwordHash: row.password_hash as string,
+    plan: row.plan as User['plan'], createdAt: new Date(row.created_at as string).toISOString(), orgId: row.org_id as string,
+    role: (row.role as string) || 'viewer', disabledAt: ts(row.disabled_at), failedLogins: Number(row.failed_logins || 0), lockedUntil: ts(row.locked_until),
+    mfaSecret: (row.mfa_secret as string) || null, mfaEnabledAt: ts(row.mfa_enabled_at),
+    mfaLastStep: row.mfa_last_step != null ? Number(row.mfa_last_step) : null, mfaRecovery: (row.mfa_recovery as string[]) || [],
+  }
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
@@ -172,21 +154,33 @@ export async function getUserById(id: string): Promise<User | undefined> {
   return res.rows[0] ? rowToUser(res.rows[0]) : undefined
 }
 
-/** Creates the user and, unless joining an existing org, a new private organization for their firm. */
-export async function createUser(user: Omit<User, 'orgId'> & { orgId?: string; orgName?: string }): Promise<User> {
+/** Creates the user and, unless joining an existing org (invitation), a new private organization for their firm. */
+export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'passwordHash' | 'plan' | 'createdAt'> & { orgId?: string; orgName?: string; role?: string }): Promise<User> {
   await initSchema()
   const orgId = user.orgId || `org_${user.id}`
-  if (!user.orgId) {
-    await query('INSERT INTO organizations (id, name) VALUES ($1,$2) ON CONFLICT (id) DO NOTHING', [orgId, user.orgName || user.name])
-  }
-  await query('INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)', [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId])
-  return { ...user, orgId }
+  const role = user.orgId ? (user.role || 'viewer') : 'owner'
+  return withTransaction(async q => {
+    if (!user.orgId) {
+      const { defaultPlan } = await import('@/lib/server/entitlements')
+      await q('INSERT INTO organizations (id, name, plan) VALUES ($1,$2,$3) ON CONFLICT (id) DO NOTHING', [orgId, user.orgName || user.name, defaultPlan()])
+    }
+    const res = await q('INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
+      [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId, role])
+    return rowToUser(res.rows[0])
+  })
 }
 
-export async function getOrganization(id: string): Promise<{ id: string; name: string } | undefined> {
+export async function getOrganization(id: string): Promise<{ id: string; name: string; settings: Record<string, unknown>; createdAt: string; plan: string; sso: Record<string, unknown> } | undefined> {
   await initSchema()
-  const res = await query('SELECT id, name FROM organizations WHERE id=$1', [id])
-  return res.rows[0]
+  const res = await query('SELECT id, name, settings, created_at, plan, sso FROM organizations WHERE id=$1', [id])
+  const r = res.rows[0]
+  return r ? { id: r.id, name: r.name, settings: r.settings || {}, createdAt: new Date(r.created_at).toISOString(), plan: r.plan || 'free', sso: r.sso || {} } : undefined
+}
+
+export async function listMembers(orgId: string): Promise<User[]> {
+  await initSchema()
+  const res = await query('SELECT * FROM users WHERE org_id=$1 ORDER BY created_at', [orgId])
+  return res.rows.map(rowToUser)
 }
 
 export async function updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
@@ -400,6 +394,10 @@ export interface ExpertReview {
   /** Optional per-activity notes: activity id -> note */
   activityNotes?: Record<string, string>
   at: string
+  /** Account that recorded the review (for separation-of-duties checks) */
+  reviewerUserId?: string
+  /** Schedule generation the review applies to (an approval goes stale when the schedule is regenerated) */
+  generatedAt?: string
 }
 
 export interface PlanDecision { decision: 'accept' | 'fix'; note: string; by: string; at: string }
@@ -418,42 +416,74 @@ export interface Plan {
   decisions: Record<string, PlanDecision>
   scheduleId: string | null
   createdAt: string; updatedAt: string
+  /** Optimistic-locking version; incremented on every save. */
+  version: number
 }
+
+/** Audit entries already persisted when the plan was loaded (new ones are appended to the audit log on save). */
+const loadedAuditLength = new WeakMap<Plan, number>()
 
 function rowToPlan(r: Record<string, unknown>): Plan {
   return {
     id: r.id as string, orgId: r.org_id as string, userId: r.user_id as string, name: r.name as string,
     answers: (r.answers as Record<string, Answer>) || {}, extraQuestions: (r.extra_questions as Question[]) || [], generated: (r.generated as GeneratedSchedule) || null,
     reviews: (r.reviews as ExpertReview[]) || [], decisions: (r.decisions as Record<string, PlanDecision>) || {}, audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
-    createdAt: String(r.created_at), updatedAt: String(r.updated_at),
+    createdAt: String(r.created_at), updatedAt: String(r.updated_at), version: Number(r.version ?? 1),
   }
+}
+
+function trackPlan(p: Plan): Plan {
+  loadedAuditLength.set(p, p.audit.length)
+  return p
 }
 
 export async function listPlans(orgId: string): Promise<Plan[]> {
   await initSchema()
   const res = await query('SELECT * FROM plans WHERE org_id=$1 ORDER BY updated_at DESC', [orgId])
-  return res.rows.map(rowToPlan)
+  return res.rows.map(r => trackPlan(rowToPlan(r)))
 }
 
 export async function getPlan(id: string, orgId: string): Promise<Plan | undefined> {
   await initSchema()
   const res = await query('SELECT * FROM plans WHERE id=$1 AND org_id=$2', [id, orgId])
-  return res.rows[0] ? rowToPlan(res.rows[0]) : undefined
+  return res.rows[0] ? trackPlan(rowToPlan(res.rows[0])) : undefined
 }
 
 export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name'>): Promise<Plan> {
   await initSchema()
   const res = await query('INSERT INTO plans (id, org_id, user_id, name) VALUES ($1,$2,$3,$4) RETURNING *', [p.id, p.orgId, p.userId, p.name])
-  return rowToPlan(res.rows[0])
+  return trackPlan(rowToPlan(res.rows[0]))
 }
 
+export class StalePlanError extends Error {
+  constructor() { super('Plan was modified concurrently') }
+}
+
+/**
+ * Saves a plan with optimistic locking (the row must still be at the version that was loaded) and
+ * appends any new plan audit entries to the tamper-evident audit log in the same request. The
+ * plan's own audit list is a display copy; audit_events is the complete record.
+ */
 export async function savePlan(p: Plan): Promise<Plan> {
   await initSchema()
-  const res = await query(`UPDATE plans SET name=$3, answers=$4, generated=$5, reviews=$6, audit=$7, schedule_id=$8, extra_questions=$9, decisions=$10, updated_at=NOW()
-    WHERE id=$1 AND org_id=$2 RETURNING *`,
-    [p.id, p.orgId, p.name, JSON.stringify(p.answers), p.generated ? JSON.stringify(p.generated) : null, JSON.stringify(p.reviews), JSON.stringify(p.audit.slice(-500)), p.scheduleId, JSON.stringify(p.extraQuestions), JSON.stringify(p.decisions || {})])
-  if (!res.rows[0]) throw new Error('Plan not found')
-  return rowToPlan(res.rows[0])
+  const res = await query(`UPDATE plans SET name=$3, answers=$4, generated=$5, reviews=$6, audit=$7, schedule_id=$8, extra_questions=$9, decisions=$10, updated_at=NOW(), version=version+1
+    WHERE id=$1 AND org_id=$2 AND version=$11 RETURNING *`,
+    [p.id, p.orgId, p.name, JSON.stringify(p.answers), p.generated ? JSON.stringify(p.generated) : null, JSON.stringify(p.reviews), JSON.stringify(p.audit.slice(-500)), p.scheduleId, JSON.stringify(p.extraQuestions), JSON.stringify(p.decisions || {}), p.version])
+  if (!res.rows[0]) {
+    const exists = await query('SELECT 1 FROM plans WHERE id=$1 AND org_id=$2', [p.id, p.orgId])
+    if (exists.rows[0]) throw new StalePlanError()
+    throw new Error('Plan not found')
+  }
+  const from = loadedAuditLength.get(p) ?? p.audit.length
+  const fresh = p.audit.slice(from)
+  if (fresh.length) {
+    const { appendAudit } = await import('@/lib/server/audit')
+    await appendAudit(fresh.map(e => ({
+      orgId: p.orgId, action: `plan.${e.action}`, targetType: 'plan', targetId: p.id,
+      detail: { plan: p.name, by: e.by, ...(e.detail ? { detail: e.detail } : {}), version: Number(res.rows[0].version) },
+    })))
+  }
+  return trackPlan(rowToPlan(res.rows[0]))
 }
 
 export async function deletePlan(id: string, orgId: string): Promise<boolean> {
@@ -477,4 +507,88 @@ export async function saveDataQuestionResponse(scheduleId: string, r: Omit<DataQ
   await query(`INSERT INTO data_question_responses (schedule_id, question_id, response, note, user_id) VALUES ($1,$2,$3,$4,$5)
     ON CONFLICT (schedule_id, question_id) DO UPDATE SET response=EXCLUDED.response, note=EXCLUDED.note, user_id=EXCLUDED.user_id, created_at=NOW()`,
     [scheduleId, r.questionId, r.response, r.note, r.userId])
+}
+
+/* ─── Privacy: export and deletion ──────────────────── */
+
+export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {
+  await initSchema()
+  const res = await query('SELECT * FROM chat_messages WHERE user_id=$1 ORDER BY created_at', [userId])
+  return res.rows.map(row => ({ id: row.id, scheduleId: row.schedule_id, userId: row.user_id, role: row.role, content: row.content, createdAt: row.created_at }))
+}
+
+/** Everything the organization has stored in Planora, as one JSON document (data portability). */
+export async function exportOrganization(orgId: string) {
+  await initSchema()
+  const org = await getOrganization(orgId)
+  const members = (await listMembers(orgId)).map(u => ({ id: u.id, email: u.email, name: u.name, role: u.role, createdAt: u.createdAt, disabledAt: u.disabledAt, twoStepVerification: !!u.mfaEnabledAt }))
+  const plans = await listPlans(orgId)
+  const schedules = await getSchedules(orgId)
+  const scheduleData = []
+  for (const s of schedules) {
+    const [activities, relationships, responses, chats] = await Promise.all([
+      getActivities(s.id), getRelationships(s.id), getDataQuestionResponses(s.id),
+      query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
+    ])
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats })
+  }
+  const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
+  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
+}
+
+/**
+ * Deletes an organization and all of its data, including its audit log (the customer's data). A
+ * tombstone with the purged chain's final hash is appended to the system audit chain as evidence.
+ */
+export async function deleteOrganization(orgId: string, actor: { id: string; email: string }): Promise<{ auditEventsPurged: number }> {
+  await initSchema()
+  const summary = await withTransaction(async q => {
+    const counts = (await q(`SELECT (SELECT COUNT(*) FROM plans WHERE org_id=$1)::int AS plans, (SELECT COUNT(*) FROM schedules WHERE org_id=$1)::int AS schedules,
+      (SELECT COUNT(*) FROM users WHERE org_id=$1)::int AS members, (SELECT COUNT(*) FROM audit_events WHERE org_id=$1)::int AS audit,
+      (SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1) AS last_hash`, [orgId])).rows[0]
+    await q(`SELECT set_config('planora.audit_purge', 'on', true)`)
+    await q('DELETE FROM audit_events WHERE org_id=$1', [orgId])
+    await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
+    await q('DELETE FROM plans WHERE org_id=$1', [orgId])
+    await q('DELETE FROM invitations WHERE org_id=$1', [orgId])
+    await q(`DELETE FROM rate_limits WHERE key LIKE $1`, [`%:org:${orgId}%`])
+    await q('DELETE FROM users WHERE org_id=$1', [orgId])
+    await q('DELETE FROM organizations WHERE id=$1', [orgId])
+    return counts
+  })
+  const { audit, SYSTEM_ORG } = await import('@/lib/server/audit')
+  await audit({ orgId: SYSTEM_ORG, action: 'privacy.organization_deleted', targetType: 'organization', targetId: orgId, actor,
+    detail: { plans: summary.plans, schedules: summary.schedules, members: summary.members, auditEventsPurged: summary.audit, purgedChainLastHash: summary.last_hash } })
+  return { auditEventsPurged: Number(summary.audit) }
+}
+
+/**
+ * Erases one person's account. If they are the last member, the whole organization is deleted.
+ * Otherwise their projects are reassigned to an owner (the firm keeps its work) and their
+ * personal data (account, sessions, Ask AI history) is deleted.
+ */
+export async function deleteAccountData(userId: string, orgId: string): Promise<{ orgDeleted: boolean; reassignedTo?: string }> {
+  await initSchema()
+  const members = await listMembers(orgId)
+  const me = members.find(m => m.id === userId)
+  if (!me) throw new Error('Account not found')
+  const others = members.filter(m => m.id !== userId && !m.disabledAt)
+  if (!others.length) {
+    await deleteOrganization(orgId, { id: userId, email: me.email })
+    return { orgDeleted: true }
+  }
+  const owners = others.filter(m => m.role === 'owner')
+  if (me.role === 'owner' && !owners.length) {
+    const { ApiError } = await import('@/lib/server/api')
+    throw new ApiError(400, 'You are the only owner. Transfer ownership to another member first (Organization → Members).')
+  }
+  const heir = (owners[0] || others.find(m => m.role === 'admin') || others[0]).id
+  await withTransaction(async q => {
+    await q('UPDATE plans SET user_id=$2 WHERE user_id=$1', [userId, heir])
+    await q('UPDATE schedules SET user_id=$2 WHERE user_id=$1', [userId, heir])
+    await q('UPDATE data_question_responses SET user_id=$2 WHERE user_id=$1', [userId, heir])
+    await q('DELETE FROM chat_messages WHERE user_id=$1', [userId])
+    await q('DELETE FROM users WHERE id=$1', [userId])
+  })
+  return { orgDeleted: false, reassignedTo: heir }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractJson, isAllowedAirgapHost, resolveLlmConfig } from './provider'
+import { extractJson, isAllowedAirgapHost, resolveLlmConfig, DEFAULT_CLOUD_MODEL } from './provider'
 
 describe('LLM provider routing', () => {
   it('defaults to cloud with a key, offline without', () => {
@@ -23,8 +23,17 @@ describe('LLM provider routing', () => {
     const c = resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://10.20.0.5:11434/v1', LLM_MODEL: 'llama3.1:8b' })
     expect(c.mode).toBe('local')
     expect(c.smallModel).toBe(true)
-    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://gpu01.scif.internal:8000/v1', LLM_MODEL: 'llama-3.3-70b' }).smallModel).toBe(false)
+    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://gpu01.scif.internal:8000/v1', LLM_MODEL: 'llama-3.3-70b', PLANORA_APPROVED_MODELS: 'llama-3.3-70b' }).smallModel).toBe(false)
     expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://llm.corp/v1', PLANORA_ALLOWED_HOSTS: 'llm.corp' }).mode).toBe('local')
+  })
+
+  it('only uses models in the approved registry, pinned by default', () => {
+    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k' }).model).toBe(DEFAULT_CLOUD_MODEL)
+    const refused = resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'some-unreviewed-model' })
+    expect(refused.mode).toBe('offline')
+    expect(refused.error).toMatch(/approved model registry/)
+    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'gpt-4o-mini', PLANORA_APPROVED_MODELS: 'gpt-4o-mini' }).mode).toBe('cloud')
+    expect(resolveLlmConfig({ LLM_BASE_URL: 'http://localhost:11434/v1', LLM_MODEL: 'llama3.1:8b', PLANORA_APPROVED_MODELS: 'qwen2.5:14b' }).mode).toBe('offline')
   })
 
   it('classifies hosts', () => {

@@ -2,6 +2,7 @@
 // Gantt layout on 11×17 landscape pages — WBS bands, activity table, month timescale, critical bars.
 // Uses pdf-lib's standard fonts, so no font files are needed (works air-gapped).
 
+import type { SraResult } from '@/lib/planning/sra'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { GeneratedSchedule } from '@/lib/planning/types'
 import type { Evaluation } from '@/lib/planning/evaluation'
@@ -44,7 +45,7 @@ function wrap(text: string, font: PDFFont, size: number, max: number): string[] 
   return out
 }
 
-export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string } = {}): Promise<Uint8Array> {
+export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string; sra?: SraResult } = {}): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   doc.setTitle(`${projectName} — Schedule`)
   doc.setProducer('Planora')
@@ -69,7 +70,9 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
     p.drawText(pdfSafe(`Schedule report · prepared ${printed}${opts.preparedBy ? ' by ' + opts.preparedBy : ''}`), { x: M, y, size: 10, font, color: GREY }); y -= 30
     const stats: [string, string][] = [
       ['Start (NTP)', fmtDate(s.projectStart)], ['Deterministic finish', fmtDate(finish)],
-      ['P50 / P80 finish', ev ? `${fmtDate(ev.forecast.p50)} / ${fmtDate(ev.forecast.p80)}` : '—'],
+      opts.sra
+        ? ['Monte Carlo P50 / P80', `${fmtDate(opts.sra.percentiles.p50)} / ${fmtDate(opts.sra.percentiles.p80)}`]
+        : ['Scenario P50 / P80', ev ? `${fmtDate(ev.forecast.p50)} / ${fmtDate(ev.forecast.p80)}` : '—'],
       ['Activities', `${s.activities.length} (${s.activities.filter(a => t[a.id]?.critical).length} critical)`],
       ['Quality', ev ? `${ev.grade} (${ev.score}/100) · DCMA ${ev.dcma.passed}/${ev.dcma.applicable}` : '—'],
     ]

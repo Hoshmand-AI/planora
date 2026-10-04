@@ -1,0 +1,14 @@
+# Security-sensitive paths. When "Require review from Code Owners" is on for main, changes here need
+# an approving review from a code owner other than the author (docs/operations/CHANGE-MANAGEMENT.md).
+/src/lib/auth.ts                @Hoshmand-AI
+/src/lib/server/                @Hoshmand-AI
+/src/lib/migrations.ts          @Hoshmand-AI
+/src/lib/db.ts                  @Hoshmand-AI
+/src/app/api/auth/              @Hoshmand-AI
+/src/app/api/org/               @Hoshmand-AI
+/src/app/api/account/           @Hoshmand-AI
+/src/app/api/audit/             @Hoshmand-AI
+/src/lib/llm/                   @Hoshmand-AI
+/next.config.js                 @Hoshmand-AI
+/.github/                       @Hoshmand-AI
+/package-lock.json              @Hoshmand-AI

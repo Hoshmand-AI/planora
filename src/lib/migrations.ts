@@ -1,0 +1,252 @@
+// Versioned, ordered database migrations. Each runs once, in order, inside a transaction, and is
+// recorded in schema_migrations with a checksum so drift is detectable. Never edit a migration that
+// has shipped: add a new one. Migration 1 is the original schema (idempotent, so it is safe on
+// databases created before migrations existed).
+
+import { createHash } from 'crypto'
+
+export interface Migration { id: number; name: string; sql: string }
+
+export const MIGRATIONS: Migration[] = [
+  {
+    id: 1, name: 'baseline',
+    sql: `    CREATE TABLE IF NOT EXISTS organizations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'free',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id TEXT REFERENCES organizations(id);
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      version TEXT,
+      source_type TEXT,
+      file_name TEXT,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      activity_count INTEGER DEFAULT 0,
+      relationship_count INTEGER DEFAULT 0,
+      project_start TEXT,
+      project_finish TEXT,
+      data_date TEXT,
+      variance_days INTEGER,
+      critical_count INTEGER DEFAULT 0,
+      percent_complete NUMERIC DEFAULT 0
+    );
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS org_id TEXT REFERENCES organizations(id);
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS calendars JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS default_calendar_id TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS plan_id TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS project_type TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS region TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS gross_sqft NUMERIC;
+    CREATE INDEX IF NOT EXISTS schedules_org_idx ON schedules(org_id);
+    CREATE TABLE IF NOT EXISTS activities (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      activity_id TEXT,
+      name TEXT,
+      wbs TEXT,
+      duration NUMERIC DEFAULT 0,
+      remaining_duration NUMERIC DEFAULT 0,
+      percent_complete NUMERIC DEFAULT 0,
+      early_start TEXT, early_finish TEXT,
+      late_start TEXT, late_finish TEXT,
+      actual_start TEXT, actual_finish TEXT,
+      baseline_start TEXT, baseline_finish TEXT,
+      total_float NUMERIC DEFAULT 0,
+      free_float NUMERIC DEFAULT 0,
+      is_critical BOOLEAN DEFAULT false,
+      status TEXT DEFAULT 'not_started',
+      activity_type TEXT DEFAULT 'task'
+    );
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS calendar_id TEXT;
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS constraint_type TEXT;
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS constraint_date TEXT;
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS category TEXT;
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS source_id TEXT;
+    CREATE INDEX IF NOT EXISTS activities_schedule_idx ON activities(schedule_id);
+    CREATE TABLE IF NOT EXISTS relationships (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      predecessor_id TEXT, successor_id TEXT,
+      type TEXT DEFAULT 'FS',
+      lag NUMERIC DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS relationships_schedule_idx ON relationships(schedule_id);
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS plans (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      answers JSONB NOT NULL DEFAULT '{}',
+      generated JSONB,
+      reviews JSONB NOT NULL DEFAULT '[]',
+      audit JSONB NOT NULL DEFAULT '[]',
+      schedule_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS extra_questions JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS decisions JSONB NOT NULL DEFAULT '{}';
+    CREATE INDEX IF NOT EXISTS plans_org_idx ON plans(org_id);
+    CREATE TABLE IF NOT EXISTS data_question_responses (
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      question_id TEXT NOT NULL,
+      response TEXT NOT NULL,
+      note TEXT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (schedule_id, question_id)
+    );
+  
+    INSERT INTO organizations (id, name)
+      SELECT 'org_' || u.id, u.name FROM users u WHERE u.org_id IS NULL
+      ON CONFLICT (id) DO NOTHING;
+    UPDATE users SET org_id = 'org_' || id WHERE org_id IS NULL;
+    UPDATE schedules s SET org_id = u.org_id FROM users u WHERE s.user_id = u.id AND s.org_id IS NULL;
+  `,
+  },
+  {
+    id: 2, name: 'security_and_governance',
+    sql: `
+    -- Roles and account security
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT;
+    UPDATE users SET role = 'owner' WHERE role IS NULL;
+    ALTER TABLE users ALTER COLUMN role SET DEFAULT 'viewer';
+    ALTER TABLE users ALTER COLUMN role SET NOT NULL;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_step BIGINT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery JSONB NOT NULL DEFAULT '[]';
+    CREATE INDEX IF NOT EXISTS users_org_idx ON users(org_id);
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}';
+
+    -- Server-side sessions: short idle timeout, revocable, visible to the user
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      revoked_at TIMESTAMPTZ,
+      ip TEXT,
+      user_agent TEXT
+    );
+    CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id);
+
+    -- Fixed-window counters for rate limits and quotas
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key TEXT PRIMARY KEY,
+      window_start TIMESTAMPTZ NOT NULL,
+      count INTEGER NOT NULL
+    );
+
+    -- Invitations into an organization
+    CREATE TABLE IF NOT EXISTS invitations (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      invited_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      accepted_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS invitations_org_idx ON invitations(org_id);
+
+    -- Tamper-evident, append-only audit log (hash-chained per organization).
+    -- No foreign key to organizations: records outlive the objects they describe.
+    CREATE TABLE IF NOT EXISTS audit_events (
+      seq BIGSERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      org_id TEXT NOT NULL,
+      at TIMESTAMPTZ NOT NULL,
+      actor_id TEXT,
+      actor_email TEXT,
+      action TEXT NOT NULL,
+      target_type TEXT,
+      target_id TEXT,
+      detail JSONB NOT NULL DEFAULT '{}',
+      ip TEXT,
+      user_agent TEXT,
+      request_id TEXT,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS audit_events_org_idx ON audit_events(org_id, seq);
+    CREATE INDEX IF NOT EXISTS audit_events_target_idx ON audit_events(org_id, target_type, target_id);
+    CREATE OR REPLACE FUNCTION planora_audit_immutable() RETURNS trigger AS $fn$
+    BEGIN
+      IF TG_OP = 'DELETE' AND current_setting('planora.audit_purge', true) = 'on' THEN
+        RETURN OLD;
+      END IF;
+      RAISE EXCEPTION 'audit_events is append-only (% blocked)', TG_OP;
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS audit_events_immutable ON audit_events;
+    CREATE TRIGGER audit_events_immutable BEFORE UPDATE OR DELETE ON audit_events
+      FOR EACH ROW EXECUTE FUNCTION planora_audit_immutable();
+    DROP TRIGGER IF EXISTS audit_events_no_truncate ON audit_events;
+    CREATE TRIGGER audit_events_no_truncate BEFORE TRUNCATE ON audit_events
+      FOR EACH STATEMENT EXECUTE FUNCTION planora_audit_immutable();
+
+    -- Optimistic locking for plans
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+
+    -- Housekeeping bookkeeping (retention purges run at most hourly)
+    CREATE TABLE IF NOT EXISTS maintenance_runs (
+      name TEXT PRIMARY KEY,
+      last_run_at TIMESTAMPTZ NOT NULL
+    );
+    `,
+  },
+  {
+    id: 3, name: 'plans_entitlements_and_sso',
+    sql: `
+    -- Subscription plan per organization (entitlements are enforced in src/lib/server/entitlements.ts).
+    -- Organizations that existed before plans were enforced keep full (pro) access.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan TEXT;
+    UPDATE organizations SET plan = 'pro' WHERE plan IS NULL;
+    ALTER TABLE organizations ALTER COLUMN plan SET DEFAULT 'free';
+    ALTER TABLE organizations ALTER COLUMN plan SET NOT NULL;
+    -- Single sign-on (OpenID Connect) configuration; the client secret is stored encrypted.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS sso JSONB NOT NULL DEFAULT '{}';
+    CREATE TABLE IF NOT EXISTS sso_domains (
+      domain TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE
+    );
+    -- How a session was established (password, password+totp, sso, ...)
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS method TEXT;
+    `,
+  },
+]
+
+export function checksum(m: Migration): string {
+  return createHash('sha256').update(m.sql.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 16)
+}
+
+export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1].id

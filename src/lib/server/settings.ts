@@ -1,0 +1,52 @@
+// Organization-level policy, editable by admins. Stored as JSON on the organization; always read
+// through normalizeSettings so missing or invalid values fall back to safe defaults.
+
+export interface OrgSettings {
+  /** Every member must enroll in two-step verification before using the app. */
+  requireMfa: boolean
+  /** The person who built a plan cannot record the approving review on it (separation of duties). */
+  requireIndependentReview: boolean
+  /** Publishing a baseline requires an approving review by someone other than the plan's author. */
+  requireApprovalToPublish: boolean
+  /** Allow AI features at all for this organization (off = rules-only, nothing sent to any model). */
+  aiEnabled: boolean
+  /** Maximum AI requests per organization per UTC day. */
+  aiDailyLimit: number
+  /** Sign members out after this many hours without activity. */
+  sessionIdleHours: number
+  /** Delete Ask AI conversation history older than this many days (0 = keep until deleted). */
+  chatRetentionDays: number
+  /** Delete plans and uploaded schedules not changed in this many days (0 = keep until deleted). */
+  projectRetentionDays: number
+}
+
+export const DEFAULT_SETTINGS: OrgSettings = {
+  requireMfa: false,
+  requireIndependentReview: false,
+  requireApprovalToPublish: false,
+  aiEnabled: true,
+  aiDailyLimit: Number(process.env.PLANORA_AI_DAILY_LIMIT) || 300,
+  sessionIdleHours: 12,
+  chatRetentionDays: 365,
+  projectRetentionDays: 0,
+}
+
+const clamp = (v: unknown, lo: number, hi: number, d: number) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d
+}
+
+export function normalizeSettings(raw: unknown): OrgSettings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const b = (k: keyof OrgSettings) => typeof r[k] === 'boolean' ? r[k] as boolean : DEFAULT_SETTINGS[k] as boolean
+  return {
+    requireMfa: b('requireMfa'),
+    requireIndependentReview: b('requireIndependentReview'),
+    requireApprovalToPublish: b('requireApprovalToPublish'),
+    aiEnabled: b('aiEnabled'),
+    aiDailyLimit: clamp(r.aiDailyLimit, 0, 10_000, DEFAULT_SETTINGS.aiDailyLimit),
+    sessionIdleHours: clamp(r.sessionIdleHours, 1, 24, DEFAULT_SETTINGS.sessionIdleHours),
+    chatRetentionDays: clamp(r.chatRetentionDays, 0, 3650, DEFAULT_SETTINGS.chatRetentionDays),
+    projectRetentionDays: clamp(r.projectRetentionDays, 0, 3650, DEFAULT_SETTINGS.projectRetentionDays),
+  }
+}

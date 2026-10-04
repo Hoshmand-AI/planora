@@ -18,10 +18,10 @@ export default function HomePage() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-white/55 text-[13px] font-medium hover:text-white/90 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-white/55 text-[13px] font-medium hover:text-white/90 transition-colors">How It Works</a>
-            <a href="#reports" className="text-white/55 text-[13px] font-medium hover:text-white/90 transition-colors">Reports</a>
-            <a href="#pricing" className="text-white/55 text-[13px] font-medium hover:text-white/90 transition-colors">Pricing</a>
+            <a href="#features" className="text-white/65 text-[13px] font-medium hover:text-white/90 transition-colors">Features</a>
+            <a href="#how-it-works" className="text-white/65 text-[13px] font-medium hover:text-white/90 transition-colors">How It Works</a>
+            <a href="#reports" className="text-white/65 text-[13px] font-medium hover:text-white/90 transition-colors">Reports</a>
+            <a href="#pricing" className="text-white/65 text-[13px] font-medium hover:text-white/90 transition-colors">Pricing</a>
           </div>
 
           <div className="hidden md:flex items-center gap-5">
@@ -142,7 +142,7 @@ export default function HomePage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex gap-4">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Icon size={16} className="text-accent-500" />
+                <Icon size={16} className="text-accent-600" />
               </div>
               <div>
                 <h3 className="text-[15px] font-semibold text-navy-950 mb-1">{title}</h3>
@@ -165,7 +165,7 @@ export default function HomePage() {
               { num: '04', title: 'Report',  desc: 'Get professional reports, or ask questions in plain English.' },
             ].map(({ num, title, desc }) => (
               <div key={num} className="text-center">
-                <div className="text-[30px] font-bold text-accent-500 mb-3 tabular-nums font-display">{num}</div>
+                <div className="text-[30px] font-bold text-accent-600 mb-3 tabular-nums font-display">{num}</div>
                 <div className="text-[15px] font-semibold text-navy-950 mb-2">{title}</div>
                 <div className="text-[13px] text-warm-500 leading-relaxed max-w-[200px] mx-auto">{desc}</div>
               </div>
@@ -187,7 +187,7 @@ export default function HomePage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="bg-warm-100 border border-warm-200 rounded-lg p-5 hover:border-warm-300 transition-colors">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center mb-4">
-                <Icon size={16} className="text-accent-500" />
+                <Icon size={16} className="text-accent-600" />
               </div>
               <h3 className="text-[15px] font-semibold text-navy-950 mb-1.5">{title}</h3>
               <p className="text-[13.5px] text-warm-600 leading-relaxed">{desc}</p>
@@ -208,14 +208,14 @@ export default function HomePage() {
               <div className="text-[36px] font-bold text-navy-950">$0<span className="text-[15px] font-medium text-warm-400">/month</span></div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For individual PMs trying AI schedule analysis.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Up to 3 schedules', 'Executive Summary report', '10 AI questions/day', 'P6, MS Project, PDF'].map(f => (
+                {['Up to 3 schedules', 'Executive Summary report', '10 AI questions/day', 'P6, MS Project, PDF import', 'Roles, 2-step verification & audit log'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
                 ))}
-                {['Critical Path report', 'Variance report', 'Export to PDF/Word'].map(f => (
-                  <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-300">
-                    <span className="text-warm-300">—</span>{f}
+                {['Critical Path & Variance reports', 'Export to PDF & Excel'].map(f => (
+                  <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-500">
+                    <span aria-hidden="true">—</span><span className="line-through decoration-warm-300">{f}</span><span className="sr-only">(not included)</span>
                   </li>
                 ))}
               </ul>
@@ -230,7 +230,7 @@ export default function HomePage() {
               <div className="text-[36px] font-bold text-navy-950">$49<span className="text-[15px] font-medium text-warm-400">/month</span></div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For PMs and schedulers who need full capabilities.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Unlimited schedules', 'All 4 report types', 'Unlimited AI questions', 'P6, MS Project, PDF', 'Critical Path report', 'Variance & QA/QC', 'Export to PDF/Word/Excel'].map(f => (
+                {['Unlimited schedules', 'All 4 report types', 'Up to 1,000 AI questions/day', 'P6, MS Project, PDF, Excel import', 'Monte Carlo schedule risk analysis', 'Export to P6, MS Project, PDF & Excel', 'Roles, 2-step verification & audit log'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
@@ -246,7 +246,7 @@ export default function HomePage() {
               <div className="text-[36px] font-bold text-navy-950">Custom</div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For organizations deploying across teams.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Everything in Pro', 'Org-wide deployment', 'Role-based access', 'SSO & audit trails', 'White-label reports', 'Dedicated support', 'Custom integrations'].map(f => (
+                {['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Dedicated support'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
@@ -265,11 +265,11 @@ export default function HomePage() {
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="bg-navy-900 rounded-lg px-8 py-16 text-center">
           <h2 className="font-display text-[30px] text-white mb-4">Stop waiting for schedule reports.</h2>
-          <p className="text-white/45 mb-8 text-[15px]">Upload your first P6 or MS Project file and get instant AI-powered analysis.</p>
+          <p className="text-white/60 mb-8 text-[15px]">Upload your first P6 or MS Project file and get instant AI-powered analysis.</p>
           <Link href="/auth?mode=signup" className="inline-block bg-accent-500 text-navy-950 px-10 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
             Get Started Free
           </Link>
-          <p className="text-white/30 text-[12px] mt-4">No credit card required.</p>
+          <p className="text-white/60 text-[12px] mt-4">No credit card required.</p>
         </div>
       </section>
 
@@ -281,28 +281,28 @@ export default function HomePage() {
               <div className="mb-3">
                 <Logo variant="light" size="text-[18px]" />
               </div>
-              <p className="text-warm-500 text-[13px] leading-relaxed max-w-[240px]">AI Schedule Analysis for Construction. Built by Hoshmand AI.</p>
+              <p className="text-white/70 text-[13px] leading-relaxed max-w-[240px]">AI Schedule Analysis for Construction. Built by Hoshmand AI.</p>
             </div>
             <div>
               <div className="text-white text-[11px] font-bold uppercase tracking-wider mb-3">Product</div>
-              <a href="#features" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Features</a>
-              <a href="#pricing" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Pricing</a>
-              <a href="#how-it-works" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">How It Works</a>
+              <a href="#features" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Features</a>
+              <a href="#pricing" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Pricing</a>
+              <a href="#how-it-works" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">How It Works</a>
             </div>
             <div>
               <div className="text-white text-[11px] font-bold uppercase tracking-wider mb-3">Company</div>
-              <a href="https://www.hoshmand.ai" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Hoshmand AI</a>
-              <a href="mailto:support@hoshmand.ai" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Contact</a>
+              <a href="https://www.hoshmand.ai" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Hoshmand AI</a>
+              <a href="mailto:support@hoshmand.ai" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Contact</a>
             </div>
             <div>
               <div className="text-white text-[11px] font-bold uppercase tracking-wider mb-3">Legal</div>
-              <Link href="/privacy" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="block text-warm-500 text-[13px] py-1.5 hover:text-white/80 transition-colors">Terms of Service</Link>
+              <Link href="/privacy" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="block text-white/70 text-[13px] py-1.5 hover:text-white/80 transition-colors">Terms of Service</Link>
             </div>
           </div>
           <div className="border-t border-white/5 pt-5 flex flex-col md:flex-row items-center justify-between gap-2">
-            <span className="text-warm-500/50 text-[12px]">© 2026 Planora. Built by Hoshmand AI. All rights reserved.</span>
-            <span className="text-warm-500/30 text-[12px]">Built in Virginia</span>
+            <span className="text-white/60 text-[12px]">© 2026 Planora. Built by Hoshmand AI. All rights reserved.</span>
+            <span className="text-white/60 text-[12px]">Built in Virginia</span>
           </div>
         </div>
       </footer>

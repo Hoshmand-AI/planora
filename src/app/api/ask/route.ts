@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthContext } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { api } from '@/lib/server/api'
 import { getScheduleById, createChatMessage, getChatMessages } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
 import { askScheduleQuestion } from '@/lib/openai'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 
-export async function POST(req: NextRequest) {
-  const auth = await getAuthContext()
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   const { question, scheduleId } = await req.json()
   if (!question || !scheduleId) return NextResponse.json({ error: 'Question and scheduleId required' }, { status: 400 })
 
@@ -23,16 +20,13 @@ export async function POST(req: NextRequest) {
   await createChatMessage({ id: uuid(), scheduleId, userId: auth.userId, role: 'assistant', content: answer, createdAt: new Date().toISOString() })
 
   return NextResponse.json({ answer })
-}
+})
 
-export async function GET(req: NextRequest) {
-  const auth = await getAuthContext()
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const GET = api({ permission: 'read' }, async (req, { auth }) => {
   const scheduleId = req.nextUrl.searchParams.get('scheduleId')
   if (!scheduleId) return NextResponse.json({ error: 'scheduleId required' }, { status: 400 })
 
   if (!(await getScheduleById(scheduleId, auth.orgId))) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
   const messages = await getChatMessages(scheduleId, auth.userId)
   return NextResponse.json({ messages })
-}
+})

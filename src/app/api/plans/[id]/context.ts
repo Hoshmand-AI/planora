@@ -1,4 +1,5 @@
-import { getAuthContext, type AuthContext } from '@/lib/auth'
+import type { AuthContext } from '@/lib/auth'
+import { ApiError, ConflictError } from '@/lib/server/api'
 import { getPlan, type Plan } from '@/lib/db'
 import { elicit, questionBank, type ElicitationContext } from '@/lib/planning/elicitation'
 import { evaluatePlan } from '@/lib/planning/evaluation'
@@ -8,12 +9,16 @@ import { loadFirmHistory } from '@/lib/planning/service'
 import { llmStatus } from '@/lib/llm/provider'
 import type { ProjectType } from '@/lib/planning/types'
 
-export async function loadPlanContext(id: string): Promise<{ ctx: AuthContext; plan: Plan } | { error: string; status: number }> {
-  const ctx = await getAuthContext()
-  if (!ctx) return { error: 'Unauthorized', status: 401 }
-  // Scoped to the caller's firm: another firm's plan id returns 404, not 403, so ids don't leak.
+/**
+ * Loads a plan in the caller's organization. Another firm's plan id returns 404, not 403, so ids
+ * don't leak. Writes may send the version they were based on (x-plan-version); a stale write is
+ * rejected with 409 instead of silently overwriting someone else's change.
+ */
+export async function loadPlanContext(req: Request, id: string, ctx: AuthContext): Promise<{ ctx: AuthContext; plan: Plan }> {
   const plan = await getPlan(id, ctx.orgId)
-  if (!plan) return { error: 'Plan not found', status: 404 }
+  if (!plan) throw new ApiError(404, 'Plan not found')
+  const expected = req.headers.get('x-plan-version')
+  if (req.method !== 'GET' && expected && Number(expected) !== plan.version) throw new ConflictError()
   return { ctx, plan }
 }
 

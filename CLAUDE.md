@@ -10,7 +10,13 @@ The owner has asked Claude to ship without waiting on them:
 Rollback: Vercel → Deployments → Instant Rollback.
 
 ## Checks
-`npm run typecheck`, `npm test`, `npm run build`; end-to-end: `BASE_URL=… node scripts/e2e-smoke.mjs` against a running server with Postgres.
+`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (CI runs all of them — see `.github/workflows/ci.yml` for the env).
+
+## Security rules for changes
+- Every API handler uses `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (enforced by `src/lib/server/routes.test.ts`).
+- Schema changes: add a new numbered migration in `src/lib/migrations.ts`; never edit a shipped one; keep migrations additive (rollback safety).
+- Record material actions with `audit()` from `src/lib/server/audit.ts`; never log secrets or prompt content.
+- Change management: docs/operations/CHANGE-MANAGEMENT.md. If code-owner review is enabled on `main`, PRs touching `.github/CODEOWNERS` paths wait for the owner's approval instead of self-merging.
 
 ## Conventions
-See README.md (Tailwind v3 only, raw SQL via `pg`, all firm data scoped by `org_id`, dates shown MM/DD/YYYY via `src/lib/format.ts`).
+See README.md (Tailwind v3 only, raw SQL via `pg`, all firm data scoped by `org_id`, dates shown MM/DD/YYYY via `src/lib/format.ts`, text colors must keep WCAG AA contrast — use the `warm-*` tokens, not `text-white/40`-style faint text).

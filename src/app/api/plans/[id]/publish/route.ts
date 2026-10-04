@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { v4 as uuid } from 'uuid'
+import { NextResponse } from 'next/server'
+import { api } from '@/lib/server/api'
+import { randomUUID as uuid } from 'crypto'
 import { createActivities, createRelationships, createSchedule, getSchedules, savePlan, type Activity } from '@/lib/db'
 import { profileFrom } from '@/lib/planning/elicitation'
 import { loadPlanContext, planView } from '../context'
@@ -8,13 +9,21 @@ import { loadPlanContext, planView } from '../context'
  * Publish the generated schedule as a project schedule so the analyze/monitor stages
  * (dashboard, timeline, Ask AI, quality checks, updates) work on it. Each publish is a new version.
  */
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const g = plan.generated
   if (!g?.cpm) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
 
+  if (ctx.settings.requireApprovalToPublish) {
+    // Only reviews of the current generation count, and the latest one must not be a rejection.
+    const current = plan.reviews.filter(rv => rv.generatedAt ? rv.generatedAt === g.generatedAt : rv.at >= g.generatedAt)
+    const latest = current[current.length - 1]
+    const approved = current.some(rv => rv.verdict !== 'reject' && rv.reviewerUserId && rv.reviewerUserId !== plan.userId)
+    if (!approved || latest?.verdict === 'reject') {
+      return NextResponse.json({ error: 'Your organization requires an approving review of this version by someone other than its author before it can be published.', code: 'approval_required' }, { status: 403 })
+    }
+  }
   const existing = (await getSchedules(ctx.orgId)).filter(s => s.planId === plan.id)
   const scheduleId = uuid()
   const profile = profileFrom(plan.answers)
@@ -48,4 +57,4 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   plan.audit.push({ at: new Date().toISOString(), by: ctx.name, action: 'publish', detail: `${schedule.version} (${activities.length} activities)` })
   const saved = await savePlan(plan)
   return NextResponse.json({ ...(await planView(saved, ctx.orgId)), schedule })
-}
+})

@@ -5,7 +5,16 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Typecheck, unit tests (incl. access-control route guard, security and CPM performance budgets),
+  # production build, and supply-chain checks.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -21,3 +30,77 @@ jobs:
       - run: npm run build
         env:
           JWT_SECRET: ci-only
+      - name: Runtime dependencies have no high or critical advisories
+        run: npm audit --omit=dev --audit-level=high
+      - name: Full dependency audit (report only)
+        run: npm audit || true
+      - name: Software bill of materials (CycloneDX)
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          retention-days: 90
+
+  # The real app against Postgres: end-to-end flows, security controls, backup + restore drill,
+  # and the WCAG 2.2 AA accessibility check.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: planora
+          POSTGRES_PASSWORD: planora
+          POSTGRES_DB: planora
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U planora" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://planora:planora@localhost:5432/planora
+      JWT_SECRET: ci-only-secret
+      PLANORA_AI_MODE: offline
+      PLANORA_DEFAULT_PLAN: pro
+      PLANORA_ALLOW_INSECURE_OIDC: '1'
+      BASE_URL: http://localhost:3000
+      OIDC_ISSUER: http://localhost:4010
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Start test identity provider and app
+        run: |
+          PORT=4010 nohup node scripts/mock-oidc.mjs > oidc.log 2>&1 &
+          nohup npm start > app.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/api/health && break; sleep 2; done
+          curl -sf http://localhost:3000/api/health
+      - name: End-to-end smoke test
+        run: node scripts/e2e-smoke.mjs
+      - name: Backup and restore drill
+        run: |
+          node scripts/backup.mjs backups
+          ADMIN_DATABASE_URL=postgres://planora:planora@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
+      - name: Security and governance checks
+        run: node scripts/e2e-security.mjs
+      - name: Accessibility (WCAG 2.2 AA)
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/a11y-check.mjs
+      - name: App log
+        if: failure()
+        run: tail -n 200 app.log; tail -n 50 oidc.log
+
+  # Static analysis for common vulnerability classes (OWASP Top 10) and committed secrets.
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config p/owasp-top-ten --config p/secrets --config p/nodejs --severity ERROR --error --metrics off src scripts

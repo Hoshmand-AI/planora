@@ -15,10 +15,10 @@
   --warm-100: #F8F6F3;
   --warm-200: #F0EDE8;
   --warm-300: #E2DDD5;
-  --warm-400: #B8B0A4;
-  --warm-500: #8A8178;
-  --warm-600: #6B6359;
-  --warm-700: #4A443C;
+  --warm-400: #736A60;
+  --warm-500: #665E54;
+  --warm-600: #575047;
+  --warm-700: #433D36;
 }
 
 * { -webkit-font-smoothing: antialiased; }
@@ -34,10 +34,27 @@ body {
   color: var(--navy-950);
 }
 
-input:focus, textarea:focus, select:focus {
-  outline: none;
-  border-color: var(--accent-500);
-  box-shadow: 0 0 0 3px var(--accent-100);
+/* Keyboard focus is always visible (WCAG 2.4.7 / 2.4.11) with 3:1 contrast against the page. */
+:focus-visible {
+  outline: 2px solid var(--accent-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent-600);
+  outline-offset: 1px;
+  border-color: var(--accent-600);
+}
+header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
+
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 100;
+  background: var(--navy-950); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 14px; font-weight: 600;
+}
+.skip-link:focus { top: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 .tabular-nums {

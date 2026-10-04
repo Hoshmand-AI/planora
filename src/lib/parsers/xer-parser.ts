@@ -3,7 +3,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, Weekday, WorkCalendar } from '@/lib/planning/types'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoDatePrefix, serialToIso, round2, constraintFromLabel,
 } from './types'

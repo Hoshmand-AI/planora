@@ -9,6 +9,8 @@
 | **Hosting** | Vercel (app), Neon Postgres (database) |
 | **Document date** | 10/03/2026 |
 
+> **Update 10/04/2026:** the independent audit's findings have been remediated on top of this release. Read [governance/AUDIT-REMEDIATION.md](governance/AUDIT-REMEDIATION.md) for the item-by-item response, [security/SECURITY-OVERVIEW.md](security/SECURITY-OVERVIEW.md) for the controls now in place, and section 7 below for the current status of the original open risks. New automated suites are `scripts/e2e-security.mjs` (100+ checks), `scripts/a11y-check.mjs` (WCAG 2.2 AA) and `scripts/restore-drill.mjs`.
+
 ---
 
 ## 1. Purpose and scope
@@ -113,7 +115,7 @@ npm start                       # http://localhost:3000
 | Check | Command | Result at release `d75f048` |
 |---|---|---|
 | Type check (TypeScript strict) | `npm run typecheck` | Pass, 0 errors |
-| Unit tests (16 files) | `npm test` | **331 / 331 pass** |
+| Unit tests | `npm test` | **331 / 331 pass** at `d75f048`; see the remediation PR for the current count |
 | Production build | `npm run build` | Pass |
 | End-to-end smoke test | `BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs` | **70 / 70 pass** (offline mode) |
 | CI (GitHub Actions `check` job) | Runs automatically on every PR and push to `main` | Green |
@@ -258,22 +260,20 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 
 ---
 
-## 7. Known limitations and open risks
+## 7. Known limitations and open risks (status after remediation)
 
-| # | Item | Severity | Recommendation |
-|---|---|---|---|
-| 1 | No mandatory human review before merge (see 6.5) | High for regulated or defense use | Require an approving review on `main` |
-| 2 | No rate limiting or lockout on login | Medium | Add rate limiting / lockout on `POST /api/auth` |
-| 3 | Minimum password length is 6 characters | Medium | Raise to 12+ or adopt SSO |
-| 4 | Sessions last 7 days and can't be revoked server-side | Medium | Shorter expiry, or a token revocation list |
-| 5 | The plan audit trail keeps the **most recent 500 entries** per plan | Medium for audit retention | Move audit entries to an append-only table if full retention is required |
-| 6 | No role-based permissions inside an organization (every member has the same rights) | Medium | Add roles (viewer / scheduler / approver) |
-| 7 | Permit review times, regulations and lead times are reference ranges (10 regions, 50 permits, 27 long-lead items) | Informational | Verify with the AHJ and suppliers before baselining (stated in the app) |
-| 8 | The production log shows a `pg` SSL-mode deprecation warning | Low | Set `sslmode=verify-full` explicitly in `DATABASE_URL` |
-| 9 | Recovery options are what-if models (e.g. −15% crash, 6×10 week) | Informational | Confirm cost and feasibility before committing |
-| 10 | DCMA checks 10–14 need resource, baseline or progress data | Informational | Shown as N/A when the data isn't present |
-
----
+| # | Item (as of 10/03/2026) | Status 10/04/2026 |
+|---|---|---|
+| 1 | No mandatory human review before merge | Required CI gates (unit, e2e, security, accessibility, SAST, CodeQL). CODEOWNERS marks the security-sensitive paths. **Owner action:** turn on code-owner review in branch protection (docs/operations/CHANGE-MANAGEMENT.md) |
+| 2 | No login rate limiting or lockout | **Fixed:** IP and email limits, 15-minute lockout after 8 failures, generic errors |
+| 3 | 6-character minimum password | **Fixed:** 12+ characters, common and personal passwords blocked; TOTP two-step verification and OIDC SSO added |
+| 4 | 7-day sessions that couldn't be revoked | **Fixed:** server-side sessions; 12 h idle (adjustable); sign out everywhere; revoked on password change or removal |
+| 5 | Audit trail capped at 500 entries per plan | **Fixed:** append-only, hash-chained `audit_events` enforced by database triggers; complete record; verification and CSV export |
+| 6 | No role-based permissions | **Fixed:** owner, admin, scheduler, reviewer and viewer roles, enforced on every route |
+| 7 | Reference ranges | Unchanged by design (shown as ranges; verify with the AHJ and suppliers). Now also drive the Monte Carlo ranges |
+| 8 | `pg` SSL-mode warning | **Fixed:** verified TLS, and `sslmode` is stripped from the URL |
+| 9 | Recovery options are what-if models | Unchanged; the Monte Carlo analysis now gives the probability of meeting the date |
+| 10 | DCMA checks 10–14 need extra data | Unchanged (N/A when the data is absent) |
 
 ## 8. Deliverables requested from QA/QC and audit
 

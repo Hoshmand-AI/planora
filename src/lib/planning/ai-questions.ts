@@ -69,6 +69,6 @@ ${covered}
 List up to 3 more questions that would change the schedule for THIS project. Return a JSON array like:
 [{"question": "...", "why": "how the answer changes the schedule", "section": "site"}]
 section is one of: ${SECTIONS.join(', ')}.`
-  const result = await chatJson([{ role: 'system', content: system }, { role: 'user', content: user }], v => validateSuggestions(v, bank), { maxTokens: 700 })
+  const result = await chatJson([{ role: 'system', content: system }, { role: 'user', content: user }], v => validateSuggestions(v, bank), { maxTokens: 700, purpose: 'interview.follow_up_questions' })
   return result ?? []
 }

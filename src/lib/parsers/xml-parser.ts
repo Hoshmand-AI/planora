@@ -2,7 +2,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, Weekday, WorkCalendar } from '@/lib/planning/types'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 import { ParsedSchedule, makeActivity, isoDatePrefix, addDaysIso, round2 } from './types'
 
 /** Field id of Text1, which exportMspXml (and many P6→MSP exports) use for the activity code. */

@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { v4 as uuid } from 'uuid'
-import { getAuthContext } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { randomUUID as uuid } from 'crypto'
+import { api, ApiError } from '@/lib/server/api'
+import { audit } from '@/lib/server/audit'
+import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
+import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, deleteSchedule, updateScheduleProfile } from '@/lib/db'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -11,10 +14,7 @@ import { PROJECT_TYPES } from '@/lib/planning/types'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
-export async function GET(req: NextRequest) {
-  const ctx = await getAuthContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const GET = api({ permission: 'read' }, async (req, { auth: ctx }) => {
   const scheduleId = req.nextUrl.searchParams.get('id')
 
   if (scheduleId) {
@@ -51,13 +51,17 @@ export async function GET(req: NextRequest) {
 
   const schedules = await getSchedules(ctx.orgId)
   return NextResponse.json({ schedules })
-}
+})
 
-export async function POST(req: NextRequest) {
-  const ctx = await getAuthContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  try {
+export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
+  const ent = entitlementsFor(ctx.plan)
+  if (ent.maxUploadedSchedules != null) {
+    const uploaded = (await getSchedules(ctx.orgId)).filter(s => s.sourceType !== 'generated').length
+    requireFeature(ctx.plan, uploaded < ent.maxUploadedSchedules, `More than ${ent.maxUploadedSchedules} uploaded schedules`)
+  }
+  const quota = await hit(`upload:org:${ctx.orgId}`, LIMITS.uploadsPerOrg.limit, LIMITS.uploadsPerOrg.windowSec)
+  if (!quota.ok) throw new ApiError(429, 'Your organization has uploaded a lot of files in the last hour. Try again later.', 'rate_limited', { retryAfterSec: quota.retryAfterSec })
+  {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const versionLabel = (formData.get('version') as string) || 'v1.0'
@@ -145,6 +149,7 @@ export async function POST(req: NextRequest) {
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -160,29 +165,25 @@ export async function POST(req: NextRequest) {
         warnings,
       },
     })
-  } catch (error: unknown) {
-    const err = error as Error
-    console.error('Upload error:', err)
-    return NextResponse.json({ error: `Failed to import file: ${err.message}` }, { status: 500 })
   }
-}
+})
 
 /** Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft } */
-export async function PATCH(req: NextRequest) {
-  const ctx = await getAuthContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const body = await req.json().catch(() => ({}))
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
-  await updateScheduleProfile(s.id, ctx.orgId, { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null })
+  const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
+  await updateScheduleProfile(s.id, ctx.orgId, profile)
+  await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
   return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
-}
+})
 
-export async function DELETE(req: NextRequest) {
-  const ctx = await getAuthContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const DELETE = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const id = req.nextUrl.searchParams.get('id')
-  if (!id || !(await deleteSchedule(id, ctx.orgId))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const existing = id ? await getScheduleById(id, ctx.orgId) : undefined
+  if (!id || !existing || !(await deleteSchedule(id, ctx.orgId))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  await audit({ action: 'schedule.delete', targetType: 'schedule', targetId: id, detail: { name: existing.name, version: existing.version, activities: existing.activityCount } })
   return NextResponse.json({ success: true })
-}
+})

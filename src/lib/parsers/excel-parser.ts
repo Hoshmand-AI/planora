@@ -4,7 +4,7 @@
 import type { Activity, Relationship } from '@/lib/db'
 import type { Weekday, WorkCalendar } from '@/lib/planning/types'
 import ExcelJS from 'exceljs'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoFromUtcDate, serialToIso, round2, constraintFromLabel,
 } from './types'

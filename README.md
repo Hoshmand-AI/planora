@@ -28,7 +28,15 @@ The scheduling core is deterministic TypeScript and runs without any model:
 
 ## Tech stack
 
-Next.js 14 (App Router), TypeScript strict, Tailwind v3, Postgres (`pg`, raw SQL, schema created automatically), JWT in httpOnly cookies, Vitest.
+Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v3, Postgres (`pg`, raw SQL, versioned migrations in `src/lib/migrations.ts` applied automatically), server-side sessions (signed httpOnly cookie), Vitest, Playwright + axe-core.
+
+## Security, governance and operations
+
+Roles (owner/admin/scheduler/reviewer/viewer), invitations, two-step verification, OpenID Connect SSO, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
+
+- Start with [docs/security/SECURITY-OVERVIEW.md](docs/security/SECURITY-OVERVIEW.md) and [docs/governance/AUDIT-REMEDIATION.md](docs/governance/AUDIT-REMEDIATION.md).
+- Operations docs are in [docs/operations](docs/operations); to report a vulnerability, see [SECURITY.md](SECURITY.md).
+- Every API route is built with `api({ permission })` or `publicApi()` from `src/lib/server/api.ts`. A test fails the build otherwise.
 
 ## Setup
 
@@ -42,8 +50,13 @@ npm run dev
 
 ```bash
 npm run typecheck
-npm test                                            # 300+ unit tests
+npm test                                            # 380+ unit tests (incl. route guard, security, CPM performance budgets)
 BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs   # end-to-end against a running server
+# Security & governance suite (use DATABASE_URL for the audit-immutability checks; OIDC_ISSUER for SSO,
+# with `PORT=4010 node scripts/mock-oidc.mjs` running and the app started with PLANORA_ALLOW_INSECURE_OIDC=1)
+BASE_URL=… DATABASE_URL=… OIDC_ISSUER=http://localhost:4010 node scripts/e2e-security.mjs
+BASE_URL=… node scripts/a11y-check.mjs                     # WCAG 2.2 AA (axe-core) on the main screens
+DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node scripts/restore-drill.mjs backups/*.dump
 ```
 
 ### Air-gapped deployment

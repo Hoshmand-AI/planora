@@ -2,7 +2,7 @@
 // Extracts text from PDF and attempts to identify schedule data
 
 import { Activity } from '@/lib/db'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 import type { ParsedSchedule } from './types'
 
 export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<ParsedSchedule> {
