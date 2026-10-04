@@ -55,7 +55,7 @@ jobs:
         run: |
           for f in backups/*.dump; do gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"; rm "$f"; done
       - if: env.HAS_SECRETS == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: planora-backup-${{ github.run_id }}
           path: backups/
