@@ -71,7 +71,7 @@ export default function ReportsPage() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
-              <Icon size={14} className="text-accent-500" />
+              <Icon size={14} className="text-accent-600" />
             </div>
             <h2 className="font-display text-[20px] text-navy-950">{rt?.title}</h2>
           </div>
@@ -108,8 +108,8 @@ export default function ReportsPage() {
           >
             <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0">
               {generating === rt.id
-                ? <Loader2 size={15} className="text-accent-500 animate-spin" />
-                : <rt.icon size={15} className="text-accent-500" />
+                ? <Loader2 size={15} className="text-accent-600 animate-spin" />
+                : <rt.icon size={15} className="text-accent-600" />
               }
             </div>
             <div>

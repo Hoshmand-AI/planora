@@ -1,5 +1,6 @@
 import { Activity, Relationship, Schedule } from '@/lib/db'
 import { chat, llmStatus } from '@/lib/llm/provider'
+import { log } from '@/lib/server/log'
 import { runDcma } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import type { ProjectBrief } from '@/lib/analysis/brief'
@@ -117,12 +118,12 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
     const answer = await chat([
       { role: 'system', content: systemPrompt + extraContext },
       { role: 'user', content: question },
-    ], { temperature: 0.3, maxTokens: 2000 })
+    ], { temperature: 0.3, maxTokens: 2000, purpose: 'ask_ai' })
     if (answer) return answer
     return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   } catch (error: unknown) {
     const err = error as Error
-    console.error('LLM error:', err.message)
+    log('warn', 'model call failed', { purpose: 'ask_ai', error: err.message })
     return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   }
 }
@@ -239,10 +240,10 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
         content: `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
       },
       { role: 'user', content: prompt },
-    ], { temperature: 0.3, maxTokens: 3000 })
+    ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}` })
     if (report) return report
   } catch (error: unknown) {
-    console.error('LLM error:', (error as Error).message)
+    log('warn', 'model call failed', { purpose: 'report', error: (error as Error).message })
   }
   // Deterministic report (offline / air-gapped / model failure).
   return [

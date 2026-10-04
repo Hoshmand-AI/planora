@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { api } from '@/lib/server/api'
+import { audit } from '@/lib/server/audit'
 import { deletePlan, savePlan } from '@/lib/db'
 import { coerceAnswer, elicit, questionBank, validateAnswer } from '@/lib/planning/elicitation'
 import type { Answer } from '@/lib/planning/types'
 import { elicitationContext, loadPlanContext, planView } from './context'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   return NextResponse.json(await planView(r.plan, r.ctx.orgId))
-}
+})
 
 /** Record interview answers: { answers: { [questionId]: { status, value?, note? } }, name? } */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const PATCH = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const body = await req.json().catch(() => ({}))
   const incoming = (body.answers || {}) as Record<string, Partial<Answer> | null>
@@ -61,11 +61,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Date problems introduced by this change, so the UI can flag them right away.
   const newDateIssues = (view.elicitation.dateIssues || []).filter(i => !before.has(i.text))
   return NextResponse.json({ ...view, errors, newDateIssues })
-}
+})
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const DELETE = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   await deletePlan(r.plan.id, r.ctx.orgId)
+  await audit({ action: 'plan.deleted', targetType: 'plan', targetId: r.plan.id, detail: { plan: r.plan.name, version: r.plan.version, activities: r.plan.generated?.activities.length ?? 0 } })
   return NextResponse.json({ success: true })
-}
+})

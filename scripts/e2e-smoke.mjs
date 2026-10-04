@@ -70,9 +70,9 @@ async function main() {
   const A = new Client('Firm A'), B = new Client('Firm B')
 
   /* ── Accounts: two competing firms ── */
-  let r = await A.post('/api/auth', { action: 'signup', email: `a${stamp}@example.com`, password: 'secret123', name: 'Ana Scheduler', company: 'Alpha Builders' })
+  let r = await A.post('/api/auth', { action: 'signup', email: `a${stamp}@example.com`, password: 'correct horse battery staple', name: 'Ana Scheduler', company: 'Alpha Builders' })
   ok(r.status === 200, 'Firm A signs up')
-  r = await B.post('/api/auth', { action: 'signup', email: `b${stamp}@example.com`, password: 'secret123', name: 'Bo Rival', company: 'Beta Construction' })
+  r = await B.post('/api/auth', { action: 'signup', email: `b${stamp}@example.com`, password: 'correct horse battery staple', name: 'Bo Rival', company: 'Beta Construction' })
   ok(r.status === 200, 'Firm B signs up')
 
   r = await A.get('/api/system')

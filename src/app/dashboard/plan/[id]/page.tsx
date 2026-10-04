@@ -15,11 +15,13 @@ import type { EditImpact } from '@/lib/planning/overrides'
 import type { RecoveryPlan } from '@/lib/planning/recovery'
 import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
+import { useApp } from '../../layout'
 
 interface Review { id: string; reviewer: string; verdict: string; comment: string; at: string }
 interface Plan {
   id: string; name: string; answers: Record<string, Answer>; generated: GeneratedSchedule | null
   reviews: Review[]; audit: { at: string; by: string; action: string; detail?: string }[]; scheduleId: string | null
+  version: number
 }
 interface View {
   plan: Plan; elicitation: ElicitationResult; evaluation: Evaluation | null
@@ -54,6 +56,8 @@ export default function PlanPage() {
   const [notice, setNotice] = useState('')
   const [dateAlerts, setDateAlerts] = useState<string[]>([])
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
+  const [conflict, setConflict] = useState(false)
+  const { can } = useApp()
   const stickyRef = useRef<HTMLDivElement>(null)
   const [stickyTop, setStickyTop] = useState(0)
   useEffect(() => {
@@ -73,10 +77,14 @@ export default function PlanPage() {
   useEffect(() => { load() }, [load])
 
   const call = async (key: string, url: string, init: RequestInit): Promise<Record<string, unknown> | null> => {
-    setBusy(key); setError('')
+    setBusy(key); setError(''); setConflict(false)
     try {
-      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init })
+      // Send the version this screen is showing; the server refuses the write if someone else changed the plan since.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (view?.plan.version) headers['x-plan-version'] = String(view.plan.version)
+      const res = await fetch(url, { headers, ...init })
       const data = await res.json()
+      if (res.status === 409 && data.code === 'conflict') { setConflict(true); return null }
       if (!res.ok) { setError(data.error || 'Request failed.'); return null }
       if (data.plan) setView(data as View)
       return data
@@ -150,14 +158,14 @@ export default function PlanPage() {
             <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight truncate">{plan.name}</h1>
           </div>
           <div className="flex flex-wrap gap-2 flex-shrink-0">
-            <button onClick={() => generate(false)} disabled={!!busy} className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-semibold transition-colors disabled:opacity-50">
+            {can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-semibold transition-colors disabled:opacity-50">
               {busy === 'generate' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {g ? 'Regenerate' : 'Generate schedule'}
-            </button>
+            </button>}
             {g && (
               <>
-                <button onClick={publish} disabled={!!busy} className="flex items-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
+                {can('plan.publish') && <button onClick={publish} disabled={!!busy} className="flex items-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
                   {busy === 'publish' ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Publish
-                </button>
+                </button>}
                 <ExportMenu id={plan.id} />
               </>
             )}
@@ -167,7 +175,7 @@ export default function PlanPage() {
           <Chip label="Readiness" value={`${el.readiness}%`} onClick={() => setTab('interview')} />
           <Chip label="Open questions" value={String(el.questions.length)} onClick={() => setTab('interview')} />
           {g?.cpm && <Chip label="Finish" value={fmtDate(g.cpm.projectFinish)} onClick={() => setTab('schedule')} />}
-          {ev && <Chip label="P80" value={fmtDate(ev.forecast.p80)} onClick={goEvaluation} />}
+          {ev && <Chip label="Scenario P80" value={fmtDate(ev.forecast.p80)} onClick={goEvaluation} />}
           {ev && <Chip label="Quality" value={`${ev.grade} · ${ev.score}`} onClick={goEvaluation} />}
           {ev && <Chip label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} tone={failing ? 'warn' : 'ok'} onClick={goEvaluation} />}
           {lateDays > 0 && <Chip label="Required finish" value={`${lateDays} days late`} tone="bad" onClick={() => { setTab('schedule'); setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }} />}
@@ -183,6 +191,17 @@ export default function PlanPage() {
         </div>
       </div>
 
+      {conflict && (
+        <Banner kind="warn" onClose={() => setConflict(false)}>
+          Someone else changed this plan since you opened it, so your last change was not saved (nothing was overwritten).{' '}
+          <button onClick={() => { setConflict(false); load() }} className="underline font-semibold">Load the latest version</button>, then make your change again.
+        </Banner>
+      )}
+      {!can('plan.write') && (
+        <Banner kind="warn">
+          You have read-only access to plans{can('plan.review') ? ' (you can record expert reviews on the Evaluation tab)' : ''}. Ask an admin of your organization if you need to make changes.
+        </Banner>
+      )}
       {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}</Banner>}
       {error && <Banner kind="error" onClose={() => setError('')}>{error}</Banner>}
       {dateAlerts.length > 0 && (
@@ -210,7 +229,7 @@ export default function PlanPage() {
         return false
       }} onRegenerateFresh={() => generate(true)} busy={busy} recovery={view.recovery} onRecover={recover} onInterview={() => setTab('interview')} focusCodes={focusCodes} onClearFocus={() => setFocusCodes(null)} />}
       {tab === 'evaluation' && g && ev && <EvaluationTab ev={ev} plan={plan} busy={busy} guidance={view.guidance} recovery={view.recovery} onRecover={recover} onDecide={decide} onShowCodes={showCodes} onInterview={() => setTab('interview')} onReview={async (body) => { const d = await call('review', `/api/plans/${id}/review`, { method: 'POST', body: JSON.stringify(body) }); if (d) setNotice('Review recorded.'); return !!d }} />}
-      {tab === 'audit' && <AuditTab plan={plan} onDelete={remove} />}
+      {tab === 'audit' && <AuditTab plan={plan} onDelete={can('plan.write') ? remove : undefined} fullLog={can('audit.read')} />}
     </div>
   )
 }
@@ -229,9 +248,9 @@ function Chip({ label, value, onClick, tone }: { label: string; value: string; o
 function Banner({ kind, children, onClose }: { kind: 'ok' | 'error' | 'warn'; children: React.ReactNode; onClose?: () => void }) {
   const style = kind === 'ok' ? 'border-status-on-track bg-status-on-track-bg' : kind === 'error' ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-status-attention bg-status-attention-bg'
   return (
-    <div className={`border-l-2 ${style} text-[13px] text-warm-700 px-3 py-2 rounded-md mb-4 flex items-start gap-2`}>
+    <div role={kind === 'error' ? 'alert' : 'status'} className={`border-l-2 ${style} text-[13px] text-warm-700 px-3 py-2 rounded-md mb-4 flex items-start gap-2`}>
       <div className="flex-1">{children}</div>
-      {onClose && <button onClick={onClose} className="text-warm-400 hover:text-warm-600"><X size={14} /></button>}
+      {onClose && <button onClick={onClose} aria-label="Dismiss" className="text-warm-400 hover:text-warm-600"><X size={14} aria-hidden="true" /></button>}
     </div>
   )
 }
@@ -802,10 +821,12 @@ function EvaluationTab({ ev, plan, busy, onReview, guidance, recovery, onRecover
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Overall" value={`${ev.grade} · ${ev.score}`} sub="DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%" />
         <Stat label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} sub="applicable checks passing" />
-        <Stat label="P50 finish" value={fmtDate(ev.forecast.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
-        <Stat label="P80 finish" value={fmtDate(ev.forecast.p80)} sub={ev.forecast.requiredFinish ? `required ${fmtDate(ev.forecast.requiredFinish)}${ev.forecast.p80MeetsRequired ? ' ✓' : ' ✗'}` : 'risk-adjusted'} />
+        <Stat label="Scenario P50" value={fmtDate(ev.forecast.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
+        <Stat label="Scenario P80" value={fmtDate(ev.forecast.p80)} sub={ev.forecast.requiredFinish ? `required ${fmtDate(ev.forecast.requiredFinish)}${ev.forecast.p80MeetsRequired ? ' ✓' : ' ✗'}` : 'risk-adjusted'} />
       </div>
-      <p className="text-[12px] text-warm-500 -mt-2">Risk basis: {ev.forecast.basis}</p>
+      <p className="text-[12px] text-warm-500 -mt-2">Scenario dates are a quick rule-based estimate, not a simulation. Basis: {ev.forecast.basis} For a probabilistic answer, use the Monte Carlo analysis below.</p>
+
+      <RiskPanel planId={plan.id} version={plan.version} />
 
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
 
@@ -984,22 +1005,140 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   )
 }
 
+/* ─── Monte Carlo schedule risk analysis ─────────────── */
+
+interface Sra {
+  method: string; iterations: number; deterministic: string
+  percentiles: { p10: string; p50: string; p80: string; p90: string; mean: string }
+  required?: { date: string; probability: number }
+  histogram: { from: string; to: string; count: number }[]
+  criticality: { id: string; code: string; name: string; index: number }[]
+  sensitivity: { id: string; code: string; name: string; correlation: number; criticality: number; basis: string }[]
+  assumptions: string[]
+}
+
+function RiskPanel({ planId, version }: { planId: string; version: number }) {
+  const [r, setR] = useState<Sra | null>(null)
+  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle')
+  const run = useCallback(async () => {
+    setState('running')
+    try {
+      const res = await fetch(`/api/plans/${planId}/risk`)
+      if (!res.ok) throw new Error()
+      setR(await res.json()); setState('idle')
+    } catch { setState('error') }
+  }, [planId])
+  useEffect(() => { setR(null) }, [version])
+  const max = r ? Math.max(...r.histogram.map(h => h.count)) : 1
+  const pct = (x: number) => `${Math.round(x * 100)}%`
+  return (
+    <section aria-labelledby="sra-title" className="border border-warm-200 rounded-lg p-4 bg-warm-50">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h3 id="sra-title" className="text-[14px] font-semibold text-navy-950">Schedule risk analysis (Monte Carlo)</h3>
+        <button onClick={run} disabled={state === 'running'} className="flex items-center gap-1.5 bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-50">
+          {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
+        </button>
+      </div>
+      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-500">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {state === 'error' && <p role="alert" className="text-[12.5px] text-status-at-risk">The simulation could not run. Try again.</p>}
+      {r && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {([['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90], ['Deterministic', r.deterministic]] as const).map(([l, d]) => (
+              <div key={l} className="bg-warm-100 border border-warm-200 rounded-md px-3 py-2">
+                <div className="text-[10.5px] uppercase tracking-wider text-warm-500 font-semibold">{l}</div>
+                <div className="text-[15px] font-semibold text-navy-950 tabular-nums">{fmtDate(d)}</div>
+              </div>
+            ))}
+          </div>
+          {r.required && (
+            <p className="text-[13px] text-warm-700">
+              Chance of finishing by the required {fmtDate(r.required.date)}: <span className={`font-semibold ${r.required.probability >= 0.8 ? 'text-status-on-track' : r.required.probability >= 0.5 ? 'text-status-attention' : 'text-status-at-risk'}`}>{pct(r.required.probability)}</span>
+              {r.required.probability < 0.8 && ' — below the usual 80% confidence target; see the recovery options and the drivers below.'}
+            </p>
+          )}
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
+            <div className="flex items-end gap-0.5 h-24" role="img" aria-label={`Histogram of simulated finish dates from ${fmtDate(r.histogram[0]?.from)} to ${fmtDate(r.histogram[r.histogram.length - 1]?.to)}; median ${fmtDate(r.percentiles.p50)}.`}>
+              {r.histogram.map((h, i) => (
+                <div key={i} title={`${fmtDate(h.from)}–${fmtDate(h.to)}: ${h.count} runs`} className={`flex-1 rounded-t ${r.required && h.to <= r.required.date ? 'bg-status-on-track/70' : 'bg-accent-500/70'}`} style={{ height: `${Math.max(2, (h.count / max) * 100)}%` }} />
+              ))}
+            </div>
+            <div className="flex justify-between text-[11px] text-warm-500 mt-1"><span>{fmtDate(r.histogram[0]?.from)}</span><span>{fmtDate(r.histogram[r.histogram.length - 1]?.to)}</span></div>
+          </div>
+          {r.sensitivity.length > 0 && (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">What drives the risk</div>
+              <table className="w-full text-[12.5px]">
+                <caption className="sr-only">Activities whose uncertainty moves the finish date most</caption>
+                <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-500"><th scope="col" className="py-1">Activity</th><th scope="col" className="py-1 text-right">Sensitivity</th><th scope="col" className="py-1 text-right">Critical in</th><th scope="col" className="py-1 pl-3 hidden md:table-cell">Range used</th></tr></thead>
+                <tbody>
+                  {r.sensitivity.map(s => (
+                    <tr key={s.id} className="border-t border-warm-200">
+                      <td className="py-1.5"><span className="font-mono text-warm-500 mr-1.5">{s.code}</span>{s.name}</td>
+                      <td className="py-1.5 text-right tabular-nums">{s.correlation.toFixed(2)}</td>
+                      <td className="py-1.5 text-right tabular-nums">{pct(s.criticality)}</td>
+                      <td className="py-1.5 pl-3 text-warm-500 hidden md:table-cell">{s.basis}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-[11.5px] text-warm-500 mt-1">Sensitivity is the rank correlation between the activity&apos;s duration and the finish date across runs (1.00 = moves the finish one-for-one). &quot;Critical in&quot; is the share of runs in which the activity was on the critical path.</p>
+            </div>
+          )}
+          <details className="text-[12px] text-warm-600">
+            <summary className="cursor-pointer text-warm-700 font-medium">Method and assumptions</summary>
+            <p className="mt-1.5">{r.method}</p>
+            <ul className="list-disc ml-5 mt-1 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
+          </details>
+        </div>
+      )}
+    </section>
+  )
+}
+
 /* ─── Audit ──────────────────────────────────────────── */
 
-function AuditTab({ plan, onDelete }: { plan: Plan; onDelete: () => void }) {
+interface AuditRecord { seq: number; at: string; actorEmail: string | null; action: string; detail: Record<string, unknown>; ip: string | null; hash: string }
+
+function AuditTab({ plan, onDelete, fullLog }: { plan: Plan; onDelete?: () => void; fullLog: boolean }) {
+  // Reviewers/admins see the complete, tamper-evident record (who, when, from where, hash);
+  // others see the plan's own change history.
+  const [records, setRecords] = useState<AuditRecord[] | null>(null)
+  useEffect(() => {
+    if (!fullLog) return
+    fetch(`/api/audit?targetType=plan&targetId=${plan.id}&limit=1000`).then(r => r.ok ? r.json() : null).then(d => d && setRecords(d.events)).catch(() => {})
+  }, [fullLog, plan.id, plan.version])
   return (
     <div>
-      <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
-        {plan.audit.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
-        {[...plan.audit].reverse().map((e, i) => (
-          <div key={i} className="px-4 py-2.5 text-[12.5px] flex gap-3">
-            <span className="text-warm-400 tabular-nums w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
-            <span className="text-navy-950 w-28 flex-shrink-0 truncate">{e.by}</span>
-            <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
+      {records ? (
+        <>
+          <p className="text-[12.5px] text-warm-500 mb-2">Complete record from the organization audit log ({records.length} entries). Each entry is hash-chained; verify integrity or download the full log under Organization.</p>
+          <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
+            {records.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
+            {records.map(e => (
+              <div key={e.seq} className="px-4 py-2.5 text-[12.5px] flex flex-col sm:flex-row gap-1 sm:gap-3">
+                <span className="text-warm-500 tabular-nums sm:w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
+                <span className="text-navy-950 sm:w-44 flex-shrink-0 truncate" title={e.ip ? `from ${e.ip}` : undefined}>{e.actorEmail || 'system'}</span>
+                <span className="text-warm-600 min-w-0"><span className="font-medium">{e.action.replace(/^plan\./, '')}</span>{e.detail?.detail ? ` — ${fmtDates(String(e.detail.detail))}` : e.detail?.format ? ` — ${String(e.detail.format)}` : ''}</span>
+                <span className="sm:ml-auto font-mono text-[10.5px] text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-[12.5px] text-status-at-risk"><Trash2 size={12} /> Delete plan</button>
+        </>
+      ) : (
+        <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
+          {plan.audit.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
+          {[...plan.audit].reverse().map((e, i) => (
+            <div key={i} className="px-4 py-2.5 text-[12.5px] flex gap-3">
+              <span className="text-warm-500 tabular-nums w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
+              <span className="text-navy-950 w-28 flex-shrink-0 truncate">{e.by}</span>
+              <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {onDelete && <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-[12.5px] text-status-at-risk"><Trash2 size={12} aria-hidden="true" /> Delete plan</button>}
     </div>
   )
 }

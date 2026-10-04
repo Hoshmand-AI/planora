@@ -7,3 +7,9 @@ data/
 next-env.d.ts
 .DS_Store
 .vercel
+
+# Database backups (never commit)
+backups/
+*.dump
+*.dump.manifest.json
+sbom.cdx.json

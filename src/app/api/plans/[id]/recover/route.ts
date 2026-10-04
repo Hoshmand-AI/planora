@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { api } from '@/lib/server/api'
 import { savePlan } from '@/lib/db'
 import { recoveryPlan } from '@/lib/planning/recovery'
 import { applyEdit, EditError } from '@/lib/planning/overrides'
@@ -8,9 +9,8 @@ import type { ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
 
 /** Apply one modeled recovery option: { optionId } */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   if (!plan.generated) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
   const { optionId } = await req.json().catch(() => ({}))
@@ -34,4 +34,4 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   plan.audit.push({ at: now, by: ctx.name, action: 'recovery', detail: `${opt.title} → finish ${plan.generated.cpm?.projectFinish}` })
   const saved = await savePlan(plan)
   return NextResponse.json({ ...(await planView(saved, ctx.orgId)), applied: opt.title })
-}
+})

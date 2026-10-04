@@ -2,6 +2,7 @@
 // It documents what the schedule assumes, where each number came from, what was withheld,
 // and every human override, which is what reviewers and claims consultants look for.
 
+import type { SraResult } from '@/lib/planning/sra'
 import type { GeneratedSchedule } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
 import type { Evaluation } from '@/lib/planning/evaluation'
@@ -21,6 +22,8 @@ export function basisOfSchedule(opts: {
   aiMode: string
   teamNotes?: string[]
   decisions?: Record<string, { decision: string; note: string; by: string; at: string }>
+  /** Monte Carlo schedule risk analysis, when run for the export */
+  sra?: SraResult
 }): string {
   const { planName, profile, schedule: s, evaluation: ev, reviews } = opts
   const t = s.cpm?.times || {}
@@ -47,9 +50,21 @@ export function basisOfSchedule(opts: {
   L.push(`| Notice to Proceed | ${s.projectStart} |`)
   for (const a of s.activities.filter(a => a.type === 'milestone' && a.category !== 'ntp')) L.push(`| ${esc(a.name)} | ${t[a.id]?.earlyFinish ?? '—'} |`)
   L.push(`| Deterministic finish | ${ev.forecast.deterministic} |`)
-  L.push(`| Risk-adjusted P50 / P80 | ${ev.forecast.p50} / ${ev.forecast.p80} |`)
-  if (ev.forecast.requiredFinish) L.push(`| Required finish | ${ev.forecast.requiredFinish} |`)
-  L.push('', `Risk basis: ${ev.forecast.basis}`, '')
+  L.push(`| Rule-based scenario P50 / P80 | ${ev.forecast.p50} / ${ev.forecast.p80} |`)
+  if (opts.sra) L.push(`| Monte Carlo P50 / P80 / P90 | ${opts.sra.percentiles.p50} / ${opts.sra.percentiles.p80} / ${opts.sra.percentiles.p90} |`)
+  if (ev.forecast.requiredFinish) L.push(`| Required finish | ${ev.forecast.requiredFinish}${opts.sra?.required ? ` (probability of meeting it: ${Math.round(opts.sra.required.probability * 100)}%)` : ''} |`)
+  L.push('', `Scenario basis: ${ev.forecast.basis}`, '')
+  if (opts.sra) {
+    const r = opts.sra
+    L.push('### Schedule risk analysis', '', r.method, '')
+    L.push('| Percentile | Finish |', '|---|---|')
+    for (const [k, v] of [['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['Mean', r.percentiles.mean], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90]]) L.push(`| ${k} | ${v} |`)
+    if (r.sensitivity.length) {
+      L.push('', 'Largest drivers of finish-date uncertainty:', '', '| ID | Activity | Sensitivity | Critical in | Range used |', '|---|---|---|---|---|')
+      for (const x of r.sensitivity.slice(0, 8)) L.push(`| ${x.code} | ${esc(x.name)} | ${x.correlation.toFixed(2)} | ${Math.round(x.criticality * 100)}% | ${esc(x.basis)} |`)
+    }
+    L.push('', 'Assumptions:', '', ...r.assumptions.map(a => `- ${a}`), '')
+  }
 
   L.push('## 3. Calendars', '')
   for (const c of s.calendars) L.push(`- **${esc(c.name)}** — ${c.canonical || ''}; ${c.holidays.length} holidays through ${c.holidays[c.holidays.length - 1] || 'n/a'}.`)

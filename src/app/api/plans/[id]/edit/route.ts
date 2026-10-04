@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { api } from '@/lib/server/api'
 import { savePlan } from '@/lib/db'
 import { applyEdit, EditError, type Edit } from '@/lib/planning/overrides'
 import { loadPlanContext, planView } from '../context'
 
 /** Scheduler override: { edit: Edit }. Reason is mandatory; impact on finish and critical path is returned. */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const r = await loadPlanContext(params.id)
-  if ('error' in r) return NextResponse.json({ error: r.error }, { status: r.status })
+export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req, { params, auth }) => {
+  const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   if (!plan.generated) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
   const { edit } = await req.json().catch(() => ({})) as { edit?: Edit }
@@ -21,4 +21,4 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (err instanceof EditError) return NextResponse.json({ error: err.message }, { status: 400 })
     throw err
   }
-}
+})

@@ -1,0 +1,62 @@
+name: Nightly backup and restore drill
+
+# Independent off-provider backup of production, verified by restoring it every night.
+# Needs repository secrets BACKUP_DATABASE_URL (a read-only production connection string) and
+# BACKUP_PASSPHRASE (encrypts the backup artifact). Without them the job explains and exits;
+# Neon's point-in-time recovery remains the primary backup either way.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: drill
+          POSTGRES_PASSWORD: drill
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U drill" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      HAS_SECRETS: ${{ secrets.BACKUP_DATABASE_URL != '' && secrets.BACKUP_PASSPHRASE != '' }}
+    steps:
+      - if: env.HAS_SECRETS != 'true'
+        run: echo "::notice::Set BACKUP_DATABASE_URL and BACKUP_PASSPHRASE repository secrets to enable off-provider backups (see docs/operations/BACKUP-AND-RECOVERY.md)."
+      - if: env.HAS_SECRETS == 'true'
+        uses: actions/checkout@v4
+      - if: env.HAS_SECRETS == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: env.HAS_SECRETS == 'true'
+        run: npm ci
+      - if: env.HAS_SECRETS == 'true'
+        name: Back up production
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: node scripts/backup.mjs backups
+      - if: env.HAS_SECRETS == 'true'
+        name: Restore drill
+        run: ADMIN_DATABASE_URL=postgres://drill:drill@localhost:5432/postgres ALLOW_BROKEN_CHAINS=0 node scripts/restore-drill.mjs backups/*.dump
+      - if: env.HAS_SECRETS == 'true'
+        name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          for f in backups/*.dump; do gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"; rm "$f"; done
+      - if: env.HAS_SECRETS == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: planora-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 35

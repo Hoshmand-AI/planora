@@ -2,7 +2,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, WorkCalendar } from '@/lib/planning/types'
-import { v4 as uuid } from 'uuid'
+import { randomUUID as uuid } from 'crypto'
 
 export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
 

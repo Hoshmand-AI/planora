@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getAuthContext } from '@/lib/auth'
+import { api } from '@/lib/server/api'
 import { getOrgHistory, getOrganization, getSchedules } from '@/lib/db'
 import { computeFirmHistory } from '@/lib/planning/history'
 import { backtest } from '@/lib/planning/evaluation'
 import type { ProjectType } from '@/lib/planning/types'
 
 /** The firm's private knowledge base: what its own projects actually did, plus a leave-one-out backtest. */
-export async function GET() {
-  const ctx = await getAuthContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const GET = api({ permission: 'read' }, async (_req, { auth: ctx }) => {
   const [org, schedules, { rows, calendars }] = await Promise.all([getOrganization(ctx.orgId), getSchedules(ctx.orgId), getOrgHistory(ctx.orgId)])
   const history = computeFirmHistory(rows, calendars)
   const uploaded = schedules.filter(s => s.sourceType !== 'generated')
@@ -22,4 +20,4 @@ export async function GET() {
     overallOverrunP80: history.overallOverrunP80,
     backtest: bt,
   })
-}
+})

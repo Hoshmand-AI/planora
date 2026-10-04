@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   LayoutDashboard, MessageSquare, FileText, Clock,
-  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock,
+  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2,
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
 
 /* ─── Types ─────────────────────────────────────────── */
-interface User     { id: string; email: string; name: string; plan: string }
+interface User     { id: string; email: string; name: string; plan: string; role?: string }
 interface Schedule {
   id: string; name: string; version: string; activityCount: number
   uploadedAt: string; varianceDays: number | null; criticalCount: number
@@ -27,11 +27,16 @@ interface AppContextType {
   refreshSchedules: () => Promise<void>
   metrics: Record<string, unknown> | null
   refreshMetrics: () => Promise<void>
+  /** Organization the user belongs to */
+  org: { id: string; name: string } | null
+  /** What the user's role allows (read, plan.write, schedule.write, plan.review, …) */
+  can: (permission: string) => boolean
 }
 
 const AppContext = createContext<AppContextType>({
   user: null, schedules: [], selectedSchedule: null, setSelectedSchedule: () => {},
   refreshSchedules: async () => {}, metrics: null, refreshMetrics: async () => {},
+  org: null, can: () => false,
 })
 
 export const useApp = () => useContext(AppContext)
@@ -70,14 +75,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [uploadError,      setUploadError]      = useState('')
   const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[] } | null>(null)
   const [llm,              setLlm]              = useState<LlmStatus | null>(null)
+  const [org,              setOrg]              = useState<{ id: string; name: string } | null>(null)
+  const [permissions,      setPermissions]      = useState<string[]>([])
+  const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
+  const can = useCallback((p: string) => permissions.includes(p), [permissions])
 
   /* ── Auth ── */
   useEffect(() => {
     fetch('/api/auth').then(r => r.json()).then(data => {
-      if (!data.user) router.push('/auth')
-      else setUser(data.user)
+      if (!data.user) { router.push('/auth'); return }
+      setUser(data.user)
+      setOrg(data.org ?? null)
+      setPermissions(data.permissions ?? [])
+      setMfaSetupRequired(!!data.security?.mfaSetupRequired)
     })
   }, [router])
+
+  // The organization requires two-step verification: everything else waits until it's set up.
+  useEffect(() => {
+    if (mfaSetupRequired && pathname !== '/dashboard/account') router.push('/dashboard/account?setup=mfa')
+  }, [mfaSetupRequired, pathname, router])
 
   /* ── Data ── */
   const refreshSchedules = useCallback(async () => {
@@ -96,8 +113,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setMetrics(data.metrics ? { ...data.metrics, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
   }, [selectedSchedule])
 
-  useEffect(() => { if (user) refreshSchedules() }, [user, refreshSchedules])
-  useEffect(() => { if (user) fetch('/api/system').then(r => r.json()).then(d => setLlm(d.llm || null)).catch(() => {}) }, [user])
+  useEffect(() => { if (user && !mfaSetupRequired) refreshSchedules() }, [user, mfaSetupRequired, refreshSchedules])
+  useEffect(() => { if (user && !mfaSetupRequired) fetch('/api/system').then(r => r.json()).then(d => setLlm(d.llm || null)).catch(() => {}) }, [user])
   useEffect(() => { if (selectedSchedule) refreshMetrics() }, [selectedSchedule, refreshMetrics])
 
   /* ── Upload ── */
@@ -136,7 +153,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sourceLabel = (t: string) => ({ p6_xer: 'P6', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Planora' } as Record<string, string>)[t] || t
 
   return (
-    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics }}>
+    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can }}>
       {/*
        * LAYOUT STRATEGY
        * ─────────────────────────────────────────────────────────
@@ -152,6 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        * ─────────────────────────────────────────────────────────
        */}
       <div className="min-h-screen bg-warm-50 flex flex-col">
+        <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Top Header ──────────────────────────────────────── */}
         <header className="bg-navy-900 flex-shrink-0 sticky top-0 z-40 border-b border-white/5">
@@ -171,7 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-white/65 text-[12px] font-medium truncate">
                 {selectedSchedule ? selectedSchedule.name : 'No schedule selected'}
               </span>
-              <ChevronDown size={11} className="text-white/35 flex-shrink-0" />
+              <ChevronDown size={11} className="text-white/60 flex-shrink-0" />
             </button>
 
             {/* Right: actions */}
@@ -189,20 +207,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {llm && (
                 <span title={llm.error || (llm.model ? `${llm.model} @ ${llm.host}` : 'Deterministic analysis only')}
-                  className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-white/55 border border-white/10 rounded-md px-2 py-1">
+                  className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-white/65 border border-white/10 rounded-md px-2 py-1">
                   {llm.airgapped && <Lock size={10} />}{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
                 </span>
               )}
+              {can('schedule.write') && (
               <button
                 onClick={() => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }}
                 className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
               >
-                <Upload size={12} />
+                <Upload size={12} aria-hidden="true" />
                 <span className="hidden sm:inline">Upload</span>
+                <span className="sr-only sm:hidden">Upload schedule</span>
               </button>
+              )}
 
               <button
                 onClick={() => setShowSettings(true)}
+                aria-label={`Account menu for ${user.name}`}
                 className="w-7 h-7 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[11px] font-bold text-white/70 hover:border-accent-500/40 transition-colors flex-shrink-0"
               >
                 {user.name?.[0]?.toUpperCase() || 'U'}
@@ -211,37 +233,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Desktop tab bar (inside header, below the main row) */}
-          <div className="hidden md:flex border-t border-white/5 px-5">
+          <nav aria-label="Main" className="hidden md:flex border-t border-white/5 px-5">
             {TABS.map(tab => {
               const active = isActive(pathname, tab.href)
               return (
                 <Link
                   key={tab.href}
                   href={tab.href}
+                  aria-current={active ? 'page' : undefined}
                   className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
                     active
                       ? 'text-white border-accent-500'
-                      : 'text-white/40 border-transparent hover:text-white/70'
+                      : 'text-white/60 border-transparent hover:text-white/85'
                   }`}
                 >
-                  <tab.icon size={13} />
+                  <tab.icon size={13} aria-hidden="true" />
                   {tab.label}
                 </Link>
               )
             })}
-          </div>
+          </nav>
         </header>
 
         {/* ── Main content ────────────────────────────────────── */}
         {/* pb-16 on mobile = space for bottom tab bar */}
-        <main className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0">
+        <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0 focus:outline-none">
           <div className="max-w-5xl mx-auto">
             {children}
           </div>
         </main>
 
         {/* ── Mobile bottom tab bar ────────────────────────────── */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900 border-t border-white/8 safe-area-bottom">
+        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900 border-t border-white/8 safe-area-bottom">
           <div className="flex overflow-x-auto">
             {TABS.map(tab => {
               const active = isActive(pathname, tab.href)
@@ -250,7 +273,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={tab.href}
                   href={tab.href}
                   className={`flex-1 min-w-[64px] flex flex-col items-center gap-1 py-2.5 transition-colors ${
-                    active ? 'text-accent-400' : 'text-white/35'
+                    active ? 'text-accent-400' : 'text-white/60'
                   }`}
                 >
                   <tab.icon size={18} strokeWidth={active ? 2 : 1.5} />
@@ -267,7 +290,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-display text-[20px] text-navy-950">Upload Schedule</h2>
-                <button onClick={() => setShowUpload(false)} className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
 
               {/* Mobile drag handle */}
@@ -339,7 +362,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-display text-[20px] text-navy-950">Select Schedule</h2>
-                <button onClick={() => setShowScheduleList(false)} className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
                 <p className="text-center text-warm-400 py-8 text-[14px]">No schedules yet. Upload one to get started.</p>
@@ -363,12 +386,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ))}
                 </div>
               )}
+              {can('schedule.write') && (
               <button
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
                 className="w-full mt-4 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors"
               >
                 + Upload New Schedule
               </button>
+              )}
             </div>
           </div>
         )}
@@ -380,16 +405,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-display text-[20px] text-navy-950">Account</h2>
-                <button onClick={() => setShowSettings(false)} className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               <div className="space-y-3">
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
                   <div className="text-[15px] font-semibold text-navy-950">{user.name}</div>
                   <div className="text-[13px] text-warm-500">{user.email}</div>
-                  <div className="mt-2 inline-block text-[11px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">
-                    {user.plan}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {user.role && <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
+                    {org && <span className="inline-block text-[11px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                    <UserCog size={14} aria-hidden="true" /> Account &amp; security
+                  </Link>
+                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                    <Building2 size={14} aria-hidden="true" /> Organization
+                  </Link>
                 </div>
                 {llm && (
                   <div className="bg-warm-100 border border-warm-200 rounded-md p-4">

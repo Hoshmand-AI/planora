@@ -246,11 +246,11 @@ function riskForecast(s: GeneratedSchedule, history: FirmHistory | null, answers
     }
     p50 = scenario(a => Math.max(1, cat(a, 'overrunMedian')) * permitHigh(a, 'p50'))
     p80 = scenario(a => Math.max(1, cat(a, 'overrunP80')) * permitHigh(a, 'p80'))
-    basis = `Firm actual-vs-planned ratios (median ×${history.overallOverrunMedian.toFixed(2)}, P80 ×${(history.overallOverrunP80 ?? history.overallOverrunMedian).toFixed(2)}) plus catalog review/lead-time ranges.`
+    basis = `Rule-based scenario (not a Monte Carlo simulation): firm actual-vs-planned ratios (median ×${history.overallOverrunMedian.toFixed(2)}, P80 ×${(history.overallOverrunP80 ?? history.overallOverrunMedian).toFixed(2)}) plus catalog review/lead-time ranges.`
   } else {
     p50 = scenario(a => permitHigh(a, 'p50'))
     p80 = scenario(a => permitHigh(a, 'p80') * (a.calendarId === 'cal-7d' ? 1 : 1.1))
-    basis = 'No firm history yet: catalog high-end review and lead times, plus 10% on field work for P80.'
+    basis = 'Rule-based scenario (not a Monte Carlo simulation). No firm history yet: catalog high-end review and lead times, plus 10% on field work for P80.'
   }
   return { deterministic, p50, p80, basis, requiredFinish: required, p80MeetsRequired: required ? p80 <= required : undefined }
 }
