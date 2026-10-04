@@ -5,6 +5,7 @@ import { normalizeSettings } from '@/lib/server/settings'
 import { elicit, questionBank, type ElicitationContext } from '@/lib/planning/elicitation'
 import { evaluatePlan } from '@/lib/planning/evaluation'
 import { recoveryPlan } from '@/lib/planning/recovery'
+import { adaptiveInterview } from '@/lib/planning/adaptive'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
 import { loadFirmHistory } from '@/lib/planning/service'
 import { llmStatus } from '@/lib/llm/provider'
@@ -39,6 +40,7 @@ export async function elicitationContext(plan: Plan, orgId: string) {
 export async function planView(plan: Plan, orgId: string) {
   const { history, llm, ectx } = await elicitationContext(plan, orgId)
   const elicitation = elicit({ answers: plan.answers }, ectx)
+  const adaptive = adaptiveInterview(plan.answers, elicitation, { history })
   const bank = new Map(questionBank({ answers: plan.answers }, ectx).all.map(q => [q.id, q]))
   const answered = Object.entries(plan.answers).map(([id, a]) => {
     const q = bank.get(id)
@@ -60,6 +62,7 @@ export async function planView(plan: Plan, orgId: string) {
   return {
     plan,
     elicitation,
+    adaptive,
     evaluation,
     recovery,
     guidance,

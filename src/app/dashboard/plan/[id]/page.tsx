@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, HelpCircle, Lock, Sparkles, Play, Download, Send, ChevronDown, ChevronRight,
+  ArrowLeft, Loader2, Lock, Play, Download, Send, ChevronDown, ChevronRight,
   AlertTriangle, CheckCircle2, Trash2, Link2, X,
 } from 'lucide-react'
 import type {
-  Answer, Assumption, ElicitationResult, GeneratedSchedule, PlanActivity, PlanLink, Question, SourceRef,
+  Answer, ElicitationResult, GeneratedSchedule, PlanActivity, PlanLink, SourceRef,
 } from '@/lib/planning/types'
 import type { Evaluation } from '@/lib/planning/evaluation'
 import type { EditImpact } from '@/lib/planning/overrides'
@@ -16,6 +16,8 @@ import type { RecoveryPlan } from '@/lib/planning/recovery'
 import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 import { useApp } from '../../layout'
+import type { AdaptiveInterview } from '@/lib/planning/adaptive'
+import { SmartInterview } from '@/components/interview/SmartInterview'
 
 interface Review { id: string; reviewer: string; verdict: string; comment: string; at: string }
 interface Plan {
@@ -24,7 +26,7 @@ interface Plan {
   version: number
 }
 interface View {
-  plan: Plan; elicitation: ElicitationResult; evaluation: Evaluation | null
+  plan: Plan; elicitation: ElicitationResult; adaptive: AdaptiveInterview; evaluation: Evaluation | null
   llm: { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; error?: string }
   history: { projectCount: number; similarCount: number } | null
   answered: { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }[]
@@ -34,10 +36,6 @@ interface View {
 
 type Tab = 'interview' | 'schedule' | 'evaluation' | 'audit'
 
-const SECTION_LABEL: Record<string, string> = {
-  project: 'Project', design: 'Design', permits: 'Permits', procurement: 'Long-lead', site: 'Site', milestones: 'Milestone targets',
-  regulatory: 'Regulatory', calendar: 'Calendar', security: 'Security', history: 'Firm history', cost: 'Cost basis',
-}
 const SOURCE_LABEL: Record<SourceRef['kind'], string> = {
   user: 'Your answer', file: 'Uploaded file', catalog: 'Regional catalog', firm_history: 'Firm history', template: 'Template',
   model: 'AI suggestion', override: 'Override', assumption: 'Assumption',
@@ -111,13 +109,14 @@ export default function PlanPage() {
     if (data) setNotice(view?.plan.generated ? 'Added. Click Regenerate to include it in the Basis of Schedule; add it as an activity on the Schedule tab if it is work.' : 'Added to the project brief.')
     return !!data
   }
-  const saveAnswer = async (qid: string, a: Partial<Answer>) => {
-    const data = await call(`answer:${qid}`, `/api/plans/${id}`, { method: 'PATCH', body: JSON.stringify({ answers: { [qid]: a } }) })
+  const saveAnswers = async (answers: Record<string, Partial<Answer> | null>, key = 'answer:batch') => {
+    const data = await call(key, `/api/plans/${id}`, { method: 'PATCH', body: JSON.stringify({ answers }) })
     const errs = data?.errors as Record<string, string> | undefined
-    if (errs && errs[qid]) setError(errs[qid])
+    if (errs && Object.keys(errs).length) setError(Object.values(errs)[0])
     const issues = (data?.newDateIssues as { text: string }[] | undefined) || []
     if (issues.length) setDateAlerts(issues.map(i => i.text))
   }
+  const saveAnswer = (qid: string, a: Partial<Answer> | null) => saveAnswers({ [qid]: a }, `answer:${qid}`)
   const generate = async (fresh = false) => {
     const hadSchedule = !!view?.plan.generated
     const data = await call('generate', `/api/plans/${id}/generate`, { method: 'POST', body: JSON.stringify({ fresh }) })
@@ -158,12 +157,12 @@ export default function PlanPage() {
             <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight truncate">{plan.name}</h1>
           </div>
           <div className="flex flex-wrap gap-2 flex-shrink-0">
-            {can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-semibold transition-colors disabled:opacity-50">
+            {can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className="pressable flex items-center gap-1.5 bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 rounded-full text-[13px] font-semibold disabled:opacity-50">
               {busy === 'generate' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {g ? 'Regenerate' : 'Generate schedule'}
             </button>}
             {g && (
               <>
-                {can('plan.publish') && <button onClick={publish} disabled={!!busy} className="flex items-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
+                {can('plan.publish') && <button onClick={publish} disabled={!!busy} className="pressable flex items-center gap-1.5 border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-4 py-2 rounded-full text-[13px] font-medium disabled:opacity-50">
                   {busy === 'publish' ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Publish
                 </button>}
                 <ExportMenu id={plan.id} />
@@ -171,21 +170,23 @@ export default function PlanPage() {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-          <Chip label="Readiness" value={`${el.readiness}%`} onClick={() => setTab('interview')} />
-          <Chip label="Open questions" value={String(el.questions.length)} onClick={() => setTab('interview')} />
-          {g?.cpm && <Chip label="Finish" value={fmtDate(g.cpm.projectFinish)} onClick={() => setTab('schedule')} />}
-          {ev && <Chip label="Scenario P80" value={fmtDate(ev.forecast.p80)} onClick={goEvaluation} />}
-          {ev && <Chip label="Quality" value={`${ev.grade} · ${ev.score}`} onClick={goEvaluation} />}
-          {ev && <Chip label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} tone={failing ? 'warn' : 'ok'} onClick={goEvaluation} />}
-          {lateDays > 0 && <Chip label="Required finish" value={`${lateDays} days late`} tone="bad" onClick={() => { setTab('schedule'); setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }} />}
-          <span className="text-[11.5px] text-warm-400 flex items-center gap-1 ml-1">{llm.airgapped && <Lock size={10} />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'AI offline — rules only'}</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-[13px] text-warm-600">
+          <HeaderStat label="Questions that matter" value={view.adaptive.enoughToBuild ? 'none left' : String(view.adaptive.remainingThatMatter)} onClick={() => setTab('interview')} />
+          {g?.cpm && <HeaderStat label="Finish" value={fmtDate(g.cpm.projectFinish)} onClick={() => setTab('schedule')} />}
+          {ev && <HeaderStat label="P80" value={fmtDate(ev.forecast.p80)} onClick={goEvaluation} />}
+          {ev && <HeaderStat label="Quality" value={`${ev.grade} · ${ev.score}`} onClick={goEvaluation} />}
+          {ev && <HeaderStat label="DCMA" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} tone={failing ? 'warn' : undefined} onClick={goEvaluation} />}
+          {lateDays > 0 && (
+            <button onClick={() => { setTab('schedule'); setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }}
+              className="pressable rounded-full bg-status-at-risk-bg text-status-at-risk px-2.5 py-0.5 text-[12.5px] font-semibold">{lateDays} days late</button>
+          )}
+          <span className="text-[12px] text-warm-500 inline-flex items-center gap-1">{llm.airgapped && <Lock size={10} aria-hidden />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'}</span>
         </div>
-        <div className="flex gap-1.5 mt-3 overflow-x-auto">
+        <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/70 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-navy-900 text-white' : 'bg-warm-100 border border-warm-200 text-warm-600 hover:border-warm-300'}`}>
-              {t === 'interview' ? `Interview (${el.questions.length})` : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? `Evaluation & review${failing ? ` (${failing} to fix)` : ''}` : 'Audit trail'}
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
+              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(10,22,40,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
+              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? `Evaluation${failing ? ` · ${failing} to fix` : ''}` : 'Audit trail'}
             </button>
           ))}
         </div>
@@ -211,14 +212,17 @@ export default function PlanPage() {
         </Banner>
       )}
 
-      {g && tab !== 'interview' && tab !== 'audit' && el.questions.length > 0 && (
+      {g && tab !== 'interview' && tab !== 'audit' && view.adaptive.ask.length > 0 && (
         <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2.5 rounded-md mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="flex-1 min-w-[240px]">This schedule was built with <span className="font-semibold text-navy-950">{el.questions.length} questions still open</span> (readiness {el.readiness}%). Answer any of them or add information, then regenerate — your overrides are kept.</span>
+          <span className="flex-1 min-w-[240px]">{view.adaptive.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-navy-950">{view.adaptive.remainingThatMatter} open question{view.adaptive.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}</span>
           <button onClick={() => setTab('interview')} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium">Answer remaining questions</button>
         </div>
       )}
 
-      {tab === 'interview' && <InterviewTab view={view} busy={busy} onAnswer={saveAnswer} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />}
+      {tab === 'interview' && (
+        <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
+          onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
+      )}
       {tab === 'schedule' && g && <ScheduleTab plan={plan} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
@@ -236,11 +240,10 @@ export default function PlanPage() {
 
 /* ─── Shared bits ────────────────────────────────────── */
 
-function Chip({ label, value, onClick, tone }: { label: string; value: string; onClick?: () => void; tone?: 'ok' | 'warn' | 'bad' }) {
-  const t = tone === 'bad' ? 'border-status-at-risk text-status-at-risk' : tone === 'warn' ? 'border-status-attention text-navy-950' : tone === 'ok' ? 'border-status-on-track text-navy-950' : 'border-warm-300 text-navy-950'
+function HeaderStat({ label, value, onClick, tone }: { label: string; value: string; onClick?: () => void; tone?: 'warn' }) {
   return (
-    <button onClick={onClick} className={`flex items-center gap-1.5 bg-warm-100 border-l-2 ${t} rounded-md px-2.5 py-1 text-[12px] hover:bg-warm-200 transition-colors`}>
-      <span className="text-warm-500">{label}</span><span className="font-semibold tabular-nums">{value}</span>
+    <button onClick={onClick} className="inline-flex items-baseline gap-1.5 hover:text-navy-950">
+      <span>{label}</span><span className={`font-semibold tabular-nums ${tone === 'warn' ? 'text-status-attention' : 'text-navy-950'}`}>{value}</span>
     </button>
   )
 }
@@ -277,7 +280,7 @@ function ExportMenu({ id }: { id: string }) {
   const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-medium transition-colors">
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="pressable flex items-center gap-1.5 border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-4 py-2 rounded-full text-[13px] font-medium">
         <Download size={13} /> Export <ChevronDown size={12} />
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
@@ -295,232 +298,6 @@ function ExportMenu({ id }: { id: string }) {
           {item('md', 'Basis of Schedule narrative (.md)', 'Assumptions, sources, overrides, review')}
         </div>
       )}
-    </div>
-  )
-}
-
-/* ─── Interview ──────────────────────────────────────── */
-
-function InterviewTab({ view, busy, onAnswer, onSuggest, onGenerate, onAddNote }: {
-  view: View; busy: string | null
-  onAnswer: (qid: string, a: Partial<Answer>) => Promise<void>
-  onSuggest: () => void; onGenerate: () => void
-  onAddNote: (text: string) => Promise<boolean>
-}) {
-  const { elicitation: el, plan, llm, history } = view
-  const [showAll, setShowAll] = useState(false)
-  const [showAnswered, setShowAnswered] = useState(false)
-  const visible = showAll ? el.questions : el.questions.slice(0, 6)
-  const answered = view.answered
-  const [note, setNote] = useState('')
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <div className="lg:col-span-2 space-y-3">
-        {plan.generated && (
-          <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2.5 rounded-md flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="flex-1 min-w-[240px]">A schedule already exists. You can keep answering questions or add information at any time, then regenerate — your overrides are kept.</span>
-            <button onClick={onGenerate} disabled={!!busy} className="bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12.5px] font-semibold transition-colors disabled:opacity-50">Regenerate with my answers</button>
-          </div>
-        )}
-        {el.conflicts.map((c, i) => <Banner key={i} kind="warn"><span className="font-semibold">Check this: </span>{fmtDates(c)}</Banner>)}
-
-        {el.questions.length === 0 ? (
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[14px] text-warm-600">
-            <CheckCircle2 size={16} className="inline text-status-on-track mr-1.5" />
-            Every question is answered or deliberately left open. Generate the schedule when ready.
-            <button onClick={onGenerate} className="block mt-3 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3.5 py-2 rounded-md text-[13px] font-semibold transition-colors">Generate schedule</button>
-          </div>
-        ) : (
-          <>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">What I still need to know — highest schedule impact first</div>
-            {visible.map(q => <QuestionCard key={q.id} q={q} busy={busy === `answer:${q.id}`} onAnswer={onAnswer} />)}
-            {el.questions.length > 6 && (
-              <button onClick={() => setShowAll(s => !s)} className="text-[13px] text-accent-600 hover:underline">
-                {showAll ? 'Show fewer' : `Show all ${el.questions.length} open questions`}
-              </button>
-            )}
-          </>
-        )}
-
-        {answered.length > 0 && (
-          <div className="pt-2">
-            <button onClick={() => setShowAnswered(s => !s)} className="flex items-center gap-1 text-[13px] font-medium text-warm-600 hover:text-navy-950">
-              {showAnswered ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Answered ({answered.length})
-            </button>
-            {showAnswered && (
-              <div className="mt-2 bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
-                {answered.map(a => <AnsweredRow key={a.id} a={a} issues={(el.dateIssues || []).filter(i => i.questionIds.includes(a.id)).map(i => i.text)} onAnswer={onAnswer} />)}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Brief readiness</div>
-          <div className="text-[32px] font-display text-navy-950 tabular-nums leading-none">{el.readiness}%</div>
-          <div className="h-1.5 bg-warm-200 rounded-sm overflow-hidden mt-3"><div className="h-full bg-accent-500" style={{ width: `${el.readiness}%` }} /></div>
-          <p className="text-[12px] text-warm-500 mt-3">Weighted by how much each answer can move the finish date. You can generate at any point; gaps become explicit assumptions and contingency.</p>
-        </div>
-
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Grounding</div>
-          <ul className="text-[12.5px] text-warm-600 space-y-1.5">
-            <li>Permits &amp; regulations for {el.profile.state || 'your region (state not set)'}{el.profile.projectType ? `, ${el.profile.projectType.replace(/_/g, ' ')}` : ''}</li>
-            <li>Long-lead equipment lead times (2024–25 market ranges)</li>
-            <li>{history ? `${history.projectCount} of your firm's schedules (${history.similarCount} similar) — private to your firm` : 'No firm history yet — upload past schedules to ground durations in your actuals'}</li>
-          </ul>
-        </div>
-
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Add something I didn&apos;t ask</div>
-          <p className="text-[12px] text-warm-500 mb-2">Owner requirements, site constraints, phasing, anything that affects the schedule. It goes into the Basis of Schedule.</p>
-          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000}
-            placeholder="e.g. Utility will only energize the substation after the owner's commissioning agent signs off"
-            className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px] text-warm-700 placeholder:text-warm-400" />
-          <button disabled={!!busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }}
-            className="mt-2 w-full bg-navy-900 text-white rounded-md text-[13px] font-medium py-2 disabled:opacity-40">Add to brief</button>
-        </div>
-
-        {llm.mode !== 'offline' ? (
-          <button onClick={onSuggest} disabled={!!busy} className="w-full flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
-            {busy === 'suggest' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Ask AI for project-specific follow-ups
-          </button>
-        ) : (
-          <p className="text-[12px] text-warm-400">AI follow-up questions are off ({llm.error || 'offline mode'}). The rule-based interview covers the core schedule drivers.</p>
-        )}
-
-        {el.assumptions.length > 0 && (
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Assumptions ({el.assumptions.length})</div>
-            <ul className="space-y-2">
-              {el.assumptions.slice(0, 12).map((a: Assumption) => (
-                <li key={a.questionId} className="text-[12px] text-warm-600">
-                  {a.kind === 'withheld' && <Lock size={10} className="inline mr-1" />}{fmtDates(a.text)}{a.bufferDays ? <span className="text-warm-400"> (+{a.bufferDays}d)</span> : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function AnsweredRow({ a, issues, onAnswer }: { a: View['answered'][number]; issues: string[]; onAnswer: (qid: string, a: Partial<Answer>) => Promise<void> }) {
-  const [editing, setEditing] = useState(false)
-  const [note, setNote] = useState(a.note || '')
-  return (
-    <div className="px-4 py-2.5 text-[13px]">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-warm-600 min-w-0"><span className="text-[10.5px] font-bold uppercase tracking-wider text-warm-400 mr-2">{SECTION_LABEL[a.section] || a.section}</span>{a.prompt}</span>
-        <span className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-navy-950 font-medium flex items-center gap-1">{a.status === 'withheld' && <Lock size={11} />}{fmtDates(a.label)}{a.custom && <span className="text-[10px] text-warm-400 font-normal">(typed)</span>}</span>
-          {a.status !== 'withheld' && <button onClick={() => setEditing(x => !x)} className="text-[11.5px] text-accent-600 hover:underline">{a.note ? 'Edit details' : 'Add details'}</button>}
-          <button onClick={() => onAnswer(a.id, null as unknown as Partial<Answer>)} title="Clear and ask again" className="text-warm-400 hover:text-status-at-risk"><X size={13} /></button>
-        </span>
-      </div>
-      {a.note && !editing && <p className="text-[12px] text-warm-500 mt-1 border-l-2 border-accent-500 pl-2">“{a.note}”</p>}
-      {issues.map((t, i) => <p key={i} className="text-[12px] text-status-at-risk mt-1 flex gap-1"><AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />{fmtDates(t)}</p>)}
-      {editing && (
-        <div className="mt-2 flex gap-2">
-          <input value={note} onChange={e => setNote(e.target.value)} maxLength={1000} placeholder="Qualify this answer in your own words" className="flex-1 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
-          <button onClick={async () => { await onAnswer(a.id, { status: a.status as Answer['status'], value: a.value ?? undefined, note }); setEditing(false) }} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium">Save</button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function QuestionCard({ q, busy, onAnswer }: { q: Question; busy: boolean; onAnswer: (qid: string, a: Partial<Answer>) => Promise<void> }) {
-  const [value, setValue] = useState<string>('')
-  const [other, setOther] = useState('')
-  const [showOther, setShowOther] = useState(false)
-  const [details, setDetails] = useState('')
-  const withNote = (a: Partial<Answer>): Partial<Answer> => (details.trim() ? { ...a, note: details.trim() } : a)
-  const submit = (v: unknown) => onAnswer(q.id, withNote({ status: 'known', value: v as Answer['value'] }))
-  const dropdown = q.kind === 'choice' && (q.options?.length || 0) > 5
-  const otherBox = (
-    <form onSubmit={e => { e.preventDefault(); if (other.trim().length >= 2) submit(other.trim()) }} className="flex gap-2 flex-wrap items-center w-full">
-      <input value={other} onChange={e => setOther(e.target.value)} maxLength={200} autoFocus={!dropdown}
-        placeholder={q.id === 'project.state' ? 'e.g. Toronto, Ontario, Canada' : dropdown ? 'Type your answer' : (q.otherPrompt || 'Type your answer')}
-        className="flex-1 min-w-[240px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 placeholder:text-warm-400" />
-      <button disabled={busy || other.trim().length < 2} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-40">Save</button>
-    </form>
-  )
-
-  return (
-    <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-[10.5px] font-bold uppercase tracking-wider text-warm-500 border-l-2 border-accent-500 pl-1.5">{SECTION_LABEL[q.section] || q.section}</span>
-        {q.id.startsWith('ai.') && <span className="text-[10.5px] text-warm-400 flex items-center gap-0.5"><Sparkles size={10} /> AI follow-up</span>}
-      </div>
-      <div className="text-[15px] font-semibold text-navy-950">{q.prompt}</div>
-      <div className="text-[12.5px] text-warm-500 mt-1 flex gap-1.5"><HelpCircle size={13} className="flex-shrink-0 mt-0.5" /><span><span className="font-medium text-warm-600">Why I ask:</span> {fmtDates(q.why)}</span></div>
-      {q.groundedBy && <Sources sources={q.groundedBy} />}
-
-      {dropdown && q.allowOther && (
-        <div className="mt-3">
-          <div className="text-[12px] text-warm-600 mb-1.5">{q.otherPrompt ? `${q.otherPrompt}:` : 'Not in the list? Type your answer:'}</div>
-          {otherBox}
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mt-3">Or choose from the list</div>
-        </div>
-      )}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {q.kind === 'choice' && q.options && (
-          q.options.length <= 5 ? (
-            <>
-              {q.options.map(o => (
-                <button key={o.value} disabled={busy} onClick={() => submit(o.value)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[13px] text-navy-950 transition-colors disabled:opacity-50">{o.label}</button>
-              ))}
-              {q.allowOther && (
-                <button disabled={busy} onClick={() => setShowOther(x => !x)} className={`px-3 py-1.5 rounded-md border text-[13px] transition-colors ${showOther ? 'border-navy-900 bg-navy-900 text-white' : 'border-dashed border-warm-400 bg-warm-50 text-warm-600 hover:border-navy-900'}`}>Other…</button>
-              )}
-              {showOther && otherBox}
-            </>
-          ) : (
-            <>
-              <select value={value} onChange={e => setValue(e.target.value)} className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 min-w-[200px]">
-                <option value="">Choose…</option>
-                {q.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <button disabled={busy || !value} onClick={() => submit(value)} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-40">Save</button>
-            </>
-          )
-        )}
-        {q.kind === 'boolean' && (
-          <>
-            <button disabled={busy} onClick={() => submit(true)} className="px-4 py-1.5 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[13px] text-navy-950 transition-colors">Yes</button>
-            <button disabled={busy} onClick={() => submit(false)} className="px-4 py-1.5 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[13px] text-navy-950 transition-colors">No</button>
-          </>
-        )}
-        {(q.kind === 'number' || q.kind === 'date' || q.kind === 'text') && (
-          <form onSubmit={e => { e.preventDefault(); if (value.trim()) submit(q.kind === 'number' ? Number(value) : value.trim()) }} className="flex gap-2 flex-wrap">
-            <input
-              type={q.kind === 'number' ? 'number' : q.kind === 'date' ? 'date' : 'text'} value={value} onChange={e => setValue(e.target.value)}
-              min={q.kind === 'number' ? 0 : undefined} max={q.unit === '%' ? 100 : undefined}
-              placeholder={q.unit ? q.unit : 'Your answer'}
-              className={`bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 ${q.kind === 'text' ? 'w-72 max-w-full' : 'w-40'}`}
-            />
-            <button disabled={busy || !value.trim()} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-40">{busy ? <Loader2 size={13} className="animate-spin" /> : 'Save'}</button>
-          </form>
-        )}
-        <span className="flex-1" />
-        <button disabled={busy} onClick={() => onAnswer(q.id, withNote({ status: 'unknown' }))} className="text-[12.5px] text-warm-500 hover:text-navy-950">Don&apos;t know</button>
-        {q.allowWithheld && (
-          <button disabled={busy} onClick={() => onAnswer(q.id, { status: 'withheld' })} title="Plan around it without sharing the detail" className="text-[12.5px] text-warm-500 hover:text-navy-950 flex items-center gap-1"><Lock size={11} /> Can&apos;t share</button>
-        )}
-      </div>
-      <div className="mt-3">
-        <label className="block text-[11.5px] font-medium text-warm-500 mb-1">Anything to add? Qualify your answer in your own words (optional)</label>
-        <textarea value={details} onChange={e => setDetails(e.target.value)} rows={1} maxLength={1000}
-          placeholder={q.section === 'permits' ? 'e.g. “Issued, but only for foundations — superstructure permit still in review”' : q.section === 'procurement' ? 'e.g. “Needed, but a new substation with different criteria — utility is designing it”' : 'e.g. “Mostly yes, except the east wing”'}
-          className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700 placeholder:text-warm-400 resize-y" />
-        <p className="text-[11px] text-warm-400 mt-0.5">Saved with whichever answer you pick. It goes into the Basis of Schedule and flags the related activities for review.</p>
-      </div>
-      {q.fallback && q.fallback.explanation && <div className="text-[11.5px] text-warm-400 mt-2">If unknown: {fmtDates(q.fallback.explanation)}</div>}
     </div>
   )
 }
