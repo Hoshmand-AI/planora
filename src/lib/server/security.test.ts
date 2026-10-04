@@ -118,6 +118,9 @@ describe('field encryption', () => {
     const parts = sealed.split('.')
     parts[3] = parts[3].slice(0, -2) + (parts[3].endsWith('A') ? 'BB' : 'AA')
     expect(() => decrypt(parts.join('.'))).toThrow()
+    const short = sealed.split('.')
+    short[2] = Buffer.from(short[2], 'base64url').subarray(0, 4).toString('base64url')
+    expect(() => decrypt(short.join('.'))).toThrow(/tag/)
   })
 })
 

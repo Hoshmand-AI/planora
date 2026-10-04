@@ -4,13 +4,14 @@
 import { currentRequest } from './context'
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
-const SECRET_KEY = /pass(word)?|secret|token|authorization|cookie|api[_-]?key|mfa|code$/i
+const SECRET_KEY = /pass(?:word)?|secret|token|authorization|cookie|api[_-]?key|mfa/i
+const isSecretKey = (k: string) => SECRET_KEY.test(k) || /code$/i.test(k)
 
 function redact(v: unknown, depth = 0): unknown {
   if (depth > 4 || v == null || typeof v !== 'object') return v
   if (Array.isArray(v)) return v.slice(0, 50).map(x => redact(x, depth + 1))
   const out: Record<string, unknown> = {}
-  for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = SECRET_KEY.test(k) ? '[redacted]' : redact(x, depth + 1)
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = isSecretKey(k) ? '[redacted]' : redact(x, depth + 1)
   return out
 }
 

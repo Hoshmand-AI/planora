@@ -35,6 +35,10 @@ const ACTION_LABELS: Record<string, string> = {
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
   'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
 }
+// Download links come from this fixed table, never from page text.
+const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'ai.', 'privacy.'] as const
+const AUDIT_CSV: Record<string, string> = Object.fromEntries(AUDIT_FILTERS.map(f => [f, f ? `/api/audit?format=csv&action=${f}` : '/api/audit?format=csv']))
+
 const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.override') ? 'Override' : a)
 
 function summarize(e: AuditEvent): string {
@@ -254,7 +258,7 @@ export default function OrgPage() {
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {
               setBusy('verify'); const r = await fetch('/api/audit?verify=1'); setVerify(await r.json()); setBusy(null)
             }}>{busy === 'verify' ? 'Verifying…' : 'Verify integrity'}</Button>
-            <a href={`/api/audit?format=csv${actionFilter ? `&action=${actionFilter}` : ''}`} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
+            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
           </div>
           {verify && (
             <div className="mb-3">{verify.ok
