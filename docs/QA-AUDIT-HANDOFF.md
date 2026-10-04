@@ -199,6 +199,10 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | INT-02 | Add a webhook to an HTTPS endpoint (e.g. a request-bin), "Send test", then create a plan | Signed deliveries arrive; `http://` and private addresses are refused |
 | EML-01 | With an email provider configured, sign up a new organization | A confirmation email arrives; inviting people is blocked until the link is clicked; the link works once |
 | QRL-01 | Organization → Policies → raise "High duration above" to 60 | Quality results state "remaining > 60d" and re-judge check 8 |
+| ADP-01 | New plan → Interview | Facility type, location, scope, size and start come first; permit and long-lead questions are held under "Waiting on an earlier answer" until type and location are known |
+| ADP-02 | Answer the foundations | Each next question shows how far it can move the finish ("up to N days"); questions that can't move it sit under "Optional details" |
+| ADP-03 | Data center in VA, 60% drawings | Parallel long-lead items appear as one checklist ("together they move the finish up to N days") instead of many questions |
+| ADP-04 | Open the sample project | Header says "Enough to build"; nothing left that moves the finish |
 
 ### 5.6 Quality (DCMA 14-point) and evaluation
 

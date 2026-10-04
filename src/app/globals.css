@@ -66,3 +66,24 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 ::-webkit-scrollbar-track { background: var(--warm-100); }
 ::-webkit-scrollbar-thumb { background: var(--warm-300); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--warm-400); }
+
+/* ── Motion system: one easing, short durations, transform/opacity only ── */
+:root { --ease-out: cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Disclosure: height animates via grid rows (no measuring, no layout jank) */
+.disclosure-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms var(--ease-out); }
+.disclosure-panel[data-open='true'] { grid-template-rows: 1fr; }
+.disclosure-panel > .disclosure-inner { overflow: hidden; min-height: 0; opacity: 0; transition: opacity 220ms var(--ease-out); }
+.disclosure-panel[data-open='true'] > .disclosure-inner { opacity: 1; transition-delay: 60ms; }
+.disclosure-chevron { transition: transform 260ms var(--ease-out); }
+[data-open='true'] .disclosure-chevron, .disclosure-chevron[data-open='true'] { transform: rotate(90deg); }
+
+/* A new question arrives from just below and settles; never bounces */
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.rise-in { animation: rise-in 360ms var(--ease-out) both; }
+
+/* Pressable: instant feedback on press, not on release */
+.pressable { transition: transform 120ms ease-out, background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; }
+.pressable:active { transform: scale(0.985); }
+
+.meter-fill { transition: width 600ms var(--ease-out); }
