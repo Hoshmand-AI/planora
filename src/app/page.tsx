@@ -48,13 +48,14 @@ export default function HomePage() {
       {/* Hero */}
       <section className="px-6 pt-20 pb-16 text-center">
         <div className="inline-block text-[11px] font-semibold uppercase tracking-widest text-accent-600 bg-accent-100 px-3 py-1 rounded-md mb-6">
-          Built by Hoshmand AI
+          Construction scheduling, explained
         </div>
-        <h1 className="font-display text-[42px] md:text-[50px] text-navy-950 max-w-[700px] mx-auto leading-[1.1] mb-5">
-          Construction schedule analysis. Instant. AI&#8209;powered.
+        <h1 className="font-display text-[40px] md:text-[50px] text-navy-950 max-w-[760px] mx-auto leading-[1.1] mb-5">
+          Build and check construction schedules. Every number explained.
         </h1>
-        <p className="text-[17px] text-warm-500 max-w-[540px] mx-auto mb-9 leading-relaxed">
-          Upload your Primavera P6 or MS Project schedule and get instant AI-powered analysis, delay insights, and executive reports.
+        <p className="text-[17px] text-warm-500 max-w-[600px] mx-auto mb-9 leading-relaxed">
+          Planora interviews you like a senior scheduler, builds a CPM schedule with a written basis for every duration and link,
+          runs the DCMA 14-Point Assessment, and exports native Primavera P6 and MS Project files. Already have a schedule? Upload it to check it.
         </p>
         <div className="flex gap-3 justify-center flex-wrap">
           <Link href="/auth?mode=signup" className="bg-accent-500 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
@@ -65,48 +66,44 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Stats Row */}
-        <div className="flex justify-center gap-12 mt-14 pt-10 border-t border-warm-200 max-w-[700px] mx-auto flex-wrap">
+        {/* Facts row: each figure is backed by an automated test or the product's own limits (see "Where these numbers come from") */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mt-14 pt-10 border-t border-warm-200 max-w-[820px] mx-auto">
           {[
-            ['100K+', 'Activities Parsed'],
-            ['$200/hr', 'Consultant Replaced'],
-            ['4', 'Report Types'],
-            ['Free', 'To Start'],
+            ['14 of 14', 'DCMA 14-Point checks, run automatically'],
+            ['100,000', 'activities scheduled by our CPM engine in automated tests'],
+            ['0 days', 'difference in dates and float after a P6 or MS Project round trip, in our test set'],
+            ['$0', 'to start. No credit card'],
           ].map(([value, label]) => (
             <div key={label} className="text-center">
-              <div className="text-[30px] font-bold text-navy-950 tabular-nums">{value}</div>
-              <div className="text-[11px] font-medium text-warm-400 uppercase tracking-wider mt-1">{label}</div>
+              <div className="text-[28px] font-bold text-navy-950 tabular-nums">{value}</div>
+              <div className="text-[12px] text-warm-500 mt-1 leading-snug max-w-[180px] mx-auto">{label}</div>
             </div>
           ))}
         </div>
+        <a href="#evidence" className="inline-block mt-6 text-[12.5px] text-accent-600 hover:underline">Where these numbers come from</a>
       </section>
 
       {/* Proof Bar */}
       <div className="bg-warm-100 border-y border-warm-200 py-4 text-center px-6">
         <p className="text-[13px] text-warm-500 font-medium">
-          Built by <span className="text-warm-700 font-semibold">Hoshmand AI</span> — a{' '}
-          <span className="text-warm-700 font-semibold">13-year construction scheduling professional</span> who managed schedules at{' '}
-          <span className="text-warm-700 font-semibold">Meta</span>,{' '}
-          <span className="text-warm-700 font-semibold">USPS</span>, and{' '}
-          <span className="text-warm-700 font-semibold">Applied Digital</span>
+          Built by <span className="text-warm-700 font-semibold">Hoshmand AI</span>, founded by a construction scheduling consultant with{' '}
+          <span className="text-warm-700 font-semibold">13 years</span> in the field and a degree in architecture.
         </p>
       </div>
 
       {/* Problem / Solution */}
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center mb-14">
-          <h2 className="font-display text-[30px] text-navy-950 mb-3">The $200/hour problem</h2>
-          <p className="text-warm-600 max-w-[560px] mx-auto text-[15px]">Every major construction project has a schedule. Analyzing it shouldn't require a specialist and three days of manual work.</p>
+          <h2 className="font-display text-[30px] text-navy-950 mb-3">Less time building and checking. More time managing.</h2>
+          <p className="text-warm-600 max-w-[580px] mx-auto text-[15px]">Planora does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </div>
         <div className="grid md:grid-cols-2 gap-5">
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-8">
-            <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-status-at-risk bg-status-at-risk-bg px-3 py-1 rounded-md border-l-2 border-status-at-risk mb-5">Today</span>
-            <h3 className="text-[18px] font-semibold text-navy-950 mb-3">Manual, slow, expensive</h3>
-            <p className="text-[14px] text-warm-600 mb-4">Schedule analysis is done by hand using 20-year-old desktop software and expensive consultants.</p>
+            <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-warm-600 bg-warm-200 px-3 py-1 rounded-md mb-5">The usual way</span>
             <ul className="space-y-3">
-              {['Senior scheduler: $150–250/hour', 'Single variance report: 2–3 days', 'No mobile access to schedule data', 'Project managers wait for answers', 'Reports are dashboards, not narratives'].map(item => (
-                <li key={item} className="flex items-center gap-3 text-[13.5px] text-warm-700 border-b border-warm-200 pb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-status-at-risk flex-shrink-0" />
+              {['Baselines are built activity by activity in P6 or MS Project', 'Quality checks are a separate step, often run just before submittal', 'The reason behind a duration lives in the scheduler’s head', 'When the date slips, recovery options are worked out by hand'].map(item => (
+                <li key={item} className="flex items-start gap-3 text-[13.5px] text-warm-700 border-b border-warm-200 pb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-warm-400 flex-shrink-0 mt-2" />
                   {item}
                 </li>
               ))}
@@ -114,12 +111,10 @@ export default function HomePage() {
           </div>
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-8">
             <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-status-on-track bg-status-on-track-bg px-3 py-1 rounded-md border-l-2 border-status-on-track mb-5">With Planora</span>
-            <h3 className="text-[18px] font-semibold text-navy-950 mb-3">Instant, AI-powered, on any device</h3>
-            <p className="text-[14px] text-warm-600 mb-4">Upload your schedule file and get the same analysis a consultant produces — instantly.</p>
             <ul className="space-y-3">
-              {['AI analysis: seconds, not days', 'Executive narrative reports', 'Works on any device with a browser', 'Ask questions in plain English', 'Critical path, variance, QA/QC — automated'].map(item => (
-                <li key={item} className="flex items-center gap-3 text-[13.5px] text-warm-700 border-b border-warm-200 pb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-status-on-track flex-shrink-0" />
+              {['An interview builds the first schedule; you review and adjust it', 'DCMA 14-Point checks run on every change', 'Each duration and link shows its source and assumptions', 'Recovery options are re-scheduled on the real network and priced from your labor cost'].map(item => (
+                <li key={item} className="flex items-start gap-3 text-[13.5px] text-warm-700 border-b border-warm-200 pb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-on-track flex-shrink-0 mt-2" />
                   {item}
                 </li>
               ))}
@@ -133,12 +128,12 @@ export default function HomePage() {
         <h2 className="font-display text-[30px] text-navy-950 mb-10">Built by a scheduler, for everyone on the project</h2>
         <div className="grid md:grid-cols-2 gap-8 gap-x-14">
           {[
-            { icon: FileText,      title: 'Real P6 & MS Project Parsing',  desc: 'Upload XER, XML, or PDF files. Every activity, relationship, and constraint extracted automatically.' },
-            { icon: MessageSquare, title: 'AI-Powered Q&A',                 desc: 'Ask questions in plain English. Get precise answers based on your actual schedule data — powered by GPT-4o.' },
-            { icon: BarChart3,     title: 'Executive Reports',              desc: 'Generate professional narrative reports with findings and recommendations. The same deliverable a consultant produces.' },
-            { icon: Activity,      title: 'Critical Path Analysis',         desc: 'Instantly identify driving activities, float consumption, and near-critical paths across your entire schedule.' },
-            { icon: CheckCircle,   title: 'Variance Tracking',              desc: 'Compare baseline vs. current with milestone-by-milestone variance breakdown and cause categorization.' },
-            { icon: Shield,        title: 'Schedule QA/QC',                 desc: 'Automated quality checks against DCMA 14-point standards. Find logic issues, missing links, and constraint problems.' },
+            { icon: FileText,      title: 'Native P6 and MS Project files', desc: 'Import .xer and .xml with activities, logic, lags, constraints and calendars, and export the same formats. Excel and PDF imports read activities and dates; a PDF carries no logic.' },
+            { icon: MessageSquare, title: 'A schedule built from an interview', desc: 'Planora asks what a senior scheduler would ask: scope, permits, long-lead equipment, site and calendar. Questions are ranked by how far each answer can move your finish date.' },
+            { icon: CheckCircle,   title: 'DCMA 14-Point Assessment', desc: 'All 14 checks, with the published thresholds by default or your organization’s own. Each failing check lists the activities involved and a suggested fix.' },
+            { icon: Activity,      title: 'Critical path and float', desc: 'Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float for every activity.' },
+            { icon: BarChart3,     title: 'Schedule risk and recovery', desc: 'Monte Carlo risk analysis (200 to 1,000 iterations of the full network) gives P50 and P80 finish dates. When a date is missed, recovery options are modeled on the network and priced from your labor cost.' },
+            { icon: Shield,        title: 'Ask AI, with limits', desc: 'Ask questions in plain English and draft narrative reports with a version-pinned OpenAI model (GPT-4o by default). Calculated figures such as DCMA results come from the engine, not the model. AI can be switched off.' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex gap-4">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -159,15 +154,15 @@ export default function HomePage() {
           <h2 className="font-display text-[30px] text-navy-950 mb-12 text-center">How it works</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { num: '01', title: 'Upload',  desc: 'Select a P6 (.xer), MS Project (.xml), or PDF schedule file.' },
-              { num: '02', title: 'Parse',   desc: 'Every activity, relationship, and constraint extracted automatically.' },
-              { num: '03', title: 'Analyze', desc: 'AI identifies the critical path, calculates variance, and assesses quality.' },
-              { num: '04', title: 'Report',  desc: 'Get professional reports, or ask questions in plain English.' },
+              { num: '01', title: 'Start',     desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
+              { num: '02', title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
+              { num: '03', title: 'Check',     desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
+              { num: '04', title: 'Deliver',   desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative.' },
             ].map(({ num, title, desc }) => (
               <div key={num} className="text-center">
                 <div className="text-[30px] font-bold text-accent-600 mb-3 tabular-nums font-display">{num}</div>
                 <div className="text-[15px] font-semibold text-navy-950 mb-2">{title}</div>
-                <div className="text-[13px] text-warm-500 leading-relaxed max-w-[200px] mx-auto">{desc}</div>
+                <div className="text-[13px] text-warm-500 leading-relaxed max-w-[210px] mx-auto">{desc}</div>
               </div>
             ))}
           </div>
@@ -176,14 +171,14 @@ export default function HomePage() {
 
       {/* Reports */}
       <section id="reports" className="max-w-6xl mx-auto px-6 py-20">
-        <h2 className="font-display text-[30px] text-navy-950 mb-3">Professional reports, generated instantly</h2>
-        <p className="text-warm-600 mb-10 max-w-[560px] text-[15px]">The same deliverables a scheduling consultant produces — executive narratives with findings and recommendations.</p>
+        <h2 className="font-display text-[30px] text-navy-950 mb-3">Narrative reports, drafted from your data</h2>
+        <p className="text-warm-600 mb-10 max-w-[600px] text-[15px]">Four report types, drafted by AI from your schedule’s calculated figures. Review them before you send them; the figures they quote come from the schedule, and the wording comes from the model.</p>
         <div className="grid md:grid-cols-2 gap-4">
           {[
-            { icon: BarChart3,     title: 'Executive Schedule Summary',        desc: 'High-level narrative with status, variance, key findings, and recommendations.' },
-            { icon: Activity,      title: 'Critical & Near-Critical Paths',     desc: 'Driving activities, float consumption, path sequences, and near-critical analysis.' },
-            { icon: FileText,      title: 'Baseline vs Current Variance',       desc: 'Milestone-by-milestone comparison with variance breakdown and cause categories.' },
-            { icon: CheckCircle,   title: 'Schedule QA/QC Audit',               desc: 'DCMA 14-point compliance check with logic issues and specific fixes.' },
+            { icon: BarChart3,     title: 'Executive Schedule Summary',     desc: 'Status, key dates, findings and recommendations in plain language.' },
+            { icon: Activity,      title: 'Critical Path Report',           desc: 'Driving activities, float and low-float paths from the CPM calculation.' },
+            { icon: FileText,      title: 'Baseline vs Current Variance',   desc: 'Compares current dates with the baseline stored in your P6 or MS Project file.' },
+            { icon: CheckCircle,   title: 'Schedule QA/QC Report',          desc: 'The DCMA 14-Point results, with the issues and suggested fixes.' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="bg-warm-100 border border-warm-200 rounded-lg p-5 hover:border-warm-300 transition-colors">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center mb-4">
@@ -206,14 +201,14 @@ export default function HomePage() {
             <div className="bg-warm-50 border border-warm-200 rounded-lg p-7">
               <div className="text-[11px] font-bold uppercase tracking-wider text-warm-400 mb-2">Free</div>
               <div className="text-[36px] font-bold text-navy-950">$0<span className="text-[15px] font-medium text-warm-400">/month</span></div>
-              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For individual PMs trying AI schedule analysis.</p>
+              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For trying Planora on real projects.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Up to 3 schedules', 'Executive Summary report', '10 AI questions/day', 'P6, MS Project, PDF import', 'Roles, 2-step verification & audit log', 'API keys & signed webhooks'].map(f => (
+                {['Up to 3 uploaded schedules', 'Unlimited interview-built schedules', 'Executive Summary report', '10 AI requests/day', 'Export to P6, MS Project & CSV', 'Roles, 2-step verification & audit log'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
                 ))}
-                {['Critical Path & Variance reports', 'Export to PDF & Excel'].map(f => (
+                {['Critical Path, Variance & QA/QC reports', 'Export to PDF & Excel', 'API keys & webhooks'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-500">
                     <span aria-hidden="true">—</span><span className="line-through decoration-warm-300">{f}</span><span className="sr-only">(not included)</span>
                   </li>
@@ -225,19 +220,18 @@ export default function HomePage() {
             </div>
 
             <div className="bg-warm-50 border-2 border-accent-500 rounded-lg p-7 relative">
-              <div className="absolute -top-3 left-6 bg-accent-500 text-navy-950 text-[11px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-md">Most Popular</div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-warm-400 mb-2">Pro</div>
               <div className="text-[36px] font-bold text-navy-950">$49<span className="text-[15px] font-medium text-warm-400">/month</span></div>
-              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For PMs and schedulers who need full capabilities.</p>
+              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For schedulers and consultants who need every report and export.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Unlimited schedules', 'All 4 report types', 'Up to 1,000 AI questions/day', 'P6, MS Project, PDF, Excel import', 'Monte Carlo schedule risk analysis', 'Export to P6, MS Project, PDF & Excel', 'Roles, 2-step verification & audit log'].map(f => (
+                {['Unlimited uploaded schedules', 'All 4 report types', 'Up to 1,000 AI requests/day', 'Export to P6, MS Project, PDF & Excel', 'Monte Carlo schedule risk analysis', 'API keys & signed webhooks', 'Roles, 2-step verification & audit log'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
                 ))}
               </ul>
               <Link href="/auth?mode=signup" className="block text-center bg-accent-500 text-navy-950 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-400 transition-colors">
-                Get Started
+                Start free, then upgrade
               </Link>
             </div>
 
@@ -246,7 +240,7 @@ export default function HomePage() {
               <div className="text-[36px] font-bold text-navy-950">Custom</div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For organizations deploying across teams.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Dedicated support'].map(f => (
+                {['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Support by email from the founder'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>
@@ -261,11 +255,30 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Evidence: how each figure on this page can be checked */}
+      <section id="evidence" className="max-w-[860px] mx-auto px-6 pt-16">
+        <h2 className="font-display text-[26px] text-navy-950 mb-3">Where these numbers come from</h2>
+        <p className="text-[14px] text-warm-600 mb-5">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
+        <dl className="divide-y divide-warm-200 border-y border-warm-200 text-[13.5px]">
+          {[
+            ['14 of 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
+            ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
+            ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves Planora’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
+            ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
+          ].map(([term, def]) => (
+            <div key={term} className="py-3.5 grid md:grid-cols-[200px_1fr] gap-1 md:gap-6">
+              <dt className="font-semibold text-navy-950">{term}</dt>
+              <dd className="text-warm-600">{def}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       {/* CTA */}
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="bg-navy-900 rounded-lg px-8 py-16 text-center">
-          <h2 className="font-display text-[30px] text-white mb-4">Stop waiting for schedule reports.</h2>
-          <p className="text-white/60 mb-8 text-[15px]">Upload your first P6 or MS Project file and get instant AI-powered analysis.</p>
+          <h2 className="font-display text-[30px] text-white mb-4">Build or check your next schedule today.</h2>
+          <p className="text-white/70 mb-8 text-[15px]">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
           <Link href="/auth?mode=signup" className="inline-block bg-accent-500 text-navy-950 px-10 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
             Get Started Free
           </Link>
@@ -281,7 +294,7 @@ export default function HomePage() {
               <div className="mb-3">
                 <Logo variant="light" size="text-[18px]" />
               </div>
-              <p className="text-white/70 text-[13px] leading-relaxed max-w-[240px]">AI Schedule Analysis for Construction. Built by Hoshmand AI.</p>
+              <p className="text-white/70 text-[13px] leading-relaxed max-w-[240px]">Construction scheduling, explained. Built by Hoshmand AI.</p>
             </div>
             <div>
               <div className="text-white text-[11px] font-bold uppercase tracking-wider mb-3">Product</div>
@@ -302,7 +315,6 @@ export default function HomePage() {
           </div>
           <div className="border-t border-white/5 pt-5 flex flex-col md:flex-row items-center justify-between gap-2">
             <span className="text-white/60 text-[12px]">© 2026 Planora. Built by Hoshmand AI. All rights reserved.</span>
-            <span className="text-white/60 text-[12px]">Built in Virginia</span>
           </div>
         </div>
       </footer>
