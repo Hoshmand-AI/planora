@@ -172,6 +172,7 @@ describe('withheld answers never reach a model', () => {
 
 describe('webhooks and API keys', () => {
   it('refuses private, loopback, link-local and metadata destinations', async () => {
+    delete process.env.PLANORA_ALLOW_INSECURE_WEBHOOKS // a test-only escape hatch must not leak into this check
     const { isPrivateAddress, urlProblem } = await import('./webhooks')
     for (const ip of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.5.4', '192.168.1.1', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '224.0.0.1'])
       expect(isPrivateAddress(ip), ip).toBe(true)

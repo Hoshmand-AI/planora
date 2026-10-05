@@ -16,8 +16,8 @@ const dmSerifDisplay = DM_Serif_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'Planora — AI Schedule Analysis for Construction',
-  description: 'Upload your Primavera P6 or MS Project schedule and get instant AI-powered analysis, delay insights, and executive reports.',
+  title: 'Planora — Construction scheduling, explained',
+  description: 'Build and check construction schedules with a written basis for every duration and link, the DCMA 14-Point Assessment, and native Primavera P6 and MS Project export.',
   keywords: 'Planora, construction scheduling, Primavera P6, MS Project, critical path, schedule analysis, AI, CPM',
 }
 
