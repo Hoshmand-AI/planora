@@ -75,7 +75,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
         {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
           <div className="space-y-4 text-[13px] text-warm-700">
             <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
-              <a className="underline text-navy-950" href={`/api/schedules/compare?id=${scheduleId}${base ? `&base=${base}` : ''}&format=csv`}>Download differences (CSV)</a></p>
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Largest float erosion (work days)</caption>
