@@ -327,6 +327,8 @@ export interface Activity {
   actualStart: string | null; actualFinish: string | null; baselineStart: string | null; baselineFinish: string | null
   totalFloat: number; freeFloat: number; isCritical: boolean
   status: 'not_started' | 'in_progress' | 'complete'; activityType: 'task' | 'milestone' | 'loe' | 'summary'
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone; null when the source does not say */
+  milestoneKind?: 'start' | 'finish' | null
   /** Source calendar id (as referenced in the schedule's calendars list) */
   calendarId?: string | null
   constraintType?: string | null; constraintDate?: string | null
@@ -334,8 +336,6 @@ export interface Activity {
   category?: string | null
   /** Source-system id (P6 task_id, MSP UID) used to resolve relationships */
   sourceId?: string | null
-  /** P6 milestone type: TT_FinMile -> 'finish', TT_Mile -> 'start'; null when the source has none */
-  milestoneKind?: 'start' | 'finish' | null
 }
 
 function rowToActivity(row: Record<string, unknown>): Activity {
@@ -346,9 +346,9 @@ function rowToActivity(row: Record<string, unknown>): Activity {
     actualStart: row.actual_start as string | null, actualFinish: row.actual_finish as string | null, baselineStart: row.baseline_start as string | null, baselineFinish: row.baseline_finish as string | null,
     totalFloat: Number(row.total_float), freeFloat: Number(row.free_float), isCritical: Boolean(row.is_critical),
     status: row.status as Activity['status'], activityType: row.activity_type as Activity['activityType'],
+    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
     calendarId: (row.calendar_id as string) ?? null, constraintType: (row.constraint_type as string) ?? null, constraintDate: (row.constraint_date as string) ?? null,
     category: (row.category as string) ?? null, sourceId: (row.source_id as string) ?? null,
-    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
   }
 }
 

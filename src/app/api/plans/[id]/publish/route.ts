@@ -36,6 +36,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
   const profile = profileFrom(plan.answers)
   const t = g.cpm.times
   const idMap = new Map(g.activities.map(a => [a.id, `${scheduleId}:${a.id}`]))
+  const hasPred = new Set(g.links.map(l => l.to))
   const activities: Activity[] = g.activities.map(a => ({
     id: idMap.get(a.id)!, scheduleId, activityId: a.code, name: a.name, wbs: a.phase,
     duration: a.duration, remainingDuration: a.duration, percentComplete: 0,
@@ -46,6 +47,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
     baselineStart: t[a.id]?.earlyStart ?? null, baselineFinish: t[a.id]?.earlyFinish ?? null,
     totalFloat: t[a.id]?.totalFloat ?? 0, freeFloat: t[a.id]?.freeFloat ?? 0, isCritical: !!t[a.id]?.critical,
     status: 'not_started', activityType: a.type,
+    milestoneKind: a.type === 'milestone' ? (a.milestoneKind ?? (hasPred.has(a.id) ? 'finish' : 'start')) : null,
     calendarId: a.calendarId ?? g.defaultCalendarId, constraintType: a.constraint?.type ?? null, constraintDate: a.constraint?.date ?? null,
     category: a.category, sourceId: a.id,
   }))

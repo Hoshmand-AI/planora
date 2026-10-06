@@ -396,16 +396,18 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       const a = inp?.activities.find((x) => x.id === id)
       return a && !a.actualFinish && (a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO') ? a : null
     }
-    const pinnedOnPath = (base?.longestPath ?? []).map(mandatory).filter((a): a is CpmActivity => !!a)
+    // The longest path stops at a mandatory constraint; test the path logic alone would drive.
+    const path = base?.logicLongestPath?.length ? base.logicLongestPath : (base?.longestPath ?? [])
+    const pinnedOnPath = [...(base?.longestPathConstraint ? [base.longestPathConstraint.id] : []), ...path].filter((id, i, all) => all.indexOf(id) === i).map(mandatory).filter((a): a is CpmActivity => !!a)
     const pinnedAny = pinnedOnPath.length ? pinnedOnPath : (base?.violations ?? []).map((v) => mandatory(v.id)).filter((a): a is CpmActivity => !!a)
     const pinText = (list: CpmActivity[]) => list.slice(0, 3).map((a) => `${a.code} (${a.constraint!.type === 'MSO' ? 'Mandatory Start' : 'Mandatory Finish'} ${fmtDate(a.constraint!.date)})`).join(', ')
     let result: DcmaCheck | null = null
-    if (inp && base && base.longestPath.length) {
+    if (inp && base && path.length) {
       // Test the longest path from its first open task that has a successor (adding time to a dangling
       // end activity would move the finish trivially and prove nothing).
       const withSucc = new Set(inp.links.map((l) => l.from))
       const openIds = new Set(inp.activities.filter((a) => !a.actualFinish && a.type === 'task' && withSucc.has(a.id)).map((a) => a.id))
-      const targetId = base.longestPath.find((id) => openIds.has(id))
+      const targetId = path.find((id) => openIds.has(id))
       if (targetId) {
         const target = inp.activities.find((a) => a.id === targetId)!
         const bumped: CpmInput = {

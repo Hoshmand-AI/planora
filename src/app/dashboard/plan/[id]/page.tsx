@@ -56,9 +56,31 @@ export default function PlanPage() {
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
   const [conflict, setConflict] = useState(false)
   // Monte Carlo result for the plan version on screen; when present it is THE forecast shown everywhere.
+  // Fetched as soon as the plan version has a schedule (not only when the Evaluation tab opens), so
+  // the header shows the same Monte Carlo P50/P80 as the Basis of Schedule and the PDF.
   const [sra, setSra] = useState<Sra | null>(null)
+  const [sraState, setSraState] = useState<SraState>('idle')
   const planVersion = view?.plan.version
-  useEffect(() => { setSra(null) }, [planVersion])
+  const hasCpm = !!view?.plan.generated?.cpm
+  const versionRef = useRef(planVersion)
+  versionRef.current = planVersion
+  const runSra = useCallback(async () => {
+    const forVersion = versionRef.current
+    setSraState('running')
+    try {
+      const res = await fetch(`/api/plans/${id}/risk`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      // A result for an older version must never be shown as this version's forecast.
+      if (versionRef.current === forVersion) setSra(data)
+      setSraState('idle')
+    } catch { setSraState('error') }
+  }, [id])
+  useEffect(() => {
+    setSra(null)
+    setSraState('idle')
+    if (hasCpm) runSra()
+  }, [planVersion, hasCpm, runSra])
   const { can } = useApp()
   const stickyRef = useRef<HTMLDivElement>(null)
   const [stickyTop, setStickyTop] = useState(0)
@@ -178,7 +200,7 @@ export default function PlanPage() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-[13px] text-warm-600">
           <HeaderStat label="Questions that matter" value={view.adaptive.enoughToBuild ? 'none left' : String(view.adaptive.remainingThatMatter)} onClick={() => setTab('interview')} />
           {g?.cpm && <HeaderStat label="Finish" value={fmtDate(g.cpm.projectFinish)} onClick={() => setTab('schedule')} />}
-          {fc && <HeaderStat label={`P80 (${fc.short})`} value={fmtDate(fc.p80)} onClick={goEvaluation} />}
+          {fc && <HeaderStat label={fc.method === 'monte_carlo' ? 'Monte Carlo P50/P80' : 'Rule-based P50/P80'} value={`${fmtDate(fc.p50)} / ${fmtDate(fc.p80)}`} onClick={goEvaluation} />}
           {ev && <HeaderStat label="Quality" value={`${ev.grade} · ${ev.score}`} onClick={goEvaluation} />}
           {ev && <HeaderStat label="DCMA" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} tone={failing ? 'warn' : undefined} onClick={goEvaluation} />}
           {lateDays > 0 && (
@@ -240,7 +262,7 @@ export default function PlanPage() {
         }
         return false
       }} onRegenerateFresh={() => generate(true)} busy={busy} recovery={view.recovery} onRecover={recover} onInterview={() => setTab('interview')} focusCodes={focusCodes} onClearFocus={() => setFocusCodes(null)} />}
-      {tab === 'evaluation' && g && ev && <EvaluationTab ev={ev} plan={plan} sra={sra} onSra={setSra} busy={busy} guidance={view.guidance} recovery={view.recovery} onRecover={recover} onDecide={decide} onShowCodes={showCodes} onInterview={() => setTab('interview')} onReview={async (body) => { const d = await call('review', `/api/plans/${id}/review`, { method: 'POST', body: JSON.stringify(body) }); if (d) setNotice('Review recorded.'); return !!d }} />}
+      {tab === 'evaluation' && g && ev && <EvaluationTab ev={ev} plan={plan} sra={sra} sraState={sraState} onRunSra={runSra} busy={busy} guidance={view.guidance} recovery={view.recovery} onRecover={recover} onDecide={decide} onShowCodes={showCodes} onInterview={() => setTab('interview')} onReview={async (body) => { const d = await call('review', `/api/plans/${id}/review`, { method: 'POST', body: JSON.stringify(body) }); if (d) setNotice('Review recorded.'); return !!d }} />}
       {tab === 'audit' && <AuditTab plan={plan} onDelete={can('plan.write') ? remove : undefined} fullLog={can('audit.read')} />}
     </div>
   )
@@ -618,8 +640,8 @@ function LinkRow({ l, other, dir, onEdit, busy }: { l: PlanLink; other?: PlanAct
 
 type Guide = View['guidance'][number]
 
-function EvaluationTab({ ev, plan, sra, onSra, busy, onReview, guidance, recovery, onRecover, onDecide, onShowCodes, onInterview }: {
-  ev: Evaluation; plan: Plan; sra: Sra | null; onSra: (r: Sra | null) => void; busy: string | null; onReview: (b: Record<string, string>) => Promise<boolean>
+function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guidance, recovery, onRecover, onDecide, onShowCodes, onInterview }: {
+  ev: Evaluation; plan: Plan; sra: Sra | null; sraState: SraState; onRunSra: () => void; busy: string | null; onReview: (b: Record<string, string>) => Promise<boolean>
   guidance: Guide[]; recovery: RecoveryPlan | null; onRecover: (id: string) => void
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
   onShowCodes: (codes: string[]) => void; onInterview: () => void
@@ -644,7 +666,7 @@ function EvaluationTab({ ev, plan, sra, onSra, busy, onReview, guidance, recover
           : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis below has run. Basis: {ev.forecast.basis}</>}
       </p>
 
-      <RiskPanel planId={plan.id} r={sra} onResult={onSra} />
+      <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
 
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
 
@@ -833,21 +855,12 @@ interface Sra {
   criticality: { id: string; code: string; name: string; index: number }[]
   sensitivity: { id: string; code: string; name: string; correlation: number; criticality: number; basis: string }[]
   assumptions: string[]
+  warnings?: string[]
 }
+type SraState = 'idle' | 'running' | 'error'
 
-function RiskPanel({ planId, r, onResult }: { planId: string; r: Sra | null; onResult: (r: Sra | null) => void }) {
-  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle')
-  const run = useCallback(async () => {
-    setState('running')
-    try {
-      const res = await fetch(`/api/plans/${planId}/risk`)
-      if (!res.ok) throw new Error()
-      onResult(await res.json()); setState('idle')
-    } catch { setState('error') }
-  }, [planId, onResult])
-  // Run once when the evaluation opens, so the forecast shown is the simulation rather than the quick estimate.
-  // (Also after an edit, which clears the result; a failed run waits for the button.)
-  useEffect(() => { if (!r && state === 'idle') run() }, [r, state, run])
+/** The simulation is run by the page for each plan version (see PlanPage); this panel shows it. */
+function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; onRun: () => void }) {
   const max = r ? Math.max(...r.histogram.map(h => h.count)) : 1
   const pct = (x: number) => `${Math.round(x * 100)}%`
   return (
@@ -870,6 +883,7 @@ function RiskPanel({ planId, r, onResult }: { planId: string; r: Sra | null; onR
               </div>
             ))}
           </div>
+          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12.5px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
           {r.required && (
             <p className="text-[13px] text-warm-700">
               Chance of finishing by the required {fmtDate(r.required.date)}: <span className={`font-semibold ${r.required.probability >= 0.8 ? 'text-status-on-track' : r.required.probability >= 0.5 ? 'text-status-attention' : 'text-status-at-risk'}`}>{pct(r.required.probability)}</span>

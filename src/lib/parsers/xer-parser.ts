@@ -121,7 +121,12 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     if (status === 'complete' && pct === 0) pct = 100
 
     let activityType: Activity['activityType'] = 'task'
-    if (t['task_type'] === 'TT_Mile' || t['task_type'] === 'TT_FinMile') activityType = 'milestone'
+    let milestoneKind: Activity['milestoneKind'] = null
+    if (t['task_type'] === 'TT_Mile' || t['task_type'] === 'TT_FinMile') {
+      activityType = 'milestone'
+      // P6 start milestones (TT_Mile) occur at the start of their day, finish milestones at the end
+      milestoneKind = t['task_type'] === 'TT_Mile' ? 'start' : 'finish'
+    }
     else if (t['task_type'] === 'TT_LOE') activityType = 'loe'
     else if (t['task_type'] === 'TT_WBS') activityType = 'summary'
 
@@ -163,11 +168,11 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
       isCritical: t['driving_path_flag'] === 'Y' || (tf !== null && tf <= 0 && status !== 'complete'),
       status,
       activityType,
+      milestoneKind,
       calendarId: clndrId || null,
       constraintType,
       constraintDate: constraintType ? constraintDate : null,
       sourceId: t['task_id'] || null,
-      milestoneKind: t['task_type'] === 'TT_FinMile' ? 'finish' : t['task_type'] === 'TT_Mile' ? 'start' : null,
     })
     if (t['task_id']) byTaskId.set(t['task_id'], a)
     return a
@@ -184,8 +189,8 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     }
     const t = (p['pred_type'] || 'PR_FS').replace('PR_', '')
     const type: Relationship['type'] = t === 'SS' || t === 'FF' || t === 'SF' ? t : 'FS'
-    // P6 lag is measured on the successor's calendar by default
-    const lag = round2((parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(succ.calendarId))
+    // P6's default lag calendar is the predecessor's ("Calendar for scheduling relationship lag")
+    const lag = round2((parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(pred.calendarId))
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
 

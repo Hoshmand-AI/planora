@@ -26,6 +26,7 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
       duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
       remaining: a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : undefined,
       type: a.activityType === 'milestone' ? 'milestone' : 'task',
+      milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
       calendarId: a.calendarId && calendars.some(c => c.id === a.calendarId) ? a.calendarId : defaultCalendarId,
       constraint: a.constraintType && CSTR.has(a.constraintType) && a.constraintDate ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : undefined,
       actualStart: a.actualStart, actualFinish: a.actualFinish,
