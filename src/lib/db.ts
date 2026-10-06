@@ -217,6 +217,8 @@ export interface Schedule {
   projectKey?: string | null
   /** Whether this schedule's actuals calibrate firm history */
   inHistory?: boolean
+  /** Contract/finish milestone the scheduler designated (activity id or activity code); null = automatic */
+  finishMilestoneId?: string | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -231,6 +233,7 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     grossSqft: row.gross_sqft != null ? Number(row.gross_sqft) : null,
     analysis: (row.analysis as ScheduleAnalysis) ?? null, projectKey: (row.project_key as string) ?? null,
     inHistory: row.in_history == null ? true : Boolean(row.in_history),
+    finishMilestoneId: (row.finish_milestone_id as string) ?? null,
   }
 }
 
@@ -262,6 +265,12 @@ export async function updateScheduleAnalysis(id: string, orgId: string, a: { ana
   await initSchema()
   await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
     [id, orgId, JSON.stringify(a.analysis), a.projectFinish, a.varianceDays, a.criticalCount])
+}
+
+/** Designate (or clear, with null) the schedule's contract/finish milestone. */
+export async function setScheduleFinishMilestone(id: string, orgId: string, finishMilestoneId: string | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET finish_milestone_id=$3 WHERE id=$1 AND org_id=$2', [id, orgId, finishMilestoneId])
 }
 
 export async function setScheduleInHistory(id: string, orgId: string, inHistory: boolean): Promise<void> {
@@ -325,6 +334,8 @@ export interface Activity {
   category?: string | null
   /** Source-system id (P6 task_id, MSP UID) used to resolve relationships */
   sourceId?: string | null
+  /** P6 milestone type: TT_FinMile -> 'finish', TT_Mile -> 'start'; null when the source has none */
+  milestoneKind?: 'start' | 'finish' | null
 }
 
 function rowToActivity(row: Record<string, unknown>): Activity {
@@ -337,6 +348,7 @@ function rowToActivity(row: Record<string, unknown>): Activity {
     status: row.status as Activity['status'], activityType: row.activity_type as Activity['activityType'],
     calendarId: (row.calendar_id as string) ?? null, constraintType: (row.constraint_type as string) ?? null, constraintDate: (row.constraint_date as string) ?? null,
     category: (row.category as string) ?? null, sourceId: (row.source_id as string) ?? null,
+    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
   }
 }
 
@@ -360,8 +372,8 @@ async function bulkInsert(table: string, columns: string[], rows: unknown[][]) {
 export async function createActivities(activities: Activity[]): Promise<void> {
   await initSchema()
   await bulkInsert('activities',
-    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id'],
-    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null]))
+    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id', 'milestone_kind'],
+    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null, a.milestoneKind ?? null]))
 }
 
 export interface Relationship {

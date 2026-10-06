@@ -413,7 +413,10 @@ export function checkAnswerDates(answers: Record<string, Answer>, permits: Permi
   for (const m of ALL_MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
   if (finish) pts.push({ id: 'project.required_finish', label: 'Required completion', date: finish, rank: 6 })
   for (const a of pts) for (const b of pts) {
-    if (a.rank < b.rank && b.date <= a.date) {
+    // The required completion is usually the Substantial Completion date itself (and may equal the
+    // other completion-stage milestones), so only a required completion BEFORE them is a conflict.
+    const sameDayOk = b.id === 'project.required_finish' && a.rank >= 4
+    if (a.rank < b.rank && (sameDayOk ? b.date < a.date : b.date <= a.date)) {
       out.push({ questionIds: [a.id, b.id], severity: 'error', text: `“${b.label}” (${f(b.date)}) is on or before “${a.label}” (${f(a.date)}). ${b.label} can't happen until ${a.label.toLowerCase()} — one of these dates needs to change.` })
     }
   }

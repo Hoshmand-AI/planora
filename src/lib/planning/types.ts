@@ -440,6 +440,8 @@ export interface AnalyzableActivity {
   totalFloat?: number | null
   constraint?: { type: ConstraintType | string; date?: string | null } | null
   resourceCount?: number
+  /** P6 milestone type (TT_FinMile = 'finish', TT_Mile = 'start') when the source carries it */
+  milestoneKind?: 'start' | 'finish' | null
 }
 
 export interface AnalyzableSchedule {
@@ -450,6 +452,10 @@ export interface AnalyzableSchedule {
   links: CpmLink[]
   calendars: WorkCalendar[]
   defaultCalendarId?: string | null
+  /** Required finish (P6 Must Finish By); a target for the finish milestone in CPLI */
+  mustFinishBy?: string | null
+  /** Contract/finish milestone the scheduler designated (activity id or code) */
+  finishMilestoneId?: string | null
 }
 
 export type CheckResult = 'pass' | 'fail' | 'warn' | 'n/a'
@@ -460,7 +466,7 @@ export interface DcmaCheck {
   metric: string      // e.g. "3.2%"
   threshold: string   // e.g. "≤ 5%"
   result: CheckResult
-  offenders: string[] // activity codes (capped)
+  offenders: string[] // activity codes (every offender, de-duplicated)
   explanation: string
 }
 

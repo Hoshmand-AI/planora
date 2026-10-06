@@ -167,6 +167,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
       constraintType,
       constraintDate: constraintType ? constraintDate : null,
       sourceId: t['task_id'] || null,
+      milestoneKind: t['task_type'] === 'TT_FinMile' ? 'finish' : t['task_type'] === 'TT_Mile' ? 'start' : null,
     })
     if (t['task_id']) byTaskId.set(t['task_id'], a)
     return a
