@@ -4,6 +4,7 @@
 import type { ConstraintType, GeneratedSchedule, LinkType, PlanActivity, WorkCalendar } from '@/lib/planning/types'
 import { compileCalendar, toDayNumber } from '@/lib/planning/calendar'
 import { buildWbs, type WbsNode } from './wbs'
+import { markedTitle, type ExportMarking } from './markings'
 
 const MSP_LINK_TYPE: Record<LinkType, number> = { FF: 0, FS: 1, SF: 2, SS: 3 }
 // MS Project has no two-sided "Start On"/"Finish On"; its Must Start/Finish On is the closest match.
@@ -159,7 +160,8 @@ function outline(s: GeneratedSchedule, projectName: string): OutlineLine[] {
   return lines
 }
 
-export function exportMspXml(s: GeneratedSchedule, projectName: string): string {
+export function exportMspXml(s: GeneratedSchedule, projectName: string, opts: { marking?: ExportMarking | null } = {}): string {
+  const mk = opts.marking ?? null
   const calendars: WorkCalendar[] = s.calendars.length
     ? s.calendars
     : [{ id: 'standard', name: 'Standard', workDays: [1, 2, 3, 4, 5], hoursPerDay: 8, holidays: [] }]
@@ -187,7 +189,9 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string): string 
   const h = '  '
   x += tag('SaveVersion', 14, h)
   x += tag('Name', projectName, h)
-  x += tag('Title', projectName, h)
+  // CUI: the banner leads the Title, the designation is the Subject and the project summary task's Notes.
+  x += tag('Title', markedTitle(projectName, mk), h)
+  if (mk) x += tag('Subject', `${mk.banner}. ${mk.designation.join('; ')}`, h)
   x += tag('CreationDate', `${String(s.generatedAt || '').slice(0, 10) || s.projectStart}T00:00:00`, h)
   x += tag('ScheduleFromStart', 1, h)
   x += tag('StartDate', `${s.projectStart}T${dayStartTime(hpd0)}`, h)
@@ -211,7 +215,7 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string): string 
 
   const i = '      '
   const compiled = compileCalendar(defaultCal)
-  const summaryTask = (uid: number, id: number, name: string, wbs: string, num: string, level: number, start: string | null, fin: string | null, critical: boolean) => {
+  const summaryTask = (uid: number, id: number, name: string, wbs: string, num: string, level: number, start: string | null, fin: string | null, critical: boolean, notes?: string) => {
     let t = '    <Task>\n'
     t += tag('UID', uid, i)
     t += tag('ID', id, i)
@@ -233,12 +237,13 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string): string 
     t += tag('Critical', critical ? 1 : 0, i)
     t += tag('ConstraintType', 0, i)
     t += tag('CalendarUID', -1, i)
+    if (notes) t += tag('Notes', notes, i)
     return t + '    </Task>\n'
   }
 
   x += `${h}<Tasks>\n`
   // UID 0 is MS Project's project summary task; it carries the project name.
-  x += summaryTask(0, 0, projectName, '0', '0', 0, s.projectStart, finish ?? null, false)
+  x += summaryTask(0, 0, projectName, '0', '0', 0, s.projectStart, finish ?? null, false, mk ? [mk.banner, ...mk.designation, mk.banner].join('\n') : undefined)
   let nextSummaryUid = s.activities.length + 1
   lines.forEach((ln, idx) => {
     const id = idx + 1

@@ -183,6 +183,8 @@ export default function DashboardPage() {
         <ScheduleTools scheduleId={selectedSchedule.id}
           progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
           inHistory={selectedSchedule.inHistory ?? true}
+          version={selectedSchedule.version} classification={selectedSchedule.classification ?? null}
+          origin={selectedSchedule.uploadOrigin ?? null} historyOverride={selectedSchedule.historyOverride ?? false}
           onChanged={() => { refreshSchedules(); refreshMetrics() }} />
       )}
 

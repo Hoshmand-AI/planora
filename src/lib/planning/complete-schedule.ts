@@ -46,7 +46,9 @@ export function completeSchedule(input: {
   progressMode?: ProgressMode
 }): CompletionResult {
   const { relationships, calendars } = input
-  const activities = input.activities.map(a => ({ ...a }))
+  // Level of effort and WBS summary activities are never critical (nor counted or listed as such),
+  // whatever the file says: their dates follow other work, they do not drive it.
+  const activities = input.activities.map(a => (a.activityType === 'loe' || a.activityType === 'summary' ? { ...a, isCritical: false } : { ...a }))
   const hasLogic = relationships.length > 0
   const earliest = activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()[0] || null
   const latest = activities.map(a => a.actualFinish || a.earlyFinish).filter((d): d is string => !!d).sort().pop() || null

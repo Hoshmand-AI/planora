@@ -8,6 +8,7 @@ import type { GeneratedSchedule } from '@/lib/planning/types'
 import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import { buildWbs } from './wbs'
 import { fmtDate, fmtDates } from '@/lib/format'
+import type { ExportMarking } from './markings'
 
 const W = 1224, H = 792 // 17 × 11 in
 const M = 28
@@ -45,7 +46,8 @@ function wrap(text: string, font: PDFFont, size: number, max: number): string[] 
   return out
 }
 
-export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string; sra?: SraResult } = {}): Promise<Uint8Array> {
+export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string; sra?: SraResult; marking?: ExportMarking | null } = {}): Promise<Uint8Array> {
+  const mk = opts.marking ?? null
   const doc = await PDFDocument.create()
   doc.setTitle(`${projectName} — Schedule`)
   doc.setProducer('Planora')
@@ -56,6 +58,12 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   const printed = fmtDate(new Date().toISOString())
 
   const footer = (p: PDFPage, n: number) => {
+    if (mk) {
+      // CUI banner marking, centered at the top and bottom of every page.
+      const bw = bold.widthOfTextAtSize(mk.banner, 10)
+      p.drawText(mk.banner, { x: (W - bw) / 2, y: H - 16, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
+      p.drawText(mk.banner, { x: (W - bw) / 2, y: 27, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
+    }
     p.drawLine({ start: { x: M, y: 24 }, end: { x: W - M, y: 24 }, thickness: 0.5, color: LINE })
     p.drawText(pdfSafe(`${projectName} · Data date ${fmtDate(s.projectStart)} · Printed ${printed} · Planora`), { x: M, y: 12, size: 7, font, color: GREY })
     p.drawText(`Page ${n}`, { x: W - M - 40, y: 12, size: 7, font, color: GREY })
@@ -66,7 +74,12 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   {
     const p = doc.addPage([W, H]); pageNo++
     let y = H - M - 10
-    p.drawText(fit(projectName, bold, 22, W - 2 * M), { x: M, y, size: 22, font: bold, color: NAVY }); y -= 20
+    p.drawText(fit(projectName, bold, 22, W - 2 * M - (mk ? 330 : 0)), { x: M, y, size: 22, font: bold, color: NAVY })
+    if (mk) {
+      // Designation indicator block, top right of the first page.
+      mk.designation.forEach((l, i) => p.drawText(fit(l, i === 0 ? bold : font, 7.5, 320), { x: W - M - 320, y: y + 12 - i * 10, size: 7.5, font: i === 0 ? bold : font, color: rgb(0.29, 0.27, 0.24) }))
+    }
+    y -= 20
     p.drawText(pdfSafe(`Schedule report · prepared ${printed}${opts.preparedBy ? ' by ' + opts.preparedBy : ''}`), { x: M, y, size: 10, font, color: GREY }); y -= 30
     // One forecast: Monte Carlo when available, otherwise the rule-based estimate, labeled as such.
     const fc = headlineForecast(ev?.forecast, opts.sra)
@@ -158,7 +171,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   const newPage = () => { if (p) footer(p, pageNo); p = doc.addPage([W, H]); pageNo++; pageHeader(p); y = top - ROW }
   newPage()
   for (const r of rows) {
-    if (y < 34) newPage()
+    if (y < (mk ? 44 : 34)) newPage()
     const pg = p as unknown as PDFPage
     const isWbs = r.kind === 'wbs'
     const lvl = r.level

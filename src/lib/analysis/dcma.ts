@@ -56,6 +56,10 @@ export function normalizeDcmaRules(raw: unknown): DcmaRules {
   return { maxPct: n('maxPct', 1, 25), minFsPct: n('minFsPct', 50, 100), highFloatDays: n('highFloatDays', 10, 260), highDurationDays: n('highDurationDays', 5, 260), indexTarget: n('indexTarget', 0.8, 1, 0.01) }
 }
 const HARD_CONSTRAINTS = new Set(['MSO', 'MFO', 'SO', 'FO', 'SNLT', 'FNLT'])
+const CONSTRAINT_LABEL: Record<string, string> = {
+  SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before',
+  SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish',
+}
 
 export function isCompleteActivity(a: AnalyzableActivity): boolean {
   return !!a.actualFinish || a.status === 'complete' || (a.percentComplete ?? 0) >= 100
@@ -420,20 +424,48 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
         }
         try {
           const after = runCpm(bumped)
-          const cal = (target.calendarId && calById.get(target.calendarId)) || defaultCal
+          const calOf = (id: string | undefined) => {
+            const a = id ? inp.activities.find((x) => x.id === id) : undefined
+            return (a?.calendarId && calById.get(a.calendarId)) || defaultCal
+          }
+          const cal = calOf(targetId)
+          const endId = base.longestPath[base.longestPath.length - 1] ?? path[path.length - 1]
+          // Counted in the target's work days, and in the finish activity's: seasonal shutdowns or other
+          // nonwork periods that only one of the calendars has make the two counts differ.
           const delta = workDaysBetween(base.projectFinish, after.projectFinish, cal)
-          // A 600-day shift moves work into different years, so holiday placement and 5-day/7-day
-          // calendar transitions add a little noise; a broken path absorbs far more than 2%.
-          const ok = Math.abs(delta - CP_TEST_DAYS) <= tol
+          const deltaAtFinish = workDaysBetween(base.projectFinish, after.projectFinish, calOf(endId))
+          const within = (d: number) => Math.abs(d - CP_TEST_DAYS) <= tol
+          // Continuity itself: after the delay the target still drives the same finish activity through
+          // the longest path and the finish moved. Holds whatever nonwork periods the calendars add.
+          const afterEnd = after.longestPath[after.longestPath.length - 1]
+          const drives = after.longestPath.includes(targetId) && afterEnd === endId && toDayNumber(after.projectFinish) > toDayNumber(base.projectFinish)
+          const ok = within(delta) || within(deltaAtFinish) || drives
+          const calNote = !within(delta) && ok
+            ? ` (${delta} work days on ${target.code}'s calendar${deltaAtFinish !== delta ? `, ${deltaAtFinish} on the finish activity's` : ''}: the calendars' nonwork periods, such as seasonal shutdowns, account for the difference, and ${target.code} still drives the finish)`
+            : ''
           const moved = delta === CP_TEST_DAYS
             ? 'pushed the project finish by the same amount'
-            : `pushed the project finish by ${delta} work days (within the ${tol}-day allowance for holidays and calendar changes over that span)`
+            : `pushed the project finish by ${delta} work days${calNote || ` (within the ${tol}-day allowance for holidays and calendar changes over that span)`}`
+          // Where the delay stopped: the first activity after the target on the path whose finish moved
+          // less than half as far (calendar days) as the target's, and the constraint on it, if any.
+          const calShift = (id: string) => {
+            const b = base.times[id], x = after.times[id]
+            return b && x ? toDayNumber(x.earlyFinish) - toDayNumber(b.earlyFinish) : 0
+          }
+          const targetShift = calShift(targetId)
+          const stopId = ok ? undefined : path.slice(path.indexOf(targetId) + 1).find((id) => calShift(id) < targetShift / 2)
+          const stopAct = stopId ? inp.activities.find((x) => x.id === stopId) : undefined
+          const stopText = stopAct
+            ? stopAct.constraint
+              ? `the delay stops at ${stopAct.code}, held by its ${CONSTRAINT_LABEL[stopAct.constraint.type] ?? stopAct.constraint.type} constraint ${fmtDate(stopAct.constraint.date)}`
+              : `the delay stops at ${stopAct.code}, so the path is broken there by missing logic, a lag or a relationship type`
+            : null
           const why = pinnedAny.length
             ? `the finish is held by a mandatory constraint on ${pinText(pinnedAny)}, so logic does not drive it`
-            : 'the path is broken by a constraint, missing logic or a lag'
+            : stopText ?? 'the path is broken by a constraint, missing logic or a lag'
           result = {
             id: 12, name: 'Critical path test', metric: `+${delta}d finish for +${CP_TEST_DAYS}d on ${target.code}`,
-            threshold: thr, result: ok ? 'pass' : 'fail', offenders: ok ? [] : cap([target.code, ...pinnedAny.map((a) => a.code)]),
+            threshold: thr, result: ok ? 'pass' : 'fail', offenders: ok ? [] : cap([target.code, ...pinnedAny.map((a) => a.code), ...(stopAct && !pinnedAny.length ? [stopAct.code] : [])]),
             explanation: ok
               ? `Adding ${CP_TEST_DAYS} days to ${target.code}, the first open task on the longest path, ${moved}, so the driving path is continuous.`
               : `Adding ${CP_TEST_DAYS} days to ${target.code}, the first open task on the longest path, moved the finish by only ${delta} work days, so ${why}.`,

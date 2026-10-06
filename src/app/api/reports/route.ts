@@ -8,6 +8,8 @@ import { getScheduleSeries } from '@/lib/db'
 import { compareSchedules } from '@/lib/analysis/compare'
 import { REPORT_TITLES, type ReportType } from '@/lib/export/reports'
 import { fmtDates } from '@/lib/format'
+import { exportMarking, markText } from '@/lib/export/markings'
+import { scheduleClassification } from '@/lib/server/classification'
 
 const REPORT_TYPES = Object.keys(REPORT_TITLES) as ReportType[]
 
@@ -42,6 +44,10 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
 
   const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison })
 
+  // CUI / classified schedules: banner and designation on the report itself.
+  const classification = await scheduleClassification(schedule.id, auth.orgId).catch(() => 'classified' as const)
+  const marking = exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name })
+
   await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType } })
-  return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: fmtDates(report) })
+  return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: markText(fmtDates(report), marking), marking: marking ? { banner: marking.banner, designation: marking.designation } : null })
 })

@@ -9,7 +9,7 @@ import type { BacktestResult } from '@/lib/planning/evaluation'
 interface HistoryData {
   organization: { id: string; name: string } | null
   privacy: string
-  schedules: { id: string; name: string; version: string; projectType: string | null; region: string | null; grossSqft: number | null; activityCount: number }[]
+  schedules: { id: string; name: string; version: string; projectType: string | null; region: string | null; grossSqft: number | null; activityCount: number; usedInHistory?: boolean; historyNote?: string | null }[]
   categories: CategoryStats[]
   overallOverrunMedian: number | null
   overallOverrunP80: number | null
@@ -68,7 +68,8 @@ export default function HistoryPage() {
               <tbody>
                 {data.schedules.map(s => (
                   <tr key={s.id} className="border-t border-warm-200">
-                    <td className="py-2 pr-2 text-navy-950">{s.name} <span className="text-warm-400">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}</td>
+                    <td className="py-2 pr-2 text-navy-950">{s.name} <span className="text-warm-500">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
+                      <span className="block text-[11.5px] text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
                     <td className="py-2 pr-2">
                       <select value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]">
                         <option value="">—</option>{PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}

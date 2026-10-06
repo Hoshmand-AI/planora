@@ -1,7 +1,7 @@
 // Shared result type for all schedule-file parsers, plus small helpers the parsers share.
 
 import type { Activity, Relationship } from '@/lib/db'
-import type { ConstraintType, WorkCalendar } from '@/lib/planning/types'
+import type { ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { randomUUID as uuid } from 'crypto'
 
 export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
@@ -28,6 +28,10 @@ export interface ParsedSchedule {
   resourceCounts?: Record<string, number>
   /** P6 only: every table present in the file */
   sourceTables?: string[]
+  /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */
+  progressMode?: ProgressMode | null
+  /** The file was written by Planora's own exporter (a re-import of Planora output, not a project record) */
+  planoraExport?: boolean
 }
 
 /* ─── helpers shared by the parsers (not part of the public contract) ─── */

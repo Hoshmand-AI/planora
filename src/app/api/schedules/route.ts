@@ -4,7 +4,7 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -15,6 +15,18 @@ import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineF
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
 import { fmtDate, fmtDay } from '@/lib/format'
+import { decideHistory, inheritSeriesProfile, progressModeWarning, resolveProgressMode, seriesDataDateWarning } from '@/lib/planning/upload-rules'
+
+const CLASSIFICATIONS = ['unclassified', 'cui', 'classified'] as const
+type ScheduleClassification = typeof CLASSIFICATIONS[number]
+const isClassification = (v: unknown): v is ScheduleClassification => typeof v === 'string' && (CLASSIFICATIONS as readonly string[]).includes(v)
+const ORIGINS = ['own', 'third_party'] as const
+const isOrigin = (v: unknown): v is 'own' | 'third_party' => typeof v === 'string' && (ORIGINS as readonly string[]).includes(v)
+/** Activities that must carry an actual finish for an as-built schedule (not LOE or WBS summaries). */
+const workCounts = (acts: { activityType: string; actualFinish: string | null }[]) => {
+  const work = acts.filter(a => a.activityType !== 'loe' && a.activityType !== 'summary')
+  return { workCount: work.length, openCount: work.filter(a => !a.actualFinish).length }
+}
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -79,8 +91,14 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const versionInput = ((formData.get('version') as string) || '').trim().slice(0, 40)
-    const progressMode = formData.get('progressMode') === 'override' ? 'override' : 'retained'
+    const progressInput = formData.get('progressMode')
+    const chosenMode = progressInput === 'override' || progressInput === 'retained' ? progressInput : null
     const inHistoryInput = formData.get('inHistory')
+    const historyOverrideInput = formData.get('historyOverride') === 'true'
+    const classificationInput = formData.get('classification') || null
+    if (classificationInput !== null && !isClassification(classificationInput)) return NextResponse.json({ error: `classification must be one of ${CLASSIFICATIONS.join(', ')}.` }, { status: 400 })
+    const originInput = formData.get('origin') || null
+    if (originInput !== null && !isOrigin(originInput)) return NextResponse.json({ error: 'origin must be own or third_party.' }, { status: 400 })
     const projectIdInput = (formData.get('projectId') as string) || null
     const projectType = formData.get('projectType') as string | null
     const region = formData.get('region') as string | null
@@ -140,6 +158,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       if (n.conflict) warnings.push(`Calendar "${cal.name}": ${n.conflict}`)
     }
 
+    // Progress mode: the scheduler's choice, else the file's own P6 setting (SCHEDOPTIONS).
+    const { mode: progressMode, warning: modeWarning } = resolveProgressMode(chosenMode, parsed.progressMode ?? null)
+    if (modeWarning) warnings.push(modeWarning)
+
     // Recalculate the network (never trust header dates or stored float) and analyze it.
     const reportedFinish = parsed.projectFinish
     const completed = completeSchedule({
@@ -162,6 +184,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
       reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
       dataDate: parsed.dataDate, seriesBaseline, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
+      fileProgressMode: parsed.progressMode ?? null,
     })
     const recalcNote = recalcWarning(analysis.recalc)
     if (recalcNote) warnings.unshift(recalcNote)
@@ -172,8 +195,22 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const percentComplete = parsed.activities.length > 0
       ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
       : 0
-    // Only finished (as-built) projects calibrate firm history unless the uploader says otherwise.
-    const inHistory = inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : percentComplete >= 95
+    // Firm history: own as-built projects by default; never a Planora re-import or a third-party schedule.
+    const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
+    const history = decideHistory({
+      requested: inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : null, override: historyOverrideInput,
+      origin: originInput, planoraExport, ...workCounts(parsed.activities),
+    })
+    const inHistory = history.inHistory
+    warnings.push(...history.warnings)
+    // Update series: a later upload inherits the project's tags it omits; flag out-of-order data dates.
+    const profile = inheritSeriesProfile(series, {
+      projectType: projectType && (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : null,
+      region: region ? region.toUpperCase().slice(0, 12) : null, grossSqft,
+    })
+    if (profile.inherited.length) warnings.push(`Tags carried over from earlier uploads of this project: ${profile.inherited.map(k => ({ projectType: 'facility type', region: 'state', grossSqft: 'gross area' } as Record<string, string>)[k]).join(', ')}.`)
+    const orderWarning = seriesDataDateWarning(series, parsed.dataDate, versionLabel)
+    if (orderWarning) warnings.unshift(orderWarning)
 
     const schedule = await createSchedule({
       id: scheduleId,
@@ -199,10 +236,13 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       defaultCalendarId: parsed.defaultCalendarId,
       warnings,
       planId: null,
-      projectType: projectType && (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : null,
-      region: region ? region.toUpperCase().slice(0, 12) : null,
-      grossSqft,
+      projectType: profile.projectType,
+      region: profile.region,
+      grossSqft: profile.grossSqft,
     })
+    const meta = { classification: classificationInput, uploadOrigin: originInput, planoraExport, historyOverride: history.historyOverride }
+    await updateScheduleMeta(schedule.id, ctx.orgId, meta)
+    Object.assign(schedule, meta)
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
@@ -210,7 +250,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, planoraExport, progressMode } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -238,8 +278,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
 
 /**
  * Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft }; include it in
- * firm history { inHistory }; choose progress handling { progressMode }; or designate the contract /
- * finish milestone { finishMilestoneId: activity id or activity code, or null for automatic }.
+ * firm history { inHistory, historyOverride (include although not as-built), origin: own | third_party };
+ * choose progress handling { progressMode }; designate the contract / finish milestone
+ * { finishMilestoneId: activity id or activity code, or null for automatic }; relabel the upload
+ * { version }; or set its security classification { classification: unclassified | cui | classified }.
+ * Every change is audited; `warnings` explains settings that will not behave as the caller may expect.
  */
 export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const body = await req.json().catch(() => ({}))
@@ -247,14 +290,52 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const typeErr = projectTypeError(body.projectType)
   if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
-  if (typeof body.inHistory === 'boolean') {
-    await setScheduleInHistory(s.id, ctx.orgId, body.inHistory)
-    await audit({ action: 'schedule.history', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.inHistory ?? true, after: body.inHistory } })
+  if ('classification' in body && !isClassification(body.classification)) return NextResponse.json({ error: `classification must be one of ${CLASSIFICATIONS.join(', ')}.` }, { status: 400 })
+  if ('origin' in body && body.origin !== null && !isOrigin(body.origin)) return NextResponse.json({ error: 'origin must be own, third_party or null.' }, { status: 400 })
+  let version: string | null = null
+  if ('version' in body) {
+    version = typeof body.version === 'string' ? body.version.trim().slice(0, 40) : ''
+    if (!version) return NextResponse.json({ error: 'version must be a non-empty label (40 characters at most).' }, { status: 400 })
+  }
+  const warnings: string[] = []
+
+  if (version !== null && version !== s.version) {
+    await setScheduleVersion(s.id, ctx.orgId, version)
+    await audit({ action: 'schedule.relabel', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.version, after: version } })
+    // Relabeling can make (or stop making) this upload the series Baseline; the next read re-measures variance.
+    if (s.projectKey) {
+      const series = await getScheduleSeries(ctx.orgId, s.projectKey)
+      if (series.some(x => x.id !== s.id && x.version.trim().toLowerCase() === version!.toLowerCase())) warnings.push(`Another upload of this project is also labelled "${version}".`)
+    }
+  }
+  if ('classification' in body && body.classification !== (s.classification ?? null)) {
+    await updateScheduleMeta(s.id, ctx.orgId, { classification: body.classification })
+    await audit({ action: 'schedule.classification', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.classification ?? null, after: body.classification } })
+    if (body.classification !== 'unclassified') warnings.push('CUI and classified schedules are never sent to a cloud AI model, every export carries the banner and designation markings, and CSV exports are refused.')
+  }
+  if ('origin' in body && (body.origin ?? null) !== (s.uploadOrigin ?? null)) {
+    await updateScheduleMeta(s.id, ctx.orgId, { uploadOrigin: body.origin ?? null })
+    await audit({ action: 'schedule.origin', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.uploadOrigin ?? null, after: body.origin ?? null } })
+  }
+  if (typeof body.inHistory === 'boolean' || typeof body.historyOverride === 'boolean') {
+    const requested = typeof body.inHistory === 'boolean' ? body.inHistory : (s.inHistory ?? true)
+    const decision = decideHistory({
+      requested, override: typeof body.historyOverride === 'boolean' ? body.historyOverride : (s.historyOverride ?? false),
+      origin: 'origin' in body ? (body.origin ?? null) : (s.uploadOrigin ?? null), planoraExport: !!s.planoraExport, ...workCounts(await getActivities(s.id)),
+    })
+    warnings.push(...decision.warnings)
+    if (decision.inHistory !== (s.inHistory ?? true) || decision.historyOverride !== !!s.historyOverride) {
+      await setScheduleInHistory(s.id, ctx.orgId, decision.inHistory)
+      await updateScheduleMeta(s.id, ctx.orgId, { historyOverride: decision.historyOverride })
+      await audit({ action: 'schedule.history', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.inHistory ?? true, after: decision.inHistory, requested, historyOverride: decision.historyOverride } })
+    }
   }
   if ((body.progressMode === 'retained' || body.progressMode === 'override') && s.analysis && s.analysis.progressMode !== body.progressMode) {
     // Store the choice; the next read recalculates with it.
     await updateScheduleAnalysis(s.id, ctx.orgId, { analysis: { ...s.analysis, progressMode: body.progressMode, forecastFinish: null }, projectFinish: s.projectFinish, varianceDays: s.varianceDays, criticalCount: s.criticalCount })
-    await audit({ action: 'schedule.progress_mode', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.analysis.progressMode, after: body.progressMode } })
+    await audit({ action: 'schedule.progress_mode', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.analysis.progressMode, after: body.progressMode, fileProgressMode: s.analysis.fileProgressMode ?? null } })
+    const w = progressModeWarning(body.progressMode, s.analysis.fileProgressMode)
+    if (w) warnings.push(w)
   }
   if ('finishMilestoneId' in body) {
     const raw = body.finishMilestoneId
@@ -284,9 +365,9 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   if ('finishMilestoneId' in body) {
     // Recalculate now so the stored headline (lists, portfolio) reflects the designated milestone.
     const data = await loadScheduleData(s.id, ctx.orgId)
-    return NextResponse.json({ schedule: data?.schedule ?? await getScheduleById(s.id, ctx.orgId), analysis: data?.analysis ?? null })
+    return NextResponse.json({ schedule: data?.schedule ?? await getScheduleById(s.id, ctx.orgId), analysis: data?.analysis ?? null, warnings })
   }
-  return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
+  return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId), warnings })
 })
 
 export const DELETE = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {

@@ -11,7 +11,7 @@
 //    complete types, LOE activities, milestone types, WBS, baselines, activity codes, UDFs, resources,
 //    cost accounts and notebooks survive the round trip untouched.
 
-import type { CpmResult, GeneratedSchedule, LinkType, ConstraintType, WorkCalendar } from '@/lib/planning/types'
+import type { CpmResult, GeneratedSchedule, LinkType, ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { buildWbs } from './wbs'
 import { isCp1252 } from '@/lib/parsers/xer-codec'
 import { readXerTables, xerCalendarTimes } from '@/lib/parsers/xer-parser'
@@ -85,7 +85,7 @@ function calendarIds(cals: WorkCalendar[]): Map<string, number> {
   return new Map(cals.map((c, i) => [c.id, 100 + i]))
 }
 
-export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exportedBy?: string; now?: Date; projectShortName?: string } = {}): string {
+export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exportedBy?: string; now?: Date; projectShortName?: string; progressMode?: ProgressMode } = {}): string {
   const now = opts.now || new Date()
   const today = now.toISOString().slice(0, 10)
   const t = s.cpm?.times || {}
@@ -109,6 +109,11 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', projShortName(opts.projectShortName || projectName), '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0,
       // last_recalc_date = data date; plan_end_date = P6 "Must Finish By" (the required finish, so float after F9 matches); scd_end_date = forecast
       dt(s.dataDate || s.projectStart, '08:00'), dt(s.projectStart, '08:00'), s.mustFinishBy ? dt(s.mustFinishBy, finishTime(hoursOf())) : '', dt(s.cpm?.projectFinish, finishTime(hoursOf())), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Planora'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', dt(s.dataDate || s.projectStart, '08:00'), 'N', '', 'N']])
+
+  // Scheduling options: how out-of-sequence progress is scheduled (P6 Retained Logic / Progress Override),
+  // so P6 recalculates the file the way Planora did.
+  const mode = opts.progressMode ?? 'retained'
+  table('SCHEDOPTIONS', ['schedoptions_id', 'proj_id', 'sched_retained_logic', 'sched_progress_override'], [[1, PROJ, mode === 'retained' ? 'Y' : 'N', mode === 'override' ? 'Y' : 'N']])
 
   // WBS: project node + phases + work packages.
   const wbsId = new Map<string, number>()
@@ -225,7 +230,7 @@ export function xerUpdatesFrom(activities: { id: string; sourceId?: string | nul
  * open activities, and Planora's forecast as the project's scheduled finish. Every other table, row
  * and field (including the file's own time of day on unchanged dates) is written back exactly as read.
  */
-export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null } = {}): string {
+export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null; progressMode?: ProgressMode | null } = {}): string {
   const tables = readXerTables(original)
   const cal = new Map((tables['CALENDAR'] || []).map(c => [c['clndr_id'], xerCalendarTimes(c)]))
   const projOfTasks = new Set<string>()
@@ -276,6 +281,14 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
       // Free float never exceeds total float in P6 (a date constraint can limit total float alone).
       set('free_float_hr_cnt', hrs(Math.min(u.freeFloat, Math.max(0, u.totalFloat)), hpd))
       set('driving_path_flag', u.driving ? 'Y' : 'N')
+      return cols.join('\t')
+    }
+    // The progress option Planora scheduled with, when it was changed from the file's own.
+    if (table === 'SCHEDOPTIONS' && opts.progressMode && (!projOfTasks.size || !get('proj_id').trim() || projOfTasks.has(get('proj_id').trim()))) {
+      const retained = opts.progressMode === 'retained' ? 'Y' : 'N', override = opts.progressMode === 'override' ? 'Y' : 'N'
+      if (get('sched_retained_logic').trim() === retained && get('sched_progress_override').trim() === override) return line
+      set('sched_retained_logic', retained)
+      set('sched_progress_override', override)
       return cols.join('\t')
     }
     if (table === 'PROJECT' && opts.forecastFinish && projOfTasks.has(get('proj_id').trim())) {
