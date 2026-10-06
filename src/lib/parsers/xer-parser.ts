@@ -2,7 +2,7 @@
 // XER is a tab-separated text format: %T table, %F field names, %R rows, %E end.
 
 import type { Activity, Relationship } from '@/lib/db'
-import type { ConstraintType, Weekday, WorkCalendar } from '@/lib/planning/types'
+import type { ConstraintType, ProgressMode, Weekday, WorkCalendar } from '@/lib/planning/types'
 import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoDatePrefix, serialToIso, round2, constraintFromLabel,
@@ -165,7 +165,8 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
       baselineFinish: isoDatePrefix(t['target_end_date']),
       totalFloat: tf ?? 0,
       freeFloat: ff ?? 0,
-      isCritical: t['driving_path_flag'] === 'Y' || (tf !== null && tf <= 0 && status !== 'complete'),
+      // Level of effort and WBS summary activities are never critical (P6 excludes them from the critical path).
+      isCritical: activityType !== 'loe' && activityType !== 'summary' && (t['driving_path_flag'] === 'Y' || (tf !== null && tf <= 0 && status !== 'complete')),
       status,
       activityType,
       milestoneKind,
@@ -201,8 +202,14 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     warnings.push(`Not used in Planora's analysis: ${notModeled.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
   }
 
+  /* ── Scheduling options (P6 SCHEDOPTIONS) ─────────────── */
+  const opt = (tables['SCHEDOPTIONS'] || []).find(o => !projId || !o['proj_id'] || o['proj_id'] === projId)
+  const progressMode = progressModeFromSchedOptions(opt)
+  if (opt && !progressMode) warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Planora does not model; Planora uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
+
   return {
-    projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey,
+    projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,
+    planoraExport: isPlanoraXer(content),
     activities, relationships, calendars, defaultCalendarId, warnings,
     sourceType: 'p6_xer',
     resourceCounts: tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tasks) : undefined,
@@ -210,7 +217,29 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   }
 }
 
-const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED'])
+/**
+ * P6 "When scheduling progressed activities use": Retained Logic (sched_retained_logic = Y), Progress
+ * Override (sched_progress_override = Y) or Actual Dates (both N, returned as null: not modeled).
+ */
+export function progressModeFromSchedOptions(opt: Row | undefined | null): ProgressMode | null {
+  if (!opt) return null
+  const yes = (v: string | undefined) => (v || '').trim().toUpperCase() === 'Y'
+  if (yes(opt['sched_progress_override'])) return 'override'
+  if (yes(opt['sched_retained_logic'])) return 'retained'
+  return null
+}
+
+/**
+ * True when the XER was written by Planora's own exporter (its ERMHDR names Planora as the exporting
+ * application), so a re-import is recognized as Planora's output rather than the project's record.
+ */
+export function isPlanoraXer(content: string): boolean {
+  const first = content.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/, 1)[0] || ''
+  const cols = first.split('\t')
+  return cols[0].trim() === 'ERMHDR' && cols[5]?.trim() === 'Planora'
+}
+
+const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS'])
 const TABLE_LABELS: Record<string, string> = {
   ACTVTYPE: 'activity code types', ACTVCODE: 'activity code values', TASKACTV: 'activity code assignments',
   UDFTYPE: 'user-defined fields', UDFVALUE: 'user-defined field values', RSRC: 'resources', TASKRSRC: 'resource assignments',

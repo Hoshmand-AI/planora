@@ -1,6 +1,8 @@
 import { api, json } from '@/lib/server/api'
 import { audit, listAudit, verifyAuditChain } from '@/lib/server/audit'
 import { csvCell } from '@/lib/export/csv'
+import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
+import { auditEventFilter } from '@/lib/server/workspaces'
 
 /**
  * Organization audit log.
@@ -19,13 +21,16 @@ export const GET = api({ permission: 'audit.read' }, async (req, { auth }) => {
     targetType: sp.get('targetType') || undefined, targetId: sp.get('targetId') || undefined, action: sp.get('action') || undefined,
     actorId: sp.get('actorId') || undefined, beforeSeq: Number(sp.get('before')) || undefined,
   }
+  // Members who don't see every workspace don't see audit events about walled schedules and plans.
+  const visible = await auditEventFilter(auth.orgId, await currentWorkspaceAccess())
   if (sp.get('format') === 'csv') {
-    const events = await listAudit(auth.orgId, { ...filters, limit: 50_000 })
+    const events = (await listAudit(auth.orgId, { ...filters, limit: 50_000 })).filter(visible)
     await audit({ action: 'audit.exported', targetType: 'organization', targetId: auth.orgId, detail: { records: events.length } })
     const head = ['seq', 'at', 'actor_email', 'action', 'target_type', 'target_id', 'detail', 'ip', 'request_id', 'prev_hash', 'hash']
     const rows = events.reverse().map(e => [e.seq, e.at, e.actorEmail, e.action, e.targetType, e.targetId, JSON.stringify(e.detail), e.ip, e.requestId, e.prevHash, e.hash].map(v => csvCell(v == null ? '' : String(v))).join(','))
     return new Response([head.join(','), ...rows].join('\r\n'), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="planora-audit-log-${new Date().toISOString().slice(0, 10)}.csv"` } })
   }
-  const events = await listAudit(auth.orgId, { ...filters, limit: Number(sp.get('limit')) || 200 })
-  return json({ events, nextBefore: events.length ? events[events.length - 1].seq : null })
+  const page = await listAudit(auth.orgId, { ...filters, limit: Number(sp.get('limit')) || 200 })
+  // Paging continues from the last record read, even when some of the page was filtered out.
+  return json({ events: page.filter(visible), nextBefore: page.length ? page[page.length - 1].seq : null })
 })

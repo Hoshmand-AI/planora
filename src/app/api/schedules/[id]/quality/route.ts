@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
-import { getDataQuestionResponses, getScheduleById, getScheduleFile, saveDataQuestionResponse } from '@/lib/db'
+import { getDataQuestionResponses, getReviewState, getScheduleById, getScheduleFile, saveDataQuestionResponse } from '@/lib/db'
 import { xerResourceCounts } from '@/lib/parsers/xer-parser'
 import { decodeXer } from '@/lib/parsers/xer-codec'
 import { runDcma } from '@/lib/analysis/dcma'
@@ -14,7 +14,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const data = await loadScheduleData(params.id, ctx.orgId)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
-  const responses = await getDataQuestionResponses(schedule.id)
+  const [responses, review] = await Promise.all([getDataQuestionResponses(schedule.id), getReviewState(schedule.id, ctx.orgId)])
   // P6 resource assignments (TASKRSRC) are not stored per activity; read them from the original file.
   let resourceCounts: Record<string, number> | null = null
   if (schedule.sourceType === 'p6_xer') {
@@ -26,7 +26,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const questions = checkInputs(a)
   const byId = new Map(responses.map(r => [r.questionId, r]))
   const guidance = dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({
-    ...guidanceFor(c, { generated: false }),
+    // Uploads with logic have what-if / recovery options and Planora edits on the schedule dashboard.
+    ...guidanceFor(c, { generated: false, uploadedRecoveryHref: data.cpm && schedule.sourceType !== 'generated' ? `/dashboard?schedule=${encodeURIComponent(schedule.id)}#recovery` : undefined }),
     decision: byId.get(`dcma:${c.id}`) ?? null,
   }))
   return NextResponse.json({
@@ -36,6 +37,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     dcma,
     dataQuestions: questions.map(q => ({ ...q, response: byId.get(q.id) ?? null })),
     classification: summarizeCategories(activities.map(x => x.category || 'other')),
+    review,
   })
 })
 

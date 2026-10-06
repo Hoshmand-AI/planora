@@ -12,6 +12,7 @@ import { listLongLeadItems } from '@/lib/knowledge/long-lead'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
+import { civilOptionsFrom, civilQuestions, featuresFrom } from './civil-options'
 
 export interface HistorySummary {
   /** Firm's own past schedules with categorized activities */
@@ -50,16 +51,65 @@ const bool = (v: AnswerValue | undefined) => parseBool(v)
 /** A known yes/no answer, whatever form it was stored in (older answers may hold "false" or "No"). */
 export const knownBool = (answers: Record<string, Answer>, id: string): boolean | undefined => parseBool(known(answers, id))
 
+/** Square feet per square metre (gross area typed in m² is planned in sf, the catalogs' unit). */
+export const SQFT_PER_M2 = 10.7639
+
+const US_WORDS = /\b(usa|u\.s\.a?\.?|us|united states|america)\b/i
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/**
+ * The location typed instead of picking a US state ("Ontario, Canada", "Dubai") is outside the US
+ * unless it names the US or a US state.
+ */
+export function isOutsideUS(answers: Record<string, Answer>): boolean {
+  const a = answers['project.state']
+  if (!a || a.status !== 'known' || !a.custom || typeof a.value !== 'string') return false
+  const t = a.value.trim()
+  if (US_WORDS.test(t)) return false
+  const lower = t.toLowerCase()
+  return !US_STATES.some(st => new RegExp(`\\b${escapeRe(st.name.toLowerCase())}\\b`).test(lower))
+}
+
+/**
+ * Floor numbers typed for an interiors / TI project: "12-15", "3, 5, 7", "L2–L4", "Floors 10 to 12".
+ * Returned ascending and de-duplicated; a range spans at most 200 floors.
+ */
+export function parseFloors(v: AnswerValue | undefined): number[] | undefined {
+  if (v === undefined || v === null) return undefined
+  if (typeof v === 'number') return Number.isInteger(v) && v > 0 ? [v] : undefined
+  const text = (Array.isArray(v) ? v.join(',') : String(v)).toLowerCase().replace(/floors?|levels?|\bl(?=\d)/g, ' ')
+  const out = new Set<number>()
+  for (const part of text.split(/[,;&]|\band\b/)) {
+    const m = part.match(/(\d+)\s*(?:-|–|—|to|through|thru)\s*(\d+)/)
+    if (m) {
+      const a = Number(m[1]), b = Number(m[2])
+      const lo = Math.min(a, b), hi = Math.max(a, b)
+      if (hi - lo <= 200) for (let f = lo; f <= hi; f++) out.add(f)
+      continue
+    }
+    for (const n of part.match(/\d+/g) || []) out.add(Number(n))
+  }
+  const floors = [...out].filter(f => f > 0).sort((a, b) => a - b)
+  return floors.length ? floors : undefined
+}
+
 export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const type = str(known(answers, 'project.type')) as ProjectType | undefined
-  const federal = bool(known(answers, 'project.federal'))
+  const outsideUS = isOutsideUS(answers)
+  // Outside the US there is no US federal undertaking (a defense facility keeps its own rules).
+  const federal = outsideUS && type !== 'federal_defense' ? false : bool(known(answers, 'project.federal'))
   const civil = isCivilType(type)
-  const sqft = civil ? undefined : num(known(answers, 'project.gross_sqft'))
-  const stories = num(known(answers, 'project.stories'))
-  const acres = num(known(answers, 'site.acres_disturbed'))
+  const ti = type === 'interiors_ti'
+  const area = civil ? undefined : num(known(answers, 'project.gross_sqft'))
+  const sqft = area !== undefined && known(answers, 'project.area_unit') === 'm2' ? Math.round(area * SQFT_PER_M2) : area
+  const floors = ti ? parseFloors(known(answers, 'project.floors')) : undefined
+  const stories = floors ? floors.length : ti ? undefined : num(known(answers, 'project.stories'))
+  const acres = ti ? undefined : num(known(answers, 'site.acres_disturbed'))
   const classification = str(known(answers, 'security.classification')) as Classification | undefined
+  const projectType = type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined
+  const state = answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase()
+  const civilOpts = civil && projectType ? civilOptionsFrom(projectType, answers, state, str(known(answers, 'project.scope'))) : undefined
   return {
-    projectType: type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined,
+    projectType,
     // A typed location ("Ontario, Canada") is kept for the record but uses generic permitting.
     state: answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase(),
     city: str(known(answers, 'project.city')),
@@ -67,12 +117,16 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     stories,
     scope: str(known(answers, 'project.scope')) as WorkScope | undefined,
     // Unknown disturbed area: estimate footprint ×2 for laydown/parking so NPDES-type rules can still fire.
-    siteAcresDisturbed: acres ?? (sqft && stories ? Math.round((sqft / stories / 43560) * 2 * 10) / 10 : undefined),
+    // An interiors / TI fit-out disturbs no ground.
+    siteAcresDisturbed: ti ? undefined : acres ?? (sqft && stories ? Math.round((sqft / stories / 43560) * 2 * 10) / 10 : undefined),
     isFederal: type === 'federal_defense' ? true : federal,
     onFederalInstallation: type === 'federal_defense' ? true : federal === false ? false : bool(known(answers, 'project.federal_installation')),
     classification: classification ?? (answers['security.classification']?.status === 'withheld' ? 'classified' : undefined),
     deliveryMethod: str(known(answers, 'project.delivery')) as DeliveryMethod | undefined,
     valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
+    ...(floors ? { floors } : {}),
+    ...(outsideUS ? { outsideUS } : {}),
+    ...(civilOpts && projectType ? { civil: civilOpts, features: featuresFrom(projectType, civilOpts) } : {}),
   }
 }
 
@@ -89,6 +143,8 @@ function addDays(iso: string, days: number): string {
 function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: ElicitationContext): Question[] {
   const today = ctx.today || new Date().toISOString().slice(0, 10)
   const civil = isCivilType(p.projectType)
+  const ti = p.projectType === 'interiors_ti'
+  const intl = !!p.outsideUS
   const qs: Question[] = [
     {
       id: 'project.type', section: 'project', kind: 'choice', impact: 100, allowWithheld: false,
@@ -120,6 +176,12 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
             { value: 'new_construction', label: 'New (greenfield / new alignment)' }, { value: 'addition', label: 'Expansion / widening' },
             { value: 'renovation', label: 'Rehabilitation or replacement (out of service)' }, { value: 'renovation_occupied', label: 'Rehabilitation or replacement kept in service (staged)' },
           ]
+        : ti
+        ? [
+            { value: 'new_construction', label: 'First-generation space (shell, no demolition)' },
+            { value: 'renovation', label: 'Second-generation space (demolish existing build-out)' },
+            { value: 'renovation_occupied', label: 'Occupied building or floor (phased, after-hours work)' },
+          ]
         : [
             { value: 'new_construction', label: 'New construction' }, { value: 'addition', label: 'Addition' },
             { value: 'renovation', label: 'Renovation (vacant)' }, { value: 'renovation_occupied', label: 'Renovation (occupied / phased)' },
@@ -130,11 +192,24 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       prompt: 'Roughly what is the construction value, in millions of dollars?',
       why: 'Civil work packages are sized by construction value rather than floor area. Without it, durations use a $20M reference project.',
     }] : [{
-      id: 'project.gross_sqft', section: 'project' as const, kind: 'number' as const, unit: 'sf', impact: 85, allowWithheld: true,
-      prompt: 'What is the gross building area?',
+      id: 'project.gross_sqft', section: 'project' as const, kind: 'number' as const,
+      unit: known(answers, 'project.area_unit') === 'm2' ? 'm²' : 'sf', impact: 85, allowWithheld: true,
+      prompt: ti ? 'What is the fit-out area?' : 'What is the gross building area?',
       why: 'Work-package durations scale with area. Without it every duration is a guess.',
     },
-    {
+    ...(intl ? [{
+      id: 'project.area_unit', section: 'project' as const, kind: 'choice' as const, impact: 30, allowWithheld: false,
+      prompt: 'Is the area in square metres or square feet?',
+      why: 'Durations are sized per 1,000 sf; an area in m² is converted (1 m² = 10.76 sf).',
+      options: [{ value: 'm2', label: 'Square metres (m²)' }, { value: 'sf', label: 'Square feet (sf)' }],
+      fallback: { value: 'sf', explanation: 'Assumed square feet.' },
+    }] : []),
+    ti ? {
+      id: 'project.floors', section: 'project' as const, kind: 'text' as const, impact: 60, allowWithheld: true,
+      prompt: 'Which floors are in the fit-out? Enter the floor numbers, for example 12-15 or 3, 5, 7.',
+      why: 'Demolition, rough-in, drywall and finishes move floor by floor; the plan sequences and labels the work by your actual floor numbers.',
+      fallback: { value: '1', explanation: 'Assumed a single floor.' },
+    } : {
       id: 'project.stories', section: 'project' as const, kind: 'number' as const, unit: 'stories', impact: 60, allowWithheld: true,
       prompt: 'How many stories above grade?',
       why: 'Stories drive the structure cycle, elevator scope, and deep-foundation likelihood.',
@@ -165,13 +240,21 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     },
   ]
 
-  if (p.projectType !== 'federal_defense') {
-    qs.push({
-      id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
-      prompt: 'Is this federally funded or on federal property?',
-      why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
-      fallback: { value: false, explanation: 'Assumed not federal.' },
-    })
+  // Outside the US there are no US federal funding / property questions (or their Davis-Bacon, NEPA follow-ups).
+  if (p.projectType !== 'federal_defense' && !intl) {
+    qs.push(civil
+      ? {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this a federal or federally funded project (for example FHWA federal-aid, FTA, FAA AIP, USACE or EPA funding)?',
+          why: 'Federal funding adds NEPA/Section 106 reviews, Davis-Bacon certified payrolls, Buy America and agency concurrence. Whether the work is on federal property (a base or federal campus) is asked separately: federal-aid work in public right-of-way needs no base access.',
+          fallback: { value: false, explanation: 'Assumed not federally funded.' },
+        }
+      : {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this federally funded or on federal property?',
+          why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
+          fallback: { value: false, explanation: 'Assumed not federal.' },
+        })
     // Federal money is not federal land: base access and installation work clearances only apply on an installation.
     if (p.isFederal === true) {
       qs.push({
@@ -184,6 +267,9 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       })
     }
   }
+
+  // Civil networks: staging, utility owners, in-water windows, guideway type, facility and scope variants.
+  qs.push(...civilQuestions(p, answers))
 
   // Data centers are usually precast or insulated-panel boxes; curtain wall only when the design has it.
   if (p.projectType === 'data_center' && p.scope !== 'renovation' && p.scope !== 'renovation_occupied') {
@@ -238,7 +324,8 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     }
   }
 
-  qs.push(
+  // An interiors / TI fit-out has no site work: no disturbed-area or site-condition questions.
+  if (!ti) qs.push(
     {
       id: 'site.acres_disturbed', section: 'site', kind: 'number', unit: 'acres', impact: 40, allowWithheld: true,
       prompt: 'How many acres of ground will be disturbed (including laydown and parking)?',
@@ -251,6 +338,8 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       options: [{ value: 'greenfield', label: 'Greenfield' }, { value: 'previously_developed', label: 'Previously developed' }, { value: 'brownfield', label: 'Brownfield / known contamination' }, { value: 'poor_soils', label: 'Poor soils / high groundwater' }],
       fallback: { value: 'previously_developed', explanation: 'Assumed previously developed site with no remediation.' },
     },
+  )
+  qs.push(
     {
       id: 'calendar.workweek', section: 'calendar', kind: 'choice', impact: 50, allowWithheld: false,
       prompt: 'What is the planned work week for field work?',
@@ -258,19 +347,21 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       options: [{ value: '5x8', label: '5 days × 8 h (Mon–Fri)' }, { value: '5x10', label: '5 days × 10 h' }, { value: '4x10', label: '4 days × 10 h (Mon–Thu)' }, { value: '6x10', label: '6 days × 10 h (Mon–Sat)' }, { value: '7x12', label: '7 days (24/7 critical work)' }],
       fallback: { value: '5x8', explanation: 'Assumed a standard 5-day, 8-hour work week.' },
     },
-    {
-      id: 'calendar.holidays', section: 'calendar', kind: 'boolean', impact: 20, allowWithheld: false,
-      prompt: 'Observe US federal holidays as non-work days?',
-      why: 'About 11 non-work days per year that most schedules forget.',
-      fallback: { value: true, explanation: 'Federal holidays are non-work days.' },
-    },
-    {
-      id: 'calendar.weather', section: 'calendar', kind: 'boolean', impact: 30, allowWithheld: false,
-      prompt: 'Include regional weather days for exterior work?',
-      why: 'We add a weather allowance based on the region\'s adverse months that overlap earthwork through dry-in.',
-      fallback: { value: true, explanation: 'Regional weather allowance included.' },
-    },
   )
+  // US federal holidays only for US projects (outside the US, local holidays are added to the calendar).
+  if (!intl) qs.push({
+    id: 'calendar.holidays', section: 'calendar', kind: 'boolean', impact: 20, allowWithheld: false,
+    prompt: 'Observe US federal holidays as non-work days?',
+    why: 'About 11 non-work days per year that most schedules forget.',
+    fallback: { value: true, explanation: 'Federal holidays are non-work days.' },
+  })
+  // Interior fit-outs have no exterior exposure to carry weather days for.
+  if (!ti) qs.push({
+    id: 'calendar.weather', section: 'calendar', kind: 'boolean', impact: 30, allowWithheld: false,
+    prompt: 'Include regional weather days for exterior work?',
+    why: 'We add a weather allowance based on the region\'s adverse months that overlap earthwork through dry-in.',
+    fallback: { value: true, explanation: 'Regional weather allowance included.' },
+  })
 
   if (p.projectType) {
     for (const m of milestoneTargetsFor(p)) {
@@ -376,7 +467,8 @@ function regulationQuestions(regs: RegulationSpec[], p: ProjectProfile): Questio
 
 /* ─── Milestone targets & date logic ─────────────────── */
 
-export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string }[] = [
+/** `activityKey`: the template activity (key) that reaches the milestone, when its category has several. */
+export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string; activityKey?: string }[] = [
   { key: 'foundations', label: 'Foundations complete', category: 'foundations', rank: 1, impact: 22, why: 'Foundations gate the structure.' },
   { key: 'structure', label: 'Structure complete (topped out)', category: 'structure_steel', rank: 2, impact: 22, why: 'Topping out gates the envelope and roof.' },
   { key: 'dry_in', label: 'Building dried-in', category: 'dry_in', rank: 3, impact: 24, why: 'Interior finishes and sensitive equipment wait for a watertight building.' },
@@ -413,9 +505,28 @@ const CIVIL_MILESTONES: Partial<Record<ProjectType, MilestoneTarget[]>> = {
     { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
     SC_TARGET,
   ],
+  aviation: [
+    { key: 'airfield_reopen', label: 'Runway / taxiway reopened to aircraft', category: 'cutover', rank: 4, impact: 28, why: 'Closures are negotiated with the airport and airlines; reopening dates usually carry liquidated damages.' },
+    SC_TARGET,
+  ],
+  marine_civil_works: [
+    { key: 'cofferdam_removed', label: 'In-water work complete', category: 'in_water_work', rank: 3, impact: 24, why: 'In-water work must finish inside the permit window.' },
+    SC_TARGET,
+  ],
+  environmental_remediation: [
+    { key: 'excavation_complete', label: 'Excavation & disposal complete', category: 'remediation', rank: 3, impact: 24, why: 'Regulators and consent orders often set the date contaminated material must be removed.' },
+    SC_TARGET,
+  ],
+  epc_industrial: [
+    { key: 'mechanical_completion', label: 'Mechanical completion', category: 'inspections', activityKey: 'mc', rank: 3, impact: 24, why: 'Mechanical completion hands each system to commissioning.' },
+    { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
+    SC_TARGET,
+  ],
 }
 /** Milestone targets the interview asks about for this project type. */
 export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
+  // Interiors / TI: no foundations, structure or dry-in to target.
+  if (p.projectType === 'interiors_ti') return MILESTONE_TARGETS.filter(m => m.key === 'commissioning' || m.key === 'substantial_completion')
   return (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
 }
 /** Every milestone target key across project types (for date checks on stored answers). */
@@ -430,6 +541,7 @@ const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
   substructure: 'substructure', superstructure: 'deck', deck: 'deck', track_systems: 'track', process_structures: 'process_structures',
   process_equipment: 'startup', power_equipment: 'energization', conductors: 'energization', controls_scada: 'startup', pipeline: 'mechanical_completion',
+  remediation: 'excavation_complete', tunneling: 'substantial_completion', mass_concrete: 'substantial_completion',
   substantial_completion: 'substantial_completion',
 }
 
@@ -503,7 +615,7 @@ export function questionBank(state: InterviewState, ctx: ElicitationContext = {}
  * silently planned as the default (e.g. procure.escalators.status = "not_required" stayed in scope).
  */
 const STRICT_CHOICE = (id: string) =>
-  ['project.type', 'project.scope', 'project.delivery', 'security.classification'].includes(id) || /^(permit|procure)\.[^.]+\.status$/.test(id)
+  ['project.type', 'project.scope', 'project.delivery', 'security.classification', 'project.area_unit'].includes(id) || /^(permit|procure)\.[^.]+\.status$/.test(id)
 
 /** history.use when the firm has no completed projects yet: accepted as a preference (no effect until history exists). */
 export const HISTORY_USE_QUESTION: Question = {
@@ -594,7 +706,9 @@ export function unansweredAssumption(q: Question, permits: PermitSpec[], longLea
 /** A typed answer outside the catalog: recorded verbatim, planned with the default, flagged for review. */
 function customAssumption(q: Question, a: Answer): Assumption {
   const fallback = q.id === 'project.state'
-    ? 'Generic US permitting and climate are used — add local permits as activities if needed.'
+    ? (isOutsideUS({ [q.id]: a })
+      ? 'Treated as outside the US: no US permits, federal questions or US holidays; a generic local building approval and utility connection are planned — add the local approvals and holidays.'
+      : 'Generic US permitting and climate are used — add local permits as activities if needed.')
     : q.id === 'project.type'
       ? 'A generic building template is used; review the activity list for this facility type.'
       : q.fallback?.explanation || 'Planora plans with its default for this item.'

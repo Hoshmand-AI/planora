@@ -325,6 +325,122 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
     `,
   },
+  {
+    id: 7, name: 'uploaded_schedule_edits_and_risk_inputs',
+    sql: `
+    -- Edits a scheduler makes to an uploaded schedule in Planora (remaining duration, relationship,
+    -- constraint), each with a reason. An override layer: the imported activities and relationships
+    -- are never changed; edits are applied in order on read. Reverting sets reverted_at (kept for the
+    -- record). Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS schedule_edits (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      change JSONB NOT NULL,
+      reason TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      option_id TEXT,
+      user_id TEXT,
+      user_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reverted_at TIMESTAMPTZ,
+      reverted_by TEXT,
+      revert_reason TEXT
+    );
+    CREATE INDEX IF NOT EXISTS schedule_edits_schedule_idx ON schedule_edits(org_id, schedule_id, created_at);
+    -- Schedule risk analysis inputs for an uploaded schedule: the scheduler's per-activity three-point
+    -- ranges (work days) and discrete risk events (probability, impact days, affected activity).
+    CREATE TABLE IF NOT EXISTS schedule_risk_inputs (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      ranges JSONB NOT NULL DEFAULT '[]',
+      events JSONB NOT NULL DEFAULT '[]',
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS schedule_risk_inputs_org_idx ON schedule_risk_inputs(org_id);
+    `,
+  },
+  {
+    id: 8, name: 'upload_history_series_cui',
+    sql: `
+    -- Security classification of an uploaded schedule (same values as plans: unclassified, cui,
+    -- classified); NULL = not set. CUI/classified uploads never reach a cloud model and their exports
+    -- carry CUI markings.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS classification TEXT;
+    -- Firm history: whose schedule it is ('own' / 'third_party', NULL = not stated), an explicit
+    -- override to include a schedule that is not as-built, and whether the file is a re-imported
+    -- Planora export (never used to calibrate history). Additive: older code ignores the columns.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS upload_origin TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS history_override BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS planora_export BOOLEAN NOT NULL DEFAULT FALSE;
+    `,
+  },
+  {
+    id: 9, name: 'submission_review_dispositions',
+    sql: `
+    -- Reviewer workflow for uploaded submissions. Additive: older code ignores both tables.
+    -- One disposition per DCMA finding ('dcma:<n>') or data question (its id) of an upload:
+    -- accepted / exception (with justification) / needs_revision.
+    CREATE TABLE IF NOT EXISTS review_dispositions (
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('accepted', 'exception', 'needs_revision')),
+      justification TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (schedule_id, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS review_dispositions_org_idx ON review_dispositions(org_id);
+    -- The overall disposition of the submission: approved / approved as noted / revise and resubmit.
+    CREATE TABLE IF NOT EXISTS submission_reviews (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('approved', 'approved_as_noted', 'revise_and_resubmit')),
+      comments TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS submission_reviews_org_idx ON submission_reviews(org_id);
+    `,
+  },
+  {
+    id: 10, name: 'workspaces_ethical_walls',
+    sql: `
+    -- Matter / engagement workspaces inside an organization, for project-level access control
+    -- (ethical walls). Enforcement lives in src/lib/server/workspaces.ts and the scoped reads in
+    -- src/lib/db.ts. Additive: older code ignores the new tables and columns, and every existing
+    -- schedule and plan stays organization-wide (workspace_id NULL) until an admin assigns it.
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      -- Walled: only the workspace's members (and owners/admins) can see its schedules and plans.
+      walled BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS workspaces_org_idx ON workspaces(org_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS workspaces_org_name_idx ON workspaces(org_id, LOWER(name));
+    CREATE TABLE IF NOT EXISTS workspace_members (
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      added_by TEXT,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (workspace_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members(org_id, user_id);
+    -- A restricted member sees only the schedules and plans of the workspaces they belong to.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS workspace_restricted BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    CREATE INDEX IF NOT EXISTS schedules_workspace_idx ON schedules(org_id, workspace_id);
+    CREATE INDEX IF NOT EXISTS plans_workspace_idx ON plans(org_id, workspace_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

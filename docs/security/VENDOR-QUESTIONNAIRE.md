@@ -14,8 +14,9 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 |---|---|---|
 | Legal entity / contact | Hoshmand AI; security contact support@hoshmand.ai | Terms, Privacy pages |
 | What data is processed? | Schedule files (activities, dates, logic, calendars), interview answers, account data, audit log | [../privacy/DATA-MAP.md](../privacy/DATA-MAP.md) |
-| Where is data stored? | United States: Vercel (iad1) application hosting, Neon Postgres (us-east). No EU or Canadian region yet | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
-| Can it run on-premises / air-gapped? | Yes. The same build runs on your own servers with a local or no AI model (`PLANORA_DEPLOYMENT=onprem`, `PLANORA_AIRGAPPED=1`). Nothing leaves your network | [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md), [CUI-HANDLING.md](CUI-HANDLING.md) |
+| Where is data stored? | Hosted service: United States only (Vercel iad1 application hosting, Neon Postgres us-east). There is no hosted EU or Canadian region | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
+| EU / Canadian data residency | Available only through a customer-hosted (on-premises or private-cloud) deployment that you run in the country or region you choose. Planora does not offer it as a hosted region. The customer-hosted instance makes no runtime calls to Planora or other outside services, so residency follows your hosting | [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md) section 9 |
+| Can it run on-premises / air-gapped? | Yes. The same build runs on your own servers with a local or no AI model (`PLANORA_DEPLOYMENT=onprem`, `PLANORA_AIRGAPPED=1`). A production `Dockerfile` (non-root, standalone server) and a `docker-compose.yml` with PostgreSQL 17 are provided, with an install, upgrade, backup and hardening guide. Nothing leaves your network | [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md), [CUI-HANDLING.md](CUI-HANDLING.md) |
 
 ## 2. Access control
 | Question | Answer | Evidence |
@@ -23,6 +24,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 | SSO | OpenID Connect (Azure AD / Entra, Okta, Google); per-domain enforcement | `src/lib/server/sso.ts` |
 | MFA | TOTP with single-use recovery codes. Replayed codes are rejected. An organization can require MFA | `src/lib/server/mfa.ts` |
 | Roles | Owner, admin, scheduler, reviewer, viewer. Every API route declares its permission and a test enforces it | `src/lib/server/routes.test.ts` |
+| Project-level access (ethical walls) | Workspaces group schedules and plans by client matter or engagement. A walled workspace is visible only to its members; members can be limited to their own workspaces; owners and admins see all. Enforced on every list, read and export endpoint, and audited | `src/lib/server/workspaces.ts`, `src/lib/server/workspaces.test.ts` |
 | Separation of duties | Publishing a plan requires an approval by someone other than the author, tied to the exact schedule content. Any edit invalidates the approval | `src/lib/server/approval.ts` |
 | Session security | Revocable server sessions, idle and absolute timeouts, CSRF protection, secure cookies | [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md) |
 | Brute force | Per-account lockout after 8 failures; failed-attempt limits per account and per IP | `src/lib/server/rate-limit.ts` |
@@ -50,7 +52,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 | Question | Answer | Evidence |
 |---|---|---|
 | Code review and CI | Every change goes through a pull request. CI runs typecheck, unit tests, build, end-to-end, security and accessibility tests, SAST and CodeQL | `.github/workflows/ci.yml` |
-| Dependency management | `npm audit` gates the build on high and critical advisories; an SBOM is produced on every build | [VULNERABILITY-MANAGEMENT.md](VULNERABILITY-MANAGEMENT.md) |
+| Dependency management | `npm audit` gates the build on high and critical advisories; a CycloneDX SBOM is produced on every build. `npm run sbom` produces a CycloneDX 1.5 SBOM from `package-lock.json` without network access (also shipped in the on-prem image at `/app/sbom.cdx.json`) | [VULNERABILITY-MANAGEMENT.md](VULNERABILITY-MANAGEMENT.md), `scripts/sbom.mjs` |
 | Vulnerability SLAs | Critical 7 days, high 30 days | [VULNERABILITY-MANAGEMENT.md](VULNERABILITY-MANAGEMENT.md) |
 | Penetration test | Not yet. Scope and selection criteria are in [PENTEST-PLAN.md](PENTEST-PLAN.md) | — |
 
@@ -65,7 +67,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 | Question | Answer |
 |---|---|
 | SOC 2 | Not yet. The control matrix ([CONTROL-MATRIX.md](CONTROL-MATRIX.md)) is the readiness baseline |
-| FedRAMP / CMMC / NIST 800-171 | Not assessed. For federal or CUI work, use the on-premises deployment inside your own accredited environment |
+| FedRAMP / CMMC / NIST 800-171 | Not assessed. For federal or CUI work, use the on-premises deployment inside your own accredited environment. A vendor self-assessment maps all 110 NIST SP 800-171 Rev. 2 requirements to what the application provides, what your environment must provide, and seven known gaps: [NIST-800-171-MAPPING.md](NIST-800-171-MAPPING.md) |
 | Accessibility | WCAG 2.2 AA is checked automatically on every build; manual testing with assistive technology is planned |
 
 ## 8. Contracts

@@ -34,7 +34,7 @@ describe('buildReport (offline, per type)', () => {
     expect(analysis.varianceDays).toBe(2) // remaining 8d from Mon 03/09 -> 03/18; A300 03/19-04/01; baseline 03/30
     expect(out.variance).toMatch(/M900 Substantial Completion/)
     expect(out.variance).toMatch(/Variance \(calendar days, \+ = late\) \| \+2/)
-    expect(out.variance).toMatch(/## 3\. Activities finishing latest against baseline/)
+    expect(out.variance).toMatch(/## 4\. Activities finishing latest against baseline \(all 4 activities/)
     expect(out.variance).not.toMatch(/Unknown days/)
   })
   it('critical path report lists the driving path in sequence', () => {

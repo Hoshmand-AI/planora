@@ -41,7 +41,8 @@
 // FF/SF predecessors can push the finish in both modes. A milestone with only actualStart is
 // treated as complete on that date.
 //
-// Constraints: SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
+// Constraints: start constraints (SNET/SNLT/SO/MSO) are ignored once an activity has an actual start
+// (as P6). SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
 // do both, so logic still drives the early date and a late predecessor shows negative float.
 // MSO/MFO are mandatory (as P6): they fix the early dates (never earlier than the data date) and the
 // late dates (on the constraint date, even one before the data date) against logic. The
@@ -55,7 +56,7 @@
 // logicLongestPath / logicFinish give the path and finish logic alone would produce. The critical
 // path is the TF <= 0 chain and can be empty when a required finish leaves positive float everywhere.
 
-import type { CpmActivity, CpmInput, CpmLink, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
+import type { CpmActivity, CpmInput, CpmLink, CpmLinkFloat, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
 import { compileCalendar, defaultCalendar, fromDayNumber, toDayNumber, type CompiledCalendar } from '@/lib/planning/calendar'
 
 interface Node {
@@ -97,6 +98,8 @@ interface Edge {
 }
 
 const INF = Number.POSITIVE_INFINITY
+/** Constraints on an activity's start: P6 ignores them once the activity has an actual start. */
+const START_CONSTRAINTS = new Set<string>(['SNET', 'SNLT', 'SO', 'MSO'])
 
 /** Move an instant by `lag` work days on calendar c (see header). */
 function shift(t: number, lag: number, c: CompiledCalendar): number {
@@ -239,7 +242,14 @@ export function runCpm(input: CpmInput): CpmResult {
   const msInstant = (node: Node, day: number) => (node.startLike ? day : day + 1)
   // A start milestone sits at the start of a work day; a finish milestone on a work-day boundary.
   const msSnap = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapFwd(t, node.c))
-  const msSnapLate = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapBack(t, node.c))
+  // A finish milestone's late date sits at the END of its last work day (not the start of the next
+  // one across a weekend), so LF - EF shown on screen equals its total float.
+  // (Unless that would put it before its early instant, e.g. a finish milestone driven to the start of a day.)
+  const msSnapLate = (node: Node, t: number) => {
+    if (node.startLike) return node.c.next(t)
+    const end = node.c.prev(t - 1) + 1
+    return end >= node.ef || end >= t ? end : msSnapBack(t, node.c)
+  }
   const msDisplay = (node: Node, t: number): number => {
     const preferStart = node.startLike || node.pinnedLow
     if (preferStart) return node.c.isWork(t) || !node.c.isWork(t - 1) ? t : t - 1
@@ -308,6 +318,9 @@ export function runCpm(input: CpmInput): CpmResult {
     const kd = constraintDay(node)
     const hasK = !!k && !Number.isNaN(kd)
     node.mand = node.state === 'open' && hasK && (k!.type === 'MSO' || k!.type === 'MFO')
+    if (node.state === 'progress' && hasK && START_CONSTRAINTS.has(k!.type)) {
+      warnings.push(`Activity ${a.code}: ${k!.type} start constraint ignored because the activity has an actual start (as P6).`)
+    }
 
     if (node.state === 'progress') {
       const as = dateNum(a.actualStart)
@@ -449,7 +462,8 @@ export function runCpm(input: CpmInput): CpmResult {
     }
 
     const d = node.state === 'progress' ? remainingOf(node) : node.dur
-    if (hasK) {
+    // P6 ignores start constraints (SNET/SNLT/Start On/MSO) once an activity has an actual start.
+    if (hasK && !(node.state === 'progress' && START_CONSTRAINTS.has(k!.type))) {
       if (k!.type === 'SNLT' || k!.type === 'SO') startUB = Math.min(startUB, kd)
       else if (k!.type === 'FNLT' || k!.type === 'FO') finishUB = Math.min(finishUB, kd + 1)
     }
@@ -489,6 +503,7 @@ export function runCpm(input: CpmInput): CpmResult {
     violations.push({ id: node.a.id, type: k.type as 'MSO' | 'MFO', constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
     warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
+  const linkFloat: CpmLinkFloat[] | null = input.linkFloat ? [] : null
   for (let i = 0; i < n; i++) {
     const node = nodes[i]
     if (node.state === 'complete') { node.ff = 0; continue }
@@ -502,7 +517,9 @@ export function runCpm(input: CpmInput): CpmResult {
       const src = ed.type === 'FS' || ed.type === 'FF' ? node.ef : node.es
       const bound = shift(src, ed.lag, node.c)
       const target = ed.type === 'FS' || ed.type === 'SS' ? (q.state === 'progress' ? q.resume : q.es) : q.ef
-      ff = Math.min(ff, wdInstants(bound, target, node.c))
+      const rff = wdInstants(bound, target, node.c)
+      if (linkFloat) linkFloat.push({ from: node.a.id, to: q.a.id, type: ed.type, lag: ed.lag, freeFloat: rff })
+      ff = Math.min(ff, rff)
     }
     // No open successors: measured to the project finish, or to the required finish when earlier
     // (the same anchor total float uses).
@@ -628,7 +645,7 @@ export function runCpm(input: CpmInput): CpmResult {
   return {
     times, projectFinish, logicFinish, criticalPath, longestPath, logicLongestPath,
     ...(longestPathConstraint ? { longestPathConstraint } : {}),
-    violations, progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
+    violations, ...(linkFloat ? { linkFloat } : {}), progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
   }
 }
 

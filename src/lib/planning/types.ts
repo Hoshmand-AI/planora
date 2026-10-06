@@ -20,6 +20,11 @@ export interface WorkCalendar {
   canonical?: string
   /** Original label as written in the source file */
   sourceName?: string
+  /**
+   * A seasonal variant of another calendar (same work week, plus a winter shutdown window off): the
+   * base calendar's id. The DCMA critical path test lifts seasonal windows, which move dates by calendar, not logic.
+   */
+  seasonalBaseId?: string
 }
 
 /* ─── CPM ────────────────────────────────────────────── */
@@ -79,7 +84,12 @@ export interface CpmInput {
   mustFinishBy?: string
   /** How in-progress work that started out of sequence is scheduled. Defaults to 'retained' (P6 default). */
   progressMode?: ProgressMode
+  /** Also return each relationship's free float (CpmResult.linkFloat); off by default to keep stored plans small */
+  linkFloat?: boolean
 }
+
+/** Relationship free float: work days (predecessor calendar) the predecessor can slip before the link moves its successor; <= 0 = driving */
+export interface CpmLinkFloat { from: string; to: string; type: CpmLink['type']; lag: number; freeFloat: number }
 
 export interface CpmTimes {
   earlyStart: string
@@ -110,6 +120,8 @@ export interface CpmResult {
   logicLongestPath?: string[]
   /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
   violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
+  /** Relationship free float between open activities (only when CpmInput.linkFloat is set) */
+  linkFloat?: CpmLinkFloat[]
   progressMode: ProgressMode
   /** Any cycles found (activity ids). If non-empty, times are best-effort. */
   cycles: string[][]
@@ -147,16 +159,24 @@ export const PROJECT_TYPES = [
   'retail',
   'lab_research',
   'federal_defense',
+  'interiors_ti',
   'highway_bridge',
   'transit_rail',
   'water_wastewater',
   'utility_power',
   'industrial_process',
+  'aviation',
+  'marine_civil_works',
+  'environmental_remediation',
+  'epc_industrial',
 ] as const
 export type ProjectType = typeof PROJECT_TYPES[number]
 
 /** Horizontal / infrastructure types: their own networks, permits and long-lead items; sized by construction value, not floor area. */
-export const CIVIL_PROJECT_TYPES: readonly ProjectType[] = ['highway_bridge', 'transit_rail', 'water_wastewater', 'utility_power', 'industrial_process']
+export const CIVIL_PROJECT_TYPES: readonly ProjectType[] = [
+  'highway_bridge', 'transit_rail', 'water_wastewater', 'utility_power', 'industrial_process',
+  'aviation', 'marine_civil_works', 'environmental_remediation', 'epc_industrial',
+]
 export const isCivilType = (t: string | null | undefined): boolean => !!t && (CIVIL_PROJECT_TYPES as readonly string[]).includes(t)
 export const isProjectType = (t: unknown): t is ProjectType => typeof t === 'string' && (PROJECT_TYPES as readonly string[]).includes(t)
 /**
@@ -178,11 +198,16 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   retail: 'Retail',
   lab_research: 'Laboratory / research',
   federal_defense: 'Federal / defense facility',
+  interiors_ti: 'Interiors / tenant improvement (TI)',
   highway_bridge: 'Highway / bridge',
   transit_rail: 'Transit / rail',
   water_wastewater: 'Water / wastewater (plant, pump station, pipeline)',
   utility_power: 'Power / substation / transmission',
   industrial_process: 'Industrial / process plant',
+  aviation: 'Aviation (airfield airside / landside)',
+  marine_civil_works: 'Marine, locks, dams & tunnels',
+  environmental_remediation: 'Environmental remediation',
+  epc_industrial: 'EPC / EPCm industrial (process plant, engineer-procure-construct)',
 }
 
 export type WorkScope = 'new_construction' | 'renovation' | 'renovation_occupied' | 'addition'
@@ -208,6 +233,55 @@ export interface ProjectProfile {
   deliveryMethod?: DeliveryMethod
   /** Civil types: construction value in USD millions (their size measure instead of floor area) */
   valueMusd?: number
+  /**
+   * Interiors / TI: the actual floor numbers in scope (e.g. [12, 13, 14, 15]), ascending. Work is
+   * sequenced and labelled by these floors; `stories` is their count.
+   */
+  floors?: number[]
+  /** The project is outside the United States: no US federal/state permits, regulations or holidays. */
+  outsideUS?: boolean
+  /** Civil types: interview answers that shape the network (staging, variants, seasonal limits) */
+  civil?: CivilOptions
+  /**
+   * Scope features from the interview (e.g. 'airside', 'tunnel', 'drill_blast'). Catalog items that
+   * list `features` apply only when the project has them.
+   */
+  features?: string[]
+}
+
+/** Civil network options, built from the interview (with defaults) by civilOptionsFrom(). */
+export interface CivilOptions {
+  /** Highway: maintenance-of-traffic stages (1 = no staging) */
+  motStages?: number
+  /** Northern-state paving season / winter shutdown applies to seasonal work */
+  winterShutdown?: boolean
+  /** Right-of-way certified or not required: no ROW work in the contract schedule */
+  rowClear?: boolean
+  /** Utility relocations: none / complete before NTP / by the utility owners during the contract / in the contract */
+  utilities?: 'none' | 'complete' | 'by_others' | 'by_contractor'
+  utilityOwners?: number
+  /** Railroad: none (not required), agreement in place, or agreement still to be obtained */
+  railroad?: 'none' | 'issued' | 'pending'
+  /** In-water work is in scope (no "not required" answer on the in-water permit) */
+  inWater?: boolean
+  /** Transit: at-grade or elevated segmental guideway */
+  guideway?: 'at_grade' | 'elevated_segmental'
+  /** Transit: stations in scope */
+  stations?: number
+  /** Water / wastewater */
+  wwFacility?: 'water_treatment' | 'wastewater_treatment' | 'pump_station'
+  wwStructures?: number
+  /** Aviation */
+  airportArea?: 'airside' | 'landside' | 'both'
+  /** Marine / locks / dams / tunnels */
+  marineScope?: 'lock_dam' | 'marine_structure' | 'tunnel'
+  tunnelMethod?: 'drill_blast' | 'tbm'
+  /** Remediation */
+  groundwaterTreatment?: boolean
+  /** EPC industrial */
+  epcDelivery?: 'epc' | 'epcm'
+  heavyLifts?: boolean
+  hydrotestSystems?: number
 }
 
 /* ─── Knowledge catalogs (grounding) ─────────────────── */
@@ -216,6 +290,8 @@ export interface DurationRange { low: number; typical: number; high: number }
 
 export interface Applicability {
   projectTypes?: ProjectType[] | 'all'
+  /** Never applies to these project types (e.g. site, structure and envelope work on an interiors / TI project) */
+  excludeTypes?: ProjectType[]
   scopes?: WorkScope[]
   minSqft?: number
   minStories?: number
@@ -224,6 +300,13 @@ export interface Applicability {
   nonFederalOnly?: boolean
   /** Only on a federal installation / federal property (base access, installation work clearance) */
   federalInstallationOnly?: boolean
+  /**
+   * Not on a federal installation: state / local building-code and certificate-of-occupancy steps do
+   * not apply on federal property (the government is the authority there).
+   */
+  nonInstallationOnly?: boolean
+  /** Only when the project has all of these scope features (ProjectProfile.features) */
+  features?: string[]
   /**
    * Also applies to civil/infrastructure project types. Without it, an item that does not list the
    * civil type explicitly is treated as building-only and does not apply to bridges, plants, etc.
@@ -272,7 +355,22 @@ export interface RegionSpec {
     adverseNote: string
     /** Typical weather days per adverse month */
     weatherDaysPerAdverseMonth: number
+    /**
+     * Seasonal windows when weather-sensitive work does not run (e.g. asphalt plants closed, cold-weather
+     * roofing and concrete limits). Activities in `categories` use a calendar with these days off.
+     */
+    seasonal?: SeasonalWindow[]
   }
+}
+
+export interface SeasonalWindow {
+  id: string
+  label: string
+  /** Inclusive start and end as MM-DD; a window may wrap the new year (12-01 → 03-31) */
+  start: string
+  end: string
+  categories: CanonicalCategory[]
+  note: string
 }
 
 export interface LongLeadSpec {
@@ -295,15 +393,26 @@ export interface LongLeadSpec {
 }
 
 export interface TemplateActivity {
+  /**
+   * Unique activity key within a network when a category has several activities (civil networks:
+   * staged deck pours, per-structure leak tests). Defaults to the category; the generator's id is `t-<key>`.
+   */
+  key?: string
   category: CanonicalCategory
   name: string
   phase: Phase
   appliesWhen: Applicability
   /** Work days = base + perKsf * (sqft/1000) + perStory * stories, clamped to [min,max] */
   duration: { base: number; perKsf?: number; perStory?: number; min: number; max: number }
-  preds: { category: CanonicalCategory; type: LinkType; lag: number }[]
+  /** `key` names the predecessor activity when its category has several; otherwise the category does */
+  preds: { category: CanonicalCategory; key?: string; type: LinkType; lag: number }[]
   milestone?: boolean
   note?: string
+  /**
+   * Calendar: field work (default), 7-day (concrete cure, lab turnaround, biology) or the seasonal
+   * field calendar (paving, striping, seeding — no work in the winter shutdown).
+   */
+  calendar?: 'field' | '7d' | 'season'
 }
 
 /* ─── Semantic taxonomy ──────────────────────────────── */
@@ -324,6 +433,7 @@ export const CANONICAL_CATEGORIES = [
   'row_utilities', 'traffic_control', 'in_water_work', 'substructure', 'superstructure', 'deck', 'roadway', 'drainage',
   'pipeline', 'process_structures', 'process_equipment', 'power_equipment', 'controls_scada', 'track_systems', 'conductors',
   'startup_testing', 'cutover',
+  'signals_lighting', 'erosion_control', 'restoration', 'concrete_cure', 'tunneling', 'mass_concrete', 'remediation', 'sampling_analysis',
   'contingency', 'other',
 ] as const
 export type CanonicalCategory = typeof CANONICAL_CATEGORIES[number]
@@ -403,7 +513,7 @@ export interface ElicitationResult {
 /* ─── Generated schedule ─────────────────────────────── */
 
 export interface Override {
-  field: 'duration' | 'remove' | 'lag' | 'type' | 'add_link' | 'remove_link' | 'name'
+  field: 'duration' | 'remove' | 'lag' | 'type' | 'add_link' | 'remove_link' | 'name' | 'constraint'
   from?: unknown
   to?: unknown
   reason: string

@@ -45,6 +45,8 @@ export interface SeriesBaseline {
 export interface ScheduleAnalysis {
   version: 1
   progressMode: ProgressMode
+  /** The file's own out-of-sequence progress option (P6 SCHEDOPTIONS), when it states one */
+  fileProgressMode?: ProgressMode | null
   /** Latest finish the recalculated logic produces */
   forecastFinish: string | null
   /** Finish date written in the file header (P6 scheduled finish / MSP finish), for comparison only */
@@ -113,6 +115,8 @@ export function analyzeSchedule(input: {
   /** Used to name the calendar float is counted on */
   calendars?: WorkCalendar[]
   defaultCalendarId?: string | null
+  /** The file's own progress option (kept in the analysis so a later change can be compared with it) */
+  fileProgressMode?: ProgressMode | null
 }): ScheduleAnalysis {
   const { activities, cpm } = input
   const work = activities.filter(isWork)
@@ -226,8 +230,8 @@ export function analyzeSchedule(input: {
     )
     if (ex) {
       const R = DEFAULT_DCMA_RULES
-      if (ex.bei < R.indexTarget) bump('attention', `Baseline execution index is ${(Math.floor(ex.bei * 100) / 100).toFixed(2)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} activities complete against ${ex.due} baselined to finish by ${fmtDate(input.dataDate)}.`)
-      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} activities baselined to finish by ${fmtDate(input.dataDate)} finished late or not at all.`)
+      if (ex.bei < R.indexTarget) bump('attention', `Baseline execution index is ${(Math.floor(ex.bei * 100) / 100).toFixed(2)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} activities complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.`)
+      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} activities baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
 
@@ -250,7 +254,7 @@ export function analyzeSchedule(input: {
   }
 
   return {
-    version: 1, progressMode: cpm?.progressMode ?? 'retained', forecastFinish, reportedFinish: input.reportedFinish, mustFinishBy: input.mustFinishBy,
+    version: 1, progressMode: cpm?.progressMode ?? 'retained', fileProgressMode: input.fileProgressMode ?? null, forecastFinish, reportedFinish: input.reportedFinish, mustFinishBy: input.mustFinishBy,
     finishMilestone, varianceDays, varianceBasis, minFloat, minFloatAt, negativeFloatCount, violations, longestPath: cpm?.longestPath ?? [],
     status, statusReasons: reasons, recalc,
   }

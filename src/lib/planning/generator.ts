@@ -4,7 +4,7 @@
 
 import type {
   Answer, Assumption, CanonicalCategory, CpmResult, GeneratedSchedule, LinkType, LongLeadSpec, Override, PlanActivity, PlanLink,
-  ProjectProfile, ProjectType, Rationale, SourceRef, TemplateActivity, WorkCalendar, Weekday,
+  ProjectProfile, ProjectType, Rationale, SeasonalWindow, SourceRef, TemplateActivity, WorkCalendar, Weekday,
 } from './types'
 import { isCivilType } from './types'
 import { runCpm } from './cpm'
@@ -17,6 +17,8 @@ import { resolveRegional } from '@/lib/knowledge/regions'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel, phaseOf } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
+import { addDataCenterBackbone } from './backbone'
+import { applyEarthworkQuantity, applyFederalInstallation, applyInWaterWindow, applySeasonalCalendar } from './civil-plan'
 
 export interface GenerateInput {
   answers: Record<string, Answer>
@@ -90,7 +92,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const wwKey = (known(answers, 'calendar.workweek') as string) || '5x8'
   const ww = WORKWEEKS[wwKey] || WORKWEEKS['5x8']
   const startYear = Number(requestedStart.slice(0, 4))
-  const holidays = knownBool(answers, 'calendar.holidays') === false ? [] : usFederalHolidaysRange(startYear, startYear + 6)
+  // Outside the US, US federal holidays do not apply; local holidays are the scheduler's to add.
+  const holidays = profile.outsideUS || knownBool(answers, 'calendar.holidays') === false ? [] : usFederalHolidaysRange(startYear, startYear + 6)
   const calendars: WorkCalendar[] = [
     { id: FIELD, name: `Field work — ${ww.label}`, workDays: ww.days, hoursPerDay: ww.hours, holidays, canonical: ww.label },
     { id: CAL7, name: 'Calendar days (agency reviews, fabrication, delivery)', workDays: [0, 1, 2, 3, 4, 5, 6], hoursPerDay: 8, holidays: [], canonical: '7-day calendar' },
@@ -109,7 +112,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const notes: string[] = [
     'Permit review times and lead times are reference ranges. Verify with the Authority Having Jurisdiction and suppliers before baselining.',
   ]
-  if (regional.climate.adverseMonths.length) notes.push(`Regional climate: ${regional.climate.adverseNote}`)
+  if (regional.climate.adverseMonths.length && profile.projectType !== 'interiors_ti') notes.push(`Regional climate: ${regional.climate.adverseNote}`)
+  if (profile.outsideUS) notes.push('Project outside the US: no US permits, federal requirements or US holidays are planned. Add the local approvals and public holidays to this schedule.')
   if (start !== requestedStart) notes.push(`The target start ${requestedStart} is not a working day, so Notice to Proceed is set to the next working day, ${start}.`)
 
   /* ── NTP ── */
@@ -152,12 +156,18 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const skip = new Set<CanonicalCategory>(['ntp', 'permit_site', 'permit_building', 'permit_other', 'procurement', 'submittals', 'design_review'])
   if (civilDbb) skip.add('row_utilities')
   const tmplByCat = new Map<CanonicalCategory, TemplateActivity>(templates.map(t => [t.category, t]))
+  // Civil networks key several activities per category (t-<key>); keyed activities in a skipped
+  // category (remediation work plans, EPC PO award) are real work, not placeholders.
+  const tid = (t: TemplateActivity) => `t-${t.key ?? t.category}`
+  const seasonal = new Set<string>()
 
   for (const t of templates) {
-    if (skip.has(t.category)) continue
+    if (skip.has(t.category) && (t.key ?? t.category) === t.category) continue
     const rem = designRemaining[t.category]
     if (rem !== undefined && rem <= 0) continue
     const isMs = !!t.milestone
+    const cal7 = t.calendar === '7d'
+    if (t.calendar === 'season') seasonal.add(tid(t))
     let duration = 0
     let rationale: Rationale
     const tmplDays = computeTemplateDuration(t, profile)
@@ -173,7 +183,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
         confidence: s.projects >= 3 && s.sameType ? 'high' : 'medium',
       }
     } else {
-      duration = Math.max(1, Math.round(tmplDays * hoursFactor * (rem ?? 1)))
+      duration = Math.max(1, Math.round(tmplDays * (cal7 ? 1 : hoursFactor) * (rem ?? 1)))
       const parts = [`base ${t.duration.base}`]
       if (t.duration.perKsf && civil && profile.valueMusd) parts.push(`${t.duration.perKsf}/$1M × ${profile.valueMusd}`)
       else if (t.duration.perKsf && profile.grossSqft) parts.push(`${t.duration.perKsf}/1,000 sf × ${Math.round(profile.grossSqft / 1000)}`)
@@ -186,8 +196,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       }
     }
     b.add({
-      id: `t-${t.category}`, name: t.name, category: t.category, phase: t.phase, type: isMs ? 'milestone' : 'task',
-      duration, calendarId: FIELD, rationale,
+      id: tid(t), name: t.name, category: t.category, phase: t.phase, type: isMs ? 'milestone' : 'task',
+      duration, calendarId: cal7 ? CAL7 : FIELD, rationale,
     })
   }
 
@@ -241,11 +251,14 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const t = tmplByCat.get(cat)
     return t ? t.preds.flatMap(p => resolvePred(p.category, seen)) : []
   }
+  // A keyed predecessor (civil) links to that activity; design phases resolve through their reviews.
+  const predIds = (p: TemplateActivity['preds'][number]): string[] =>
+    p.key && b.acts.has(`t-${p.key}`) && !(p.key === p.category && p.category.startsWith('design')) ? [`t-${p.key}`] : resolvePred(p.category)
   for (const t of templates) {
-    const id = `t-${t.category}`
+    const id = tid(t)
     if (!b.acts.has(id) || designChain.includes(id)) continue
     for (const p of t.preds) {
-      for (const from of resolvePred(p.category)) b.link(from, id, p.type, p.type === 'FS' ? p.lag : Math.round(p.lag * hoursFactor), tmplLogic(t, p.category, p.type, p.lag))
+      for (const from of predIds(p)) b.link(from, id, p.type, p.type === 'FS' ? p.lag : Math.round(p.lag * hoursFactor), tmplLogic(t, p.category, p.type, p.lag))
     }
   }
 
@@ -316,12 +329,31 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     b.link(first, gate, 'FS', 0, { summary: `${b.acts.get(gate)?.name || 'Work'} cannot start until the ${pm.name} is issued.`, sources: [catalogSrc], confidence: 'high' })
   }
 
+  /* ── Work that exists only to obtain permits the team says are not required or already issued ── */
+  const permitStatus = (id: string) => known(answers, `permit.${id}.status`)
+  for (const [cat, ids] of Object.entries(PERMIT_WORK) as [CanonicalCategory, string[]][]) {
+    const id = `t-${cat}`
+    const asked = bank.permits.filter(pm => ids.includes(pm.id))
+    if (!b.acts.has(id) || !asked.length) continue
+    if (!asked.every(pm => permitStatus(pm.id) === 'not_required' || permitStatus(pm.id) === 'issued')) continue
+    const reason = asked.map(pm => `${pm.name} ${permitStatus(pm.id) === 'issued' ? 'already issued' : 'not required'}`).join('; ')
+    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Planora', at: today })
+    if (b.byCat.get(cat) === id) b.byCat.delete(cat)
+    assumptions.push({ questionId: `permit.${asked[0].id}.status`, text: `${categoryLabel(cat)} removed: ${reason} (from the interview).`, bufferDays: 0, kind: 'inferred' })
+  }
+
   /* ── Long-lead procurement ── */
-  const submittalStart = earlyPackages ? ddDone : designDone
+  // EPC: long-lead equipment is bought off the process design basis (its own PO-award activity).
+  const submittalStart = b.acts.has('t-ll_po_award') ? 't-ll_po_award' : earlyPackages ? ddDone : designDone
   // The activity an item is installed in: a more specific one when this network has it (a data
   // center's generator set-in), otherwise the catalog's gate.
   const installCategory = (it: LongLeadSpec): CanonicalCategory => it.installsIn?.find(c => b.acts.has(`t-${c}`)) ?? it.gates
-  const installTarget = (it: LongLeadSpec): string => gateTarget(installCategory(it))
+  // A delivery always feeds the work that installs it. When this network has no such activity (a roof
+  // or steel package on a renovation), one is added, so a delivery never gates mobilization or demolition.
+  const installTarget = (it: LongLeadSpec): string => {
+    const cat = mapToSelected(installCategory(it), profile)
+    return resolveCat(cat) ?? addInstallActivity(b, cat, it, profile, { hoursFactor, resolveCat, ntpId: ntp.id })
+  }
   for (const it of bank.longLead) {
     const qid = `procure.${it.id}.status`
     const a = answers[qid]
@@ -378,7 +410,9 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const outOfScope = (it: LongLeadSpec) => known(answers, `procure.${it.id}.status`) === 'not_in_scope'
   for (const cat of NOT_IN_SCOPE_REMOVABLE) {
     const id = `t-${cat}`
-    if (!b.acts.has(id)) continue
+    // Civil networks can hold several activities of the category (staged girder sets, equipment by structure).
+    const ids = civil ? [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-')).map(a => a.id) : b.acts.has(id) ? [id] : []
+    if (!ids.length) continue
     const items = bank.longLead.filter(it => installCategory(it) === cat)
     if (!items.length) continue
     const out = items.filter(outOfScope)
@@ -390,20 +424,30 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const reason = `${out.map(it => it.name).join(', ')} answered "Not in scope" in the interview`
     if (inScope.length) {
       // The defining system is out but others installed here are not: keep the work, named for what remains.
-      const act = b.acts.get(id)!
-      act.name = `Install ${inScope.map(it => midSentence(it.name)).join(' and ')}`
-      act.rationale = { ...act.rationale, assumptions: [...(act.rationale.assumptions || []), `${reason}; this activity now covers only the items still in scope.`] }
+      for (const aid of ids) {
+        const act = b.acts.get(aid)!
+        act.name = `Install ${inScope.map(it => midSentence(it.name)).join(' and ')}`
+        act.rationale = { ...act.rationale, assumptions: [...(act.rationale.assumptions || []), `${reason}; this activity now covers only the items still in scope.`] }
+      }
       assumptions.push({ questionId: `procure.${definer}.status`, text: `${categoryLabel(cat)}: ${reason}; the activity covers only ${inScope.map(it => midSentence(it.name)).join(' and ')}.`, bufferDays: 0, kind: 'inferred' })
       continue
     }
-    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Planora', at: today })
-    if (b.byCat.get(cat) === id) b.byCat.delete(cat)
+    for (const aid of ids) removeActivityBridging(b, aid, { field: 'remove', reason, by: 'Planora', at: today })
+    if (b.byCat.has(cat) && !b.acts.has(b.byCat.get(cat)!)) b.byCat.delete(cat)
     assumptions.push({ questionId: `procure.${out[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${out.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
+  }
+
+  /* ── Data centers: the mission-critical backbone as separate activities ── */
+  if (profile.projectType === 'data_center') {
+    addDataCenterBackbone(b, { ksf: (profile.grossSqft && profile.grossSqft > 0 ? profile.grossSqft : 50000) / 1000, hoursFactor, calendarId: FIELD })
   }
 
   /* ── Regulations that add activities ── */
   for (const r of bank.regulations) {
     if (!r.addsActivity) continue
+    // An inspection that follows a permit is not planned when the team says that permit is not required.
+    const needs = REGULATION_NEEDS_PERMIT[r.id]
+    if (needs && permitStatus(needs) === 'not_required') continue
     const tri = appliesTri(r.appliesWhen, profile)
     const said = knownBool(answers, `reg.${r.id}.applies`)
     // Unknown applicability is carried conservatively; only an explicit "no" drops it, and an explicit
@@ -448,16 +492,30 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     }
   }
 
+  /* ── Civil quantities and federal-installation wording ── */
+  if (civil) applyEarthworkQuantity(b.acts, answers, profile, hoursFactor)
+  applyFederalInstallation(b.acts, profile, assumptions)
+
   /* ── Close open ends so every activity has a predecessor and successor ── */
   const finishId = resolveCat('final_completion') || scId || [...b.acts.keys()].pop()!
   closeOpenEnds(b, ntp.id, finishId, scId)
   decompose(b, profile)
   // Splitting at an overlap point can leave a tail segment whose only successor was the overlap.
   closeOpenEnds(b, ntp.id, finishId, scId)
+  // Paving, striping and seeding in a northern winter shutdown: seasonal calendar (after splitting).
+  if (civil) applySeasonalCalendar(b.acts, calendars, seasonal, calendars[0], notes, assumptions)
+
+  /* ── Seasonal windows (northern winters): weather-sensitive work runs on a calendar with the window off ── */
+  // Building types only: civil networks carry their own winter shutdown (applySeasonalCalendar above).
+  if (!civil && knownBool(answers, 'calendar.weather') !== false && regional.climate.seasonal?.length) {
+    applySeasonalWindows(b, calendars, regional.climate.seasonal, startYear, profile.state, notes)
+  }
 
   /* ── First CPM pass (needed to place weather + contingency) ── */
   const mustFinishBy = known(answers, 'project.required_finish') as string | undefined
   let cpm = cpmOf(b, calendars, start, mustFinishBy)
+  // In-water work held to the permit window (needs the first pass to find the season the work is ready in).
+  if (civil) cpm = applyInWaterWindow(b.acts, cpm, () => cpmOf(b, calendars, start, mustFinishBy), answers, notes, assumptions)
 
   /* ── Weather allowance from regional climate ── */
   const earth = resolveCat('earthwork') || resolveCat('foundations')
@@ -503,9 +561,12 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const target = known(answers, `milestone.${m.key}.target`)
     if (typeof target !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target)) continue
     const cat = mapToSelected(m.category, profile)
-    // The last segment of the category's work package is where the milestone is reached.
-    const candidates = [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-'))
-    const endAct = candidates.sort((x, y) => x.id.localeCompare(y.id, undefined, { numeric: true })).pop()
+    // The last segment of the category's work package is where the milestone is reached. Civil networks
+    // with several activities in the category use the named activity, else the one that finishes last.
+    const byKey = m.activityKey ? [...b.acts.values()].filter(a => a.id === `t-${m.activityKey}` || a.id.startsWith(`t-${m.activityKey}#`)) : []
+    const candidates = byKey.length ? byKey : [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-'))
+    const ef = (a: PlanActivity) => (civil ? cpm.times[a.id]?.earlyFinish ?? '' : '')
+    const endAct = candidates.sort((x, y) => ef(x).localeCompare(ef(y)) || x.id.localeCompare(y.id, undefined, { numeric: true })).pop()
     if (!endAct) continue
     endAct.constraint = { type: 'FNLT', date: target }
     endAct.rationale = { ...endAct.rationale, assumptions: [...(endAct.rationale.assumptions || []), `Must finish by the “${m.label}” target of ${target} (from the interview).`] }
@@ -566,6 +627,106 @@ const DEFINING_ITEM: Partial<Record<ProjectType | 'all', Partial<Record<Canonica
   all: { elevators: 'elevators' },
   transit_rail: { power_equipment: 'civ-traction-power', track_systems: 'civ-special-trackwork', controls_scada: 'civ-signal-equipment' },
 }
+/**
+ * Template work packages that exist to obtain permits/agreements: when every one of those permits is
+ * answered "not required" or "issued", the work package goes too (no review time on the critical path).
+ */
+const PERMIT_WORK: Partial<Record<CanonicalCategory, string[]>> = {
+  row_utilities: ['us-row-certification', 'us-railroad-agreement'],
+}
+/** Regulation activities that only exist because of a permit (the TDLR RAS inspection follows the TDLR registration). */
+const REGULATION_NEEDS_PERMIT: Record<string, string> = {
+  'tx-ras-inspection': 'tx-tdlr-tas',
+}
+
+/** Installation activity names when a procured item's own installation is not in the template network. */
+const INSTALL_NAMES: Partial<Record<CanonicalCategory, string>> = {
+  roofing: 'Roof replacement / repairs (membrane, insulation & flashing)',
+  structure_steel: 'Structural steel modifications & reinforcing',
+  structure_concrete: 'Structural concrete modifications & repairs',
+  structure_wood: 'Wood framing modifications',
+  exterior_skin: 'Exterior cladding replacement / repairs',
+  windows_curtainwall: 'Window, storefront & curtain wall replacement',
+  elevators: 'Elevator installation / modernization & AHJ acceptance',
+  electrical_service: 'Electrical service equipment — set, terminate & energize',
+  mechanical_equipment: 'Set & connect mechanical equipment',
+}
+/** Fraction of the new-construction template duration an installation on existing work takes. */
+const INSTALL_SCALE: Partial<Record<CanonicalCategory, number>> = { structure_steel: 0.3, structure_concrete: 0.3, structure_wood: 0.3, exterior_skin: 0.5, windows_curtainwall: 0.6 }
+/** What an added installation must finish before (first one present in the network). */
+const INSTALL_BEFORE: Partial<Record<CanonicalCategory, CanonicalCategory[]>> = {
+  structure_steel: ['mep_rough', 'framing_drywall'], structure_concrete: ['mep_rough', 'framing_drywall'], structure_wood: ['mep_rough', 'framing_drywall'],
+  foundations: ['mep_rough'], roofing: ['finishes', 'framing_drywall'], exterior_skin: ['finishes'], windows_curtainwall: ['finishes'],
+  mep_rough: ['framing_drywall'], framing_drywall: ['finishes'], mechanical_equipment: ['commissioning'], electrical_service: ['commissioning'],
+}
+
+/**
+ * Add the installation activity for a procured item whose installation is not in this network (e.g.
+ * a roof on a renovation): after demolition (or mobilization), before the work it must precede.
+ */
+function addInstallActivity(b: Builder, cat: CanonicalCategory, it: LongLeadSpec, profile: ProjectProfile,
+  ctx: { hoursFactor: number; resolveCat: (c: CanonicalCategory) => string | undefined; ntpId: string }): string {
+  const id = `install-${cat}`
+  const existing = b.acts.get(id)
+  if (existing) {
+    existing.rationale = { ...existing.rationale, assumptions: [...(existing.rationale.assumptions || []), `Also installs ${midSentence(it.name)}.`] }
+    return id
+  }
+  const def = genericVariant(cat)
+  const scale = INSTALL_SCALE[cat] ?? 1
+  const duration = def && !def.milestone ? Math.max(1, Math.round(computeTemplateDuration(def, profile) * scale * ctx.hoursFactor)) : 10
+  const why = `The interview has ${midSentence(it.name)} in scope, but this ${profile.scope?.startsWith('renovation') ? 'renovation' : 'project'}'s network had no activity installing it, so one was added for the delivery to feed (not mobilization).`
+  b.add({
+    id, name: INSTALL_NAMES[cat] ?? `Install ${midSentence(it.name)}`, category: cat, phase: phaseOf(cat), type: 'task', duration, calendarId: FIELD,
+    rationale: {
+      summary: `${duration} work days${scale !== 1 ? ` (${Math.round(scale * 100)}% of the new-construction template)` : ''}. ${why}`,
+      sources: [src('template', 'Planora activity template'), src('user', 'Item in scope (procurement question)')],
+      confidence: 'low',
+      assumptions: ['Answer the item "Not in scope" if this work is not part of the project.'],
+    },
+  })
+  const after = ctx.resolveCat('demolition') ?? ctx.resolveCat('mobilization') ?? ctx.ntpId
+  b.link(after, id, 'FS', 0, { summary: 'Installation on existing work follows demolition / site setup.', sources: [src('template', 'Installation fallback')], confidence: 'medium' })
+  const before = (INSTALL_BEFORE[cat] ?? []).map(ctx.resolveCat).find((x): x is string => !!x)
+  if (before) b.link(id, before, 'FS', 0, { summary: `${categoryLabel(cat)} work precedes ${midSentence(b.acts.get(before)?.name || 'the following work')}.`, sources: [src('template', 'Installation fallback')], confidence: 'medium' })
+  return id
+}
+
+/** Every date in the window (MM-DD to MM-DD, wrapping the new year) for the given years. */
+export function seasonalDates(w: SeasonalWindow, fromYear: number, toYear: number): string[] {
+  const out: string[] = []
+  const wraps = w.end < w.start
+  for (let y = fromYear - 1; y <= toYear; y++) {
+    let d = `${y}-${w.start}`
+    const end = `${wraps ? y + 1 : y}-${w.end}`
+    while (d <= end) {
+      out.push(d)
+      d = addCalendarDays(d, 1)
+    }
+  }
+  return out
+}
+
+/** Give the categories in each seasonal window a field calendar with the window as non-work days. */
+function applySeasonalWindows(b: Builder, calendars: WorkCalendar[], windows: SeasonalWindow[], startYear: number, state: string | undefined, notes: string[]) {
+  const field = calendars.find(c => c.id === FIELD)!
+  for (const w of windows) {
+    const acts = [...b.acts.values()].filter(a => a.calendarId === FIELD && a.type === 'task' && w.categories.includes(a.category))
+    if (!acts.length) continue
+    const id = `cal-season-${w.id}`
+    const off = seasonalDates(w, startYear, startYear + 6)
+    calendars.push({
+      ...field, id, seasonalBaseId: FIELD, name: `${field.name} — ${w.label} (${w.start.replace('-', '/')}–${w.end.replace('-', '/')} off)`,
+      holidays: [...new Set([...field.holidays, ...off])].sort(), canonical: field.canonical,
+    })
+    for (const a of acts) {
+      a.calendarId = id
+      a.rationale = { ...a.rationale, assumptions: [...(a.rationale.assumptions || []), `${w.label}: no work ${w.start.replace('-', '/')}–${w.end.replace('-', '/')} (MM/DD). ${w.note}`] }
+    }
+    notes.push(`${w.label}${state ? ` (${state})` : ''}: ${acts.length} activit${acts.length === 1 ? 'y uses' : 'ies use'} a calendar with ${w.start.replace('-', '/')}–${w.end.replace('-', '/')} as non-work days. ${w.note}`)
+  }
+}
+
 /** Permits the owner obtains before letting a design-bid-build civil contract. */
 const OWNER_PRELETTING_PERMITS = new Set(['us-row-certification'])
 
@@ -598,27 +759,59 @@ function closeOpenEnds(b: Builder, startId: string, finishId: string, scId?: str
 /** DCMA check 8: field activities longer than this are split so progress is measurable. */
 export const MAX_FIELD_DURATION = 44
 const SEGMENT_TARGET = 40
-const LEVEL_PHASES = new Set(['structure', 'mep', 'interiors'])
+/** Work packages that move up the building level by level (or floor by floor on a fit-out). */
+const LEVEL_CATEGORIES = new Set<CanonicalCategory>([
+  'structure_steel', 'structure_concrete', 'structure_wood', 'mep_rough', 'fire_protection', 'low_voltage', 'process_equipment',
+  'framing_drywall', 'finishes', 'specialties', 'abatement', 'demolition',
+])
+/** Interiors / TI: trades that follow each other floor by floor, as a GC sequences a multi-floor fit-out. */
+const TI_FLOOR_FLOW = new Set<CanonicalCategory>(['abatement', 'demolition', 'mep_rough', 'fire_protection', 'low_voltage', 'framing_drywall', 'finishes', 'specialties'])
+const MAX_SEGMENTS = 12
 
-function segmentLabel(phase: string, i: number, n: number, stories?: number): string {
-  if (LEVEL_PHASES.has(phase) && stories && stories >= n) {
-    const per = Math.ceil(stories / n)
-    const lo = i * per + 1, hi = Math.min(stories, (i + 1) * per)
-    return lo === hi ? `Level ${lo}` : `Levels ${lo}–${hi}`
+/** The floor numbers work is labelled with: the fit-out's actual floors, else levels 1…stories. */
+function floorsOf(profile: ProjectProfile): number[] | undefined {
+  if (profile.floors?.length) return profile.floors
+  return profile.stories && profile.stories > 0 ? Array.from({ length: Math.round(profile.stories) }, (_, i) => i + 1) : undefined
+}
+
+function floorRange(fl: number[], word: string): string {
+  if (fl.length === 1) return `${word} ${fl[0]}`
+  const consecutive = fl.every((f, i) => i === 0 || f === fl[i - 1] + 1)
+  return `${word}s ${consecutive ? `${fl[0]}–${fl[fl.length - 1]}` : fl.join(', ')}`
+}
+
+/**
+ * Name of segment i of n. Level/floor ranges are ascending, never beyond the building's floors, and
+ * cover every floor exactly once; foundations go by area and elevators by installation stage.
+ */
+export function segmentLabel(category: CanonicalCategory, phase: string, i: number, n: number, profile: ProjectProfile): string {
+  const floors = floorsOf(profile)
+  if (LEVEL_CATEGORIES.has(category) && floors && floors.length >= n) {
+    const lo = Math.floor((i * floors.length) / n), hi = Math.floor(((i + 1) * floors.length) / n)
+    return floorRange(floors.slice(lo, hi), profile.projectType === 'interiors_ti' ? 'Floor' : 'Level')
   }
+  if (category === 'elevators') return n === 2 ? ['rails, machines & cars', 'adjust, test & AHJ acceptance'][i] : `Stage ${i + 1} of ${n}`
   return phase === 'envelope' ? `Sequence ${i + 1} of ${n}` : `Area ${i + 1} of ${n}`
+}
+
+/** n segment durations that differ by at most one day (the longer ones first). */
+export function evenSplit(total: number, n: number): number[] {
+  const base = Math.floor(total / n)
+  return Array.from({ length: n }, (_, i) => base + (i < total - base * n ? 1 : 0))
 }
 
 /**
  * Detail long field activities into ≤44-day segments (by level where the building has enough
  * floors, else by area) and restate overlaps as finish-to-start links between segments instead of
  * SS lags and leads. This is how a scheduler takes a summary network to Level 3, and it keeps the
- * DCMA lag/lead/relationship-type/high-duration checks honest.
+ * DCMA lag/lead/relationship-type/high-duration checks honest. Segments are always even (they differ
+ * by at most a day); an overlap point is taken at the nearest segment boundary. On a multi-floor
+ * interiors / TI project the interior trades are split per floor so they follow each other up the floors.
  */
 function decompose(b: Builder, profile: ProjectProfile) {
   const segs = new Map<string, string[]>()
   const segDur = new Map<string, number[]>()
-  // Overlap points: a successor that starts N days into a predecessor needs a segment boundary at N.
+  // Overlap points: a successor that starts N days into a predecessor needs a segment boundary near N.
   const cuts = new Map<string, Set<number>>()
   b.links.forEach(l => {
     const a = b.acts.get(l.from)
@@ -627,27 +820,25 @@ function decompose(b: Builder, profile: ProjectProfile) {
       cuts.get(a.id)!.add(l.lag)
     }
   })
+  const tiFloors = profile.projectType === 'interiors_ti' && (profile.floors?.length ?? 0) >= 2 ? profile.floors!.length : 0
   for (const a of [...b.acts.values()]) {
     const long = a.duration > MAX_FIELD_DURATION
-    if (a.type !== 'task' || a.calendarId !== FIELD || a.placeholder || a.category === 'contingency' || a.phase === 'design' || (!long && !cuts.has(a.id))) continue
-    let durs: number[]
-    if (long) {
-      const n = Math.ceil(a.duration / SEGMENT_TARGET)
-      const base = Math.floor(a.duration / n)
-      durs = Array.from({ length: n }, (_, i) => base + (i < a.duration - base * n ? 1 : 0))
-    } else {
-      const points = [...cuts.get(a.id)!].sort((x, y) => x - y)
-      durs = points.map((p2, i) => p2 - (i ? points[i - 1] : 0)).concat(a.duration - points[points.length - 1])
-    }
-    const n = durs.length
+    const floorFlow = tiFloors > 0 && TI_FLOOR_FLOW.has(a.category) && a.id.startsWith('t-')
+    if (a.type !== 'task' || a.calendarId !== FIELD || a.placeholder || a.category === 'contingency' || a.phase === 'design' || (!long && !cuts.has(a.id) && !floorFlow)) continue
+    let n = long ? Math.ceil(a.duration / SEGMENT_TARGET) : 1
+    if (cuts.has(a.id) && !long) n = Math.max(n, Math.round(a.duration / Math.min(...cuts.get(a.id)!)))
+    if (floorFlow) n = Math.max(n, tiFloors)
+    n = Math.min(Math.max(n, 2), MAX_SEGMENTS, a.duration)
+    if (n < 2) continue
+    const durs = evenSplit(a.duration, n)
     const ids: string[] = []
     b.acts.delete(a.id)
     durs.forEach((d, i) => {
       const id = `${a.id}#${i + 1}`
       ids.push(id)
       b.acts.set(id, {
-        ...a, id, duration: d, name: `${a.name} — ${segmentLabel(a.phase, i, n, profile.stories)}`,
-        rationale: { ...a.rationale, summary: `${a.rationale.summary} ${long ? `Split into ${n} segments of ≤${MAX_FIELD_DURATION} work days (total ${a.duration}) so progress can be measured.` : `Split at the point where following trades can start (total ${a.duration} days).`}` },
+        ...a, id, duration: d, name: `${a.name} — ${segmentLabel(a.category, a.phase, i, n, profile)}`,
+        rationale: { ...a.rationale, summary: `${a.rationale.summary} ${floorFlow ? `Split floor by floor into ${n} even segments (total ${a.duration} days) so the trades follow each other up the floors.` : long ? `Split into ${n} even segments of ≤${MAX_FIELD_DURATION} work days (total ${a.duration}) so progress can be measured.` : `Split into ${n} even segments (total ${a.duration} days) at about the point where following trades can start.`}` },
       })
     })
     if (b.byCat.get(a.category) === a.id) b.byCat.set(a.category, ids[0])
@@ -659,13 +850,18 @@ function decompose(b: Builder, profile: ProjectProfile) {
 
   const first = (id: string) => segs.get(id)?.[0] ?? id
   const last = (id: string) => { const s2 = segs.get(id); return s2 ? s2[s2.length - 1] : id }
-  /** Segment of `id` in which cumulative work first reaches `days` (whole activity if not split). */
+  /** Segment of `id` whose finish is nearest to `days` of work (ties go to the later one; whole activity if not split). */
   const segmentAt = (id: string, days: number): string => {
     const ids = segs.get(id), durs = segDur.get(id)
     if (!ids || !durs) return id
-    let cum = 0
-    for (let i = 0; i < ids.length; i++) { cum += durs[i]; if (cum >= days) return ids[i] }
-    return ids[ids.length - 1]
+    let cum = 0, best = 0, bestGap = Infinity
+    for (let i = 0; i < ids.length; i++) {
+      cum += durs[i]
+      const gap = Math.abs(cum - days)
+      if (gap <= bestGap) { best = i; bestGap = gap }
+      if (cum >= days) break
+    }
+    return ids[best]
   }
   const durOf = (id: string) => segDur.get(id)?.reduce((x, y) => x + y, 0) ?? b.acts.get(id)?.duration ?? 0
 

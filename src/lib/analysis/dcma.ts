@@ -56,6 +56,10 @@ export function normalizeDcmaRules(raw: unknown): DcmaRules {
   return { maxPct: n('maxPct', 1, 25), minFsPct: n('minFsPct', 50, 100), highFloatDays: n('highFloatDays', 10, 260), highDurationDays: n('highDurationDays', 5, 260), indexTarget: n('indexTarget', 0.8, 1, 0.01) }
 }
 const HARD_CONSTRAINTS = new Set(['MSO', 'MFO', 'SO', 'FO', 'SNLT', 'FNLT'])
+const CONSTRAINT_LABEL: Record<string, string> = {
+  SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before',
+  SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish',
+}
 
 export function isCompleteActivity(a: AnalyzableActivity): boolean {
   return !!a.actualFinish || a.status === 'complete' || (a.percentComplete ?? 0) >= 100
@@ -135,7 +139,8 @@ function indexText(v: number, ok: boolean, target: number): string {
 
 /**
  * Execution against the baseline as of the data date (DCMA #11 Missed Tasks and #14 BEI): work
- * baselined to finish by the data date vs work actually finished. Null when it cannot be measured
+ * baselined to finish strictly BEFORE the data date vs work actually finished. The data date is the
+ * first day of the remaining work, so work baselined to finish on it is not yet due (DCMA guidance). Null when it cannot be measured
  * (no data date, no baselines, a fresh baseline, or nothing due yet).
  */
 export function baselineExecution(activities: AnalyzableActivity[], dataDate: string | null | undefined): { due: number; missed: number; completed: number; bei: number; dueCodes: string[]; missedCodes: string[]; openDueCodes: string[] } | null {
@@ -144,7 +149,7 @@ export function baselineExecution(activities: AnalyzableActivity[], dataDate: st
   const withBaseline = all.filter((a) => isValidDate(a.baselineFinish))
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
   if (!firstBaseline || toDayNumber(dataDate) <= toDayNumber(firstBaseline)) return null
-  const due = withBaseline.filter((a) => toDayNumber(a.baselineFinish!) <= toDayNumber(dataDate))
+  const due = withBaseline.filter((a) => toDayNumber(a.baselineFinish!) < toDayNumber(dataDate))
   if (!due.length) return null
   const missed = due.filter((a) => !isValidDate(a.actualFinish) || toDayNumber(a.actualFinish) > toDayNumber(a.baselineFinish!))
   const completed = all.filter(isCompleteActivity).length
@@ -369,9 +374,10 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   // start milestone baselined on the data date is not "missed".
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
   const freshBaseline = !!dataDate && !!firstBaseline && toDayNumber(dataDate) <= toDayNumber(firstBaseline)
-  const due = dataDate && !freshBaseline ? withBaseline.filter((a) => toDayNumber(a.baselineFinish!) <= toDayNumber(dataDate)) : []
+  // Due = baselined to finish strictly before the data date (the data date itself is remaining time).
+  const due = dataDate && !freshBaseline ? withBaseline.filter((a) => toDayNumber(a.baselineFinish!) < toDayNumber(dataDate)) : []
   if (!dataDate || !withBaseline.length || !due.length) {
-    const why = !dataDate ? 'No data date is set.' : !withBaseline.length ? 'The schedule has no baseline dates.' : freshBaseline ? 'This is a fresh baseline: the data date is on or before the first baselined start, so nothing is due yet.' : 'No baselined work was due by the data date.'
+    const why = !dataDate ? 'No data date is set.' : !withBaseline.length ? 'The schedule has no baseline dates.' : freshBaseline ? 'This is a fresh baseline: the data date is on or before the first baselined start, so nothing is due yet.' : 'No baselined work was due before the data date.'
     add(na(11, 'Missed tasks', `≤ ${R.maxPct}%`, `${why} Missed tasks cannot be measured.`))
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
@@ -380,15 +386,33 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       id: 11, name: 'Missed tasks', metric: pct(ex.missed, due.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
       offenders: cap(ex.missedCodes),
       explanation: ok
-        ? 'Work baselined to finish by the data date has essentially all finished on time.'
-        : `${ex.missed} of ${due.length} activities baselined to finish by ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
+        ? 'Work baselined to finish before the data date has essentially all finished on time.'
+        : `${ex.missed} of ${due.length} activities baselined to finish before ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
     })
   }
 
   /* 12. Critical path test */
   {
-    const inp = scheduleToCpmInput(s)
-    const base = cpm()
+    // Seasonal nonwork moves dates by calendar, not by logic, and a 600-day shift lands work in a
+    // different season, moving the finish by more or less than 600 days with the logic intact. The test
+    // is about logic, so it runs with both kinds of seasonal nonwork lifted: seasonal-window calendars
+    // (seasonalBaseId, e.g. a northern winter window) fall back to their base calendar, and long
+    // shutdown runs (holiday runs of two weeks or more, e.g. no paving December-March) are taken out.
+    const raw = scheduleToCpmInput(s)
+    const seasonalBase = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId).map((c) => [c.id, c.seasonalBaseId!]))
+    const shutdowns = !!raw && raw.calendars.some((c) => shutdownDays(c).size > 0)
+    const seasonal = seasonalBase.size > 0 || shutdowns
+    const inp = raw && seasonal
+      ? {
+          ...raw,
+          calendars: shutdowns ? raw.calendars.map(withoutShutdowns) : raw.calendars,
+          activities: seasonalBase.size
+            ? raw.activities.map((a) => (a.calendarId && seasonalBase.has(a.calendarId) ? { ...a, calendarId: seasonalBase.get(a.calendarId) } : a))
+            : raw.activities,
+        }
+      : raw
+    let base: CpmResult | null
+    try { base = seasonal && inp ? runCpm(inp) : cpm() } catch { base = null }
     const thr = `finish moves ${CP_TEST_DAYS}d`
     const tol = Math.max(2, Math.round(CP_TEST_DAYS * 0.02))
     // Mandatory constraints (MSO/MFO) on the driving path hold dates by typing them in, not by logic.
@@ -420,20 +444,51 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
         }
         try {
           const after = runCpm(bumped)
-          const cal = (target.calendarId && calById.get(target.calendarId)) || defaultCal
+          // Counted on the calendars the test ran with (seasonal nonwork lifted).
+          const testCals = new Map(inp.calendars.map((c) => [c.id, c]))
+          const testDefault = (s.defaultCalendarId && testCals.get(s.defaultCalendarId)) || inp.calendars[0] || defaultCal
+          const calOf = (id: string | undefined) => {
+            const a = id ? inp.activities.find((x) => x.id === id) : undefined
+            return (a?.calendarId && testCals.get(a.calendarId)) || testDefault
+          }
+          const cal = calOf(targetId)
+          const endId = base.longestPath[base.longestPath.length - 1] ?? path[path.length - 1]
+          // Counted in the target's work days, and in the finish activity's: nonwork periods that only
+          // one of the calendars has make the two counts differ.
           const delta = workDaysBetween(base.projectFinish, after.projectFinish, cal)
-          // A 600-day shift moves work into different years, so holiday placement and 5-day/7-day
-          // calendar transitions add a little noise; a broken path absorbs far more than 2%.
-          const ok = Math.abs(delta - CP_TEST_DAYS) <= tol
+          const deltaAtFinish = workDaysBetween(base.projectFinish, after.projectFinish, calOf(endId))
+          const within = (d: number) => Math.abs(d - CP_TEST_DAYS) <= tol
+          // Continuity itself: after the delay the target still drives the same finish activity through
+          // the longest path and the finish moved. Holds whatever nonwork periods the calendars add.
+          const afterEnd = after.longestPath[after.longestPath.length - 1]
+          const drives = after.longestPath.includes(targetId) && afterEnd === endId && toDayNumber(after.projectFinish) > toDayNumber(base.projectFinish)
+          const ok = within(delta) || within(deltaAtFinish) || drives
+          const calNote = !within(delta) && ok
+            ? ` (${delta} work days on ${target.code}'s calendar${deltaAtFinish !== delta ? `, ${deltaAtFinish} on the finish activity's` : ''}: the calendars' nonwork periods, such as seasonal shutdowns, account for the difference, and ${target.code} still drives the finish)`
+            : ''
           const moved = delta === CP_TEST_DAYS
             ? 'pushed the project finish by the same amount'
-            : `pushed the project finish by ${delta} work days (within the ${tol}-day allowance for holidays and calendar changes over that span)`
+            : `pushed the project finish by ${delta} work days${calNote || ` (within the ${tol}-day allowance for holidays and calendar changes over that span)`}`
+          // Where the delay stopped: the first activity after the target on the path whose finish moved
+          // less than half as far (calendar days) as the target's, and the constraint on it, if any.
+          const calShift = (id: string) => {
+            const b = base.times[id], x = after.times[id]
+            return b && x ? toDayNumber(x.earlyFinish) - toDayNumber(b.earlyFinish) : 0
+          }
+          const targetShift = calShift(targetId)
+          const stopId = ok ? undefined : path.slice(path.indexOf(targetId) + 1).find((id) => calShift(id) < targetShift / 2)
+          const stopAct = stopId ? inp.activities.find((x) => x.id === stopId) : undefined
+          const stopText = stopAct
+            ? stopAct.constraint
+              ? `the delay stops at ${stopAct.code}, held by its ${CONSTRAINT_LABEL[stopAct.constraint.type] ?? stopAct.constraint.type} constraint ${fmtDate(stopAct.constraint.date)}`
+              : `the delay stops at ${stopAct.code}, so the path is broken there by missing logic, a lag or a relationship type`
+            : null
           const why = pinnedAny.length
             ? `the finish is held by a mandatory constraint on ${pinText(pinnedAny)}, so logic does not drive it`
-            : 'the path is broken by a constraint, missing logic or a lag'
+            : stopText ?? 'the path is broken by a constraint, missing logic or a lag'
           result = {
             id: 12, name: 'Critical path test', metric: `+${delta}d finish for +${CP_TEST_DAYS}d on ${target.code}`,
-            threshold: thr, result: ok ? 'pass' : 'fail', offenders: ok ? [] : cap([target.code, ...pinnedAny.map((a) => a.code)]),
+            threshold: thr, result: ok ? 'pass' : 'fail', offenders: ok ? [] : cap([target.code, ...pinnedAny.map((a) => a.code), ...(stopAct && !pinnedAny.length ? [stopAct.code] : [])]),
             explanation: ok
               ? `Adding ${CP_TEST_DAYS} days to ${target.code}, the first open task on the longest path, ${moved}, so the driving path is continuous.`
               : `Adding ${CP_TEST_DAYS} days to ${target.code}, the first open task on the longest path, moved the finish by only ${delta} work days, so ${why}.`,
@@ -508,7 +563,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
 
   /* 14. BEI */
   if (!dataDate || !withBaseline.length || !due.length) {
-    add(na(14, 'BEI', `≥ ${R.indexTarget.toFixed(2)}`, freshBaseline ? 'This is a fresh baseline, so nothing is due yet and the baseline execution index does not apply.' : 'Without baselines due by the data date, the baseline execution index cannot be computed.'))
+    add(na(14, 'BEI', `≥ ${R.indexTarget.toFixed(2)}`, freshBaseline ? 'This is a fresh baseline, so nothing is due yet and the baseline execution index does not apply.' : 'Without baselines due before the data date, the baseline execution index cannot be computed.'))
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
     const { completed, bei } = ex
@@ -518,8 +573,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       id: 14, name: 'BEI', metric: shown, threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
       offenders: ok ? [] : cap(ex.openDueCodes),
       explanation: ok
-        ? `${completed} activities are complete against ${due.length} baselined to finish by the data date, so the team is keeping pace with the plan.`
-        : `Only ${completed} activities are complete against ${due.length} baselined to finish by the data date (BEI ${shown}), so work is falling behind the baseline.`,
+        ? `${completed} activities are complete against ${due.length} baselined to finish before the data date, so the team is keeping pace with the plan.`
+        : `Only ${completed} activities are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.`,
     })
   }
 
@@ -529,3 +584,21 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   return { checks, passed, applicable, score: applicable ? Math.round((100 * passed) / applicable) : 0 }
 }
 
+/** Holidays that form a run of at least two weeks of consecutive days: a seasonal shutdown, not a holiday. */
+const SHUTDOWN_RUN_DAYS = 14
+function shutdownDays(cal: WorkCalendar): Set<string> {
+  const days = [...new Set((cal.holidays ?? []).map((h) => h.slice(0, 10)))].map((h) => ({ h, n: toDayNumber(h) })).filter((x) => !Number.isNaN(x.n)).sort((a, b) => a.n - b.n)
+  const out = new Set<string>()
+  let run: string[] = []
+  const flush = () => { if (run.length >= SHUTDOWN_RUN_DAYS) run.forEach((h) => out.add(h)); run = [] }
+  days.forEach((x, i) => {
+    if (i > 0 && x.n !== days[i - 1].n + 1) flush()
+    run.push(x.h)
+  })
+  flush()
+  return out
+}
+function withoutShutdowns(cal: WorkCalendar): WorkCalendar {
+  const off = shutdownDays(cal)
+  return off.size ? { ...cal, holidays: (cal.holidays ?? []).filter((h) => !off.has(h.slice(0, 10))) } : cal
+}

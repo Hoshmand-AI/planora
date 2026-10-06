@@ -4,7 +4,7 @@
 // published 2024–2025 industry reporting and supplier quotes. Markets move quickly (electrical gear in particular);
 // always confirm with current manufacturer/supplier quotes and record the quote date as schedule backup.
 
-import type { Classification, LongLeadSpec, ProjectProfile } from '@/lib/planning/types'
+import type { Classification, LongLeadSpec, ProjectProfile, ProjectType } from '@/lib/planning/types'
 import { appliesTri } from './applicability'
 
 const SURVEY = 'Industry supplier lead-time reporting (e.g., AGC/ENR market reports, contractor & cost-consultant quarterly lead-time surveys, manufacturer quotes), 2024–2025'
@@ -19,6 +19,8 @@ const REQUIRES_CLASSIFICATION: Record<string, Classification[]> = {
   'scif-doors-tempest': ['classified'],
 }
 
+/** Interiors / TI fit-outs: the base building already has its shell, service, elevators and fire pump. */
+const NO_SHELL: ProjectType[] = ['interiors_ti']
 const MISSION_CRITICAL = ['healthcare', 'data_center', 'lab_research', 'federal_defense'] as const
 const CENTRAL_PLANT = ['commercial_office', 'healthcare', 'data_center', 'lab_research', 'k12_school', 'federal_defense'] as const
 
@@ -46,7 +48,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'padmount-transformer',
     name: 'Pad-mount / distribution transformers (owner- or utility-furnished)',
-    appliesWhen: { projectTypes: 'all' },
+    appliesWhen: { projectTypes: 'all', excludeTypes: NO_SHELL },
     leadWeeks: { low: 30, typical: 52, high: 104 },
     submittalWeeks: 4,
     gates: 'electrical_service',
@@ -118,7 +120,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'rtu',
     name: 'Packaged rooftop units (RTUs) / DOAS',
-    appliesWhen: { projectTypes: ['commercial_office', 'retail', 'warehouse_industrial', 'multifamily', 'k12_school'] },
+    appliesWhen: { projectTypes: ['commercial_office', 'retail', 'warehouse_industrial', 'multifamily', 'k12_school', 'federal_defense'] },
     leadWeeks: { low: 12, typical: 20, high: 36 },
     submittalWeeks: 3,
     gates: 'mechanical_equipment',
@@ -137,7 +139,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'elevators',
     name: 'Elevators (traction / MRL / hydraulic)',
-    appliesWhen: { minStories: 2 },
+    appliesWhen: { minStories: 2, excludeTypes: NO_SHELL },
     leadWeeks: { low: 16, typical: 26, high: 40 },
     submittalWeeks: 8,
     gates: 'elevators',
@@ -157,7 +159,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'structural-steel',
     name: 'Structural steel (mill order + shop drawings + fabrication)',
-    appliesWhen: { projectTypes: ['commercial_office', 'healthcare', 'data_center', 'k12_school', 'warehouse_industrial', 'retail'] },
+    appliesWhen: { projectTypes: ['commercial_office', 'healthcare', 'data_center', 'k12_school', 'warehouse_industrial', 'retail', 'federal_defense'] },
     leadWeeks: { low: 12, typical: 20, high: 30 },
     submittalWeeks: 8,
     gates: 'structure_steel',
@@ -205,7 +207,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'roofing-membrane',
     name: 'Roofing membrane, insulation & accessories',
-    appliesWhen: { projectTypes: 'all' },
+    appliesWhen: { projectTypes: 'all', excludeTypes: NO_SHELL },
     leadWeeks: { low: 3, typical: 6, high: 12 },
     submittalWeeks: 3,
     gates: 'roofing',
@@ -225,7 +227,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'fire-pump',
     name: 'Fire pump, controller & jockey pump',
-    appliesWhen: { minStories: 4 },
+    appliesWhen: { minStories: 4, excludeTypes: NO_SHELL },
     leadWeeks: { low: 14, typical: 22, high: 32 },
     submittalWeeks: 4,
     gates: 'fire_protection',
@@ -273,6 +275,48 @@ const CATALOG: LongLeadSpec[] = [
     notes: 'Fume hoods require ASHRAE 110 testing after installation and TAB.',
   }),
   item({
+    id: 'lab-process-systems',
+    name: 'Laboratory process systems (RO/DI water system, lab gas manifolds, vacuum pumps, acid-waste neutralization)',
+    appliesWhen: { projectTypes: ['lab_research'] },
+    leadWeeks: { low: 12, typical: 20, high: 30 },
+    submittalWeeks: 5,
+    gates: 'mep_rough',
+    installsIn: ['process_equipment'],
+    source: SURVEY,
+    notes: 'Skid-mounted RO/DI and vacuum packages are usually the driver; piping material (stainless, PVDF, polypropylene) follows the process design.',
+  }),
+  // Interiors / TI: the fit-out's own long leads (the base building's are already in place).
+  item({
+    id: 'ti-millwork-casework',
+    name: 'Architectural millwork & casework (reception, pantry, conference)',
+    appliesWhen: { projectTypes: ['interiors_ti'] },
+    leadWeeks: { low: 8, typical: 12, high: 18 },
+    submittalWeeks: 4,
+    gates: 'specialties',
+    source: SURVEY,
+    notes: 'Shop drawings need field dimensions after framing; finish samples (veneer, solid surface) often extend approval.',
+  }),
+  item({
+    id: 'ti-glass-partitions',
+    name: 'Glass office fronts & demountable partitions',
+    appliesWhen: { projectTypes: ['interiors_ti'] },
+    leadWeeks: { low: 8, typical: 12, high: 20 },
+    submittalWeeks: 4,
+    gates: 'specialties',
+    source: SURVEY,
+    notes: 'Glass is cut to field-verified dimensions, so fabrication starts after framing and ceiling grid are in place.',
+  }),
+  item({
+    id: 'ti-hvac-equipment',
+    name: 'TI HVAC equipment (VAV boxes, fan coils, supplemental DX / IT-room cooling)',
+    appliesWhen: { projectTypes: ['interiors_ti'] },
+    leadWeeks: { low: 8, typical: 14, high: 24 },
+    submittalWeeks: 3,
+    gates: 'mechanical_equipment',
+    source: SURVEY,
+    notes: 'Base-building controls compatibility (BACnet points, landlord BAS vendor) must be confirmed in the submittal.',
+  }),
+  item({
     id: 'scif-doors-tempest',
     name: 'SCIF / vault doors (GSA-approved Class 5), acoustic doors & RF/TEMPEST shielding materials',
     appliesWhen: { federalOnly: true },
@@ -318,9 +362,16 @@ const CIVIL_ITEMS: LongLeadSpec[] = [
   item({ id: 'civ-hv-breakers', name: 'High-voltage circuit breakers & GIS', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 8, gates: 'power_equipment', source: SURVEY }),
   item({ id: 'civ-relay-panels', name: 'Protection & control relay panels', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 45 }, submittalWeeks: 6, gates: 'controls_scada', source: SURVEY }),
   item({ id: 'civ-steel-structures', name: 'Substation steel structures / transmission towers & poles', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 52 }, submittalWeeks: 6, gates: 'superstructure', source: SURVEY }),
-  item({ id: 'civ-process-vessels', name: 'Pressure vessels, columns & packaged process units', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 78 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
-  item({ id: 'civ-rotating-equipment', name: 'Large compressors, motors & rotating equipment', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
-  item({ id: 'civ-mv-switchgear', name: 'Medium-voltage switchgear, MCCs & VFDs', appliesWhen: { projectTypes: ['water_wastewater', 'industrial_process', 'transit_rail'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 6, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-process-vessels', name: 'Pressure vessels, columns & packaged process units', appliesWhen: { projectTypes: ['industrial_process', 'epc_industrial'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 78 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-rotating-equipment', name: 'Large compressors, motors & rotating equipment', appliesWhen: { projectTypes: ['industrial_process', 'epc_industrial'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-mv-switchgear', name: 'Medium-voltage switchgear, MCCs & VFDs', appliesWhen: { projectTypes: ['water_wastewater', 'industrial_process', 'transit_rail', 'epc_industrial'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 6, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-station-elevators', name: 'Station elevators & escalators (transit duty)', appliesWhen: { projectTypes: ['transit_rail'], civil: true, features: ['stations'] }, leadWeeks: { low: 30, typical: 40, high: 60 }, submittalWeeks: 8, gates: 'elevators', source: SURVEY, notes: 'Heavy-duty transit escalators and outdoor-rated elevators run longer than commercial units.' }),
+  item({ id: 'civ-launching-gantry', name: 'Segmental launching gantry (new or refurbished) & segment molds', appliesWhen: { projectTypes: ['transit_rail'], civil: true, features: ['elevated_segmental'] }, leadWeeks: { low: 30, typical: 45, high: 65 }, submittalWeeks: 8, gates: 'superstructure', source: SURVEY, notes: 'Gantry design is checked against the span lengths and segment weights; refurbished gantries still need modification and load testing.' }),
+  item({ id: 'civ-airfield-lighting', name: 'Airfield lighting fixtures, constant-current regulators & ALCMS', appliesWhen: { projectTypes: ['aviation'], civil: true, features: ['airside'] }, leadWeeks: { low: 12, typical: 20, high: 32 }, submittalWeeks: 6, gates: 'signals_lighting', source: SURVEY, notes: 'FAA-certified equipment (AC 150/5345-53 Airport Lighting Equipment Certification Program) only.' }),
+  item({ id: 'civ-gate-machinery', name: 'Lock / dam gates, valves & operating machinery (fabricated)', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['lock_dam'] }, leadWeeks: { low: 52, typical: 78, high: 110 }, submittalWeeks: 12, gates: 'mechanical_equipment', source: SURVEY, notes: 'Large fabricated gates and hydraulic machinery have long shop and shop-test durations; embedded metals ship first.' }),
+  item({ id: 'civ-sheet-piling', name: 'Sheet piling & cofferdam steel', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['lock_dam'] }, leadWeeks: { low: 8, typical: 14, high: 26 }, submittalWeeks: 4, gates: 'in_water_work', source: SURVEY }),
+  item({ id: 'civ-tbm', name: 'Tunnel boring machine (design, fabrication, factory test & shipping)', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['tbm'] }, leadWeeks: { low: 40, typical: 56, high: 78 }, submittalWeeks: 8, gates: 'tunneling', source: SURVEY, notes: 'Refurbished machines save months but still need modification for the geology and diameter.' }),
+  item({ id: 'civ-gw-treatment', name: 'Groundwater treatment system (packaged skids, vessels & controls)', appliesWhen: { projectTypes: ['environmental_remediation'], civil: true, features: ['groundwater'] }, leadWeeks: { low: 12, typical: 20, high: 32 }, submittalWeeks: 6, gates: 'process_equipment', source: SURVEY }),
 ]
 CATALOG.push(...CIVIL_ITEMS)
 

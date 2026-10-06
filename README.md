@@ -32,7 +32,7 @@ Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v3, Postgres (`pg
 
 ## Security, governance and operations
 
-Roles (owner/admin/scheduler/reviewer/viewer), invitations, two-step verification, OpenID Connect SSO, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
+Roles (owner/admin/scheduler/reviewer/viewer), workspaces with ethical walls between client matters, invitations, two-step verification, OpenID Connect SSO, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
 
 - Start with [docs/security/SECURITY-OVERVIEW.md](docs/security/SECURITY-OVERVIEW.md) and [docs/governance/AUDIT-REMEDIATION.md](docs/governance/AUDIT-REMEDIATION.md).
 - Operations docs are in [docs/operations](docs/operations); to report a vulnerability, see [SECURITY.md](SECURITY.md).
@@ -74,6 +74,8 @@ npm start
 ```
 
 Fonts are bundled at build time, so at runtime the app makes no external network calls other than to the configured model host.
+
+For a container deployment (non-root image, Docker Compose with PostgreSQL 17, backups, upgrades, TLS and hardening, every setting) see [docs/operations/ON-PREM-INSTALL.md](docs/operations/ON-PREM-INSTALL.md). `npm run sbom` writes a CycloneDX 1.5 SBOM from `package-lock.json` without network access. How the application maps to NIST SP 800-171 is in [docs/security/NIST-800-171-MAPPING.md](docs/security/NIST-800-171-MAPPING.md).
 
 ## Structure
 

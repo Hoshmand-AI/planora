@@ -35,12 +35,14 @@ Planora's cloud service is **not** offered for Controlled Unclassified Informati
 
 | Family | Application control | Status |
 |---|---|---|
-| 03.01 Access control | RBAC, least privilege, session lock/termination (idle timeout, revocation), unsuccessful-logon lockout | Implemented |
+| 03.01 Access control | RBAC, least privilege, project-level workspaces (ethical walls), session termination (idle timeout, revocation), unsuccessful-logon lockout | Implemented |
 | 03.03 Audit & accountability | Event logging with actor/time/source, protection of audit information (append-only + hash chain), review/export | Implemented |
 | 03.05 Identification & authentication | Unique accounts, MFA (TOTP) or federated SSO, password policy, replay-resistant codes | Implemented |
 | 03.13 System & communications protection | TLS to DB with verification; air-gapped model-host allowlist; no external calls at runtime | Implemented |
 | 03.14 System & information integrity | Dependency scanning, SAST, flaw remediation SLAs | Implemented (process) |
 | 03.04 Configuration management, 03.06 Incident response, 03.08 Media protection, 03.10 Physical, 03.12 Assessment | Hosting-environment and organizational controls | Owner action (customer/enclave) |
+
+Requirement-by-requirement (Rev. 2, 110 requirements), with the known gaps: [NIST-800-171-MAPPING.md](NIST-800-171-MAPPING.md). Installation and hardening: [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md).
 
 ## WCAG 2.2 AA
 

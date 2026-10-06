@@ -257,7 +257,7 @@ describe('8. Data center envelope and power train', () => {
     expect(into(gens.id)).toContain('ll-ats-fab')
     expect(into(ups.id)).toContain('ll-ups-fab')
     // Then the service is energized and backfeeds the power train, ahead of commissioning.
-    const energize = g.activities.find(a => a.category === 'electrical_service')!
+    const energize = g.activities.find(a => a.id.startsWith('t-electrical_service'))!
     expect(into(energize.id)).toEqual(expect.arrayContaining([expect.stringMatching(/^t-power_equipment/), expect.stringMatching(/^t-conductors/)]))
     expectClosed(g)
     // Offices are unchanged: no power train.

@@ -46,11 +46,16 @@ const CIVIL_TYPE_PHASE_LABELS: Partial<Record<ProjectType, Record<string, string
   water_wastewater: { sitework: 'Civil, Yard Piping & Restoration', structure: 'Process Structures', mep: 'Process, Electrical & Controls' },
   utility_power: { structure: 'Foundations & Steel Structures', mep: 'Electrical Equipment, Bus & Protection', commissioning: 'Testing, Outage & Energization' },
   industrial_process: { structure: 'Foundations & Steel', mep: 'Process Equipment, Electrical & Controls' },
+  aviation: { sitework: 'Airfield Civil, Paving & Lighting', structure: 'Structures & Pavement Cure', mep: 'NAVAIDs & Airfield Systems', commissioning: 'Flight Check, Reopening & Acceptance' },
+  marine_civil_works: { sitework: 'Cofferdams, Excavation & Tunneling', structure: 'Mass Concrete & Marine Structures', mep: 'Gates, Machinery & Systems', commissioning: 'Operational Testing & Acceptance' },
+  environmental_remediation: { procurement: 'Work Plans, Submittals & Procurement', sitework: 'Excavation, Transport & Disposal', mep: 'Treatment Systems', commissioning: 'Sampling, Laboratory & Regulator Acceptance' },
+  epc_industrial: { design: 'Engineering (FEED, P&IDs, HAZOP, IFC)', structure: 'Foundations & Steel', mep: 'Equipment, Piping, Electrical & Instrumentation', commissioning: 'Mechanical Completion, Commissioning & Startup' },
 }
 /** Categories that only occur in civil networks: an uploaded schedule with these is described as civil work. */
 const CIVIL_ONLY = new Set<CanonicalCategory>([
   'row_utilities', 'traffic_control', 'in_water_work', 'substructure', 'superstructure', 'deck', 'roadway', 'drainage',
   'pipeline', 'process_structures', 'process_equipment', 'track_systems', 'controls_scada', 'startup_testing', 'cutover',
+  'signals_lighting', 'erosion_control', 'restoration', 'concrete_cure', 'tunneling', 'mass_concrete', 'remediation', 'sampling_analysis',
 ])
 
 /**

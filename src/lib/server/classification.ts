@@ -23,11 +23,29 @@ async function ofPlan(planId: string, orgId: string): Promise<DataClassification
   return classificationFromAnswer(res.rows[0]?.c)
 }
 
-async function ofSchedule(scheduleId: string, orgId: string): Promise<DataClassification | null> {
-  const res = await query(`SELECT p.answers->'security.classification' AS c FROM schedules s JOIN plans p ON p.id = s.plan_id AND p.org_id = s.org_id
-    WHERE s.id=$1 AND s.org_id=$2`, [scheduleId, orgId])
-  return classificationFromAnswer(res.rows[0]?.c)
+const RANK: Record<DataClassification, number> = { unclassified: 0, cui: 1, classified: 2 }
+const isClassification = (c: unknown): c is DataClassification => c === 'unclassified' || c === 'cui' || c === 'classified'
+
+/** The most restrictive of several classifications (null when none is set). */
+export function mostRestrictive(...cs: (string | null | undefined)[]): DataClassification | null {
+  let out: DataClassification | null = null
+  for (const c of cs) if (isClassification(c) && (out === null || RANK[c] > RANK[out])) out = c
+  return out
 }
+
+/** An uploaded schedule: its own classification setting and, when built in Planora, its plan's. */
+async function ofSchedule(scheduleId: string, orgId: string): Promise<DataClassification | null> {
+  const res = await query(`SELECT s.classification AS own, p.answers->'security.classification' AS c FROM schedules s
+    LEFT JOIN plans p ON p.id = s.plan_id AND p.org_id = s.org_id
+    WHERE s.id=$1 AND s.org_id=$2`, [scheduleId, orgId])
+  const row = res.rows[0]
+  return row ? mostRestrictive(row.own, classificationFromAnswer(row.c)) : null
+}
+
+/** Classification of a schedule for export markings (same rules as the AI guard). */
+export const scheduleClassification = ofSchedule
+/** Classification of a plan for export markings. */
+export const planClassification = ofPlan
 
 /** Routes whose JSON body names the schedule the model will be asked about. */
 const BODY_SCHEDULE_ROUTES = new Set(['/api/ask', '/api/reports'])

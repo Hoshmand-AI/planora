@@ -29,9 +29,14 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 | GET | `/api/plans/{id}/risk` | read-only | Monte Carlo schedule risk analysis (P50/P80, criticality, sensitivity) |
 | GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes) |
 | GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics |
-| GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions |
-| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with Planora's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER |
-| GET | `/api/schedules/compare?id=…&base=…[&format=csv]` | read-only | Update-to-update comparison; without `base`, the latest upload of the project with an earlier data date. `format=csv` downloads the activity-level differences |
+| GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions, plus the reviewer dispositions (`review`) |
+| GET | `/api/schedules/{id}/review` | read-only | Reviewer dispositions of an uploaded submission: per DCMA finding / data question and overall |
+| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|lookahead-xlsx\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with Planora's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER. `lookahead-xlsx` is the 3-week look-ahead (work in progress or starting within 21 days of the data date). XLSX files carry a Provenance sheet (source file, SHA-256, release, progress mode, settings, data date) |
+| GET | `/api/schedules/{id}/edits` | read-only | Edits made in Planora to an uploaded schedule (duration, relationship, constraint), each with before/after, reason, author and date. Adding (`POST`, reason required) and reverting (`DELETE ?editId=&reason=`) need a signed-in owner, admin or scheduler |
+| GET | `/api/schedules/{id}/recovery` | read-only | What-if / recovery options modeled on the schedule's own network (crash, overlap FS→SS+lag, expedite), each with its new finish, float effect and the edits that apply it |
+| GET | `/api/schedules/{id}/risk` | read-only | Monte Carlo risk analysis of an uploaded schedule, using the scheduler's three-point ranges and risk events (`PUT`, signed-in scheduler) over the rule-based ranges |
+| GET | `/api/schedules/compare?id=…&base=…[&format=csv\|xlsx]` | read-only | Update-to-update comparison; without `base`, the latest upload of the project with an earlier data date. `format=csv` downloads the activity-level differences, `format=xlsx` a workbook with a sheet per change category. Comparing a schedule with itself (same id or identical file) is `400` (`same_schedule`) |
+| GET | `/api/schedules/windows?id=…[&format=csv\|xlsx]` | read-only | Windows analysis of the update series `id` belongs to: per consecutive pair, data dates, finish-milestone movement, driving-path start/end and the movement split into progress, added/deleted activities and revisions (logic, durations, constraints, calendars) by half-step recalculation; plus the finish-float / BEI trend |
 | PATCH | `/api/plans/{id}` | scheduler | Record interview answers: `{ "answers": { "<questionId>": { "status": "known", "value": … } } }`. An invalid value (e.g. an option that is not listed) returns `400` with code `invalid_answer` and `errors` per question naming the valid options; nothing is saved. Yes/no questions accept `true`/`false` (or `"yes"`/`"no"`). |
 | POST | `/api/plans/{id}/generate` | scheduler | Generate or regenerate the schedule |
 
@@ -40,6 +45,23 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 - A key used on any other endpoint gets `403` with code `api_key_not_allowed`.
 - An unknown, expired or revoked key gets `401` with code `invalid_api_key`.
 - Every error response includes a `requestId`. Quote it when you contact support.
+
+### Workspaces (ethical walls)
+
+Schedules and plans can belong to a workspace (a client matter or engagement). Every endpoint above
+returns only what the caller may see: a schedule or plan in a walled workspace the caller is not a
+member of is `404`, exactly like another organization's. **API keys are not workspace members, so
+they never see walled workspaces.** List responses include `workspaceId` (null = organization-wide).
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/workspaces` | any member (session only) | Workspaces the caller can see. Owners and admins also get members, limited members and every schedule and plan with its workspace |
+| POST | `/api/workspaces` | owner / admin | `{ "action": "create", "name", "walled" }`, `update` (`workspaceId`, `name`, `walled`), `delete` (empty workspaces only), `add_member` / `remove_member` (`workspaceId`, `userId`), `set_restricted` (`userId`, `restricted`), `assign` (`itemType`: `schedule` or `plan`, `itemId`, `workspaceId` or null). Moving a schedule moves its whole update series; moving a plan moves the schedules published from it. All audited as `workspace.*` |
+
+`POST /api/plans` and `POST /api/schedules` (upload) accept an optional `workspaceId`. A member
+limited to their workspaces must give one when they belong to more than one (`400`
+`workspace_required`); an upload to an existing update series goes into that series' workspace by
+default.
 
 ## Webhooks
 
@@ -99,3 +121,6 @@ The signing secret (`whsec_…`) is shown once when you add the endpoint.
 | `PLANORA_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
 | `PLANORA_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
 | `PLANORA_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
+| `PLANORA_SIGNUP=invite_only` | After the first account, sign-up needs an invitation (SSO into a verified domain still provisions members). Intended for on-premises instances |
+
+Every other setting, including on-premises and air-gapped ones, is listed in [operations/ON-PREM-INSTALL.md](operations/ON-PREM-INSTALL.md).

@@ -46,7 +46,9 @@ export function completeSchedule(input: {
   progressMode?: ProgressMode
 }): CompletionResult {
   const { relationships, calendars } = input
-  const activities = input.activities.map(a => ({ ...a }))
+  // Level of effort and WBS summary activities are never critical (nor counted or listed as such),
+  // whatever the file says: their dates follow other work, they do not drive it.
+  const activities = input.activities.map(a => (a.activityType === 'loe' || a.activityType === 'summary' ? { ...a, isCritical: false } : { ...a }))
   const hasLogic = relationships.length > 0
   const earliest = activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()[0] || null
   const latest = activities.map(a => a.actualFinish || a.earlyFinish).filter((d): d is string => !!d).sort().pop() || null
@@ -85,7 +87,7 @@ export function completeSchedule(input: {
       projectStart, dataDate: input.dataDate || projectStart, activities: cpmActs,
       links: relationships.filter(r => ids.has(r.predecessorId) && ids.has(r.successorId)).map(r => ({ from: r.predecessorId, to: r.successorId, type: r.type, lag: r.lag })),
       calendars: cals, defaultCalendarId: input.defaultCalendarId || cals[0].id,
-      mustFinishBy: input.mustFinishBy || undefined, progressMode: input.progressMode ?? 'retained',
+      mustFinishBy: input.mustFinishBy || undefined, progressMode: input.progressMode ?? 'retained', linkFloat: true,
     })
   } catch {
     return { activities, projectStart: input.projectStart || earliest, projectFinish: input.projectFinish || latest, hasLogic, cpm: null, fileValues: null, note: 'Planora could not recalculate this schedule; dates are shown as listed in the file.' }

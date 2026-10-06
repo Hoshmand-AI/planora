@@ -6,7 +6,7 @@ _For customers' security reviews and procurement. Last updated 10/06/2026._
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Application | Next.js 16 (React 19), TypeScript strict, Node.js 22 | Hosted on Vercel (cloud) or run on-premises with `npm start` |
+| Application | Next.js 16 (React 19), TypeScript strict, Node.js 22 | Hosted on Vercel (cloud) or run on-premises from the provided container image or with `npm start` ([ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)) |
 | Database | PostgreSQL 14+ (Neon in the cloud) | TLS with certificate and host-name verification; encrypted at rest by the provider |
 | AI (optional) | OpenAI API (cloud), any OpenAI-compatible on-prem model, or none | Organization-level switch, off by default for new organizations; air-gapped mode refuses non-private hosts; CUI/classified projects are never sent to a cloud model |
 
@@ -32,6 +32,8 @@ The scheduling engine (interview, CPM, DCMA checks, Monte Carlo risk analysis, r
 ## Tenant isolation
 
 Every firm is an organization and every query for firm data is scoped by `org_id`. Another firm's object ids return "not found". The end-to-end suite runs two competing firms against each other on every change.
+
+Inside an organization, **workspaces** separate client matters or engagements (ethical walls). A walled workspace's schedules and plans are visible only to its members; a member can be limited to their own workspaces; owners and admins see everything; API keys never see walled workspaces. The rule is applied in one place, the schedule and plan reads in `src/lib/db.ts`, so every list, read, export, comparison, report, portfolio and history endpoint enforces it (`src/lib/server/workspaces.test.ts`). Workspace changes are audited.
 
 ## Application security
 

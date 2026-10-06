@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
 import { Integrations } from '@/components/Integrations'
+import { Workspaces } from '@/components/Workspaces'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
@@ -13,6 +14,7 @@ interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
   quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
+  historyExcludeUploads: boolean
 }
 interface OrgData {
   org: { id: string; name: string; createdAt: string }
@@ -34,12 +36,13 @@ const ACTION_LABELS: Record<string, string> = {
   'member.invited': 'Invited a member', 'member.joined': 'Joined', 'member.role_changed': 'Changed a role', 'member.removed': 'Removed a member', 'member.invite_revoked': 'Revoked an invitation', 'member.unlocked': 'Unlocked a member',
   'plan.created': 'Created plan', 'plan.deleted': 'Deleted plan', 'plan.answer': 'Answered', 'plan.note': 'Added a note', 'plan.generate': 'Generated schedule', 'plan.generate_fresh': 'Rebuilt schedule',
   'plan.review': 'Reviewed', 'plan.publish': 'Published baseline', 'plan.decision': 'Quality decision', 'plan.recovery': 'Applied recovery option', 'plan.export': 'Exported', 'plan.ai_suggest': 'AI follow-up questions',
-  'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.dcma_decision': 'Quality decision',
+  'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.activity_category': 'Corrected activity category', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
   'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'workspace.created': 'Created workspace', 'workspace.updated': 'Changed workspace', 'workspace.deleted': 'Deleted workspace', 'workspace.member_added': 'Added to workspace', 'workspace.member_removed': 'Removed from workspace', 'workspace.member_restriction_changed': 'Changed workspace limit', 'workspace.item_assigned': 'Moved to workspace',
 }
 // Download links come from this fixed table, never from page text.
-const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'ai.', 'privacy.'] as const
+const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'workspace.', 'ai.', 'privacy.'] as const
 const AUDIT_CSV: Record<string, string> = Object.fromEntries(AUDIT_FILTERS.map(f => [f, f ? `/api/audit?format=csv&action=${f}` : '/api/audit?format=csv']))
 
 const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.override') ? 'Override' : a)
@@ -156,6 +159,8 @@ export default function OrgPage() {
         </div>
       </Section>
 
+      {manage && <Workspaces members={data.members} />}
+
       {manage && (
         <Section title="Invite someone" description="Invitations are single-use and expire in 7 days. Send the link yourself (email, Teams, Slack); it only works for the address you enter.">
           {note('invite')}
@@ -201,6 +206,7 @@ export default function OrgPage() {
               ['requireMfa', 'Require two-step verification', 'Members without it are asked to set it up before they can continue. Turn it on for your own account first.'],
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
+              ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never Planora re-imports or third-party schedules).'],
               ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (OpenAI on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
@@ -273,7 +279,7 @@ export default function OrgPage() {
             <Field label="Filter">{p => (
               <select {...p} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
                 <option value="">All activity</option><option value="auth.">Sign-ins</option><option value="plan.">Plans</option><option value="schedule.">Schedules</option>
-                <option value="member.">Members</option><option value="org.">Organization</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
+                <option value="member.">Members</option><option value="org.">Organization</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
               </select>
             )}</Field>
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {

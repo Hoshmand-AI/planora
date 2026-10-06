@@ -1,11 +1,13 @@
 'use client'
 
-// Tools for an uploaded schedule: compare with the previous update, Monte Carlo risk, exports back
-// to P6 / MS Project / Excel, the original file, and how Planora schedules it.
+// Tools for an uploaded schedule: compare with the previous update, edits made in Planora (with
+// reasons), what-if / recovery options, Monte Carlo risk with the scheduler's own ranges and risk
+// events, exports back to P6 / MS Project / Excel, the original file, and how Planora schedules it.
 
 import { useEffect, useState } from 'react'
 import { Disclosure } from './Disclosure'
 import { fmtDate } from '@/lib/format'
+import { EditsPanel, RecoveryPanel, RiskInputsPanel, type RiskInputsView } from './UploadedScheduleEdits'
 
 interface SeriesRow { id: string; version: string; dataDate: string | null; forecastFinish: string | null; varianceDays: number | null; status: string | null }
 interface Change { code: string; name: string; field: string; before: string | number | null; after: string | number | null; delta: number | null }
@@ -20,12 +22,23 @@ interface Comparison {
   actualsRewritten: Change[]
   floatErosion: { code: string; name: string; before: number; after: number; delta: number }[]
 }
-interface Sra { method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }; sensitivity: { code: string; name: string; correlation: number }[] }
+interface Sra {
+  method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }
+  sensitivity: { code: string; name: string; correlation: number; basis: string }[]; assumptions: string[]
+  events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
+  inputs?: RiskInputsView
+}
 
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
 
-export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }: { scheduleId: string; progressMode: 'retained' | 'override'; inHistory: boolean; onChanged: () => void }) {
+export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, version = '', classification = null, origin = null, historyOverride = false, canEdit = false, editsCount = 0 }: {
+  scheduleId: string; progressMode: 'retained' | 'override'; inHistory: boolean; onChanged: () => void
+  version?: string; classification?: string | null; origin?: string | null; historyOverride?: boolean; canEdit?: boolean; editsCount?: number
+}) {
+  const [label, setLabel] = useState(version)
+  const [notes, setNotes] = useState<string[]>([])
+  useEffect(() => { setLabel(version) }, [version])
   const [series, setSeries] = useState<SeriesRow[]>([])
   const [cmp, setCmp] = useState<Comparison | null>(null)
   const [cmpMsg, setCmpMsg] = useState<string>('')
@@ -33,6 +46,14 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
   const [sra, setSra] = useState<Sra | null>(null)
   const [sraErr, setSraErr] = useState('')
   const [busy, setBusy] = useState(false)
+  // Bumped after an edit so the edits list, the options and the risk analysis reload.
+  const [rev, setRev] = useState(0)
+  // Deep link from the Quality page (…#recovery) opens the what-if and recovery options.
+  const [openRecovery] = useState(() => typeof window !== 'undefined' && window.location.hash === '#recovery')
+  useEffect(() => {
+    if (openRecovery) setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+  }, [openRecovery])
+  const edited = () => { setRev(r => r + 1); setSra(null); onChanged() }
 
   useEffect(() => {
     let live = true
@@ -53,15 +74,26 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
     if (r.ok) setSra(d); else setSraErr(d.error || 'Risk analysis failed.')
   }
   const patch = async (body: Record<string, unknown>) => {
-    await fetch('/api/schedules', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scheduleId, ...body }) })
+    const r = await fetch('/api/schedules', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scheduleId, ...body }) })
+    const d = await r.json().catch(() => ({}))
+    setNotes(r.ok ? (d.warnings ?? []) : [d.error || 'The change was not saved.'])
     onChanged()
   }
+  const restricted = classification === 'cui' || classification === 'classified'
   const exp = (format: string) => `/api/schedules/${scheduleId}/export?format=${format}`
   const others = series.filter(s => s.id !== scheduleId)
 
   return (
     <section aria-labelledby="tools-h" className="space-y-1">
-      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, risk and exports</h2>
+      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, edits, risk and exports</h2>
+
+      <Disclosure title="Edits made in Planora" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
+        <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
+      </Disclosure>
+
+      <Disclosure id="recovery" title="What-if and recovery options" meta="modeled on this network" defaultOpen={openRecovery}>
+        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} />
+      </Disclosure>
 
       <Disclosure title="Compare with another update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
@@ -75,7 +107,9 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
         {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
           <div className="space-y-4 text-[13px] text-warm-700">
             <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
-              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a></p>
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'xlsx' }).toString()}`}>Excel, sheet per change type</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Largest float erosion (work days)</caption>
@@ -108,17 +142,25 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
             <p><span className="font-semibold text-navy-950">Monte Carlo P50 {fmtDate(sra.percentiles.p50)} · P80 {fmtDate(sra.percentiles.p80)}</span> (deterministic forecast {fmtDate(sra.deterministic)}){sra.required ? `; ${Math.round(sra.required.probability * 100)}% chance of meeting ${fmtDate(sra.required.date)}` : ''}.</p>
             <p className="text-warm-600">{sra.method}</p>
             {sra.sensitivity.length > 0 && <p>Biggest drivers: {sra.sensitivity.slice(0, 5).map(s => `${s.code} ${s.name}`).join('; ')}.</p>}
+            {sra.events && sra.events.length > 0 && (
+              <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Risk events in the simulation</caption>
+                <thead><tr><th className={th}>Event</th><th className={th}>Activity</th><th className={th}>Probability</th><th className={th}>Impact (wd)</th><th className={th}>Finish when it occurs</th></tr></thead>
+                <tbody>{sra.events.map(e => <tr key={e.id}><td className={td}>{e.name}</td><td className={td}>{e.code}</td><td className={td}>{Math.round(e.probability * 100)}%</td><td className={td}>{e.impactDays}</td><td className={td}>{e.finishDeltaDays > 0 ? `+${e.finishDeltaDays} calendar days` : 'no effect on the finish'}</td></tr>)}</tbody></table></div>
+            )}
+            <ul className="list-disc pl-5 text-warm-600 space-y-0.5">{sra.assumptions.slice(0, 4).map((x, i) => <li key={i}>{x}</li>)}</ul>
+            {sra.inputs && <RiskInputsPanel key={sra.inputs.updatedAt ?? 'none'} scheduleId={scheduleId} inputs={sra.inputs} canEdit={canEdit} onSaved={runRisk} />}
           </div>
         )}
       </Disclosure>
 
       <Disclosure title="Export and original file">
         <div className="flex flex-wrap gap-2 text-[13px]">
-          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['csv', 'CSV'], ['original', 'Original file as uploaded']].map(([f, label]) => (
+          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>
         <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. The original file is stored with its SHA-256, recorded in the audit log.</p>
+        {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 
       <Disclosure title="How Planora schedules this file">
@@ -129,6 +171,29 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
             <label><input type="radio" name="pm" checked={progressMode === 'override'} onChange={() => patch({ progressMode: 'override' })} /> Progress override</label>
           </fieldset>
           <label className="block"><input type="checkbox" checked={inHistory} onChange={e => patch({ inHistory: e.target.checked })} /> Use this schedule&apos;s actuals to calibrate our firm history (only for your own as-built projects)</label>
+          {inHistory && (
+            <label className="block ml-5"><input type="checkbox" checked={historyOverride} onChange={e => patch({ inHistory: true, historyOverride: e.target.checked })} /> Include it even if not every activity has an actual finish</label>
+          )}
+          <label className="block">Whose schedule{' '}
+            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={origin ?? ''} onChange={e => patch({ origin: e.target.value || null })}>
+              <option value="">Not stated</option>
+              <option value="own">Our own project</option>
+              <option value="third_party">Third-party (we review it)</option>
+            </select>
+          </label>
+          <label className="block">Security classification{' '}
+            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={classification ?? 'unclassified'} onChange={e => patch({ classification: e.target.value })}>
+              <option value="unclassified">Unclassified</option>
+              <option value="cui">CUI</option>
+              <option value="classified">Classified</option>
+            </select>
+          </label>
+          <form className="flex items-center gap-2" onSubmit={e => { e.preventDefault(); if (label.trim() && label.trim() !== version) patch({ version: label.trim() }) }}>
+            <label htmlFor="ver-label">Version label</label>
+            <input id="ver-label" className="border border-warm-300 rounded px-2 py-1 bg-white" maxLength={40} value={label} onChange={e => setLabel(e.target.value)} />
+            <button type="submit" className="px-3 py-1 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">Rename</button>
+          </form>
+          {notes.length > 0 && <ul role="status" className="list-disc pl-5 text-warm-700">{notes.map(n => <li key={n}>{n}</li>)}</ul>}
         </div>
       </Disclosure>
     </section>

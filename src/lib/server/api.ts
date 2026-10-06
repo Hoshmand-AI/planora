@@ -112,6 +112,9 @@ export function api<P = Record<string, string>>(opts: Options, handler: (req: Ne
       Object.assign(info, { userId: auth.userId, email: auth.email, name: auth.name, orgId: auth.orgId, role: auth.role, aiEnabled: auth.settings.aiEnabled, aiDailyLimit: Math.min(auth.settings.aiDailyLimit, entitlementsFor(auth.plan).aiPerDay), plan: auth.plan })
       // CUI / classified projects: the model provider checks this before calling a cloud model.
       info.dataClassification = classificationResolver(req, info.path, auth.orgId)
+      // Ethical walls: which workspaces' schedules and plans this caller may see. Resolved lazily,
+      // once, and applied by every schedule/plan read in src/lib/db.ts.
+      info.workspaceAccess = workspaceAccessFor(auth)
       if (auth.mfaSetupRequired && !opts.allowMfaSetup) {
         throw new ApiError(403, 'Your organization requires two-step verification. Set it up under Account → Security to continue.', 'mfa_setup_required')
       }
@@ -125,6 +128,12 @@ export function api<P = Record<string, string>>(opts: Options, handler: (req: Ne
       return handler(req, { params, auth })
     }))
   }
+}
+
+/** Memoized workspace access for one request (workspaces.ts is loaded lazily: it imports ApiError from here). */
+function workspaceAccessFor(auth: AuthContext): NonNullable<RequestInfo['workspaceAccess']> {
+  let p: ReturnType<NonNullable<RequestInfo['workspaceAccess']>> | null = null
+  return () => (p ??= import('./workspaces').then(m => m.resolveWorkspaceAccess(auth)).catch(err => { p = null; throw err }))
 }
 
 /** Route that works signed in or out (sign-in, health). Still gets request ids, CSRF checks, logging. */

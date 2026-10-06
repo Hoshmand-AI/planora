@@ -4,7 +4,8 @@
 
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
-import { CONSTRAINT_TYPES, type CanonicalCategory, type ConstraintType, type CpmResult, type GeneratedSchedule, type PlanActivity, type PlanLink } from './types'
+import { CONSTRAINT_TYPES, type CanonicalCategory, type ConstraintType, type CpmResult, type GeneratedSchedule, type Override, type PlanActivity, type PlanLink } from './types'
+import type { AppliedEdit } from './uploaded-edits'
 import { phaseOf } from '@/lib/semantic/taxonomy'
 import { defaultCalendar } from './calendar'
 
@@ -14,7 +15,25 @@ const isoOf = (v: unknown): string => {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
 }
 
-export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null): GeneratedSchedule {
+/**
+ * Edits made in Planora become overrides on the activities they touch (relationship edits on the
+ * successor), so their reasons travel with the activity in exports (XER notebook, Basis of Schedule).
+ */
+export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
+  const out = new Map<string, Override[]>()
+  for (const e of edits) {
+    if (e.status !== 'applied') continue
+    const c = e.change
+    const target = c.kind === 'duration' || c.kind === 'constraint' ? c.activityId : c.successorId
+    const field: Override['field'] = c.kind === 'duration' ? 'duration' : c.kind === 'constraint' ? 'constraint' : c.kind === 'link_remove' ? 'remove_link' : e.before === 'no relationship' ? 'add_link' : 'type'
+    const reason = c.kind === 'link_set' || c.kind === 'link_remove' ? `${e.label}: ${e.reason}` : e.reason
+    out.set(target, [...(out.get(target) || []), { field, from: e.before, to: e.after, reason, by: e.byName || e.by, at: e.at }])
+  }
+  return out
+}
+
+export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = []): GeneratedSchedule {
+  const overrides = editOverrides(edits)
   const calendars = s.calendars?.length ? s.calendars : [defaultCalendar()]
   const defaultCalendarId = s.defaultCalendarId && calendars.some(c => c.id === s.defaultCalendarId) ? s.defaultCalendarId : calendars[0].id
   const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
@@ -34,6 +53,7 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
       rationale: { summary: `From the uploaded file ${s.fileName}`, sources: [{ kind: 'file', label: s.fileName }], confidence: 'medium' },
       wbs: a.wbs || undefined, status: a.status, percentComplete: a.percentComplete,
       baselineStart: a.baselineStart, baselineFinish: a.baselineFinish,
+      ...(overrides.has(a.id) ? { overrides: overrides.get(a.id) } : {}),
     }
   })
   const links: PlanLink[] = relationships.filter(r => ids.has(r.predecessorId) && ids.has(r.successorId)).map(r => ({
