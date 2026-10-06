@@ -124,7 +124,7 @@ describe('analyzeSchedule: pilot findings (finish milestone, variance basis, sta
   })
 
   it('a schedule behind on execution (BEI < 0.95) is at least attention', () => {
-    // Four tasks baselined to finish by the data date; none finished (plus the finished NTP).
+    // Four tasks baselined to finish before the data date; none finished (plus the finished NTP).
     const ntp = act('A0', { activityType: 'milestone', actualStart: '2026-03-02', actualFinish: '2026-03-02', status: 'complete', percentComplete: 100, baselineStart: '2026-03-02', baselineFinish: '2026-03-02' })
     const ts = [1, 2, 3, 4].map(i => act(`T${i}`, { duration: 1, baselineStart: '2026-03-02', baselineFinish: '2026-03-03' }))
     const f = act('F', { name: 'Substantial Completion', activityType: 'milestone', baselineFinish: '2026-04-30' })
@@ -133,7 +133,7 @@ describe('analyzeSchedule: pilot findings (finish milestone, variance basis, sta
     const analysis = analyzeSchedule({ activities: done.activities, links: links(rels), cpm: done.cpm, reportedFinish: null, mustFinishBy: null, dataDate: '2026-03-16' })
     expect(analysis.status).not.toBe('on_track')
     expect(analysis.statusReasons.join(' ')).toMatch(/Baseline execution index is 0\.20, below 0\.95/)
-    expect(analysis.statusReasons.join(' ')).toMatch(/4 of 5 activities baselined to finish by 03\/16\/2026 finished late or not at all/)
+    expect(analysis.statusReasons.join(' ')).toMatch(/4 of 5 activities baselined to finish before 03\/16\/2026 finished late or not at all/)
   })
 
   it('an unstarted schedule does not report a slip against stale target dates', () => {

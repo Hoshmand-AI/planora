@@ -307,6 +307,14 @@ export async function getScheduleFile(scheduleId: string, orgId: string): Promis
   return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
 }
 
+/** File name and SHA-256 of the stored original (no content), for provenance headers. */
+export async function getScheduleFileMeta(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string } | undefined> {
+  await initSchema()
+  const res = await query('SELECT file_name, sha256 FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { fileName: String(r.file_name), sha256: String(r.sha256) } : undefined
+}
+
 export async function updateScheduleProfile(id: string, orgId: string, p: { projectType?: string | null; region?: string | null; grossSqft?: number | null }): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET project_type=COALESCE($3,project_type), region=COALESCE($4,region), gross_sqft=COALESCE($5,gross_sqft) WHERE id=$1 AND org_id=$2', [id, orgId, p.projectType ?? null, p.region ?? null, p.grossSqft ?? null])

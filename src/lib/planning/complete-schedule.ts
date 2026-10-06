@@ -85,7 +85,7 @@ export function completeSchedule(input: {
       projectStart, dataDate: input.dataDate || projectStart, activities: cpmActs,
       links: relationships.filter(r => ids.has(r.predecessorId) && ids.has(r.successorId)).map(r => ({ from: r.predecessorId, to: r.successorId, type: r.type, lag: r.lag })),
       calendars: cals, defaultCalendarId: input.defaultCalendarId || cals[0].id,
-      mustFinishBy: input.mustFinishBy || undefined, progressMode: input.progressMode ?? 'retained',
+      mustFinishBy: input.mustFinishBy || undefined, progressMode: input.progressMode ?? 'retained', linkFloat: true,
     })
   } catch {
     return { activities, projectStart: input.projectStart || earliest, projectFinish: input.projectFinish || latest, hasLogic, cpm: null, fileValues: null, note: 'Planora could not recalculate this schedule; dates are shown as listed in the file.' }

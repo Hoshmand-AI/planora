@@ -135,7 +135,8 @@ function indexText(v: number, ok: boolean, target: number): string {
 
 /**
  * Execution against the baseline as of the data date (DCMA #11 Missed Tasks and #14 BEI): work
- * baselined to finish by the data date vs work actually finished. Null when it cannot be measured
+ * baselined to finish strictly BEFORE the data date vs work actually finished. The data date is the
+ * first day of the remaining work, so work baselined to finish on it is not yet due (DCMA guidance). Null when it cannot be measured
  * (no data date, no baselines, a fresh baseline, or nothing due yet).
  */
 export function baselineExecution(activities: AnalyzableActivity[], dataDate: string | null | undefined): { due: number; missed: number; completed: number; bei: number; dueCodes: string[]; missedCodes: string[]; openDueCodes: string[] } | null {
@@ -144,7 +145,7 @@ export function baselineExecution(activities: AnalyzableActivity[], dataDate: st
   const withBaseline = all.filter((a) => isValidDate(a.baselineFinish))
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
   if (!firstBaseline || toDayNumber(dataDate) <= toDayNumber(firstBaseline)) return null
-  const due = withBaseline.filter((a) => toDayNumber(a.baselineFinish!) <= toDayNumber(dataDate))
+  const due = withBaseline.filter((a) => toDayNumber(a.baselineFinish!) < toDayNumber(dataDate))
   if (!due.length) return null
   const missed = due.filter((a) => !isValidDate(a.actualFinish) || toDayNumber(a.actualFinish) > toDayNumber(a.baselineFinish!))
   const completed = all.filter(isCompleteActivity).length
@@ -369,9 +370,10 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   // start milestone baselined on the data date is not "missed".
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
   const freshBaseline = !!dataDate && !!firstBaseline && toDayNumber(dataDate) <= toDayNumber(firstBaseline)
-  const due = dataDate && !freshBaseline ? withBaseline.filter((a) => toDayNumber(a.baselineFinish!) <= toDayNumber(dataDate)) : []
+  // Due = baselined to finish strictly before the data date (the data date itself is remaining time).
+  const due = dataDate && !freshBaseline ? withBaseline.filter((a) => toDayNumber(a.baselineFinish!) < toDayNumber(dataDate)) : []
   if (!dataDate || !withBaseline.length || !due.length) {
-    const why = !dataDate ? 'No data date is set.' : !withBaseline.length ? 'The schedule has no baseline dates.' : freshBaseline ? 'This is a fresh baseline: the data date is on or before the first baselined start, so nothing is due yet.' : 'No baselined work was due by the data date.'
+    const why = !dataDate ? 'No data date is set.' : !withBaseline.length ? 'The schedule has no baseline dates.' : freshBaseline ? 'This is a fresh baseline: the data date is on or before the first baselined start, so nothing is due yet.' : 'No baselined work was due before the data date.'
     add(na(11, 'Missed tasks', `≤ ${R.maxPct}%`, `${why} Missed tasks cannot be measured.`))
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
@@ -380,8 +382,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       id: 11, name: 'Missed tasks', metric: pct(ex.missed, due.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
       offenders: cap(ex.missedCodes),
       explanation: ok
-        ? 'Work baselined to finish by the data date has essentially all finished on time.'
-        : `${ex.missed} of ${due.length} activities baselined to finish by ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
+        ? 'Work baselined to finish before the data date has essentially all finished on time.'
+        : `${ex.missed} of ${due.length} activities baselined to finish before ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
     })
   }
 
@@ -508,7 +510,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
 
   /* 14. BEI */
   if (!dataDate || !withBaseline.length || !due.length) {
-    add(na(14, 'BEI', `≥ ${R.indexTarget.toFixed(2)}`, freshBaseline ? 'This is a fresh baseline, so nothing is due yet and the baseline execution index does not apply.' : 'Without baselines due by the data date, the baseline execution index cannot be computed.'))
+    add(na(14, 'BEI', `≥ ${R.indexTarget.toFixed(2)}`, freshBaseline ? 'This is a fresh baseline, so nothing is due yet and the baseline execution index does not apply.' : 'Without baselines due before the data date, the baseline execution index cannot be computed.'))
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
     const { completed, bei } = ex
@@ -518,8 +520,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       id: 14, name: 'BEI', metric: shown, threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
       offenders: ok ? [] : cap(ex.openDueCodes),
       explanation: ok
-        ? `${completed} activities are complete against ${due.length} baselined to finish by the data date, so the team is keeping pace with the plan.`
-        : `Only ${completed} activities are complete against ${due.length} baselined to finish by the data date (BEI ${shown}), so work is falling behind the baseline.`,
+        ? `${completed} activities are complete against ${due.length} baselined to finish before the data date, so the team is keeping pace with the plan.`
+        : `Only ${completed} activities are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.`,
     })
   }
 

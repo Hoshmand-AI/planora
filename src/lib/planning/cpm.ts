@@ -55,7 +55,7 @@
 // logicLongestPath / logicFinish give the path and finish logic alone would produce. The critical
 // path is the TF <= 0 chain and can be empty when a required finish leaves positive float everywhere.
 
-import type { CpmActivity, CpmInput, CpmLink, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
+import type { CpmActivity, CpmInput, CpmLink, CpmLinkFloat, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
 import { compileCalendar, defaultCalendar, fromDayNumber, toDayNumber, type CompiledCalendar } from '@/lib/planning/calendar'
 
 interface Node {
@@ -489,6 +489,7 @@ export function runCpm(input: CpmInput): CpmResult {
     violations.push({ id: node.a.id, type: k.type as 'MSO' | 'MFO', constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
     warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
+  const linkFloat: CpmLinkFloat[] | null = input.linkFloat ? [] : null
   for (let i = 0; i < n; i++) {
     const node = nodes[i]
     if (node.state === 'complete') { node.ff = 0; continue }
@@ -502,7 +503,9 @@ export function runCpm(input: CpmInput): CpmResult {
       const src = ed.type === 'FS' || ed.type === 'FF' ? node.ef : node.es
       const bound = shift(src, ed.lag, node.c)
       const target = ed.type === 'FS' || ed.type === 'SS' ? (q.state === 'progress' ? q.resume : q.es) : q.ef
-      ff = Math.min(ff, wdInstants(bound, target, node.c))
+      const rff = wdInstants(bound, target, node.c)
+      if (linkFloat) linkFloat.push({ from: node.a.id, to: q.a.id, type: ed.type, lag: ed.lag, freeFloat: rff })
+      ff = Math.min(ff, rff)
     }
     // No open successors: measured to the project finish, or to the required finish when earlier
     // (the same anchor total float uses).
@@ -628,7 +631,7 @@ export function runCpm(input: CpmInput): CpmResult {
   return {
     times, projectFinish, logicFinish, criticalPath, longestPath, logicLongestPath,
     ...(longestPathConstraint ? { longestPathConstraint } : {}),
-    violations, progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
+    violations, ...(linkFloat ? { linkFloat } : {}), progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
   }
 }
 

@@ -79,7 +79,12 @@ export interface CpmInput {
   mustFinishBy?: string
   /** How in-progress work that started out of sequence is scheduled. Defaults to 'retained' (P6 default). */
   progressMode?: ProgressMode
+  /** Also return each relationship's free float (CpmResult.linkFloat); off by default to keep stored plans small */
+  linkFloat?: boolean
 }
+
+/** Relationship free float: work days (predecessor calendar) the predecessor can slip before the link moves its successor; <= 0 = driving */
+export interface CpmLinkFloat { from: string; to: string; type: CpmLink['type']; lag: number; freeFloat: number }
 
 export interface CpmTimes {
   earlyStart: string
@@ -110,6 +115,8 @@ export interface CpmResult {
   logicLongestPath?: string[]
   /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
   violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
+  /** Relationship free float between open activities (only when CpmInput.linkFloat is set) */
+  linkFloat?: CpmLinkFloat[]
   progressMode: ProgressMode
   /** Any cycles found (activity ids). If non-empty, times are best-effort. */
   cycles: string[][]

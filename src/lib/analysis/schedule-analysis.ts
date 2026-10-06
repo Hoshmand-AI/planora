@@ -226,8 +226,8 @@ export function analyzeSchedule(input: {
     )
     if (ex) {
       const R = DEFAULT_DCMA_RULES
-      if (ex.bei < R.indexTarget) bump('attention', `Baseline execution index is ${(Math.floor(ex.bei * 100) / 100).toFixed(2)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} activities complete against ${ex.due} baselined to finish by ${fmtDate(input.dataDate)}.`)
-      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} activities baselined to finish by ${fmtDate(input.dataDate)} finished late or not at all.`)
+      if (ex.bei < R.indexTarget) bump('attention', `Baseline execution index is ${(Math.floor(ex.bei * 100) / 100).toFixed(2)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} activities complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.`)
+      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} activities baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
 
