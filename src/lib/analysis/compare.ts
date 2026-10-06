@@ -22,7 +22,23 @@ export interface CompareSide {
   defaultCalendarId?: string | null
   /** Mandatory constraints that overrule logic (ScheduleAnalysis.violations) */
   violations?: CpmResult['violations']
+  /** The path logic alone would drive (through mandatory constraints), activity ids */
+  logicLongestPath?: string[]
+  /** The finish logic alone produces (CpmResult.logicFinish) */
+  logicFinish?: string | null
 }
+
+/** A change that can explain finish movement (attribution by cause, not a recalculation). */
+export interface FinishCause {
+  kind: 'mandatory_constraint' | 'driving_duration' | 'driving_logic'
+  code: string
+  detail: string
+  /** Work days, for duration changes */
+  delta?: number | null
+}
+
+/** Where a mandatory constraint holds the finish milestone: the constrained date next to logic's. */
+export interface FinishBasis { code: string; type: 'MSO' | 'MFO'; constrainedFinish: string; logicFinish: string; days: number }
 
 export interface ActivityChange {
   code: string
@@ -57,6 +73,10 @@ export interface ScheduleComparison {
   milestoneMovement: { code: string; before: string | null; after: string | null; delta: number | null } | null
   /** Mandatory finish constraint that holds the finish while logic would push it later */
   finishHeldBy: { code: string; constraintDate: string; logicDate: string; days: number } | null
+  /** Changes that explain the finish movement: mandatory constraints, durations and logic on the driving path */
+  finishCauses: FinishCause[]
+  /** Constrained vs logic-driven finish of the finish milestone in each update (null: not held by a constraint) */
+  finishBasis: { before: FinishBasis | null; after: FinishBasis | null }
   matched: number
   added: { code: string; name: string }[]
   deleted: { code: string; name: string }[]
@@ -226,6 +246,38 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
     if (v) finishHeldBy = { code: aCodeOf.get(v.id) ?? v.id, constraintDate: v.constraintDate, logicDate: v.logicDate, days: v.days }
   }
 
+  // Constrained vs logic-driven finish on each side's finish milestone.
+  const basisOf = (side: CompareSide, codeOf: Map<string, string>): FinishBasis | null => {
+    const code = side.finishMilestone?.code ?? fmCode
+    if (!code) return null
+    const v = (side.violations || []).find(x => codeOf.get(x.id) === code && x.days > 0)
+    return v ? { code, type: v.type, constrainedFinish: v.constraintDate, logicFinish: v.logicDate, days: v.days } : null
+  }
+  const finishBasis = { before: basisOf(before, bCodeOf), after: basisOf(after, aCodeOf) }
+
+  // What can explain the movement: mandatory constraints added/changed/removed anywhere, and duration
+  // and logic changes on the driving path (scheduled or logic-driven) of either update.
+  const drivingCodes = new Set<string>([...bPath, ...aPath])
+  for (const [side, codeOf] of [[before, bCodeOf], [after, aCodeOf]] as const) for (const id of side.logicLongestPath ?? []) { const c = codeOf.get(id); if (c) drivingCodes.add(c) }
+  const isMand = (k: string | number | null) => typeof k === 'string' && /^(MSO|MFO)\b/.test(k)
+  const finishCauses: FinishCause[] = []
+  for (const c of changes) {
+    if (c.field === 'constraint' && (isMand(c.before) || isMand(c.after))) {
+      const holds = (after.violations || []).some(v => aCodeOf.get(v.id) === c.code && v.days > 0)
+      const what = c.before == null ? 'added' : c.after == null ? 'removed' : 'changed'
+      finishCauses.push({ kind: 'mandatory_constraint', code: c.code, detail: `mandatory constraint ${what}: ${c.before ?? 'none'} → ${c.after ?? 'none'}${holds ? ' (overrules logic)' : ''}` })
+    }
+  }
+  for (const c of changes) {
+    if ((c.field === 'duration' || c.field === 'remaining') && drivingCodes.has(c.code)) {
+      finishCauses.push({ kind: 'driving_duration', code: c.code, delta: c.delta, detail: `${c.field === 'duration' ? 'original' : 'remaining'} duration ${c.before} → ${c.after} work days on the driving path` })
+    }
+  }
+  const touches = (l: { pred: string; succ: string }) => drivingCodes.has(l.pred) || drivingCodes.has(l.succ)
+  for (const l of logicAdded.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `relationship added ${l.pred} → ${l.succ} ${l.type}${l.lag ? ` lag ${l.lag}` : ''}` })
+  for (const l of logicDeleted.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `relationship deleted ${l.pred} → ${l.succ} ${l.type}${l.lag ? ` lag ${l.lag}` : ''}` })
+  for (const l of lagChanged.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `lag ${l.pred} → ${l.succ} ${l.type} ${l.before} → ${l.after}` })
+
   // Is this a sensible pair?
   const warnings: string[] = []
   const bk = before.schedule.projectKey?.trim().toLowerCase(), ak = after.schedule.projectKey?.trim().toLowerCase()
@@ -248,6 +300,20 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   }
   if (finishActivity && projectFinishMovement != null && projectFinishMovement !== finishMovement) summary.push(`The latest-finishing activity moved ${projectFinishMovement === 0 ? '0 days' : days(projectFinishMovement)} (${fmtDate(before.schedule.forecastFinish)} → ${fmtDate(after.schedule.forecastFinish)}).`)
   if (finishHeldBy) summary.push(`The finish ${finishMovement === 0 ? 'did not move' : 'moved earlier'} only because a Mandatory Finish constraint on ${finishHeldBy.code} holds it at ${fmtDate(finishHeldBy.constraintDate)}; logic alone would finish it ${fmtDate(finishHeldBy.logicDate)}, ${n(finishHeldBy.days, 'work day')} later.`)
+  if (finishBasis.after && !finishHeldBy) summary.push(`${finishBasis.after.code} is held by a ${finishBasis.after.type === 'MFO' ? 'Mandatory Finish' : 'Mandatory Start'} at ${fmtDate(finishBasis.after.constrainedFinish)}; the logic-driven finish is ${fmtDate(finishBasis.after.logicFinish)} (${n(finishBasis.after.days, 'work day')} later).`)
+  if (finishMovement && finishCauses.length) {
+    const k = (kind: FinishCause['kind']) => finishCauses.filter(c => c.kind === kind)
+    const list = (xs: FinishCause[]) => `${xs.slice(0, 4).map(x => x.code).join(', ')}${xs.length > 4 ? ` and ${xs.length - 4} more` : ''}`
+    const parts: string[] = []
+    const m = k('mandatory_constraint'), du = k('driving_duration'), lg = k('driving_logic')
+    if (m.length) parts.push(`${n(m.length, 'mandatory constraint change')} (${list(m)})`)
+    if (du.length) {
+      const sum = du.reduce((t, x) => t + (x.delta ?? 0), 0)
+      parts.push(`${n(du.length, 'duration change')} on the driving path (${sum > 0 ? '+' : ''}${sum} work days: ${list(du)})`)
+    }
+    if (lg.length) parts.push(`${n(lg.length, 'logic change')} touching the driving path (${list(lg)})`)
+    summary.push(`Likely causes of the finish movement: ${parts.join('; ')}. See the windows analysis for the effect of each in days.`)
+  }
   summary.push(`${n(started.length, 'activity', 'activities')} started and ${finished.length} finished this period.`)
   if (added.length || deleted.length) summary.push(`${n(added.length, 'activity', 'activities')} added, ${deleted.length} deleted.`)
   if (logicAdded.length || logicDeleted.length || lagChanged.length) summary.push(`Logic: ${n(logicAdded.length, 'relationship')} added, ${logicDeleted.length} deleted, ${lagChanged.length} lag ${lagChanged.length === 1 ? 'change' : 'changes'}.`)
@@ -271,7 +337,7 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   return {
     before: { id: before.schedule.id, name: before.schedule.name, version: before.schedule.version, dataDate: before.schedule.dataDate, forecastFinish: before.schedule.forecastFinish },
     after: { id: after.schedule.id, name: after.schedule.name, version: after.schedule.version, dataDate: after.schedule.dataDate, forecastFinish: after.schedule.forecastFinish },
-    finishMovement, projectFinishMovement, finishActivity, milestoneMovement, finishHeldBy, matched, added, deleted, logicAdded, logicDeleted, lagChanged, changes, calendarChanges, actualsRewritten,
+    finishMovement, projectFinishMovement, finishActivity, milestoneMovement, finishHeldBy, finishCauses, finishBasis, matched, added, deleted, logicAdded, logicDeleted, lagChanged, changes, calendarChanges, actualsRewritten,
     floatErosion, criticalPath: { entered, left, leftDeleted }, progress: { started, finished }, warnings, summary,
   }
 }

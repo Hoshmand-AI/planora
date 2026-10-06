@@ -8,6 +8,7 @@ import ExcelJS from 'exceljs'
 import type { ConstraintType, GeneratedSchedule } from '@/lib/planning/types'
 import { buildWbs, type WbsRow } from './wbs'
 import { fmtDate } from '@/lib/format'
+import { addProvenance, type Provenance } from './provenance'
 
 const DATE_FMT = 'mm/dd/yyyy'
 const toDate = (iso?: string | null) => (iso ? new Date(iso.slice(0, 10) + 'T00:00:00Z') : null)
@@ -31,7 +32,7 @@ function header(ws: ExcelJS.Worksheet, row: number, fill = 'FF0F2140') {
 
 /* ─── 1. Import-ready workbook ───────────────────────── */
 
-export async function exportImportXlsx(s: GeneratedSchedule, projectName: string): Promise<Buffer> {
+export async function exportImportXlsx(s: GeneratedSchedule, projectName: string, prov?: Provenance | null): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Planora'
   const { root, rows } = buildWbs(s, projectName)
@@ -116,6 +117,8 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
   readme.getRow(1).font = { bold: true, size: 13 }
   ;[3, 8].forEach(r => { readme.getRow(r).font = { bold: true } })
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 4, visibility: 'visible' }]
+  // Provenance last, so the import sheets keep their positions.
+  if (prov) addProvenance(wb, prov, `${projectName} — import workbook`)
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
@@ -134,7 +137,7 @@ function mondayOf(iso: string): number {
   return d.getTime() - wd * 86_400_000
 }
 
-export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: string): Promise<Buffer> {
+export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: string, prov?: Provenance | null): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Planora'
   const ws = wb.addWorksheet('Schedule', {
@@ -259,6 +262,12 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   })
   ws.getCell(r + 4, 2).value = 'Durations in work days on each activity\'s calendar. Hover an activity name for why it is scheduled that way.'
   ws.getCell(r + 4, 2).font = { italic: true, size: 9, color: { argb: 'FF6B6359' } }
+  if (prov) {
+    const src = prov.sources[0]
+    ws.getCell(3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src?.sha256 ?? 'not recorded'} · Planora ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} — see the Provenance sheet`
+    ws.getCell(3, 1).font = { size: 9, color: { argb: 'FF6B6359' } }
+    addProvenance(wb, prov, `${projectName} — P6 layout`)
+  }
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }

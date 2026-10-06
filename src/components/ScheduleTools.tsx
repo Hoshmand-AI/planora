@@ -75,7 +75,9 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
         {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
           <div className="space-y-4 text-[13px] text-warm-700">
             <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
-              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a></p>
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'xlsx' }).toString()}`}>Excel, sheet per change type</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Largest float erosion (work days)</caption>
@@ -114,7 +116,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
 
       <Disclosure title="Export and original file">
         <div className="flex flex-wrap gap-2 text-[13px]">
-          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['csv', 'CSV'], ['original', 'Original file as uploaded']].map(([f, label]) => (
+          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ['csv', 'CSV'], ['original', 'Original file as uploaded']].map(([f, label]) => (
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>

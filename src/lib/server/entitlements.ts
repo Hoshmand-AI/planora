@@ -23,7 +23,7 @@ export interface Entitlements {
 }
 
 const ALL_REPORTS = ['executive_summary', 'critical_path', 'variance', 'qa_qc']
-const ALL_EXPORTS = ['xer', 'xml', 'pdf', 'xlsx-p6', 'xlsx-import', 'csv', 'md']
+const ALL_EXPORTS = ['xer', 'xml', 'pdf', 'xlsx-p6', 'xlsx-import', 'lookahead-xlsx', 'csv', 'md']
 
 export const PLANS: Record<PlanId, Entitlements> = {
   free: { label: 'Free', maxUploadedSchedules: 3, aiPerDay: 10, reports: ['executive_summary'], exports: ['xer', 'xml', 'csv', 'md'], sso: false, integrations: false, sra: false },

@@ -325,6 +325,35 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
     `,
   },
+  {
+    id: 8, name: 'submission_review_dispositions',
+    sql: `
+    -- Reviewer workflow for uploaded submissions. Additive: older code ignores both tables.
+    -- One disposition per DCMA finding ('dcma:<n>') or data question (its id) of an upload:
+    -- accepted / exception (with justification) / needs_revision.
+    CREATE TABLE IF NOT EXISTS review_dispositions (
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('accepted', 'exception', 'needs_revision')),
+      justification TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (schedule_id, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS review_dispositions_org_idx ON review_dispositions(org_id);
+    -- The overall disposition of the submission: approved / approved as noted / revise and resubmit.
+    CREATE TABLE IF NOT EXISTS submission_reviews (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('approved', 'approved_as_noted', 'revise_and_resubmit')),
+      comments TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS submission_reviews_org_idx ON submission_reviews(org_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {
