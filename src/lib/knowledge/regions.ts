@@ -121,7 +121,8 @@ const FEDERAL: RegionSpec = {
       name: 'Installation / agency construction approvals (work clearance, dig permits, base access)',
       authority: 'Installation DPW / Base Civil Engineer / agency facility office',
       jurisdiction: 'federal',
-      appliesWhen: { federalOnly: true },
+      // On a base or federal campus only: federal funding (e.g. a federal-aid bridge) does not bring base access.
+      appliesWhen: { federalOnly: true, federalInstallationOnly: true },
       reviewWeeks: { low: 2, typical: 4, high: 8 },
       gates: 'mobilization',
       submitAfter: 'design_cd',
@@ -138,6 +139,13 @@ const FEDERAL: RegionSpec = {
       scheduleImpact:
         'Wage determination must be incorporated at award; weekly certified payrolls (WH-347) and labor-compliance reviews add administrative lead time to subcontractor onboarding and pay applications. Reference default — verify with the contracting agency.',
       source: '40 U.S.C. §§3141–3148; 29 CFR Parts 1, 3, 5 (2023 final rule)',
+      addsActivity: {
+        name: 'Davis-Bacon wage determination, subcontractor onboarding & certified payroll setup',
+        category: 'permit_other',
+        days: { low: 5, typical: 10, high: 20 },
+        after: 'design_cd',
+        before: 'mobilization',
+      },
     },
     {
       id: 'us-baba',
@@ -146,6 +154,15 @@ const FEDERAL: RegionSpec = {
       scheduleImpact:
         'Restricts sourcing of iron/steel, manufactured products and construction materials; domestic-content certification and any waiver requests (commonly 2–5+ months) extend procurement durations for electrical gear, HVAC equipment and specialty items. Reference default — verify with the contracting agency.',
       source: '41 U.S.C. §§8301–8305; FAR Part 25; Infrastructure Investment and Jobs Act §§70901–70927 (BABA); 2 CFR Part 184',
+      // Iron and steel are the first covered materials to be incorporated, so certification precedes the structure.
+      addsActivity: {
+        name: 'Buy America (BABA) domestic-content certifications & waiver requests',
+        category: 'submittals',
+        days: { low: 10, typical: 20, high: 60 },
+        after: 'design_cd',
+        before: 'structure_steel',
+        beforeAlternatives: ['substructure', 'process_structures', 'foundations', 'mobilization'],
+      },
     },
     {
       id: 'us-ufc-4-010-01',
@@ -988,8 +1005,9 @@ FEDERAL.permits.push(
   }),
   permit({
     id: 'us-transit-safety-cert', name: 'Safety certification plan & State Safety Oversight review', authority: 'Transit agency safety office / State Safety Oversight Agency (FTA)', jurisdiction: 'state',
-    appliesWhen: { projectTypes: ['transit_rail'], civil: true }, reviewWeeks: { low: 8, typical: 16, high: 40 }, gates: 'startup_testing', submitAfter: 'design_cd',
-    source: '49 CFR Part 674 (State Safety Oversight); 49 CFR Part 673 (PTASP)', notes: CIVIL_VERIFY,
+    // Certification is what allows revenue service, so it gates substantial completion (not the testing that feeds it).
+    appliesWhen: { projectTypes: ['transit_rail'], civil: true }, reviewWeeks: { low: 8, typical: 16, high: 40 }, gates: 'substantial_completion', submitAfter: 'design_cd',
+    source: '49 CFR Part 674 (State Safety Oversight); 49 CFR Part 673 (PTASP)', notes: `Revenue service cannot start until the safety certification is issued. ${CIVIL_VERIFY}`,
   }),
   permit({
     id: 'us-interconnection', name: 'Utility / ISO interconnection approval & outage scheduling', authority: 'Interconnecting utility / ISO-RTO', jurisdiction: 'state',

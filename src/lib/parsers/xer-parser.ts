@@ -91,7 +91,17 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   }
 
   /* ── Activities ──────────────────────────────────────── */
-  const tasks = tables['TASK'] || []
+  // task_id is P6's primary key; a repeated one means a hand-edited or merged file. Keep the first row.
+  const seenTaskIds = new Set<string>()
+  const duplicates: string[] = []
+  const tasks = (tables['TASK'] || []).filter(t => {
+    const id = t['task_id']
+    if (!id) return true
+    if (seenTaskIds.has(id)) { duplicates.push(`${id}${t['task_code'] ? ` (${t['task_code']})` : ''}`); return false }
+    seenTaskIds.add(id)
+    return true
+  })
+  if (duplicates.length) warnings.push(`TASK table repeats task_id ${duplicates.slice(0, 10).join(', ')}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ''}; only the first row of each was imported.`)
   const byTaskId = new Map<string, Activity>()
   const activities: Activity[] = tasks.map(t => {
     const clndrId = t['clndr_id'] || defaultCalendarId
@@ -104,10 +114,19 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     else if (t['status_code'] === 'TK_Active') status = 'in_progress'
 
     let pct = parseFloat(t['phys_complete_pct'] || t['complete_pct'] || '0') || 0
+    if (pct < 0 || pct > 100) {
+      warnings.push(`Activity ${t['task_code'] || t['task_id']}: percent complete ${pct} is outside 0–100; set to ${pct < 0 ? 0 : 100}`)
+      pct = pct < 0 ? 0 : 100
+    }
     if (status === 'complete' && pct === 0) pct = 100
 
     let activityType: Activity['activityType'] = 'task'
-    if (t['task_type'] === 'TT_Mile' || t['task_type'] === 'TT_FinMile') activityType = 'milestone'
+    let milestoneKind: Activity['milestoneKind'] = null
+    if (t['task_type'] === 'TT_Mile' || t['task_type'] === 'TT_FinMile') {
+      activityType = 'milestone'
+      // P6 start milestones (TT_Mile) occur at the start of their day, finish milestones at the end
+      milestoneKind = t['task_type'] === 'TT_Mile' ? 'start' : 'finish'
+    }
     else if (t['task_type'] === 'TT_LOE') activityType = 'loe'
     else if (t['task_type'] === 'TT_WBS') activityType = 'summary'
 
@@ -149,6 +168,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
       isCritical: t['driving_path_flag'] === 'Y' || (tf !== null && tf <= 0 && status !== 'complete'),
       status,
       activityType,
+      milestoneKind,
       calendarId: clndrId || null,
       constraintType,
       constraintDate: constraintType ? constraintDate : null,
@@ -169,19 +189,73 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     }
     const t = (p['pred_type'] || 'PR_FS').replace('PR_', '')
     const type: Relationship['type'] = t === 'SS' || t === 'FF' || t === 'SF' ? t : 'FS'
-    // P6 lag is measured on the successor's calendar by default
-    const lag = round2((parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(succ.calendarId))
+    // P6's default lag calendar is the predecessor's ("Calendar for scheduling relationship lag")
+    const lag = round2((parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(pred.calendarId))
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
+  }
+
+  // Tables Planora does not model. They stay in the stored original file and the .xer export of this
+  // upload passes them through unchanged (see exportXerFromOriginal); other exports leave them out.
+  const notModeled = Object.keys(tables).filter(t => !MODELED_TABLES.has(t) && tables[t].length > 0)
+  if (notModeled.length) {
+    warnings.push(`Not used in Planora's analysis: ${notModeled.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
   }
 
   return {
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey,
     activities, relationships, calendars, defaultCalendarId, warnings,
     sourceType: 'p6_xer',
+    resourceCounts: tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tasks) : undefined,
+    sourceTables: Object.keys(tables),
   }
 }
 
+const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED'])
+const TABLE_LABELS: Record<string, string> = {
+  ACTVTYPE: 'activity code types', ACTVCODE: 'activity code values', TASKACTV: 'activity code assignments',
+  UDFTYPE: 'user-defined fields', UDFVALUE: 'user-defined field values', RSRC: 'resources', TASKRSRC: 'resource assignments',
+  ACCOUNT: 'cost accounts', PROJCOST: 'expenses', TASKMEMO: 'notebooks', MEMOTYPE: 'notebook topics', ROLES: 'roles',
+  RSRCRATE: 'resource rates', OBS: 'OBS', CURRTYPE: 'currencies', SCHEDOPTIONS: 'scheduling options', TASKPROC: 'steps',
+}
+
+function resourceCountsFrom(rows: Row[], tasks: Row[]): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const t of tasks) if (t['task_id']) counts[t['task_id']] = 0
+  for (const r of rows) if (r['task_id'] && r['task_id'] in counts) counts[r['task_id']]++
+  return counts
+}
+
+/** Resource assignments per P6 task_id from an XER's TASKRSRC table; null when the file has no TASKRSRC table. */
+export function xerResourceCounts(content: string): Record<string, number> | null {
+  const tables = readTables(content)
+  return tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tables['TASK'] || []) : null
+}
+
 /* ─── table reader ────────────────────────────────────── */
+
+/** All tables of an XER as rows keyed by field name. */
+export function readXerTables(content: string): Record<string, Row[]> {
+  return readTables(content)
+}
+
+/** A P6 calendar row's hours per day and the time of day work starts and ends (from clndr_data). */
+export function xerCalendarTimes(c: Row): { hoursPerDay: number; start: string; finish: string } {
+  const warnings: string[] = []
+  const cal = parseCalendarRow(c, warnings)
+  const dow = findChild(c['clndr_data'] ? parseClndrData(c['clndr_data']) : null, 'DaysOfWeek')
+  let start: number | null = null, finish: number | null = null
+  for (const d of dow?.children || []) {
+    for (const iv of d.children) {
+      const a = attrMap(iv.attrs)
+      const s = toMinutes(a['s']), f = toMinutes(a['f'])
+      if (s !== null && (start === null || s < start)) start = s
+      if (f !== null && (finish === null || (f === 0 ? 24 * 60 : f) > finish)) finish = f === 0 ? 24 * 60 : f
+    }
+    if (start !== null) break
+  }
+  const hm = (m: number) => `${String(Math.floor(Math.min(m, 23 * 60 + 59) / 60)).padStart(2, '0')}:${String(Math.min(m, 23 * 60 + 59) % 60).padStart(2, '0')}`
+  return { hoursPerDay: cal.hoursPerDay, start: start !== null ? hm(start) : '08:00', finish: finish !== null ? hm(finish) : '17:00' }
+}
 
 function readTables(content: string): Record<string, Row[]> {
   const tables: Record<string, Row[]> = {}

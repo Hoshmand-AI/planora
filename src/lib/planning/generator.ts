@@ -3,16 +3,16 @@
 // override is preserved across regeneration.
 
 import type {
-  Answer, Assumption, CanonicalCategory, CpmResult, GeneratedSchedule, LinkType, Override, PlanActivity, PlanLink,
-  ProjectProfile, Rationale, SourceRef, TemplateActivity, WorkCalendar, Weekday,
+  Answer, Assumption, CanonicalCategory, CpmResult, GeneratedSchedule, LinkType, LongLeadSpec, Override, PlanActivity, PlanLink,
+  ProjectProfile, ProjectType, Rationale, SourceRef, TemplateActivity, WorkCalendar, Weekday,
 } from './types'
 import { isCivilType } from './types'
 import { runCpm } from './cpm'
 import { nextActivityCode } from './overrides'
 import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
-import { elicit, known, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
+import { elicit, known, knownBool, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
 import { historyDuration, historyForPlan, type FirmHistory } from './history'
-import { templatesFor, computeTemplateDuration, mapToSelected } from '@/lib/knowledge/templates'
+import { templatesFor, computeTemplateDuration, mapToSelected, genericVariant } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel, phaseOf } from '@/lib/semantic/taxonomy'
@@ -90,7 +90,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const wwKey = (known(answers, 'calendar.workweek') as string) || '5x8'
   const ww = WORKWEEKS[wwKey] || WORKWEEKS['5x8']
   const startYear = Number(requestedStart.slice(0, 4))
-  const holidays = known(answers, 'calendar.holidays') === false ? [] : usFederalHolidaysRange(startYear, startYear + 6)
+  const holidays = knownBool(answers, 'calendar.holidays') === false ? [] : usFederalHolidaysRange(startYear, startYear + 6)
   const calendars: WorkCalendar[] = [
     { id: FIELD, name: `Field work — ${ww.label}`, workDays: ww.days, hoursPerDay: ww.hours, holidays, canonical: ww.label },
     { id: CAL7, name: 'Calendar days (agency reviews, fabrication, delivery)', workDays: [0, 1, 2, 3, 4, 5, 6], hoursPerDay: 8, holidays: [], canonical: '7-day calendar' },
@@ -124,8 +124,12 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   })
 
   /* ── Design phases remaining ── */
-  const drawings = known(answers, 'design.drawings')
-  const pct = drawings === false ? 0 : num(known(answers, 'design.percent')) ?? (drawings === true ? 30 : 0)
+  const civil = isCivilType(profile.projectType)
+  // Civil design-bid-build: the agency finishes design and right-of-way before letting the contract,
+  // so the contractor's schedule starts at its NTP with neither in it.
+  const civilDbb = civil && known(answers, 'project.delivery') === 'dbb'
+  const drawings = civilDbb ? true : knownBool(answers, 'design.drawings')
+  const pct = civilDbb ? 100 : drawings === false ? 0 : num(known(answers, 'design.percent')) ?? (drawings === true ? 30 : 0)
   const reviewWeeks = num(known(answers, 'design.review_weeks')) ?? (profile.isFederal ? 4 : 2)
   const designRemaining: Partial<Record<CanonicalCategory, number>> = {
     design_sd: pct < 30 ? (30 - pct) / 30 : 0,
@@ -133,11 +137,20 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     design_cd: pct < 100 ? Math.min(1, (100 - pct) / 40) : 0,
   }
   const designSource = drawings === undefined ? src('assumption', 'Drawing status unknown', 'Assumed no drawings') : src('user', `Drawings ${drawings ? pct + '% complete' : 'not started'}`)
+  if (civilDbb) {
+    assumptions.push({ questionId: 'project.delivery', text: 'Design-bid-build: the owner completes design and right-of-way before the contract is let, so neither is in this schedule; it starts at the contractor\'s Notice to Proceed.', bufferDays: 0, kind: 'inferred' })
+    const typedPct = num(known(answers, 'design.percent'))
+    if (knownBool(answers, 'design.drawings') === false || (typedPct !== undefined && typedPct < 100)) {
+      notes.push(`Design-bid-build with drawings ${typedPct !== undefined ? typedPct + '%' : 'not'} complete: the contract cannot be let until design is final. This schedule covers the contract work only; track the owner's design and letting separately or change the delivery method.`)
+    }
+  }
 
   /* ── Template activities ── */
-  const civil = isCivilType(profile.projectType)
-  const templates = templatesFor(profile)
+  // Data center curtain wall only when the interview says the design has it; otherwise entrance storefront.
+  const dcCurtainWall = profile.projectType === 'data_center' && knownBool(answers, 'envelope.curtain_wall') === true
+  const templates = templatesFor(profile).map(t => (dcCurtainWall && t.category === 'windows_curtainwall' ? { ...(genericVariant('windows_curtainwall') ?? t), preds: t.preds } : t))
   const skip = new Set<CanonicalCategory>(['ntp', 'permit_site', 'permit_building', 'permit_other', 'procurement', 'submittals', 'design_review'])
+  if (civilDbb) skip.add('row_utilities')
   const tmplByCat = new Map<CanonicalCategory, TemplateActivity>(templates.map(t => [t.category, t]))
 
   for (const t of templates) {
@@ -247,6 +260,10 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const status = a?.status === 'known' ? String(a.value) : 'not_submitted'
     const catalogSrc = src('catalog', pm.name, `${pm.authority}; ${pm.source}`)
     if (status === 'not_required') continue
+    if (civilDbb && OWNER_PRELETTING_PERMITS.has(pm.id)) {
+      assumptions.push({ questionId: qid, text: `${pm.name}: obtained by the owner before the contract is let (design-bid-build), so not scheduled.`, bufferDays: 0, kind: 'inferred' })
+      continue
+    }
     if (status === 'issued') {
       assumptions.push({ questionId: qid, text: `${pm.name} already issued — no review time scheduled.`, bufferDays: 0, kind: 'inferred' })
       continue
@@ -301,13 +318,17 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
 
   /* ── Long-lead procurement ── */
   const submittalStart = earlyPackages ? ddDone : designDone
+  // The activity an item is installed in: a more specific one when this network has it (a data
+  // center's generator set-in), otherwise the catalog's gate.
+  const installCategory = (it: LongLeadSpec): CanonicalCategory => it.installsIn?.find(c => b.acts.has(`t-${c}`)) ?? it.gates
+  const installTarget = (it: LongLeadSpec): string => gateTarget(installCategory(it))
   for (const it of bank.longLead) {
     const qid = `procure.${it.id}.status`
     const a = answers[qid]
     const status = a?.status === 'known' ? String(a.value) : 'not_released'
     if (status === 'not_in_scope') continue
     const catalogSrc = src('catalog', it.name, it.source)
-    const gate = gateTarget(it.gates)
+    const gate = installTarget(it)
     const delivery = known(answers, `procure.${it.id}.delivery`) as string | undefined
     const unknown = !a || a.status !== 'known'
     if ((status === 'released' || status === 'owner_furnished') && delivery) {
@@ -351,22 +372,45 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   }
 
   /* ── Systems the team said are not in scope: drop their installation work too ── */
-  // e.g. elevators answered "Not in scope" must not leave an elevator install and inspection behind.
-  for (const cat of ['elevators', 'windows_curtainwall', 'mechanical_equipment'] as CanonicalCategory[]) {
-    const items = bank.longLead.filter(it => it.gates === cat)
-    if (!items.length || !items.every(it => known(answers, `procure.${it.id}.status`) === 'not_in_scope')) continue
+  // e.g. elevators, traction power or special trackwork answered "Not in scope" must not leave their
+  // installation, testing and inspection behind. An activity goes when every item installed in it is
+  // out of scope, or when the item that defines it is (the rest are then named as what remains).
+  const outOfScope = (it: LongLeadSpec) => known(answers, `procure.${it.id}.status`) === 'not_in_scope'
+  for (const cat of NOT_IN_SCOPE_REMOVABLE) {
     const id = `t-${cat}`
     if (!b.acts.has(id)) continue
-    removeActivityBridging(b, id, { field: 'remove', reason: `${items.map(it => it.name).join(', ')} answered "Not in scope" in the interview`, by: 'Planora', at: today })
-    assumptions.push({ questionId: `procure.${items[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${items.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
+    const items = bank.longLead.filter(it => installCategory(it) === cat)
+    if (!items.length) continue
+    const out = items.filter(outOfScope)
+    if (!out.length) continue
+    const definer = (profile.projectType && DEFINING_ITEM[profile.projectType]?.[cat]) || DEFINING_ITEM.all?.[cat]
+    const definerOut = !!definer && out.some(it => it.id === definer)
+    const inScope = items.filter(it => !outOfScope(it))
+    if (inScope.length && !definerOut) continue
+    const reason = `${out.map(it => it.name).join(', ')} answered "Not in scope" in the interview`
+    if (inScope.length) {
+      // The defining system is out but others installed here are not: keep the work, named for what remains.
+      const act = b.acts.get(id)!
+      act.name = `Install ${inScope.map(it => midSentence(it.name)).join(' and ')}`
+      act.rationale = { ...act.rationale, assumptions: [...(act.rationale.assumptions || []), `${reason}; this activity now covers only the items still in scope.`] }
+      assumptions.push({ questionId: `procure.${definer}.status`, text: `${categoryLabel(cat)}: ${reason}; the activity covers only ${inScope.map(it => midSentence(it.name)).join(' and ')}.`, bufferDays: 0, kind: 'inferred' })
+      continue
+    }
+    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Planora', at: today })
+    if (b.byCat.get(cat) === id) b.byCat.delete(cat)
+    assumptions.push({ questionId: `procure.${out[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${out.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
   }
 
   /* ── Regulations that add activities ── */
   for (const r of bank.regulations) {
     if (!r.addsActivity) continue
     const tri = appliesTri(r.appliesWhen, profile)
-    // Unknown applicability is carried conservatively; only an explicit "no" drops it.
-    if (tri === 'no' || known(answers, `reg.${r.id}.applies`) === false) continue
+    const said = knownBool(answers, `reg.${r.id}.applies`)
+    // Unknown applicability is carried conservatively; only an explicit "no" drops it, and an explicit
+    // "yes" adds it. Federal-only rules follow the federal question's default (not federal) until the
+    // project or the rule itself is confirmed federal.
+    if (said === false) continue
+    if (said !== true && (tri === 'no' || (tri === 'unknown' && r.appliesWhen.federalOnly && profile.isFederal === undefined))) continue
     const ad = r.addsActivity
     const act = b.add({
       id: `reg-${r.id}`, name: ad.name, category: ad.category, phase: phaseOf(ad.category), type: 'task',
@@ -375,8 +419,9 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     })
     const after = resolveCat(mapToSelected(ad.after, profile)) || ntp.id
     b.link(after, act.id, 'FS', 0, { summary: `Follows ${midSentence(categoryLabel(ad.after))}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
-    const before = ad.before ? resolveCat(mapToSelected(ad.before, profile)) : undefined
-    if (before) b.link(act.id, before, 'FS', 0, { summary: `Must be complete before ${midSentence(categoryLabel(ad.before!))}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
+    const beforeCat = [ad.before, ...(ad.beforeAlternatives || [])].find((c): c is CanonicalCategory => !!c && !!resolveCat(mapToSelected(c, profile)))
+    const before = beforeCat ? resolveCat(mapToSelected(beforeCat, profile)) : undefined
+    if (before) b.link(act.id, before, 'FS', 0, { summary: `Must be complete before ${midSentence(categoryLabel(beforeCat!))}.`, sources: [src('catalog', r.name, r.source)], confidence: 'medium' })
   }
 
   /* ── Withheld (classified) constraints: plan around what we can't see ── */
@@ -417,7 +462,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   /* ── Weather allowance from regional climate ── */
   const earth = resolveCat('earthwork') || resolveCat('foundations')
   const dryIn = resolveCat('dry_in') || resolveCat('roofing')
-  if (known(answers, 'calendar.weather') !== false && earth && dryIn && regional.climate.adverseMonths.length && cpm.times[earth] && cpm.times[dryIn]) {
+  if (knownBool(answers, 'calendar.weather') !== false && earth && dryIn && regional.climate.adverseMonths.length && cpm.times[earth] && cpm.times[dryIn]) {
     const months = monthsBetween(cpm.times[earth].earlyStart, cpm.times[dryIn].earlyFinish).filter(m => regional.climate.adverseMonths.includes(m))
     const days = months.length * regional.climate.weatherDaysPerAdverseMonth
     if (days > 0) {
@@ -510,6 +555,19 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     cpm,
   }
 }
+
+/** Installation activities removed when the interview says their equipment is not in scope. */
+const NOT_IN_SCOPE_REMOVABLE: CanonicalCategory[] = [
+  'elevators', 'windows_curtainwall', 'mechanical_equipment',
+  'track_systems', 'power_equipment', 'conductors', 'process_equipment', 'controls_scada', 'superstructure',
+]
+/** The item an installation activity is named for, per project type ('all' = any type). */
+const DEFINING_ITEM: Partial<Record<ProjectType | 'all', Partial<Record<CanonicalCategory, string>>>> = {
+  all: { elevators: 'elevators' },
+  transit_rail: { power_equipment: 'civ-traction-power', track_systems: 'civ-special-trackwork', controls_scada: 'civ-signal-equipment' },
+}
+/** Permits the owner obtains before letting a design-bid-build civil contract. */
+const OWNER_PRELETTING_PERMITS = new Set(['us-row-certification'])
 
 function notAnsweredAssumption(q: import('./types').Question, bank: ReturnType<typeof questionBank>): Assumption {
   return unansweredAssumption(q, bank.permits, bank.longLead)

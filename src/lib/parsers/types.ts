@@ -24,6 +24,10 @@ export interface ParsedSchedule {
   defaultCalendarId: string | null
   warnings: string[]
   sourceType: ParsedSourceType
+  /** P6 only: resource assignments per source task id (TASKRSRC rows); undefined when the file has none */
+  resourceCounts?: Record<string, number>
+  /** P6 only: every table present in the file */
+  sourceTables?: string[]
 }
 
 /* ─── helpers shared by the parsers (not part of the public contract) ─── */

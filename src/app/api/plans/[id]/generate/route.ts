@@ -3,7 +3,7 @@ import { api } from '@/lib/server/api'
 import { savePlan } from '@/lib/db'
 import { generateSchedule } from '@/lib/planning/generator'
 import { loadFirmHistory } from '@/lib/planning/service'
-import type { ProjectType } from '@/lib/planning/types'
+import { PROJECT_TYPES, isProjectType, type ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
 
 /** Build (or rebuild) the schedule from the interview. Scheduler overrides are carried forward. */
@@ -13,6 +13,10 @@ export const POST = api<{ id: string }>({ permission: 'plan.write', apiKey: true
   const body = await req.json().catch(() => ({}))
   if (!plan.answers['project.type'] || plan.answers['project.type'].status !== 'known') {
     return NextResponse.json({ error: 'Answer at least the facility type before generating.' }, { status: 400 })
+  }
+  // Older plans may hold a typed facility type; never plan those as a generic building or a mix of every template.
+  if (!isProjectType(plan.answers['project.type'].value)) {
+    return NextResponse.json({ error: `Pick a facility type from the list before generating. Valid types: ${PROJECT_TYPES.join(', ')}.`, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
   }
   const history = await loadFirmHistory(ctx.orgId, plan.answers['project.type'].value as ProjectType)
   const generated = generateSchedule({ answers: plan.answers, history, previous: body.fresh ? null : plan.generated })

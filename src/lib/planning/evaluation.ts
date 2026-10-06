@@ -23,6 +23,7 @@ export function toAnalyzable(s: GeneratedSchedule): AnalyzableSchedule {
     projectFinish: s.cpm?.projectFinish ?? null,
     calendars: s.calendars,
     defaultCalendarId: s.defaultCalendarId,
+    mustFinishBy: s.mustFinishBy ?? null,
     links: s.links,
     activities: s.activities.map(a => ({
       id: a.id, code: a.code, name: a.name, type: a.type, duration: a.duration, calendarId: a.calendarId,

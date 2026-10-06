@@ -67,14 +67,15 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
         {others.length > 0 && (
           <label className="block text-[13px] text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>
-              <option value="">previous upload</option>
+              <option value="">previous update (earlier data date)</option>
               {others.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
             </select>
           </label>
         )}
         {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
           <div className="space-y-4 text-[13px] text-warm-700">
-            <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:</p>
+            <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Largest float erosion (work days)</caption>

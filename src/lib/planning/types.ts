@@ -33,6 +33,8 @@ export type LinkType = 'FS' | 'SS' | 'FF' | 'SF'
  */
 export type ConstraintType = 'SNET' | 'SNLT' | 'FNET' | 'FNLT' | 'SO' | 'FO' | 'MSO' | 'MFO'
 export const CONSTRAINT_TYPES: readonly ConstraintType[] = ['SNET', 'SNLT', 'FNET', 'FNLT', 'SO', 'FO', 'MSO', 'MFO']
+/** P6 milestone type: start (TT_Mile) or finish (TT_FinMile). */
+export type MilestoneKind = 'start' | 'finish'
 /** Out-of-sequence progress: P6 Retained Logic (default) or Progress Override. */
 export type ProgressMode = 'retained' | 'override'
 
@@ -46,6 +48,12 @@ export interface CpmActivity {
   remaining?: number
   calendarId?: string
   type: 'task' | 'milestone'
+  /**
+   * Milestones only: P6 start milestone (TT_Mile, at the start of its day) or finish milestone
+   * (TT_FinMile, at the end of its day). When absent, a milestone without predecessors is a start
+   * milestone and any other a finish milestone.
+   */
+  milestoneKind?: MilestoneKind
   constraint?: { type: ConstraintType; date: string }
   actualStart?: string | null
   actualFinish?: string | null
@@ -55,7 +63,7 @@ export interface CpmLink {
   from: string
   to: string
   type: LinkType
-  /** Lag in work days on the successor's calendar (may be negative = lead) */
+  /** Lag in work days on the predecessor's calendar (P6 default; may be negative = lead) */
   lag: number
 }
 
@@ -93,6 +101,13 @@ export interface CpmResult {
   criticalPath: string[]
   /** Activity ids of the longest (driving) path to the project finish, regardless of float */
   longestPath: string[]
+  /**
+   * Set when the longest path starts at an activity whose date a mandatory constraint (MSO/MFO)
+   * sets rather than logic: the path stops there, as in P6.
+   */
+  longestPathConstraint?: { id: string; type: 'MSO' | 'MFO'; date: string }
+  /** The path to logicFinish that logic alone would give (through mandatory constraints) */
+  logicLongestPath?: string[]
   /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
   violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
   progressMode: ProgressMode
@@ -143,6 +158,15 @@ export type ProjectType = typeof PROJECT_TYPES[number]
 /** Horizontal / infrastructure types: their own networks, permits and long-lead items; sized by construction value, not floor area. */
 export const CIVIL_PROJECT_TYPES: readonly ProjectType[] = ['highway_bridge', 'transit_rail', 'water_wastewater', 'utility_power', 'industrial_process']
 export const isCivilType = (t: string | null | undefined): boolean => !!t && (CIVIL_PROJECT_TYPES as readonly string[]).includes(t)
+export const isProjectType = (t: unknown): t is ProjectType => typeof t === 'string' && (PROJECT_TYPES as readonly string[]).includes(t)
+/**
+ * Validation message for an optional project type from an API body or form (null when absent or valid).
+ * An unknown type is refused: planning it as a generic building, or dropping it, gave the wrong network.
+ */
+export function projectTypeError(t: unknown): string | null {
+  if (t === undefined || t === null || t === '') return null
+  return isProjectType(t) ? null : `Unknown projectType “${String(t).slice(0, 60)}”. Valid types: ${PROJECT_TYPES.join(', ')}.`
+}
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   commercial_office: 'Commercial office',
@@ -175,6 +199,11 @@ export interface ProjectProfile {
   scope?: WorkScope
   siteAcresDisturbed?: number
   isFederal?: boolean
+  /**
+   * Work is on a federal installation or federal property with controlled access (a base, a federal
+   * campus). Federal funding alone does not make it so: a federal-aid highway bridge is not on a base.
+   */
+  onFederalInstallation?: boolean
   classification?: Classification
   deliveryMethod?: DeliveryMethod
   /** Civil types: construction value in USD millions (their size measure instead of floor area) */
@@ -193,6 +222,8 @@ export interface Applicability {
   minAcresDisturbed?: number
   federalOnly?: boolean
   nonFederalOnly?: boolean
+  /** Only on a federal installation / federal property (base access, installation work clearance) */
+  federalInstallationOnly?: boolean
   /**
    * Also applies to civil/infrastructure project types. Without it, an item that does not list the
    * civil type explicitly is treated as building-only and does not apply to bridges, plants, etc.
@@ -222,7 +253,11 @@ export interface RegulationSpec {
   appliesWhen: Applicability
   scheduleImpact: string
   /** Optional extra activity the generator should add */
-  addsActivity?: { name: string; category: CanonicalCategory; days: DurationRange; after: CanonicalCategory; before?: CanonicalCategory }
+  addsActivity?: {
+    name: string; category: CanonicalCategory; days: DurationRange; after: CanonicalCategory; before?: CanonicalCategory
+    /** Tried in order when `before` is not part of this project's network (e.g. civil types have no steel erection) */
+    beforeAlternatives?: CanonicalCategory[]
+  }
   source: string
 }
 
@@ -250,6 +285,11 @@ export interface LongLeadSpec {
   submittalWeeks: number
   /** Installation activity category this item gates */
   gates: CanonicalCategory
+  /**
+   * More specific installation activities, used when the project's network has one (e.g. a data
+   * center's generator set-in instead of generic permanent power). Falls back to `gates`.
+   */
+  installsIn?: CanonicalCategory[]
   source: string
   notes?: string
 }
@@ -439,6 +479,8 @@ export interface AnalyzableActivity {
   baselineFinish?: string | null
   totalFloat?: number | null
   constraint?: { type: ConstraintType | string; date?: string | null } | null
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone, when the source says */
+  milestoneKind?: MilestoneKind | null
   resourceCount?: number
 }
 
@@ -450,6 +492,10 @@ export interface AnalyzableSchedule {
   links: CpmLink[]
   calendars: WorkCalendar[]
   defaultCalendarId?: string | null
+  /** Required finish (P6 Must Finish By); a target for the finish milestone in CPLI */
+  mustFinishBy?: string | null
+  /** Contract/finish milestone the scheduler designated (activity id or code) */
+  finishMilestoneId?: string | null
 }
 
 export type CheckResult = 'pass' | 'fail' | 'warn' | 'n/a'
@@ -460,7 +506,7 @@ export interface DcmaCheck {
   metric: string      // e.g. "3.2%"
   threshold: string   // e.g. "≤ 5%"
   result: CheckResult
-  offenders: string[] // activity codes (capped)
+  offenders: string[] // activity codes (every offender, de-duplicated)
   explanation: string
 }
 

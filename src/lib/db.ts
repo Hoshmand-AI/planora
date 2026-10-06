@@ -217,6 +217,8 @@ export interface Schedule {
   projectKey?: string | null
   /** Whether this schedule's actuals calibrate firm history */
   inHistory?: boolean
+  /** Contract/finish milestone the scheduler designated (activity id or activity code); null = automatic */
+  finishMilestoneId?: string | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -231,6 +233,7 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     grossSqft: row.gross_sqft != null ? Number(row.gross_sqft) : null,
     analysis: (row.analysis as ScheduleAnalysis) ?? null, projectKey: (row.project_key as string) ?? null,
     inHistory: row.in_history == null ? true : Boolean(row.in_history),
+    finishMilestoneId: (row.finish_milestone_id as string) ?? null,
   }
 }
 
@@ -264,6 +267,12 @@ export async function updateScheduleAnalysis(id: string, orgId: string, a: { ana
     [id, orgId, JSON.stringify(a.analysis), a.projectFinish, a.varianceDays, a.criticalCount])
 }
 
+/** Designate (or clear, with null) the schedule's contract/finish milestone. */
+export async function setScheduleFinishMilestone(id: string, orgId: string, finishMilestoneId: string | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET finish_milestone_id=$3 WHERE id=$1 AND org_id=$2', [id, orgId, finishMilestoneId])
+}
+
 export async function setScheduleInHistory(id: string, orgId: string, inHistory: boolean): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
@@ -281,6 +290,14 @@ export async function saveScheduleFile(f: { scheduleId: string; orgId: string; f
   await initSchema()
   await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content) VALUES ($1,$2,$3,$4,$5,$6)
     ON CONFLICT (schedule_id) DO NOTHING`, [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.content])
+}
+
+/** Uploads among `scheduleIds` whose stored original file has this SHA-256 (identical bytes). */
+export async function findScheduleFilesBySha(orgId: string, sha256: string, scheduleIds: string[]): Promise<string[]> {
+  if (!scheduleIds.length) return []
+  await initSchema()
+  const res = await query('SELECT schedule_id FROM schedule_files WHERE org_id=$1 AND sha256=$2 AND schedule_id = ANY($3::text[])', [orgId, sha256, scheduleIds])
+  return res.rows.map(r => String(r.schedule_id))
 }
 
 export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
@@ -310,6 +327,8 @@ export interface Activity {
   actualStart: string | null; actualFinish: string | null; baselineStart: string | null; baselineFinish: string | null
   totalFloat: number; freeFloat: number; isCritical: boolean
   status: 'not_started' | 'in_progress' | 'complete'; activityType: 'task' | 'milestone' | 'loe' | 'summary'
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone; null when the source does not say */
+  milestoneKind?: 'start' | 'finish' | null
   /** Source calendar id (as referenced in the schedule's calendars list) */
   calendarId?: string | null
   constraintType?: string | null; constraintDate?: string | null
@@ -327,6 +346,7 @@ function rowToActivity(row: Record<string, unknown>): Activity {
     actualStart: row.actual_start as string | null, actualFinish: row.actual_finish as string | null, baselineStart: row.baseline_start as string | null, baselineFinish: row.baseline_finish as string | null,
     totalFloat: Number(row.total_float), freeFloat: Number(row.free_float), isCritical: Boolean(row.is_critical),
     status: row.status as Activity['status'], activityType: row.activity_type as Activity['activityType'],
+    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
     calendarId: (row.calendar_id as string) ?? null, constraintType: (row.constraint_type as string) ?? null, constraintDate: (row.constraint_date as string) ?? null,
     category: (row.category as string) ?? null, sourceId: (row.source_id as string) ?? null,
   }
@@ -352,8 +372,8 @@ async function bulkInsert(table: string, columns: string[], rows: unknown[][]) {
 export async function createActivities(activities: Activity[]): Promise<void> {
   await initSchema()
   await bulkInsert('activities',
-    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id'],
-    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null]))
+    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id', 'milestone_kind'],
+    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null, a.milestoneKind ?? null]))
 }
 
 export interface Relationship {

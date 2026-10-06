@@ -154,7 +154,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
 
   ws.getCell(1, 1).value = projectName
   ws.getCell(1, 1).font = { bold: true, size: 16, color: { argb: 'FF0F2140' } }
-  ws.getCell(2, 1).value = `Data date ${fmtDate(s.projectStart)} · Finish ${fmtDate(finish)} · ${s.activities.length} activities · Printed ${fmtDate(new Date().toISOString())} · Planora`
+  ws.getCell(2, 1).value = `Data date ${fmtDate(s.dataDate || s.projectStart)} · Finish ${fmtDate(finish)} · ${s.activities.length} activities · Printed ${fmtDate(new Date().toISOString())} · Planora`
   ws.getCell(2, 1).font = { size: 10, color: { argb: 'FF6B6359' } }
 
   // Row 4: months, Row 5: column titles + week starts.

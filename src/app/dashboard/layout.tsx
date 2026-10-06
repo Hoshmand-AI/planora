@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard, MessageSquare, FileText, Clock,
   Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2,
@@ -60,6 +60,28 @@ const isActive = (pathname: string, href: string) => href === '/dashboard' ? pat
 interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; host: string | null; error?: string }
 const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
 
+/** Schedule id a deep link asks for: /dashboard?schedule=<id> (portfolio links) or /dashboard?id=<id>. */
+function deepLinkedScheduleId(pathname: string, params: { get(name: string): string | null }): string | null {
+  if (pathname !== '/dashboard') return null
+  return params.get('schedule') || params.get('id') || null
+}
+
+/** Opens the schedule a deep link names once the list is loaded (and again whenever the link changes). */
+function ScheduleDeepLink({ schedules, select }: { schedules: Schedule[]; select: (s: Schedule) => void }) {
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const wanted = deepLinkedScheduleId(pathname, params)
+  const applied = useRef<string | null>(null)
+  useEffect(() => {
+    if (!wanted || applied.current === wanted) return
+    const s = schedules.find(x => x.id === wanted)
+    if (!s) return
+    applied.current = wanted
+    select(s)
+  }, [wanted, schedules, select])
+  return null
+}
+
 /* ─── Layout ─────────────────────────────────────────── */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
@@ -104,16 +126,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const refreshSchedules = useCallback(async () => {
     const res  = await fetch('/api/schedules')
     const data = await res.json()
-    setSchedules(data.schedules || [])
-    if (!selectedSchedule && data.schedules?.length > 0) {
-      setSelectedSchedule(data.schedules[0])
+    const list: Schedule[] = data.schedules || []
+    setSchedules(list)
+    if (!selectedSchedule && list.length > 0) {
+      // Honor a deep link on first load instead of flashing the newest schedule.
+      const wanted = typeof window === 'undefined' ? null : deepLinkedScheduleId(window.location.pathname, new URLSearchParams(window.location.search))
+      setSelectedSchedule(list.find(s => s.id === wanted) ?? list[0])
     }
   }, [selectedSchedule])
 
+  // Only the latest selection's metrics may land (a slower earlier request must not overwrite them).
+  const metricsFor = useRef<string | null>(null)
   const refreshMetrics = useCallback(async () => {
+    metricsFor.current = selectedSchedule?.id ?? null
     if (!selectedSchedule) { setMetrics(null); return }
-    const res  = await fetch(`/api/schedules?id=${selectedSchedule.id}`)
+    const id = selectedSchedule.id
+    const res  = await fetch(`/api/schedules?id=${id}`)
     const data = await res.json()
+    if (metricsFor.current !== id) return
     setMetrics(data.metrics ? { ...data.metrics, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
   }, [selectedSchedule])
 
@@ -158,6 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can }}>
+      <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} select={setSelectedSchedule} /></Suspense>
       {/*
        * LAYOUT STRATEGY
        * ─────────────────────────────────────────────────────────

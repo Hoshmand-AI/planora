@@ -7,6 +7,7 @@ import { basisOfSchedule } from '@/lib/export/narrative'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
 import { exportXer } from '@/lib/export/xer'
+import { encodeXer } from '@/lib/parsers/xer-codec'
 import { exportPdf } from '@/lib/export/pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
 import { profileFrom } from '@/lib/planning/elicitation'
@@ -39,12 +40,13 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const slug = plan.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule'
   const teamNotes = Object.entries(plan.answers).filter(([id, a]) => id.startsWith('note.') && a.status === 'known').map(([, a]) => String(a.value))
 
-  const sraFor = async () => g.cpm ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
+  // Same rule as the plan page header: Monte Carlo only where the plan has it, else the rule-based estimate.
+  const sraFor = async () => g.cpm && entitlementsFor(ctx.plan).sra ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
   let body: string | Buffer | Uint8Array, type: string, file: string
   switch (format) {
     case 'xer':
       // P6 reads XER in Windows-1252; exportXer only emits characters in that range.
-      body = Buffer.from(exportXer(g, plan.name, { exportedBy: ctx.name }), 'latin1'); type = 'application/octet-stream'; file = `${slug}.xer`; break
+      body = encodeXer(exportXer(g, plan.name, { exportedBy: ctx.name })); type = 'application/octet-stream'; file = `${slug}.xer`; break
     case 'xml':
       body = exportMspXml(g, plan.name); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv':

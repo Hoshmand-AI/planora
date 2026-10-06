@@ -1,21 +1,36 @@
-// Primavera P6 native export (.xer). Tab-delimited tables: CALENDAR, PROJECT, PROJWBS, TASK, TASKPRED.
+// Primavera P6 native export (.xer). Tab-delimited tables: CALENDAR, PROJECT, PROJWBS, TASK, TASKPRED
+// (+ MEMOTYPE/TASKMEMO when activities carry override reasons).
 // Dates use P6's "yyyy-mm-dd hh:mm" form; durations and lags are hours on each activity's calendar.
-// Text is kept to Windows-1252-safe characters because P6 reads XER in the client code page.
+// Text is kept to Windows-1252 characters because P6 reads XER in the client code page; encode the
+// result with encodeXer() from '@/lib/parsers/xer-codec' (the importer decodes with the same table).
+//
+// Two paths:
+//  - exportXer: builds a new XER from a schedule (Planora plans, MS Project / Excel uploads).
+//  - exportXerFromOriginal: for an uploaded P6 file, re-emits the original file row for row and only
+//    replaces the dates and float Planora recalculated, so calendars (ids, names, work hours), percent
+//    complete types, LOE activities, milestone types, WBS, baselines, activity codes, UDFs, resources,
+//    cost accounts and notebooks survive the round trip untouched.
 
-import type { GeneratedSchedule, LinkType, ConstraintType, WorkCalendar } from '@/lib/planning/types'
+import type { CpmResult, GeneratedSchedule, LinkType, ConstraintType, WorkCalendar } from '@/lib/planning/types'
 import { buildWbs } from './wbs'
+import { isCp1252 } from '@/lib/parsers/xer-codec'
+import { readXerTables, xerCalendarTimes } from '@/lib/parsers/xer-parser'
 
 const PRED: Record<LinkType, string> = { FS: 'PR_FS', SS: 'PR_SS', FF: 'PR_FF', SF: 'PR_SF' }
 const CSTR: Record<ConstraintType, string> = { SNET: 'CS_MSOA', SNLT: 'CS_MSOB', FNET: 'CS_MEOA', FNLT: 'CS_MEOB', SO: 'CS_MSO', FO: 'CS_MEO', MSO: 'CS_MANDSTART', MFO: 'CS_MANDFIN' }
 
-/** Characters P6 handles in XER (Windows-1252); others are replaced with ASCII equivalents. */
+/** Characters P6 handles in XER (Windows-1252); others are replaced with ASCII equivalents or '?'. */
 export function xerText(v: unknown): string {
-  return String(v ?? '')
+  return Array.from(String(v ?? '')
     .replace(/[\t\r\n]+/g, ' ')
     .replace(/[≥]/g, '>=').replace(/[≤]/g, '<=').replace(/[→]/g, '->').replace(/[←]/g, '<-')
-    .replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...')
-    .replace(/[^\x20-\x7e\xa0-\xff]/g, '?')
+    .replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...'))
+    .map(ch => (ch >= ' ' && ch !== '\x7f' && !(ch >= '\x80' && ch < '\xa0') && isCp1252(ch) ? ch : '?'))
+    .join('')
 }
+
+/** P6 limits activity names to 120 characters. */
+export const P6_NAME_MAX = 120
 
 const dt = (d: string | null | undefined, time: string) => (d ? `${d.slice(0, 10)} ${time}` : '')
 /** Finish time of day for a calendar: 08:00 start, its work hours, plus a lunch hour on 8h+ days. */
@@ -23,9 +38,16 @@ const finishTime = (hours: number) => {
   const end = 8 + hours + (hours >= 8 ? 1 : 0)
   return end >= 24 ? '23:59' : `${String(Math.floor(end)).padStart(2, '0')}:${String(Math.round((end % 1) * 60)).padStart(2, '0')}`
 }
-/** P6 project short name: keep the project's name (P6 allows 40 characters). */
+/**
+ * P6 project ID (proj_short_name, 40 characters max): the project's own name, cut at a word boundary
+ * when it is longer. Characters P6 rejects in IDs (quotes, '|', backslash) are dropped.
+ */
 export function projShortName(name: string): string {
-  return xerText(name).replace(/[^A-Za-z0-9 ._()-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'PLANORA'
+  const clean = xerText(name).replace(/["'|\\]/g, '').replace(/\s+/g, ' ').trim()
+  if (clean.length <= 40) return clean || 'PLANORA'
+  const cut = clean.slice(0, 41)
+  const atWord = cut.lastIndexOf(' ')
+  return (atWord >= 20 ? cut.slice(0, atWord) : clean.slice(0, 40)).trim()
 }
 
 /** Excel serial day number used by P6 calendar exceptions (days since 1899-12-30). */
@@ -53,7 +75,17 @@ export function clndrData(c: WorkCalendar): string {
   return `(0||CalendarData()((0||DaysOfWeek()(${days}))(0||VIEW(ShowTotal|Y)())(0||Exceptions()(${exc}))))`
 }
 
-export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exportedBy?: string; now?: Date } = {}): string {
+/**
+ * Calendar ids for the XER: the schedule's own ids when they are already P6 ids (positive integers,
+ * e.g. an uploaded P6 file), so a round trip does not renumber calendars; otherwise 100, 101, ...
+ */
+function calendarIds(cals: WorkCalendar[]): Map<string, number> {
+  const numeric = cals.map(c => (/^[1-9]\d{0,9}$/.test(c.id) ? Number(c.id) : NaN))
+  if (numeric.every(n => !isNaN(n)) && new Set(numeric).size === numeric.length) return new Map(cals.map((c, i) => [c.id, numeric[i]]))
+  return new Map(cals.map((c, i) => [c.id, 100 + i]))
+}
+
+export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exportedBy?: string; now?: Date; projectShortName?: string } = {}): string {
   const now = opts.now || new Date()
   const today = now.toISOString().slice(0, 10)
   const t = s.cpm?.times || {}
@@ -66,14 +98,15 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
   lines.push(['ERMHDR', '19.12', today, 'Project', xerText(opts.exportedBy || 'Planora'), 'Planora', 'dbxDatabaseNoName', 'Project Management', 'USD'].join('\t'))
 
   const PROJ = 1
-  const calId = new Map(s.calendars.map((c, i) => [c.id, 100 + i]))
+  const calId = calendarIds(s.calendars)
+  const driving = new Set(s.cpm?.longestPath ?? [])
   const hoursOf = (calendarId?: string) => s.calendars.find(c => c.id === (calendarId || s.defaultCalendarId))?.hoursPerDay || 8
 
   table('CALENDAR', ['clndr_id', 'default_flag', 'clndr_name', 'proj_id', 'base_clndr_id', 'last_chng_date', 'clndr_type', 'day_hr_cnt', 'week_hr_cnt', 'month_hr_cnt', 'year_hr_cnt', 'rsrc_private', 'clndr_data'],
     s.calendars.map(c => [calId.get(c.id)!, c.id === s.defaultCalendarId ? 'Y' : 'N', c.name, PROJ, '', dt(today, '00:00'), 'CA_Project', c.hoursPerDay, c.hoursPerDay * c.workDays.length, Math.round(c.hoursPerDay * c.workDays.length * 4.33), c.hoursPerDay * c.workDays.length * 52, 'N', clndrData(c)]))
 
   table('PROJECT', ['proj_id', 'fy_start_month_num', 'rsrc_self_add_flag', 'allow_complete_flag', 'rsrc_multi_assign_flag', 'checkout_flag', 'project_flag', 'step_complete_flag', 'cost_qty_recalc_flag', 'batch_sum_flag', 'name_sep_char', 'def_complete_pct_type', 'proj_short_name', 'acct_id', 'orig_proj_id', 'source_proj_id', 'base_type_id', 'clndr_id', 'sum_base_proj_id', 'task_code_base', 'task_code_step', 'priority_num', 'wbs_max_sum_level', 'strgy_priority_num', 'last_checksum', 'critical_drtn_hr_cnt', 'def_cost_per_qty', 'last_recalc_date', 'plan_start_date', 'plan_end_date', 'scd_end_date', 'add_date', 'last_tasksum_date', 'fcst_start_date', 'def_duration_type', 'task_code_prefix', 'guid', 'def_qty_type', 'add_by_name', 'web_local_root_path', 'proj_url', 'def_rate_type', 'add_act_remain_flag', 'act_this_per_link_flag', 'def_task_type', 'act_pct_link_flag', 'critical_path_type', 'task_code_prefix_flag', 'def_rollup_dates_flag', 'use_project_baseline_flag', 'rem_target_link_flag', 'reset_planned_flag', 'allow_neg_act_flag', 'sum_assign_level', 'last_fin_dates_id', 'last_baseline_update_date', 'cr_external_key', 'apply_actuals_date', 'location_id', 'loaded_scope_level', 'export_flag', 'new_fin_dates_id', 'baselines_to_export', 'baseline_names_to_export', 'next_data_date', 'close_period_flag', 'sum_refresh_date', 'trsrcsum_loaded'],
-    [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', projShortName(projectName), '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0,
+    [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', projShortName(opts.projectShortName || projectName), '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0,
       // last_recalc_date = data date; plan_end_date = P6 "Must Finish By" (the required finish, so float after F9 matches); scd_end_date = forecast
       dt(s.dataDate || s.projectStart, '08:00'), dt(s.projectStart, '08:00'), s.mustFinishBy ? dt(s.mustFinishBy, finishTime(hoursOf())) : '', dt(s.cpm?.projectFinish, finishTime(hoursOf())), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Planora'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', dt(s.dataDate || s.projectStart, '08:00'), 'N', '', 'N']])
 
@@ -105,7 +138,13 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     taskId.set(a.id, id)
     const h = hoursOf(a.calendarId)
     const fin = finishTime(h)
-    const type = a.type === 'milestone' ? (hasPred.has(a.id) ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
+    const msKind = a.milestoneKind ?? (hasPred.has(a.id) ? 'finish' : 'start')
+    const type = a.type === 'milestone' ? (msKind === 'finish' ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
+    // Uploaded activities carry their own baseline fields (possibly empty); never invent planned/target
+    // dates for them. Planora-built plans have no baseline yet, so their planned dates are the CPM dates.
+    const fromUpload = a.baselineStart !== undefined || a.baselineFinish !== undefined
+    const targetStart = fromUpload ? a.baselineStart : tm?.earlyStart
+    const targetFinish = fromUpload ? a.baselineFinish : tm?.earlyFinish
     const dur = a.duration * h
     const done = !!a.actualFinish || a.status === 'complete'
     const active = !done && !!a.actualStart
@@ -114,13 +153,13 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     const constraintTime = a.constraint && (a.constraint.type === 'FNET' || a.constraint.type === 'FNLT' || a.constraint.type === 'FO' || a.constraint.type === 'MFO') ? fin : '08:00'
     taskRows.push([
       id, PROJ, wbsId.get(r.wbsCode) ?? projNode, calId.get(a.calendarId || s.defaultCalendarId) ?? calId.get(s.defaultCalendarId)!,
-      pct, 'N', 1, 'N', 'N', 'CP_Drtn', type, 'DT_FixedDUR2', done ? 'TK_Complete' : active ? 'TK_Active' : 'TK_NotStart', a.code, a.name, '',
+      pct, 'N', 1, 'N', 'N', 'CP_Drtn', type, 'DT_FixedDUR2', done ? 'TK_Complete' : active ? 'TK_Active' : 'TK_NotStart', a.code, xerText(a.name).slice(0, P6_NAME_MAX), '',
       (tm?.totalFloat ?? 0) * h, (tm?.freeFloat ?? 0) * h, remaining, 0, 0, 0, dur, 0, 0, 0,
       a.constraint ? dt(a.constraint.date, constraintTime) : '', dt(a.actualStart, '08:00'), dt(a.actualFinish, fin),
       dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, fin), '',
       dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, fin), dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, fin),
-      dt(a.baselineStart || tm?.earlyStart, '08:00'), dt(a.baselineFinish || tm?.earlyFinish, fin), dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, fin),
-      a.constraint ? CSTR[a.constraint.type] : '', 'PT_Normal', tm?.critical ? 'Y' : 'N',
+      dt(targetStart, '08:00'), dt(targetFinish, fin), dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, fin),
+      a.constraint ? CSTR[a.constraint.type] : '', 'PT_Normal', driving.has(a.id) ? 'Y' : 'N',
     ])
   }
   table('TASK', ['task_id', 'proj_id', 'wbs_id', 'clndr_id', 'phys_complete_pct', 'rev_fdbk_flag', 'est_wt', 'lock_plan_flag', 'auto_compute_act_flag', 'complete_pct_type', 'task_type', 'duration_type', 'status_code', 'task_code', 'task_name', 'rsrc_id', 'total_float_hr_cnt', 'free_float_hr_cnt', 'remain_drtn_hr_cnt', 'act_work_qty', 'remain_work_qty', 'target_work_qty', 'target_drtn_hr_cnt', 'target_equip_qty', 'act_equip_qty', 'remain_equip_qty', 'cstr_date', 'act_start_date', 'act_end_date', 'late_start_date', 'late_end_date', 'expect_end_date', 'early_start_date', 'early_end_date', 'restart_date', 'reend_date', 'target_start_date', 'target_end_date', 'rem_late_start_date', 'rem_late_end_date', 'cstr_type', 'priority_type', 'driving_path_flag'], taskRows)
@@ -130,11 +169,121 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
   for (const l of s.links) {
     const from = taskId.get(l.from), to = taskId.get(l.to)
     if (from === undefined || to === undefined) continue
-    const succ = s.activities.find(a => a.id === l.to)
-    predRows.push([nextPred++, to, from, PROJ, PROJ, PRED[l.type], l.lag * hoursOf(succ?.calendarId)])
+    // Lag is in work days on the predecessor's calendar (P6's default lag calendar)
+    const pred = s.activities.find(a => a.id === l.from)
+    predRows.push([nextPred++, to, from, PROJ, PROJ, PRED[l.type], l.lag * hoursOf(pred?.calendarId)])
   }
   table('TASKPRED', ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt'], predRows)
 
+  // Notebook: the reasons recorded for the scheduler's overrides, so they travel with the activity.
+  const memoRows: (string | number)[][] = []
+  let nextMemo = 70000
+  for (const a of s.activities) {
+    const id = taskId.get(a.id)
+    const reasons = (a.overrides || []).filter(o => o.reason)
+    if (id === undefined || !reasons.length) continue
+    const esc = (v: string) => v.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!))
+    const text = reasons.map(o => `${o.field}${o.from !== undefined || o.to !== undefined ? ` ${String(o.from ?? '')} -> ${String(o.to ?? '')}` : ''}: ${o.reason} (${o.by}, ${String(o.at).slice(0, 10)})`)
+    memoRows.push([nextMemo++, id, 1, PROJ, `<HTML><BODY><P>Planora overrides</P>${text.map(x => `<P>${esc(x)}</P>`).join('')}</BODY></HTML>`])
+  }
+  if (memoRows.length) {
+    table('MEMOTYPE', ['memo_type_id', 'seq_num', 'eps_flag', 'proj_flag', 'wbs_flag', 'task_flag', 'memo_type'], [[1, 1, 'N', 'N', 'N', 'Y', 'Planora overrides']])
+    table('TASKMEMO', ['memo_id', 'task_id', 'memo_type_id', 'proj_id', 'task_memo'], memoRows)
+  }
+
   lines.push('%E')
   return lines.join('\r\n') + '\r\n'
+}
+
+/* ─── Uploaded P6 files: pass the original through ─────── */
+
+/** Planora's recalculated values for one P6 activity (dates ISO yyyy-mm-dd, float in work days). */
+export interface XerTaskUpdate {
+  earlyStart: string
+  earlyFinish: string
+  lateStart: string
+  lateFinish: string
+  totalFloat: number
+  freeFloat: number
+  driving: boolean
+}
+
+/** Recalculated values keyed by P6 task_id, from an uploaded schedule's activities and Planora's CPM. */
+export function xerUpdatesFrom(activities: { id: string; sourceId?: string | null }[], cpm: CpmResult): Map<string, XerTaskUpdate> {
+  const driving = new Set(cpm.longestPath)
+  const out = new Map<string, XerTaskUpdate>()
+  for (const a of activities) {
+    const t = cpm.times[a.id]
+    if (!a.sourceId || !t) continue
+    out.set(a.sourceId, { earlyStart: t.earlyStart, earlyFinish: t.earlyFinish, lateStart: t.lateStart, lateFinish: t.lateFinish, totalFloat: t.totalFloat, freeFloat: t.freeFloat, driving: driving.has(a.id) })
+  }
+  return out
+}
+
+/**
+ * Re-emit an uploaded XER with Planora's recalculated early/late dates, float and driving-path flag on
+ * open activities, and Planora's forecast as the project's scheduled finish. Every other table, row
+ * and field (including the file's own time of day on unchanged dates) is written back exactly as read.
+ */
+export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null } = {}): string {
+  const tables = readXerTables(original)
+  const cal = new Map((tables['CALENDAR'] || []).map(c => [c['clndr_id'], xerCalendarTimes(c)]))
+  const projOfTasks = new Set<string>()
+  for (const t of tables['TASK'] || []) if (updates.has(t['task_id']) && t['proj_id']) projOfTasks.add(t['proj_id'])
+  const projCal = new Map((tables['PROJECT'] || []).map(p => [p['proj_id'], p['clndr_id']]))
+  const defaultCal = (tables['CALENDAR'] || []).find(c => c['default_flag'] === 'Y')?.['clndr_id']
+
+  /** Replace the date part; keep the file's own value when the date did not change, else its time of day. */
+  const withDate = (orig: string, iso: string, time: string) => {
+    const o = orig.trim()
+    if (o.slice(0, 10) === iso) return orig
+    const m = o.match(/^\d{4}-\d{1,2}-\d{1,2}[ T](\d{1,2}:\d{2})/)
+    return `${iso} ${m ? m[1] : time}`
+  }
+  const hrs = (days: number, hpd: number) => String(Math.round(days * hpd * 100) / 100)
+
+  const eol = original.includes('\r\n') ? '\r\n' : '\n'
+  const endsWithNl = /(\r\n|\n|\r)$/.test(original)
+  const lines = original.replace(/^﻿/, '').split(/\r\n|\n|\r/)
+  if (endsWithNl && lines[lines.length - 1] === '') lines.pop()
+  let table = ''
+  let idx = new Map<string, number>()
+  const out = lines.map(line => {
+    const cols = line.split('\t')
+    const tag = cols[0].trim()
+    if (tag === '%T') { table = (cols[1] || '').trim(); return line }
+    if (tag === '%F') { idx = new Map(cols.slice(1).map((f, i) => [f.trim(), i + 1])); return line }
+    if (tag !== '%R') return line
+    const get = (f: string) => (idx.has(f) ? (cols[idx.get(f)!] ?? '') : '')
+    const set = (f: string, v: string) => { const i = idx.get(f); if (i === undefined) return; while (cols.length <= i) cols.push(''); cols[i] = v }
+    if (table === 'TASK') {
+      const u = updates.get(get('task_id').trim())
+      if (!u || get('status_code').trim() === 'TK_Complete') return line
+      const c = cal.get(get('clndr_id').trim()) || cal.get(projCal.get(get('proj_id').trim()) || '') || cal.get(defaultCal || '')
+      const finish = c?.finish || '17:00', hpd = c?.hoursPerDay || 8
+      // A finish milestone starts and finishes at the end of its day.
+      const start = get('task_type').trim() === 'TT_FinMile' ? finish : c?.start || '08:00'
+      // An in-progress activity's early start is its actual start in P6; only its finish moves.
+      if (get('status_code').trim() !== 'TK_Active') set('early_start_date', withDate(get('early_start_date'), u.earlyStart, start))
+      set('early_end_date', withDate(get('early_end_date'), u.earlyFinish, finish))
+      set('late_start_date', withDate(get('late_start_date'), u.lateStart, start))
+      set('late_end_date', withDate(get('late_end_date'), u.lateFinish, finish))
+      set('restart_date', withDate(get('restart_date'), u.earlyStart, start))
+      set('reend_date', withDate(get('reend_date'), u.earlyFinish, finish))
+      set('rem_late_start_date', withDate(get('rem_late_start_date'), u.lateStart, start))
+      set('rem_late_end_date', withDate(get('rem_late_end_date'), u.lateFinish, finish))
+      set('total_float_hr_cnt', hrs(u.totalFloat, hpd))
+      // Free float never exceeds total float in P6 (a date constraint can limit total float alone).
+      set('free_float_hr_cnt', hrs(Math.min(u.freeFloat, Math.max(0, u.totalFloat)), hpd))
+      set('driving_path_flag', u.driving ? 'Y' : 'N')
+      return cols.join('\t')
+    }
+    if (table === 'PROJECT' && opts.forecastFinish && projOfTasks.has(get('proj_id').trim())) {
+      const c = cal.get(get('clndr_id').trim()) || cal.get(defaultCal || '')
+      set('scd_end_date', withDate(get('scd_end_date'), opts.forecastFinish, c?.finish || '17:00'))
+      return cols.join('\t')
+    }
+    return line
+  })
+  return out.join(eol) + (endsWithNl ? eol : '')
 }

@@ -4,14 +4,17 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, setScheduleInHistory, updateScheduleAnalysis } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
-import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
+import { nearTermOutlook } from '@/lib/analysis/near-term'
+import { recalcWarning } from '@/lib/analysis/recalc-warning'
+import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
-import { PROJECT_TYPES } from '@/lib/planning/types'
+import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
+import { fmtDate, fmtDay } from '@/lib/format'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -28,10 +31,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
     const byId = new Map(activities.map(a => [a.id, a]))
     const longest = analysis.longestPath.map(id => byId.get(id)).filter((a): a is NonNullable<typeof a> => !!a && a.status !== 'complete')
-    const nearTermTasks = activities
-      .filter(a => a.status !== 'complete' && a.earlyStart)
-      .sort((a, b) => (a.earlyStart || '').localeCompare(b.earlyStart || ''))
-      .slice(0, 10)
+    // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
+    const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
     const percentComplete = activities.length > 0
       ? Math.round((completedCount / activities.length) * 100)
@@ -53,7 +54,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         status: analysis.status,
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,
-        nearTermTasks,
+        nearTerm,
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
       },
     })
@@ -84,6 +85,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const projectType = formData.get('projectType') as string | null
     const region = formData.get('region') as string | null
     const grossSqft = Number(formData.get('grossSqft')) || null
+    const allowDuplicate = formData.get('allowDuplicate') === 'true'
+    // An unknown facility type is refused, not silently dropped (the upload would lose its grounding tag).
+    const typeErr = projectTypeError(projectType)
+    if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
@@ -96,6 +101,28 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 })
+    }
+
+    // Uploads of the same project form an update series.
+    const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
+    const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
+
+    // The same bytes uploaded again are not a new update: point at the existing one instead of adding a
+    // duplicate to the series (send allowDuplicate=true to store it anyway).
+    const same = allowDuplicate ? [] : await findScheduleFilesBySha(ctx.orgId, sha256, series.map(s => s.id))
+    const existing = same.length ? series.find(s => s.id === same[0]) : undefined
+    if (existing) {
+      const warning = `This file is identical to ${existing.version} uploaded ${fmtDay(existing.uploadedAt)} (same SHA-256); no new update was created.`
+      await audit({ action: 'schedule.upload_duplicate', targetType: 'schedule', targetId: existing.id, detail: { name: existing.name, version: existing.version, fileName: file.name, sha256 } })
+      return NextResponse.json({
+        success: true, duplicate: true, duplicateOf: { id: existing.id, version: existing.version, uploadedAt: existing.uploadedAt }, warning, schedule: existing,
+        summary: {
+          activitiesImported: existing.activityCount, relationshipsImported: existing.relationshipCount, calendarsImported: existing.calendars.length,
+          criticalCount: existing.criticalCount, projectStart: existing.projectStart, projectFinish: existing.projectFinish, forecastFinish: existing.analysis?.forecastFinish ?? existing.projectFinish,
+          varianceDays: existing.varianceDays, status: existing.analysis?.status ?? null, sha256, series: series.length, classifiedPct: 0, dataQuestions: 0,
+          warnings: [warning],
+        },
+      })
     }
 
     // Semantic normalization: firms label activities and calendars differently; map them to shared meaning.
@@ -123,22 +150,25 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     parsed.activities = completed.activities
     parsed.projectStart = completed.projectStart
     if (completed.note) warnings.unshift(completed.note)
+
+    // Label versions automatically when not given.
+    const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
+    // An update is measured against the series' upload marked Baseline (same activity codes).
+    const baseUpload = pickSeriesBaseline({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series)
+    const baseActivities = baseUpload ? await getActivities(baseUpload.id) : []
+    const seriesBaseline = seriesBaselineFrom({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series, () => baseActivities)
+
     const analysis = analyzeSchedule({
       activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
       reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
+      dataDate: parsed.dataDate, seriesBaseline, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
     })
-    if (analysis.recalc && analysis.recalc.differing > 0) {
-      warnings.unshift(`${analysis.recalc.differing} of ${analysis.recalc.compared} open activities have a finish or total float in the file that differs from Planora's recalculation by more than 1 day (e.g. ${analysis.recalc.samples.slice(0, 3).map(d => `${d.code}: file ${d.fileFloat ?? '?'}d / Planora ${d.planoraFloat}d float`).join('; ')}).`)
-    }
+    const recalcNote = recalcWarning(analysis.recalc)
+    if (recalcNote) warnings.unshift(recalcNote)
     if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
-      warnings.unshift(`The file's header finish is ${reportedFinish}; Planora's recalculated forecast finish is ${analysis.forecastFinish}. Planora reports its own forecast.`)
+      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
-
-    // Uploads of the same project form an update series; label versions automatically when not given.
-    const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
-    const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
-    const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
     const percentComplete = parsed.activities.length > 0
       ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
       : 0
@@ -206,11 +236,17 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   }
 })
 
-/** Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft } */
+/**
+ * Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft }; include it in
+ * firm history { inHistory }; choose progress handling { progressMode }; or designate the contract /
+ * finish milestone { finishMilestoneId: activity id or activity code, or null for automatic }.
+ */
 export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const body = await req.json().catch(() => ({}))
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const typeErr = projectTypeError(body.projectType)
+  if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
   if (typeof body.inHistory === 'boolean') {
     await setScheduleInHistory(s.id, ctx.orgId, body.inHistory)
     await audit({ action: 'schedule.history', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.inHistory ?? true, after: body.inHistory } })
@@ -220,11 +256,35 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     await updateScheduleAnalysis(s.id, ctx.orgId, { analysis: { ...s.analysis, progressMode: body.progressMode, forecastFinish: null }, projectFinish: s.projectFinish, varianceDays: s.varianceDays, criticalCount: s.criticalCount })
     await audit({ action: 'schedule.progress_mode', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.analysis.progressMode, after: body.progressMode } })
   }
+  if ('finishMilestoneId' in body) {
+    const raw = body.finishMilestoneId
+    if (raw !== null && typeof raw !== 'string') return NextResponse.json({ error: 'finishMilestoneId must be an activity id, an activity code or null' }, { status: 400 })
+    let next: string | null = null
+    let label: string | null = null
+    if (typeof raw === 'string' && raw.trim()) {
+      const want = raw.trim().slice(0, 200)
+      const acts = await getActivities(s.id)
+      const hit = acts.find(a => a.id === want) ?? acts.find(a => a.activityId === want) ?? acts.find(a => a.activityId.toLowerCase() === want.toLowerCase())
+      if (!hit || hit.activityType === 'summary' || hit.activityType === 'loe') return NextResponse.json({ error: `No activity "${want}" in this schedule can be the finish milestone.` }, { status: 400 })
+      next = hit.activityId || hit.id
+      label = `${hit.activityId} ${hit.name}`
+    }
+    const before = s.finishMilestoneId ?? null
+    if (before !== next) {
+      await setScheduleFinishMilestone(s.id, ctx.orgId, next)
+      await audit({ action: 'schedule.finish_milestone', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before, after: next, milestone: label, previousAutomatic: before ? null : s.analysis?.finishMilestone?.code ?? null } })
+    }
+  }
   if ('projectType' in body || 'region' in body || 'grossSqft' in body) {
     const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
     const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
     await updateScheduleProfile(s.id, ctx.orgId, profile)
     await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
+  }
+  if ('finishMilestoneId' in body) {
+    // Recalculate now so the stored headline (lists, portfolio) reflects the designated milestone.
+    const data = await loadScheduleData(s.id, ctx.orgId)
+    return NextResponse.json({ schedule: data?.schedule ?? await getScheduleById(s.id, ctx.orgId), analysis: data?.analysis ?? null })
   }
   return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
 })

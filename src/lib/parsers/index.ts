@@ -5,6 +5,7 @@ import { parseXER } from './xer-parser'
 import { parseMSProjectXML } from './xml-parser'
 import { parsePDF } from './pdf-parser'
 import { parseSpreadsheet } from './excel-parser'
+import { decodeCp1252 } from './xer-codec'
 
 export type { ParsedSchedule, ParsedSourceType } from './types'
 export { parseXER } from './xer-parser'
@@ -14,14 +15,14 @@ export { parseSpreadsheet } from './excel-parser'
 
 export const SUPPORTED_EXTENSIONS = ['.xer', '.xml', '.pdf', '.xlsx', '.csv'] as const
 
-/** Decode text: honours UTF-8/UTF-16 BOMs; falls back to Windows-1252-ish latin1 for non-UTF-8 files (common for XER). */
+/** Decode text: honours UTF-8/UTF-16 BOMs; falls back to Windows-1252 for non-UTF-8 files (how P6 writes XER; see xer-codec.ts). */
 function decodeText(data: Buffer): string {
   if (data.length >= 2 && data[0] === 0xff && data[1] === 0xfe) return new TextDecoder('utf-16le').decode(data.subarray(2))
   if (data.length >= 2 && data[0] === 0xfe && data[1] === 0xff) return new TextDecoder('utf-16be').decode(data.subarray(2))
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(data).replace(/^﻿/, '')
   } catch {
-    return data.toString('latin1')
+    return decodeCp1252(data)
   }
 }
 

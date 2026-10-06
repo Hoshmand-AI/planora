@@ -8,13 +8,16 @@
 // single instant. This makes every relationship a simple chronological comparison:
 //   FS: succ.start >= shift(pred.finish, lag)     SS: succ.start  >= shift(pred.start, lag)
 //   FF: succ.finish >= shift(pred.finish, lag)    SF: succ.finish >= shift(pred.start, lag)
-// where shift() moves the instant by `lag` work days on the SUCCESSOR's calendar. With lag 0 an FS
-// successor starts on the next work day after the predecessor's finish day.
+// where shift() moves the instant by `lag` work days on the PREDECESSOR's calendar (P6's default
+// scheduling option "Calendar for scheduling relationship lag = Predecessor activity calendar").
+// With lag 0 an FS successor starts on the next work day after the predecessor's finish day.
 //
-// Milestones: a milestone with no (valid) predecessors is a "start milestone" and is displayed on
-// the day its instant begins; any other milestone is a "finish milestone" and is displayed on the
-// day its instant ends (e.g. a finish milestone after a task finishing Friday shows Friday, and an
-// FS successor of it starts Monday). This mirrors P6 start/finish milestones.
+// Milestones (P6 TT_Mile / TT_FinMile): activity.milestoneKind says which one it is. A start
+// milestone occurs at the START of its day (the start of the next work day after its drivers), so
+// an FS successor starts the same day. A finish milestone occurs at the END of its day (a finish
+// milestone after a task finishing Friday shows Friday, and an FS successor of it starts Monday).
+// Without milestoneKind, a milestone with no (valid) predecessors is a start milestone and any
+// other milestone a finish milestone.
 //
 // Float convention
 // ----------------
@@ -40,13 +43,17 @@
 //
 // Constraints: SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
 // do both, so logic still drives the early date and a late predecessor shows negative float.
-// MSO/MFO are mandatory: they fix early and late dates (never earlier than the data date) even
-// against logic; each overruled relationship is reported in `violations` and the constrained
-// activity carries the overrun as negative float.
+// MSO/MFO are mandatory (as P6): they fix the early dates (never earlier than the data date) and the
+// late dates (on the constraint date, even one before the data date) against logic. The
+// constrained activity's float comes from its own pinned dates (0 unless the date is in the past);
+// the overrun shows as negative float on its predecessors, and each overruled constraint is
+// reported in `violations`.
 //
-// Longest path: from the latest early finish, walk back through driving relationships regardless
-// of float (P6 "longest path"). The critical path is the TF <= 0 chain and can be empty when a
-// required finish leaves positive float everywhere.
+// Longest path: from the activity with the latest early finish, walk back through driving
+// relationships regardless of float (P6 "longest path"). The walk stops at an activity whose date
+// is set by a mandatory constraint rather than by logic (reported as longestPathConstraint);
+// logicLongestPath / logicFinish give the path and finish logic alone would produce. The critical
+// path is the TF <= 0 chain and can be empty when a required finish leaves positive float everywhere.
 
 import type { CpmActivity, CpmInput, CpmLink, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
 import { compileCalendar, defaultCalendar, fromDayNumber, toDayNumber, type CompiledCalendar } from '@/lib/planning/calendar'
@@ -64,11 +71,20 @@ interface Node {
   lf: number
   /** display-as-start for finish milestones pinned at the data date */
   pinnedLow: boolean
-  /** early start/finish instants logic alone would give (differs only under MSO/MFO) */
+  /** early start/finish instants logic alone would give, mandatory constraints ignored network-wide (differs only under MSO/MFO) */
   logicEs: number
   logicEf: number
-  /** in-progress work: the instant the remaining duration resumes */
+  /** in-progress work: the instant the remaining duration resumes (scheduled / logic-only) */
   resume: number
+  logicResume: number
+  /** mandatory activity: early dates its (scheduled) predecessors would give it without the constraint */
+  drvEs: number
+  drvEf: number
+  /** open activity with a valid MSO/MFO constraint */
+  mand: boolean
+  /** mandatory constraint: pinned early start/finish instants before data-date clamping (= late dates) */
+  pinEs: number
+  pinEf: number
   tf: number
   ff: number
 }
@@ -157,7 +173,7 @@ export function runCpm(input: CpmInput): CpmResult {
     if (a.actualFinish && Number.isNaN(af)) warnings.push(`Activity ${a.code}: invalid actual finish '${a.actualFinish}' ignored.`)
     if (a.actualStart && Number.isNaN(as)) warnings.push(`Activity ${a.code}: invalid actual start '${a.actualStart}' ignored.`)
     const state: Node['state'] = !Number.isNaN(af) || (isMs && !Number.isNaN(as)) ? 'complete' : !Number.isNaN(as) ? 'progress' : 'open'
-    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, tf: 0, ff: 0 })
+    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, logicResume: 0, drvEs: 0, drvEf: 0, mand: false, pinEs: 0, pinEf: 0, tf: 0, ff: 0 })
   }
   const n = nodes.length
 
@@ -195,7 +211,10 @@ export function runCpm(input: CpmInput): CpmResult {
     outs[edges[e].from].push(e)
     ins[edges[e].to].push(e)
   }
-  for (let i = 0; i < n; i++) nodes[i].startLike = ins[i].length === 0
+  for (let i = 0; i < n; i++) {
+    const kind = nodes[i].a.milestoneKind
+    nodes[i].startLike = kind === 'start' || kind === 'finish' ? kind === 'start' : ins[i].length === 0
+  }
 
   /* ── topological order (Kahn) ── */
   const indeg = new Int32Array(n)
@@ -218,6 +237,9 @@ export function runCpm(input: CpmInput): CpmResult {
   const taskFinish = (s: number, d: number, c: CompiledCalendar) => (d > 0 ? c.add(s, d - 1) : s)
   const taskStart = (f: number, d: number, c: CompiledCalendar) => (d > 0 ? c.add(f, -(d - 1)) : f)
   const msInstant = (node: Node, day: number) => (node.startLike ? day : day + 1)
+  // A start milestone sits at the start of a work day; a finish milestone on a work-day boundary.
+  const msSnap = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapFwd(t, node.c))
+  const msSnapLate = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapBack(t, node.c))
   const msDisplay = (node: Node, t: number): number => {
     const preferStart = node.startLike || node.pinnedLow
     if (preferStart) return node.c.isWork(t) || !node.c.isWork(t - 1) ? t : t - 1
@@ -236,6 +258,9 @@ export function runCpm(input: CpmInput): CpmResult {
   }
 
   /* ── forward pass ── */
+  // Two sets of early dates are carried: the scheduled ones (es/ef, mandatory constraints applied)
+  // and the ones logic alone gives (logicEs/logicEf: mandatory constraints ignored all the way
+  // down the network), for the logic-driven finish and longest path.
   for (const i of order) {
     const node = nodes[i]
     const c = node.c
@@ -250,84 +275,123 @@ export function runCpm(input: CpmInput): CpmResult {
         node.es = as
         node.ef = af + 1
       }
+      node.logicEs = node.es
+      node.logicEf = node.ef
+      node.logicResume = node.resume
       continue
     }
-    let startLB = lower
-    let finishLB = -INF
+    let startLB = lower, finishLB = -INF
+    let startLBL = lower, finishLBL = -INF
     for (const e of ins[i]) {
       const ed = edges[e]
       const p = nodes[ed.from]
       switch (ed.type) {
-        case 'FS': startLB = Math.max(startLB, shift(p.ef, ed.lag, c)); break
-        case 'SS': startLB = Math.max(startLB, shift(p.es, ed.lag, c)); break
-        case 'FF': finishLB = Math.max(finishLB, shift(p.ef, ed.lag, c)); break
-        case 'SF': finishLB = Math.max(finishLB, shift(p.es, ed.lag, c)); break
+        case 'FS':
+          startLB = Math.max(startLB, shift(p.ef, ed.lag, p.c))
+          startLBL = Math.max(startLBL, shift(p.logicEf, ed.lag, p.c))
+          break
+        case 'SS':
+          startLB = Math.max(startLB, shift(p.es, ed.lag, p.c))
+          startLBL = Math.max(startLBL, shift(p.logicEs, ed.lag, p.c))
+          break
+        case 'FF':
+          finishLB = Math.max(finishLB, shift(p.ef, ed.lag, p.c))
+          finishLBL = Math.max(finishLBL, shift(p.logicEf, ed.lag, p.c))
+          break
+        case 'SF':
+          finishLB = Math.max(finishLB, shift(p.es, ed.lag, p.c))
+          finishLBL = Math.max(finishLBL, shift(p.logicEs, ed.lag, p.c))
+          break
       }
     }
     const k = a.constraint
     const kd = constraintDay(node)
     const hasK = !!k && !Number.isNaN(kd)
+    node.mand = node.state === 'open' && hasK && (k!.type === 'MSO' || k!.type === 'MFO')
 
     if (node.state === 'progress') {
       const as = dateNum(a.actualStart)
       const rem = remainingOf(node)
-      node.es = as
-      let f: number
-      // Retained logic: the remaining work waits for FS/SS predecessors (startLB already holds them).
-      const resume = retained ? Math.max(dataDay, as, startLB) : Math.max(dataDay, as)
-      if (rem > 0) f = c.add(c.next(resume), rem - 1)
-      else f = Math.max(as, c.prev(dataDay - 1))
-      node.resume = rem > 0 ? c.next(resume) : as
-      if (finishLB > f + 1) f = c.next(finishLB - 1)
-      if (hasK && (k!.type === 'FNET' || k!.type === 'FO') && kd > f) f = c.next(kd)
-      node.ef = f + 1
-      node.logicEs = node.es
-      node.logicEf = node.ef
+      const place = (sLB: number, fLB: number) => {
+        let f: number
+        // Retained logic: the remaining work waits for FS/SS predecessors (sLB already holds them).
+        const resume = retained ? Math.max(dataDay, as, sLB) : Math.max(dataDay, as)
+        if (rem > 0) f = c.add(c.next(resume), rem - 1)
+        else f = Math.max(as, c.prev(dataDay - 1))
+        if (fLB > f + 1) f = c.next(fLB - 1)
+        if (hasK && (k!.type === 'FNET' || k!.type === 'FO') && kd > f) f = c.next(kd)
+        return { ef: f + 1, resume: rem > 0 ? c.next(resume) : as }
+      }
+      const sched = place(startLB, finishLB)
+      const logic = place(startLBL, finishLBL)
+      node.es = node.logicEs = as
+      node.ef = sched.ef
+      node.resume = sched.resume
+      node.logicEf = logic.ef
+      node.logicResume = logic.resume
       continue
     }
 
     if (node.isMs) {
-      let t = Math.max(startLB, finishLB)
-      if (hasK) {
-        // A constraint date on a milestone means "displayed on that date": the instant depends on
-        // whether it is a start or finish milestone (see msInstant).
-        const ki = msInstant(node, kd)
-        if (k!.type === 'SNET' || k!.type === 'FNET' || k!.type === 'SO' || k!.type === 'FO') t = Math.max(t, ki)
-        else if (k!.type === 'MSO' || k!.type === 'MFO') {
-          const logicT = msSnapFwd(Math.max(t, lower), c)
-          node.logicEs = node.logicEf = logicT
-          t = ki
+      // A constraint date on a milestone means "displayed on that date": the instant depends on
+      // whether it is a start or finish milestone (see msInstant).
+      const ki = hasK ? msInstant(node, kd) : NaN
+      const soft = hasK && (k!.type === 'SNET' || k!.type === 'FNET' || k!.type === 'SO' || k!.type === 'FO')
+      const place = (sLB: number, fLB: number) => {
+        let t = Math.max(sLB, fLB)
+        if (soft) t = Math.max(t, ki)
+        return msSnap(node, Math.max(t, lower))
+      }
+      const logicT = place(startLBL, finishLBL)
+      node.logicEs = node.logicEf = logicT
+      let t: number
+      if (node.mand) {
+        node.drvEs = node.drvEf = place(startLB, finishLB)
+        node.pinEs = node.pinEf = msSnap(node, ki)
+        t = ki
+        if (t < lower) {
+          warnings.push(`Activity ${a.code}: mandatory constraint before the data date was moved to the data date (its late date stays on the constraint date).`)
+          t = lower
         }
+        t = msSnap(node, t)
+      } else {
+        t = place(startLB, finishLB)
       }
-      if (t < lower) {
-        if (hasK && (k!.type === 'MSO' || k!.type === 'MFO')) warnings.push(`Activity ${a.code}: mandatory constraint before the data date was moved to the data date.`)
-        t = lower
-      }
-      t = msSnapFwd(t, c)
       node.pinnedLow = !node.startLike && t <= lower
       node.es = node.ef = t
-      if (!(hasK && (k!.type === 'MSO' || k!.type === 'MFO'))) node.logicEs = node.logicEf = t
       continue
     }
 
-    if (hasK) {
-      if (k!.type === 'SNET' || k!.type === 'SO') startLB = Math.max(startLB, kd)
-      else if (k!.type === 'FNET' || k!.type === 'FO') finishLB = Math.max(finishLB, kd + 1)
+    const placeTask = (sLB: number, fLB: number) => {
+      if (hasK) {
+        if (k!.type === 'SNET' || k!.type === 'SO') sLB = Math.max(sLB, kd)
+        else if (k!.type === 'FNET' || k!.type === 'FO') fLB = Math.max(fLB, kd + 1)
+      }
+      let s = c.next(sLB)
+      if (fLB > -INF) s = Math.max(s, taskStart(c.next(fLB - 1), node.dur, c))
+      return s
     }
-    let s = c.next(startLB)
-    if (finishLB > -INF) s = Math.max(s, taskStart(c.next(finishLB - 1), node.dur, c))
-    node.logicEs = s
-    node.logicEf = taskFinish(s, node.dur, c) + 1
-    if (hasK && (k!.type === 'MSO' || k!.type === 'MFO')) {
+    const ls0 = placeTask(startLBL, finishLBL)
+    node.logicEs = ls0
+    node.logicEf = taskFinish(ls0, node.dur, c) + 1
+    let s: number
+    if (node.mand) {
+      node.drvEs = placeTask(startLB, finishLB)
+      node.drvEf = taskFinish(node.drvEs, node.dur, c) + 1
       s = k!.type === 'MSO' ? c.next(kd) : taskStart(c.prev(kd), node.dur, c)
+      node.pinEs = s
+      node.pinEf = taskFinish(s, node.dur, c) + 1
       if (s < lower) {
-        warnings.push(`Activity ${a.code}: mandatory constraint before the data date was moved to the data date.`)
+        warnings.push(`Activity ${a.code}: mandatory constraint before the data date was moved to the data date (its late dates stay on the constraint date).`)
         s = c.next(lower)
       }
+    } else {
+      s = placeTask(startLB, finishLB)
     }
     node.es = s
     node.ef = taskFinish(s, node.dur, c) + 1
   }
+
 
   /* ── project finish ── */
   let finishNode = -1
@@ -362,10 +426,10 @@ export function runCpm(input: CpmInput): CpmResult {
       if (q.state === 'complete') continue
       if (q.state === 'progress' && !retained && (ed.type === 'FS' || ed.type === 'SS')) continue
       switch (ed.type) {
-        case 'FS': finishUB = Math.min(finishUB, shift(q.ls, -ed.lag, q.c)); break
-        case 'SS': startUB = Math.min(startUB, shift(q.ls, -ed.lag, q.c)); break
-        case 'FF': finishUB = Math.min(finishUB, shift(q.lf, -ed.lag, q.c)); break
-        case 'SF': startUB = Math.min(startUB, shift(q.lf, -ed.lag, q.c)); break
+        case 'FS': finishUB = Math.min(finishUB, shift(q.ls, -ed.lag, c)); break
+        case 'SS': startUB = Math.min(startUB, shift(q.ls, -ed.lag, c)); break
+        case 'FF': finishUB = Math.min(finishUB, shift(q.lf, -ed.lag, c)); break
+        case 'SF': startUB = Math.min(startUB, shift(q.lf, -ed.lag, c)); break
       }
     }
     if (startUB === INF && finishUB === INF) finishUB = anchor
@@ -377,9 +441,9 @@ export function runCpm(input: CpmInput): CpmResult {
       let t = Math.min(startUB, finishUB)
       if (hasK) {
         if (k!.type === 'SNLT' || k!.type === 'FNLT' || k!.type === 'SO' || k!.type === 'FO') t = Math.min(t, msInstant(node, kd))
-        else if (k!.type === 'MSO' || k!.type === 'MFO') t = node.es
+        else if (node.mand && node.state === 'open') t = node.pinEs
       }
-      t = msSnapBack(t, c)
+      t = msSnapLate(node, t)
       node.ls = node.lf = t
       continue
     }
@@ -390,8 +454,9 @@ export function runCpm(input: CpmInput): CpmResult {
       else if (k!.type === 'FNLT' || k!.type === 'FO') finishUB = Math.min(finishUB, kd + 1)
     }
     let f: number
-    if (hasK && (k!.type === 'MSO' || k!.type === 'MFO') && node.state === 'open') {
-      f = node.ef - 1
+    if (node.mand && node.state === 'open') {
+      // P6: the late dates sit on the constraint date (even a past one), whatever the successors need.
+      f = node.pinEf - 1
     } else {
       f = INF
       if (finishUB < INF) f = c.prev(finishUB - 1)
@@ -415,12 +480,13 @@ export function runCpm(input: CpmInput): CpmResult {
   for (let i = 0; i < n; i++) {
     const node = nodes[i]
     const k = node.a.constraint
-    if (node.state !== 'open' || !k || (k.type !== 'MSO' && k.type !== 'MFO')) continue
-    const over = node.isMs ? wdInstants(node.es, node.logicEs, node.c) : wdInstants(node.ef, node.logicEf, node.c)
+    if (!node.mand || !k) continue
+    const over = node.isMs ? wdInstants(node.es, node.drvEs, node.c) : wdInstants(node.ef, node.drvEf, node.c)
     if (over <= 0) continue
-    node.tf = Math.min(node.tf, -over)
-    const logicDay = node.isMs ? msDisplay(node, node.logicEs) : node.logicEf - 1
-    violations.push({ id: node.a.id, type: k.type, constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
+    // As P6, the constrained activity keeps the float of its pinned dates; the overrun shows as
+    // negative float on its predecessors (their late dates follow the pinned dates).
+    const logicDay = node.isMs ? msDisplay(node, node.drvEs) : k.type === 'MSO' ? node.drvEs : node.drvEf - 1
+    violations.push({ id: node.a.id, type: k.type as 'MSO' | 'MFO', constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
     warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
   for (let i = 0; i < n; i++) {
@@ -430,15 +496,20 @@ export function runCpm(input: CpmInput): CpmResult {
     for (const e of outs[i]) {
       const ed = edges[e]
       const q = nodes[ed.to]
+      // the same relationships the backward pass uses
       if (q.state === 'complete') continue
-      if (q.state === 'progress' && (ed.type === 'FS' || ed.type === 'SS')) continue
+      if (q.state === 'progress' && !retained && (ed.type === 'FS' || ed.type === 'SS')) continue
       const src = ed.type === 'FS' || ed.type === 'FF' ? node.ef : node.es
-      const bound = shift(src, ed.lag, q.c)
-      const target = ed.type === 'FS' || ed.type === 'SS' ? q.es : q.ef
+      const bound = shift(src, ed.lag, node.c)
+      const target = ed.type === 'FS' || ed.type === 'SS' ? (q.state === 'progress' ? q.resume : q.es) : q.ef
       ff = Math.min(ff, wdInstants(bound, target, node.c))
     }
-    if (ff === INF) ff = wdInstants(node.ef, finishInstant, node.c)
-    node.ff = Math.max(0, ff)
+    // No open successors: measured to the project finish, or to the required finish when earlier
+    // (the same anchor total float uses).
+    if (ff === INF) ff = wdInstants(node.ef, Math.min(finishInstant, anchor), node.c)
+    // Free float never exceeds total float. Without the cap it would where a successor carries
+    // negative float (a constraint or required finish) or an end activity has a required finish.
+    node.ff = Math.max(0, Math.min(ff, node.tf))
   }
 
   /* ── output times ── */
@@ -478,17 +549,25 @@ export function runCpm(input: CpmInput): CpmResult {
   const projectFinish = finishNode >= 0 ? times[nodes[finishNode].a.id].earlyFinish : fromDayNumber(projectStartDay)
 
   /* ── driving paths: walk driving predecessors back from an end activity ── */
-  // A relationship is driving when it alone would put the successor's (logic) early date where it
-  // is. Mandatory constraints are judged on the logic dates they overrule, so the walk follows the
-  // real sequence through them; retained-logic progress is judged on where the remaining work resumes.
-  const walk = (endIdx: number, eligible: (i: number) => boolean): string[] => {
+  // A relationship is driving when it alone would put the successor's early date where it is
+  // (retained-logic progress is judged on where the remaining work resumes). In 'scheduled' mode an
+  // activity whose date a mandatory constraint sets (rather than logic) ends the walk: the
+  // constraint, not its predecessors, drives it (P6 longest path). In 'logic' mode mandatory
+  // constraints are judged on the logic dates they overrule, so the walk follows the sequence
+  // logic alone would produce.
+  const isPinned = (q: Node) => q.mand && q.state === 'open' && (q.isMs ? q.es !== q.drvEs : q.ef !== q.drvEf)
+  const walk = (endIdx: number, eligible: (i: number) => boolean, mode: 'scheduled' | 'logic'): { path: string[]; stop: number } => {
     const path: string[] = []
     const visited = new Uint8Array(n)
     let cur = endIdx
+    let stop = -1
     while (cur >= 0 && !visited[cur]) {
       visited[cur] = 1
       path.push(nodes[cur].a.id)
       const q = nodes[cur]
+      if (mode === 'scheduled' && isPinned(q)) { stop = cur; break }
+      const qEs = mode === 'logic' ? q.logicEs : q.es
+      const qEf = mode === 'logic' ? q.logicEf : q.ef
       let best = -1
       let bestScore = INF
       for (const e of ins[cur]) {
@@ -497,12 +576,12 @@ export function runCpm(input: CpmInput): CpmResult {
         if (p.state === 'complete' || visited[ed.from] || !eligible(ed.from)) continue
         const startLink = ed.type === 'FS' || ed.type === 'SS'
         if (q.state === 'progress' && startLink && !retained) continue
-        const src = ed.type === 'FS' || ed.type === 'FF' ? p.ef : p.es
-        const bound = shift(src, ed.lag, q.c)
+        const src = ed.type === 'FS' || ed.type === 'FF' ? (mode === 'logic' ? p.logicEf : p.ef) : (mode === 'logic' ? p.logicEs : p.es)
+        const bound = shift(src, ed.lag, p.c)
         let driving: boolean
-        if (q.isMs) driving = msSnapFwd(bound, q.c) >= q.logicEs
-        else if (startLink) driving = q.c.next(bound) >= (q.state === 'progress' ? q.resume : q.logicEs)
-        else driving = q.c.next(bound - 1) + 1 >= q.logicEf
+        if (q.isMs) driving = msSnap(q, bound) >= qEs
+        else if (startLink) driving = q.c.next(bound) >= (q.state === 'progress' ? (mode === 'logic' ? q.logicResume : q.resume) : qEs)
+        else driving = q.c.next(bound - 1) + 1 >= qEf
         if (!driving) continue
         // prefer the most critical driver; on ties, the one that finishes latest
         const score = p.tf * 1e6 - p.ef
@@ -510,7 +589,7 @@ export function runCpm(input: CpmInput): CpmResult {
       }
       cur = best
     }
-    return path.reverse()
+    return { path: path.reverse(), stop }
   }
 
   let critEnd = -1
@@ -519,20 +598,38 @@ export function runCpm(input: CpmInput): CpmResult {
     const node = nodes[i]
     if (node.state !== 'complete' && node.tf <= 0 && node.ef >= critEf) { critEf = node.ef; critEnd = i }
   }
-  const criticalPath = critEnd >= 0 ? walk(critEnd, (i) => nodes[i].tf <= 0) : []
-  // Longest path: from the latest-finishing open activity (logic dates), whatever its float.
+  const criticalPath = critEnd >= 0 ? walk(critEnd, (i) => nodes[i].tf <= 0, 'scheduled').path : []
+  // Longest path: from the open activity with the latest early finish (the scheduled project
+  // finish), whatever its float; it stops at a mandatory constraint that sets a date.
   let longEnd = -1
   let longEf = -INF
+  let logicEnd = -1
+  let logicEf = -INF
   for (const i of order) {
     const node = nodes[i]
-    if (node.state !== 'complete' && node.logicEf >= longEf) { longEf = node.logicEf; longEnd = i }
+    if (node.state === 'complete') continue
+    if (node.ef >= longEf) { longEf = node.ef; longEnd = i }
+    if (node.logicEf >= logicEf) { logicEf = node.logicEf; logicEnd = i }
   }
-  const longestPath = longEnd >= 0 ? walk(longEnd, () => true) : []
-  const logicFinish = longEnd >= 0
-    ? fromDayNumber(nodes[longEnd].isMs ? msDisplay(nodes[longEnd], nodes[longEnd].logicEs) : nodes[longEnd].logicEf - 1)
+  const long = longEnd >= 0 ? walk(longEnd, () => true, 'scheduled') : { path: [], stop: -1 }
+  const longestPath = long.path
+  let longestPathConstraint: CpmResult['longestPathConstraint']
+  if (long.stop >= 0) {
+    const s = nodes[long.stop]
+    const k = s.a.constraint!
+    longestPathConstraint = { id: s.a.id, type: k.type as 'MSO' | 'MFO', date: k.date }
+  }
+  // What logic alone would give: the finish and the path to it, through mandatory constraints.
+  const logicLongestPath = logicEnd >= 0 ? walk(logicEnd, () => true, 'logic').path : []
+  const logicFinish = logicEnd >= 0
+    ? fromDayNumber(nodes[logicEnd].isMs ? msDisplay(nodes[logicEnd], nodes[logicEnd].logicEs) : nodes[logicEnd].logicEf - 1)
     : projectFinish
 
-  return { times, projectFinish, logicFinish, criticalPath, longestPath, violations, progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)) }
+  return {
+    times, projectFinish, logicFinish, criticalPath, longestPath, logicLongestPath,
+    ...(longestPathConstraint ? { longestPathConstraint } : {}),
+    violations, progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
+  }
 }
 
 /* ─── graph helpers ───────────────────────────────────── */

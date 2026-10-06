@@ -9,6 +9,10 @@ import { phaseOf } from '@/lib/semantic/taxonomy'
 import { defaultCalendar } from './calendar'
 
 const CSTR = new Set<string>(CONSTRAINT_TYPES)
+const isoOf = (v: unknown): string => {
+  const d = v instanceof Date ? v : new Date(String(v ?? ''))
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+}
 
 export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null): GeneratedSchedule {
   const calendars = s.calendars?.length ? s.calendars : [defaultCalendar()]
@@ -22,6 +26,7 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
       duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
       remaining: a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : undefined,
       type: a.activityType === 'milestone' ? 'milestone' : 'task',
+      milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
       calendarId: a.calendarId && calendars.some(c => c.id === a.calendarId) ? a.calendarId : defaultCalendarId,
       constraint: a.constraintType && CSTR.has(a.constraintType) && a.constraintDate ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : undefined,
       actualStart: a.actualStart, actualFinish: a.actualFinish,
@@ -36,7 +41,8 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
     rationale: { summary: 'From the uploaded file', sources: [{ kind: 'file', label: s.fileName }], confidence: 'medium' },
   }))
   return {
-    generatedAt: s.uploadedAt, projectStart: s.projectStart || s.dataDate || work.map(a => a.actualStart || a.earlyStart).filter(Boolean).sort()[0] || new Date().toISOString().slice(0, 10),
+    // Postgres returns timestamps as Date objects; exporters expect an ISO string.
+    generatedAt: isoOf(s.uploadedAt), projectStart: s.projectStart || s.dataDate || work.map(a => a.actualStart || a.earlyStart).filter(Boolean).sort()[0] || new Date().toISOString().slice(0, 10),
     dataDate: s.dataDate || undefined,
     mustFinishBy: analysis?.mustFinishBy || undefined,
     calendars, defaultCalendarId, activities: acts, links, assumptions: [], cpm: cpm || undefined,

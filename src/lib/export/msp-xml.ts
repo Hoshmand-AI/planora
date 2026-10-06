@@ -188,7 +188,7 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string): string 
   x += tag('SaveVersion', 14, h)
   x += tag('Name', projectName, h)
   x += tag('Title', projectName, h)
-  x += tag('CreationDate', `${(s.generatedAt || '').slice(0, 10) || s.projectStart}T00:00:00`, h)
+  x += tag('CreationDate', `${String(s.generatedAt || '').slice(0, 10) || s.projectStart}T00:00:00`, h)
   x += tag('ScheduleFromStart', 1, h)
   x += tag('StartDate', `${s.projectStart}T${dayStartTime(hpd0)}`, h)
   if (finish) x += tag('FinishDate', `${finish}T${dayEndTime(hpd0)}`, h)

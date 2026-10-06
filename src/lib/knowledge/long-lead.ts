@@ -60,6 +60,7 @@ const CATALOG: LongLeadSpec[] = [
     leadWeeks: { low: 30, typical: 52, high: 90 },
     submittalWeeks: 5,
     gates: 'electrical_service',
+    installsIn: ['power_equipment'],
     source: SURVEY,
     notes: 'Multi-MW data-center units and paralleling gear are at the upper end. Air-permit requirements for generators may also apply.',
   }),
@@ -70,6 +71,7 @@ const CATALOG: LongLeadSpec[] = [
     leadWeeks: { low: 20, typical: 36, high: 60 },
     submittalWeeks: 5,
     gates: 'electrical_service',
+    installsIn: ['conductors'],
     source: SURVEY,
     notes: 'Lithium-ion battery systems may require additional fire-code review (NFPA 855 / IFC 1207).',
   }),
@@ -80,6 +82,7 @@ const CATALOG: LongLeadSpec[] = [
     leadWeeks: { low: 16, typical: 26, high: 44 },
     submittalWeeks: 4,
     gates: 'electrical_service',
+    installsIn: ['power_equipment'],
     source: SURVEY,
   }),
   item({

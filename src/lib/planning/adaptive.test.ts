@@ -58,7 +58,9 @@ describe('adaptive interview', () => {
     expect(r.ask.length).toBeGreaterThan(0)
   })
   it('asks parallel long-lead items as one checklist when only together they move the finish', () => {
-    const a = { 'project.type': k('data_center'), 'project.state': k('VA'), 'project.scope': k('new_construction'), 'project.gross_sqft': k(200000), 'project.target_start': k('2026-11-02') }
+    // Generators feed their own power-train activity and drive on their own; once ordered, the remaining
+    // electrical and mechanical items run in parallel and mask each other.
+    const a = { 'project.type': k('data_center'), 'project.state': k('VA'), 'project.scope': k('new_construction'), 'project.gross_sqft': k(200000), 'project.target_start': k('2026-11-02'), 'procure.emergency-generator.status': k('released') }
     const r = run(a)
     const g = r.groups.find(x => x.id === 'procurement')!
     expect(g.questionIds.length).toBeGreaterThan(5)
