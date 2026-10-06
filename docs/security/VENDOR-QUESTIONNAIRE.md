@@ -76,7 +76,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 | Insurance | Not yet bound (POA&M #9) |
 
 ## 9. Business continuity (single-founder vendor)
-- **Source code escrow:** offered to Enterprise customers on request.
+- **Source code escrow:** not in place today; can be discussed for an Enterprise contract.
 - **On-premises licence:** your on-premises installation keeps working without Planora's servers.
 - **Data portability:** every schedule exports to P6 XER, MS Project XML, Excel and CSV, and the original file is always downloadable. You are never locked in.
 - **Operational runbooks:** in [../operations/RUNBOOKS.md](../operations/RUNBOOKS.md).
