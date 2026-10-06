@@ -5,6 +5,16 @@ import { initSchema, query, withTransaction } from '@/lib/db'
 import { randomToken, sha256 } from './crypto'
 import { isRole, type Role } from './permissions'
 import { ApiError } from './api'
+import { NEW_ORGANIZATION_SETTINGS } from './settings'
+
+/**
+ * Stores the defaults for a newly created organization (AI off until an admin opts in). Values the
+ * organization already has are kept.
+ */
+export async function applyNewOrganizationDefaults(orgId: string) {
+  await initSchema()
+  await query('UPDATE organizations SET settings = $2::jsonb || settings WHERE id=$1', [orgId, JSON.stringify(NEW_ORGANIZATION_SETTINGS)])
+}
 
 export const INVITE_DAYS = 7
 

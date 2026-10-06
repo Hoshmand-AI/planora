@@ -3,6 +3,7 @@ import { api } from '@/lib/server/api'
 import { randomUUID as uuid } from 'crypto'
 import { createActivities, createRelationships, createSchedule, getSchedules, savePlan, type Activity } from '@/lib/db'
 import { profileFrom } from '@/lib/planning/elicitation'
+import { approvalOfCurrentVersion } from '@/lib/server/approval'
 import { loadPlanContext, planView } from '../context'
 
 /**
@@ -16,12 +17,18 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
   if (!g?.cpm) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
 
   if (ctx.settings.requireApprovalToPublish) {
-    // Only reviews of the current generation count, and the latest one must not be a rejection.
-    const current = plan.reviews.filter(rv => rv.generatedAt ? rv.generatedAt === g.generatedAt : rv.at >= g.generatedAt)
-    const latest = current[current.length - 1]
-    const approved = current.some(rv => rv.verdict !== 'reject' && rv.reviewerUserId && rv.reviewerUserId !== plan.userId)
-    if (!approved || latest?.verdict === 'reject') {
-      return NextResponse.json({ error: 'Your organization requires an approving review of this version by someone other than its author before it can be published.', code: 'approval_required' }, { status: 403 })
+    // Only an independent approval of exactly this content counts: any edit, override or regeneration
+    // after the approval changes the schedule fingerprint and needs a fresh review.
+    const state = approvalOfCurrentVersion(plan)
+    if (!state.approved) {
+      const stale = state.staleApprovals > 0 && !state.rejected
+      return NextResponse.json({
+        error: stale
+          ? 'The schedule changed after it was approved. Your organization requires a fresh approving review of the current version by someone other than its author before it can be published.'
+          : 'Your organization requires an approving review of this version by someone other than its author before it can be published.',
+        code: 'approval_required',
+        ...(stale ? { reason: 'approval_stale' } : {}),
+      }, { status: 403 })
     }
   }
   const existing = (await getSchedules(ctx.orgId)).filter(s => s.planId === plan.id)

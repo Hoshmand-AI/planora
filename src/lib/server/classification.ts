@@ -1,0 +1,58 @@
+// Which security classification the project data in a request carries, so the model provider can
+// refuse to send CUI or classified content to a cloud model (see src/lib/llm/provider.ts and
+// docs/security/CUI-HANDLING.md). The interview records it as answers['security.classification'].
+
+import { query } from '@/lib/db'
+
+export type DataClassification = 'unclassified' | 'cui' | 'classified'
+
+/** Classification from a stored interview answer. A withheld answer is treated as classified (as the interview does). */
+export function classificationFromAnswer(a: unknown): DataClassification | null {
+  if (!a || typeof a !== 'object') return null
+  const { status, value } = a as { status?: string; value?: unknown }
+  if (status === 'withheld') return 'classified'
+  if (status === 'known' && (value === 'cui' || value === 'classified' || value === 'unclassified')) return value
+  return null
+}
+
+/** CUI and classified information must not leave an accredited (on-prem / air-gapped) environment. */
+export const isRestrictedClassification = (c: string | null | undefined) => c === 'cui' || c === 'classified'
+
+async function ofPlan(planId: string, orgId: string): Promise<DataClassification | null> {
+  const res = await query(`SELECT answers->'security.classification' AS c FROM plans WHERE id=$1 AND org_id=$2`, [planId, orgId])
+  return classificationFromAnswer(res.rows[0]?.c)
+}
+
+async function ofSchedule(scheduleId: string, orgId: string): Promise<DataClassification | null> {
+  const res = await query(`SELECT p.answers->'security.classification' AS c FROM schedules s JOIN plans p ON p.id = s.plan_id AND p.org_id = s.org_id
+    WHERE s.id=$1 AND s.org_id=$2`, [scheduleId, orgId])
+  return classificationFromAnswer(res.rows[0]?.c)
+}
+
+/** Routes whose JSON body names the schedule the model will be asked about. */
+const BODY_SCHEDULE_ROUTES = new Set(['/api/ask', '/api/reports'])
+
+/**
+ * Builds the (lazy, memoized) classification lookup for a request. Only project-scoped routes get
+ * one; the lookup runs only if the request actually tries to call a model. A failed lookup is
+ * treated as classified, so an error never lets restricted content through.
+ */
+export function classificationResolver(req: Request, path: string, orgId: string): (() => Promise<string | null>) | undefined {
+  const plan = /^\/api\/plans\/([^/]+)/.exec(path)?.[1]
+  const schedule = /^\/api\/schedules\/([^/]+)/.exec(path)?.[1]
+  // Clone before the handler consumes the body.
+  const bodyCopy = !plan && !schedule && req.method === 'POST' && BODY_SCHEDULE_ROUTES.has(path) ? req.clone() : null
+  if (!plan && !schedule && !bodyCopy) return undefined
+  let memo: Promise<string | null> | null = null
+  const resolve = async (): Promise<string | null> => {
+    try {
+      if (plan) return await ofPlan(decodeURIComponent(plan), orgId)
+      if (schedule) return await ofSchedule(decodeURIComponent(schedule), orgId)
+      const b = await bodyCopy!.json().catch(() => ({})) as { scheduleId?: unknown }
+      return typeof b.scheduleId === 'string' ? await ofSchedule(b.scheduleId, orgId) : null
+    } catch {
+      return 'classified'
+    }
+  }
+  return () => (memo ??= resolve())
+}

@@ -23,6 +23,7 @@ interface OrgData {
   settings?: Settings
   aiUsageToday?: number
   plan: { id: string; label: string; maxUploadedSchedules: number | null; aiPerDay: number; reports: string[]; exports: string[]; sso: boolean; uploadedSchedules: number }
+  service?: { deployment: string; cuiWarning?: string }
   sso?: { enabled: boolean; issuer: string; clientId: string; hasSecret: boolean; domains: string[]; defaultRole: string; enforce: boolean; verification: { host: string; value: string } | null }
 }
 interface AuditEvent { seq: number; at: string; actorEmail: string | null; action: string; targetType: string | null; targetId: string | null; detail: Record<string, unknown>; ip: string | null; hash: string }
@@ -190,12 +191,17 @@ export default function OrgPage() {
       {manage && settings && (
         <Section title="Policies" description="Apply to everyone in the organization. Changes are recorded in the audit log.">
           {note('settings')}
+          {data.service?.cuiWarning && (
+            <div role="note" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-4">
+              <strong className="font-semibold text-navy-950">Controlled information.</strong> {data.service.cuiWarning}
+            </div>
+          )}
           <div className="space-y-3">
             {([
               ['requireMfa', 'Require two-step verification', 'Members without it are asked to set it up before they can continue. Turn it on for your own account first.'],
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
-              ['aiEnabled', 'Allow AI features', 'Off = rules-only: nothing is sent to any AI model. Scheduling, CPM, quality checks and reports still work.'],
+              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (OpenAI on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={settings[k]} onChange={e => setSettings({ ...settings, [k]: e.target.checked })} />

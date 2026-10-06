@@ -11,6 +11,7 @@ import { normalizeSso, publicSso, saveSsoConfig, ssoConfigFor } from '@/lib/serv
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { requireVerifiedEmail } from '@/lib/server/email-verification'
 import { appOrigin, sendEmail } from '@/lib/server/email'
+import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
 
 /** Organization overview: members are visible to every member; invitations and settings to admins. */
 export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
@@ -34,6 +35,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
       sso: publicSso(normalizeSso(org.sso)),
     } : {}),
     plan: { id: org.plan, ...entitlementsFor(org.plan), uploadedSchedules: (await getSchedules(auth.orgId)).filter(s => s.sourceType !== 'generated').length },
+    service: { deployment: deploymentKind(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
   })
 })
 

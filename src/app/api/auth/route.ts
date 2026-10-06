@@ -1,20 +1,21 @@
 import { randomUUID as uuid } from 'crypto'
-import { getUserByEmail, getUserById, createUser, query } from '@/lib/db'
+import { getUserByEmail, getUserById, getOrganization, createUser, query } from '@/lib/db'
 import {
   hashPassword, verifyPassword, dummyPasswordCheck, createSession, setSessionCookie, clearSessionCookie, revokeSession,
   createMfaChallenge, verifyMfaChallenge, getAuthContext,
 } from '@/lib/auth'
 import { publicApi, json, body, ApiError } from '@/lib/server/api'
-import { hit, reset, LIMITS } from '@/lib/server/rate-limit'
+import { hit, peek, reset, LIMITS } from '@/lib/server/rate-limit'
 import { passwordProblem } from '@/lib/server/password'
 import { audit, auditQuietly } from '@/lib/server/audit'
-import { findInvitation, markInvitationAccepted } from '@/lib/server/org'
+import { applyNewOrganizationDefaults, findInvitation, markInvitationAccepted } from '@/lib/server/org'
 import { currentRequest } from '@/lib/server/context'
 import { permissionsOf, isRole } from '@/lib/server/permissions'
 import { consumeSecondFactor } from '@/lib/server/mfa'
 import { ssoConfigFor } from '@/lib/server/sso'
 import { markEmailVerified, sendVerificationEmail } from '@/lib/server/email-verification'
 import { emailConfigured, appOrigin } from '@/lib/server/email'
+import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
 
 const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.'
 
@@ -23,11 +24,13 @@ async function limitOrThrow(key: string, l: { limit: number; windowSec: number }
   if (!r.ok) throw new ApiError(429, message, 'rate_limited', { retryAfterSec: r.retryAfterSec })
 }
 
-async function startSession(user: { id: string; email: string; name: string; plan: string; role: string; orgId: string }, method: string) {
+async function startSession(user: { id: string; email: string; name: string; role: string; orgId: string }, method: string) {
   const { token, expiresAt, sessionId } = await createSession(user.id, method)
+  // The subscription belongs to the organization (users.plan is a legacy column that stays 'free').
+  const plan = (await getOrganization(user.orgId))?.plan ?? 'free'
   Object.assign(currentRequest() || {}, { userId: user.id, email: user.email, orgId: user.orgId })
   await audit({ orgId: user.orgId, action: 'auth.signin', targetType: 'user', targetId: user.id, detail: { method, sessionId } })
-  const res = json({ success: true, user: { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role } })
+  const res = json({ success: true, user: { id: user.id, email: user.email, name: user.name, plan, role: user.role } })
   setSessionCookie(res, token, expiresAt)
   return res
 }
@@ -86,6 +89,8 @@ export const POST = publicApi(async req => {
       // The invitation link was delivered to this address.
       await markEmailVerified(user.id)
     } else {
+      // New organization: cloud AI is opt-in (an admin turns it on under Organization → Policies).
+      await applyNewOrganizationDefaults(user.orgId)
       await sendVerificationEmail(user, appOrigin(req))
     }
     Object.assign(currentRequest() || {}, { userId: user.id, email: user.email, orgId: user.orgId })
@@ -94,11 +99,18 @@ export const POST = publicApi(async req => {
   }
 
   if (b.action === 'signin') {
-    await limitOrThrow(`signin:ip:${ip}`, LIMITS.signinPerIp, 'Too many sign-in attempts from this network. Wait a few minutes and try again.')
+    // Per network: only failed attempts count, so a busy office behind one IP isn't locked out by
+    // its own successful sign-ins. Per account: every attempt counts, plus lockout after repeated failures.
+    const ipKey = `signin:fail:ip:${ip}`
+    if (await peek(ipKey, LIMITS.signinFailuresPerIp.windowSec) >= LIMITS.signinFailuresPerIp.limit) {
+      throw new ApiError(429, 'Too many failed sign-in attempts from this network. Wait a few minutes and try again.', 'rate_limited', { retryAfterSec: LIMITS.signinFailuresPerIp.windowSec })
+    }
     await limitOrThrow(`signin:email:${email}`, LIMITS.signinPerEmail, 'Too many sign-in attempts for this account. Wait a few minutes and try again.')
+    const failed = () => hit(ipKey, LIMITS.signinFailuresPerIp.limit, LIMITS.signinFailuresPerIp.windowSec)
     const user = await getUserByEmail(email)
     if (!user || user.disabledAt) {
       await dummyPasswordCheck(password)
+      await failed()
       throw new ApiError(401, GENERIC_SIGNIN_ERROR, 'bad_credentials')
     }
     if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
@@ -111,6 +123,7 @@ export const POST = publicApi(async req => {
       const locked = Number(res.rows[0]?.failed_logins) >= LIMITS.lockoutAfter
       await auditQuietly({ orgId: user.orgId, action: locked ? 'auth.locked' : 'auth.signin_failed', targetType: 'user', targetId: user.id, actor: { id: null, email } })
       if (locked) await query('UPDATE users SET failed_logins=0 WHERE id=$1', [user.id])
+      await failed()
       throw new ApiError(401, GENERIC_SIGNIN_ERROR, 'bad_credentials')
     }
     await query('UPDATE users SET failed_logins=0, locked_until=NULL WHERE id=$1', [user.id])
@@ -132,13 +145,17 @@ export const GET = publicApi(async req => {
   const invite = new URL(req.url).searchParams.get('invite')
   const invitation = invite ? await findInvitation(invite) : null
   const inviteInfo = invitation ? { email: invitation.email, role: invitation.role, orgName: invitation.orgName } : invite ? { invalid: true } : undefined
-  if (!ctx) return json({ user: null, ...(inviteInfo ? { invitation: inviteInfo } : {}) })
-  const user = await getUserById(ctx.userId)
+  // Where this instance runs, so sign-up can warn that CUI doesn't belong on the commercial cloud.
+  const deployment = deploymentKind()
+  const service = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
+  if (!ctx) return json({ user: null, service, ...(inviteInfo ? { invitation: inviteInfo } : {}) })
   return json({
-    user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: user?.plan ?? 'free', role: ctx.role },
+    // Organization's subscription plan (from the session's organization row), not the legacy users.plan.
+    user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: ctx.plan, role: ctx.role },
     org: { id: ctx.orgId, name: ctx.orgName },
     permissions: isRole(ctx.role) ? permissionsOf(ctx.role) : [],
     security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired, emailVerified: !!ctx.emailVerified, emailDelivery: emailConfigured() },
+    service,
     ...(inviteInfo ? { invitation: inviteInfo } : {}),
   })
 })

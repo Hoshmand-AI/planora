@@ -33,7 +33,11 @@ export async function reset(key: string) {
 export const aiQuotaKey = (orgId: string) => `ai:org:${orgId}:${new Date().toISOString().slice(0, 10)}`
 
 export const LIMITS = {
-  signinPerIp: { limit: 30, windowSec: 15 * 60 },
+  /**
+   * FAILED sign-ins per source IP. Generous because whole offices and job-site trailers share one
+   * egress IP; the strict control is per account (signinPerEmail + lockoutAfter).
+   */
+  signinFailuresPerIp: { limit: 300, windowSec: 15 * 60 },
   signinPerEmail: { limit: 10, windowSec: 15 * 60 },
   signupPerIp: { limit: 20, windowSec: 60 * 60 },
   mfaPerUser: { limit: 10, windowSec: 15 * 60 },

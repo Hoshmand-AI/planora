@@ -196,6 +196,16 @@ async function main() {
   ok(r.status === 200, 'Independent reviewer approves')
   r = await scheduler.post(`/api/plans/${planId}/publish`, {})
   ok(r.status === 200 && r.data.schedule, 'Publish succeeds after independent approval')
+  {
+    const act = r.data.plan.generated.activities.find(a => a.duration > 1)
+    r = await scheduler.post(`/api/plans/${planId}/edit`, { edit: { kind: 'duration', activityId: act.id, value: act.duration + 3, reason: 'Edit after approval' } })
+    ok(r.status === 200 && r.data.approvalInvalidated === true, 'An edit after approval invalidates the approval')
+    r = await scheduler.post(`/api/plans/${planId}/publish`, {})
+    ok(r.status === 403 && r.data.code === 'approval_required' && r.data.reason === 'approval_stale', 'Edited schedule cannot be published on the stale approval')
+    r = await reviewer.post(`/api/plans/${planId}/review`, { verdict: 'approve' })
+    r = await scheduler.post(`/api/plans/${planId}/publish`, {})
+    ok(r.status === 200 && r.data.schedule, 'Publish succeeds after a fresh approval of the edited version')
+  }
 
   /* ── Sessions ── */
   const other = new Client()
@@ -224,6 +234,10 @@ async function main() {
   r = await owner.post('/api/account', { action: 'mfa_confirm', code: totp(secret) })
   ok(r.status === 200 && r.data.recoveryCodes.length === 10, 'Enrollment confirmed; 10 recovery codes issued')
   const recovery = r.data.recoveryCodes
+  r = await owner.post('/api/account', { action: 'mfa_confirm', code: totp(secret) })
+  ok(r.status === 400 && !r.data.recoveryCodes, 'Replaying the enrollment code is rejected and cannot rotate recovery codes')
+  r = await owner.post('/api/account', { action: 'mfa_recovery_codes' })
+  ok(r.status === 401 && !r.data.recoveryCodes, 'New recovery codes require the current password and a second factor')
   r = await owner.post('/api/org', { action: 'update_settings', settings: { requireMfa: true } })
   ok(r.status === 200, 'Owner requires MFA for the organization')
 

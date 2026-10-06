@@ -14,6 +14,7 @@ import { maybeRunMaintenance } from './maintenance'
 import { StalePlanError } from '@/lib/db'
 import { entitlementsFor } from './entitlements'
 import { resolveApiKey } from './api-keys'
+import { classificationResolver } from './classification'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string, public extra?: Record<string, unknown>) { super(message) }
@@ -109,6 +110,8 @@ export function api<P = Record<string, string>>(opts: Options, handler: (req: Ne
       }
       if (!auth) throw new ApiError(401, 'Unauthorized', 'unauthenticated')
       Object.assign(info, { userId: auth.userId, email: auth.email, name: auth.name, orgId: auth.orgId, role: auth.role, aiEnabled: auth.settings.aiEnabled, aiDailyLimit: Math.min(auth.settings.aiDailyLimit, entitlementsFor(auth.plan).aiPerDay), plan: auth.plan })
+      // CUI / classified projects: the model provider checks this before calling a cloud model.
+      info.dataClassification = classificationResolver(req, info.path, auth.orgId)
       if (auth.mfaSetupRequired && !opts.allowMfaSetup) {
         throw new ApiError(403, 'Your organization requires two-step verification. Set it up under Account → Security to continue.', 'mfa_setup_required')
       }

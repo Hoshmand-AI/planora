@@ -162,6 +162,12 @@ async function main() {
   ok(r.data.elicitation.assumptions.some(a => a.kind === 'withheld'), `Withheld/unknown answers recorded as ${r.data.elicitation.assumptions.length} explicit assumptions`)
 
   /* ── AI follow-ups from the on-prem model (withheld answers never sent) ── */
+  r = await A.get('/api/org')
+  ok(r.data.settings?.aiEnabled === false, 'AI is off by default for a new organization (opt-in)')
+  r = await A.post(`/api/plans/${planId}/suggest`)
+  ok(r.status === 400 && /turned off/i.test(r.data.error), 'Nothing is sent to a model until an admin turns AI on')
+  r = await A.post('/api/org', { action: 'update_settings', settings: { aiEnabled: true } })
+  ok(r.status === 200 && r.data.settings.aiEnabled === true, 'Admin opts the organization in to AI features')
   r = await A.post(`/api/plans/${planId}/suggest`)
   if (r.status === 200) {
     ok(r.data.added > 0, `On-prem model added ${r.data.added} follow-up questions`)

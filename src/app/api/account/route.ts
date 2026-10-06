@@ -79,6 +79,11 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
       return json(await beginEnrollment(user))
     }
     case 'mfa_confirm': {
+      // Confirming only completes a pending enrollment; with MFA already on, recovery codes are
+      // rotated through mfa_recovery_codes (password + current second factor) instead.
+      if (user.mfaEnabledAt) throw new ApiError(400, 'Two-step verification is already on. To get new recovery codes, use “Generate new recovery codes” and confirm with your password.', 'mfa_already_enabled')
+      const rl = await hit(`mfa:enroll:${user.id}`, LIMITS.mfaPerUser.limit, LIMITS.mfaPerUser.windowSec)
+      if (!rl.ok) throw new ApiError(429, 'Too many attempts. Wait a few minutes.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
       const fresh = await getUserById(user.id)
       const codes = fresh ? await confirmEnrollment(fresh, String(b.code || '')) : null
       if (!codes) throw new ApiError(400, "That code didn't match. Make sure your phone's time is set automatically, then try the newest code.", 'mfa_invalid')
@@ -89,6 +94,7 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
     case 'mfa_recovery_codes': {
       await reauth(true)
       const codes = await regenerateRecoveryCodes(user)
+      if (!codes) throw new ApiError(400, 'Two-step verification is not on.')
       await audit({ action: 'account.mfa_recovery_regenerated', targetType: 'user', targetId: user.id })
       return json({ success: true, recoveryCodes: codes })
     }

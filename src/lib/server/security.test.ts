@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { hotp, verifyTotp, base32Encode, base32Decode, newRecoveryCodes, otpauthUri } from './totp'
 import { passwordProblem } from './password'
 import { can, canAssign, ROLES, permissionsOf } from './permissions'
-import { normalizeSettings, DEFAULT_SETTINGS } from './settings'
+import { normalizeSettings, DEFAULT_SETTINGS, NEW_ORGANIZATION_SETTINGS } from './settings'
+import { LIMITS } from './rate-limit'
 import { crossSiteWrite } from './api'
 import { eventHash, GENESIS } from './audit'
 import { encrypt, decrypt } from './crypto'
@@ -83,6 +84,23 @@ describe('organization settings', () => {
     expect(s.sessionIdleHours).toBe(24)
     expect(s.aiDailyLimit).toBe(0)
     expect(s.chatRetentionDays).toBe(DEFAULT_SETTINGS.chatRetentionDays)
+  })
+  it('cloud AI is opt-in for new organizations; existing ones keep their setting', () => {
+    // New organizations get NEW_ORGANIZATION_SETTINGS stored at creation (AI off).
+    expect(normalizeSettings({ ...NEW_ORGANIZATION_SETTINGS }).aiEnabled).toBe(false)
+    // Organizations created earlier never stored aiEnabled and keep the previous behavior (on)...
+    expect(normalizeSettings({}).aiEnabled).toBe(true)
+    // ...and an explicit choice always wins.
+    expect(normalizeSettings({ aiEnabled: true }).aiEnabled).toBe(true)
+    expect(normalizeSettings({ aiEnabled: false }).aiEnabled).toBe(false)
+  })
+})
+
+describe('sign-in rate limits', () => {
+  it('stay strict per account and only count failures per network', () => {
+    expect(LIMITS.signinPerEmail).toEqual({ limit: 10, windowSec: 15 * 60 })
+    expect(LIMITS.lockoutAfter).toBe(8)
+    expect(LIMITS.signinFailuresPerIp.limit).toBeGreaterThanOrEqual(300)
   })
 })
 

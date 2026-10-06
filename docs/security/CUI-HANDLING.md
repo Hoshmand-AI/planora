@@ -1,0 +1,30 @@
+# CUI and classified project data
+
+_Last updated 10/06/2026._
+
+Planora's commercial cloud service (Vercel + Neon, optional OpenAI) is **not** authorized for Controlled Unclassified Information (CUI) or classified information. CUI belongs in an on-premises or air-gapped Planora deployment inside the customer's assessed boundary (see the NIST SP 800-171 section of [CONTROL-MATRIX.md](CONTROL-MATRIX.md)).
+
+## How a deployment is identified
+
+| Setting | Deployment | CUI warning shown |
+|---|---|---|
+| `PLANORA_AIRGAPPED=true` | Air-gapped | No |
+| `PLANORA_DEPLOYMENT=onprem` (also `on-prem`, `on-premises`, `self-hosted`) | On-premises | No |
+| Neither (default, including the hosted service) | Commercial cloud | Yes |
+
+Detection lives in `deploymentKind()` in `src/lib/llm/provider.ts`. The default is "commercial cloud", so an instance that is not configured explicitly warns rather than stays silent.
+
+## What the commercial cloud does
+
+1. **Warning.** Sign-up (`/auth`), Organization → Policies, `GET /api/auth` (`service.cuiWarning`), `GET /api/system` and every plan view (`llm.cuiWarning`) carry this notice: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped deployment for CUI and classified projects.
+2. **Server-side AI guard.** The interview records `security.classification` as `unclassified`, `cui` or `classified`. A withheld answer is treated as `classified`. Before any model call, `chat()` in `src/lib/llm/provider.ts` (the single path for every model call) checks the classification of the project the request touches. If it is `cui` or `classified` and the model is outside the customer's network, the call is refused with `RestrictedDataError` before anything is sent. "Outside the network" means cloud mode (OpenAI), or an OpenAI-compatible `LLM_BASE_URL` on a host that isn't private or listed in `PLANORA_ALLOWED_HOSTS`. The refusal is recorded in the audit log as `ai.blocked_restricted_data`, with the purpose, classification and model host but no content.
+   - The project is resolved per request in `src/lib/server/classification.ts`. Routes under `/api/plans/{id}/…` resolve it from the plan. Routes under `/api/schedules/{id}/…` and `POST /api/ask` / `POST /api/reports` (which take `scheduleId`) resolve it from the plan the schedule was published from.
+   - If the lookup itself fails, the project is treated as classified (fail closed).
+   - Results: AI follow-up questions return an error that explains the refusal. Ask AI and reports fall back to the deterministic readout. Schedule generation, CPM, quality checks, risk analysis and exports never use a model and keep working.
+3. **Organizations can switch AI off entirely.** New organizations start with AI off (see [SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md)).
+
+## Limits
+
+- The guard covers model calls. It does not stop a user from **typing** CUI into the commercial cloud: the interview stores the answers they enter. The warning and the contract terms are the control for storage. Use an on-prem deployment for CUI.
+- Uploaded schedules (XER/XML/Excel) carry no interview classification, so they are not covered by the AI guard. An organization that handles CUI must not upload such schedules to the cloud service, and should keep AI off.
+- On an on-premises deployment that is not air-gapped, the guard still blocks the cloud model and public endpoints for CUI and classified projects. Only a private, on-prem model can receive them.
