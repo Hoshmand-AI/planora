@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
+import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
@@ -210,6 +211,12 @@ export interface Schedule {
   criticalCount: number; percentComplete: number
   calendars: WorkCalendar[]; defaultCalendarId: string | null; warnings: string[]
   planId: string | null; projectType: string | null; region: string | null; grossSqft: number | null
+  /** Planora's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
+  analysis?: ScheduleAnalysis | null
+  /** Groups uploads of the same project into an update series */
+  projectKey?: string | null
+  /** Whether this schedule's actuals calibrate firm history */
+  inHistory?: boolean
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -222,6 +229,8 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     calendars: (row.calendars as WorkCalendar[]) || [], defaultCalendarId: (row.default_calendar_id as string) || null, warnings: (row.warnings as string[]) || [],
     planId: (row.plan_id as string) || null, projectType: (row.project_type as string) || null, region: (row.region as string) || null,
     grossSqft: row.gross_sqft != null ? Number(row.gross_sqft) : null,
+    analysis: (row.analysis as ScheduleAnalysis) ?? null, projectKey: (row.project_key as string) ?? null,
+    inHistory: row.in_history == null ? true : Boolean(row.in_history),
   }
 }
 
@@ -240,11 +249,45 @@ export async function getScheduleById(id: string, orgId: string): Promise<Schedu
 
 export async function createSchedule(s: Schedule): Promise<Schedule> {
   await initSchema()
-  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft,analysis,project_key,in_history)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
     [s.id, s.userId, s.orgId, s.name, s.version, s.sourceType, s.fileName, s.uploadedAt, s.activityCount, s.relationshipCount, s.projectStart, s.projectFinish, s.dataDate, s.varianceDays, s.criticalCount, s.percentComplete,
-      JSON.stringify(s.calendars), s.defaultCalendarId, JSON.stringify(s.warnings), s.planId, s.projectType, s.region, s.grossSqft])
+      JSON.stringify(s.calendars), s.defaultCalendarId, JSON.stringify(s.warnings), s.planId, s.projectType, s.region, s.grossSqft,
+      s.analysis ? JSON.stringify(s.analysis) : null, s.projectKey ?? null, s.inHistory ?? true])
   return s
+}
+
+/** Store Planora's analysis (and the numbers lists show) after a recalculation. */
+export async function updateScheduleAnalysis(id: string, orgId: string, a: { analysis: ScheduleAnalysis; projectFinish: string | null; varianceDays: number | null; criticalCount: number }): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
+    [id, orgId, JSON.stringify(a.analysis), a.projectFinish, a.varianceDays, a.criticalCount])
+}
+
+export async function setScheduleInHistory(id: string, orgId: string, inHistory: boolean): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
+}
+
+/** Every upload in the same update series, oldest data date first. */
+export async function getScheduleSeries(orgId: string, projectKey: string): Promise<Schedule[]> {
+  await initSchema()
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'
+    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey])
+  return res.rows.map(rowToSchedule)
+}
+
+export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer }): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content) VALUES ($1,$2,$3,$4,$5,$6)
+    ON CONFLICT (schedule_id) DO NOTHING`, [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.content])
+}
+
+export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
+  await initSchema()
+  const res = await query('SELECT file_name, sha256, content, created_at FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
 }
 
 export async function updateScheduleProfile(id: string, orgId: string, p: { projectType?: string | null; region?: string | null; grossSqft?: number | null }): Promise<void> {
@@ -356,9 +399,9 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
     SELECT a.schedule_id, s.project_type, s.region, s.gross_sqft, a.category, a.name, a.calendar_id, a.duration,
            a.baseline_start, a.baseline_finish, a.actual_start, a.actual_finish
     FROM activities a JOIN schedules s ON s.id = a.schedule_id
-    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'
+    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated' AND s.in_history
       AND a.category IS NOT NULL AND a.category <> 'other' AND a.activity_type = 'task'`, [orgId, excludeScheduleId ?? null])
-  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND source_type <> 'generated'`, [orgId])
+  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND source_type <> 'generated' AND in_history`, [orgId])
   return {
     rows: res.rows.map(r => ({
       scheduleId: r.schedule_id, projectType: r.project_type, region: r.region, grossSqft: r.gross_sqft != null ? Number(r.gross_sqft) : null,

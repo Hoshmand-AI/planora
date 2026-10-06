@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { randomUUID as uuid } from 'crypto'
+import { createHash, randomUUID as uuid } from 'crypto'
 import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, createActivities, createRelationships, deleteSchedule, updateScheduleProfile } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, setScheduleInHistory, updateScheduleAnalysis } from '@/lib/db'
+import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
@@ -21,9 +22,12 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
     const data = await loadScheduleData(scheduleId, ctx.orgId)
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const { schedule, activities, relationships, brief } = data
+    const { schedule, activities, relationships, brief, analysis } = data
 
     const criticalActivities = activities.filter(a => a.isCritical)
+    // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
+    const byId = new Map(activities.map(a => [a.id, a]))
+    const longest = analysis.longestPath.map(id => byId.get(id)).filter((a): a is NonNullable<typeof a> => !!a && a.status !== 'complete')
     const nearTermTasks = activities
       .filter(a => a.status !== 'complete' && a.earlyStart)
       .sort((a, b) => (a.earlyStart || '').localeCompare(b.earlyStart || ''))
@@ -34,7 +38,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
       : 0
 
     return NextResponse.json({
-      schedule, activities, relationships, brief,
+      schedule, activities, relationships, brief, analysis,
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
@@ -42,9 +46,15 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         inProgressCount: activities.filter(a => a.status === 'in_progress').length,
         notStartedCount: activities.filter(a => a.status === 'not_started').length,
         percentComplete,
-        varianceDays: schedule.varianceDays,
+        varianceDays: analysis.varianceDays,
+        varianceBasis: analysis.varianceBasis,
+        forecastFinish: analysis.forecastFinish,
+        reportedFinish: analysis.reportedFinish,
+        status: analysis.status,
+        statusReasons: analysis.statusReasons,
+        minFloat: analysis.minFloat,
         nearTermTasks,
-        drivingTasks: criticalActivities.slice(0, 10),
+        drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
       },
     })
   }
@@ -64,7 +74,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
-    const versionLabel = (formData.get('version') as string) || 'v1.0'
+    const versionInput = ((formData.get('version') as string) || '').trim().slice(0, 40)
+    const progressMode = formData.get('progressMode') === 'override' ? 'override' : 'retained'
+    const inHistoryInput = formData.get('inHistory')
+    const projectIdInput = (formData.get('projectId') as string) || null
     const projectType = formData.get('projectType') as string | null
     const region = formData.get('region') as string | null
     const grossSqft = Number(formData.get('grossSqft')) || null
@@ -74,8 +87,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
 
     const scheduleId = uuid()
     let parsed
+    const bytes = Buffer.from(await file.arrayBuffer())
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
     try {
-      parsed = await parseScheduleFile(file.name, Buffer.from(await file.arrayBuffer()), scheduleId)
+      parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 })
     }
@@ -95,27 +110,37 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       if (n.conflict) warnings.push(`Calendar "${cal.name}": ${n.conflict}`)
     }
 
-    // Fill in dates/float when the file arrived without calculated results.
+    // Recalculate the network (never trust header dates or stored float) and analyze it.
+    const reportedFinish = parsed.projectFinish
     const completed = completeSchedule({
       activities: parsed.activities, relationships: parsed.relationships, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
       projectStart: parsed.projectStart, projectFinish: parsed.projectFinish, dataDate: parsed.dataDate,
+      mustFinishBy: parsed.mustFinishBy ?? null, progressMode,
     })
     parsed.activities = completed.activities
     parsed.projectStart = completed.projectStart
-    parsed.projectFinish = completed.projectFinish
     if (completed.note) warnings.unshift(completed.note)
-
-    let varianceDays: number | null = null
-    if (parsed.projectFinish) {
-      const baselineFinishes = parsed.activities
-        .filter(a => a.baselineFinish)
-        .map(a => new Date(a.baselineFinish!).getTime())
-      if (baselineFinishes.length > 0) {
-        const latestBaseline = new Date(Math.max(...baselineFinishes))
-        const forecast = new Date(parsed.projectFinish)
-        varianceDays = Math.round((forecast.getTime() - latestBaseline.getTime()) / (1000 * 60 * 60 * 24))
-      }
+    const analysis = analyzeSchedule({
+      activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
+      reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
+    })
+    if (analysis.recalc && analysis.recalc.differing > 0) {
+      warnings.unshift(`${analysis.recalc.differing} of ${analysis.recalc.compared} open activities have a finish or total float in the file that differs from Planora's recalculation by more than 1 day (e.g. ${analysis.recalc.samples.slice(0, 3).map(d => `${d.code}: file ${d.fileFloat ?? '?'}d / Planora ${d.planoraFloat}d float`).join('; ')}).`)
     }
+    if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
+      warnings.unshift(`The file's header finish is ${reportedFinish}; Planora's recalculated forecast finish is ${analysis.forecastFinish}. Planora reports its own forecast.`)
+    }
+    const varianceDays = analysis.varianceDays
+
+    // Uploads of the same project form an update series; label versions automatically when not given.
+    const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
+    const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
+    const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
+    const percentComplete = parsed.activities.length > 0
+      ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
+      : 0
+    // Only finished (as-built) projects calibrate firm history unless the uploader says otherwise.
+    const inHistory = inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : percentComplete >= 95
 
     const schedule = await createSchedule({
       id: scheduleId,
@@ -129,13 +154,14 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       activityCount: parsed.activities.length,
       relationshipCount: parsed.relationships.length,
       projectStart: parsed.projectStart,
-      projectFinish: parsed.projectFinish,
+      projectFinish: analysis.forecastFinish,
       dataDate: parsed.dataDate,
       varianceDays,
       criticalCount: parsed.activities.filter(a => a.isCritical).length,
-      percentComplete: parsed.activities.length > 0
-        ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
-        : 0,
+      percentComplete,
+      analysis,
+      projectKey,
+      inHistory,
       calendars: parsed.calendars,
       defaultCalendarId: parsed.defaultCalendarId,
       warnings,
@@ -147,9 +173,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
+    // Keep the original file for chain of custody (its SHA-256 is also in the audit log).
+    await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -159,7 +187,14 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
         calendarsImported: parsed.calendars.length,
         criticalCount: parsed.activities.filter(a => a.isCritical).length,
         projectStart: parsed.projectStart,
-        projectFinish: parsed.projectFinish,
+        projectFinish: analysis.forecastFinish,
+        forecastFinish: analysis.forecastFinish,
+        reportedFinish,
+        varianceDays,
+        varianceBasis: analysis.varianceBasis,
+        status: analysis.status,
+        sha256,
+        series: series.length + 1,
         classifiedPct: parsed.activities.length ? Math.round((classified / parsed.activities.length) * 100) : 0,
         dataQuestions: dataQuestions.length,
         warnings,
@@ -173,10 +208,21 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   const body = await req.json().catch(() => ({}))
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
-  const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
-  await updateScheduleProfile(s.id, ctx.orgId, profile)
-  await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
+  if (typeof body.inHistory === 'boolean') {
+    await setScheduleInHistory(s.id, ctx.orgId, body.inHistory)
+    await audit({ action: 'schedule.history', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.inHistory ?? true, after: body.inHistory } })
+  }
+  if ((body.progressMode === 'retained' || body.progressMode === 'override') && s.analysis && s.analysis.progressMode !== body.progressMode) {
+    // Store the choice; the next read recalculates with it.
+    await updateScheduleAnalysis(s.id, ctx.orgId, { analysis: { ...s.analysis, progressMode: body.progressMode, forecastFinish: null }, projectFinish: s.projectFinish, varianceDays: s.varianceDays, criticalCount: s.criticalCount })
+    await audit({ action: 'schedule.progress_mode', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.analysis.progressMode, after: body.progressMode } })
+  }
+  if ('projectType' in body || 'region' in body || 'grossSqft' in body) {
+    const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
+    const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
+    await updateScheduleProfile(s.id, ctx.orgId, profile)
+    await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
+  }
   return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
 })
 

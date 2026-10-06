@@ -25,11 +25,11 @@ function decodeText(data: Buffer): string {
   }
 }
 
-export async function parseScheduleFile(fileName: string, data: Buffer, scheduleId: string): Promise<ParsedSchedule> {
+export async function parseScheduleFile(fileName: string, data: Buffer, scheduleId: string, opts: { projectId?: string | null } = {}): Promise<ParsedSchedule> {
   const ext = (fileName.toLowerCase().match(/\.[a-z0-9]+$/) || [''])[0]
   switch (ext) {
     case '.xer':
-      return parseXER(decodeText(data), scheduleId)
+      return parseXER(decodeText(data), scheduleId, opts)
     case '.xml': {
       const text = decodeText(data)
       if (/<APIBusinessObjects[\s>]/.test(text)) {

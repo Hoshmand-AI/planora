@@ -4,7 +4,8 @@
 import type { ConstraintType, GeneratedSchedule, LinkType, WorkCalendar } from '@/lib/planning/types'
 
 const MSP_LINK_TYPE: Record<LinkType, number> = { FF: 0, FS: 1, SF: 2, SS: 3 }
-const MSP_CONSTRAINT: Record<ConstraintType, number> = { MSO: 2, MFO: 3, SNET: 4, SNLT: 5, FNET: 6, FNLT: 7 }
+// MS Project has no two-sided "Start On"/"Finish On"; its Must Start/Finish On is the closest match.
+const MSP_CONSTRAINT: Record<ConstraintType, number> = { MSO: 2, MFO: 3, SO: 2, FO: 3, SNET: 4, SNLT: 5, FNET: 6, FNLT: 7 }
 const TEXT1_FIELD_ID = '188743731'
 
 /** Escape text for XML element content / attributes and drop characters XML 1.0 forbids. */

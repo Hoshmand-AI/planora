@@ -261,3 +261,59 @@ describe('constrained milestones', () => {
     expect(r.times.I.earlyStart).toBe('2026-11-03')
   })
 })
+
+describe('runCpm: P6 constraint semantics (pilot findings)', () => {
+  // A (10d, Mon 03/02-Fri 03/13) -> M finish milestone
+  it('Finish On keeps logic in charge and shows the slip as negative float', () => {
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'FO', date: '2026-03-11' } })], [fs('A', 'M')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-13') // logic wins over the Finish On date
+    expect(r.times.M.totalFloat).toBe(-2)
+    expect(r.times.A.totalFloat).toBe(-2)
+    expect(r.violations).toEqual([])
+  })
+  it('Start On keeps logic in charge for a task', () => {
+    const r = runCpm(input([act('A', 10), act('B', 2, { constraint: { type: 'SO', date: '2026-03-12' } })], [fs('A', 'B')]))
+    expect(r.times.B.earlyStart).toBe('2026-03-16')
+    expect(r.times.B.totalFloat).toBe(-2)
+  })
+  it('a mandatory finish overrules logic, carries the overrun as negative float and is reported', () => {
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-11' } })], [fs('A', 'M')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-11')
+    expect(r.times.M.totalFloat).toBe(-2)
+    expect(r.times.A.totalFloat).toBe(-2)
+    expect(r.violations).toEqual([{ id: 'M', type: 'MFO', constraintDate: '2026-03-11', logicDate: '2026-03-13', days: 2 }])
+    expect(r.logicFinish).toBe('2026-03-13')
+    expect(r.longestPath).toEqual(['A', 'M'])
+  })
+})
+
+describe('runCpm: out-of-sequence progress', () => {
+  // A (10d) is half done; B started early (out of sequence) with 3d remaining. Data date Mon 03/09.
+  const acts = [
+    act('A', 10, { actualStart: '2026-03-02', remaining: 5 }),
+    act('B', 6, { actualStart: '2026-03-04', remaining: 3 }),
+    act('C', 1),
+  ]
+  const links = [fs('A', 'B'), fs('B', 'C')]
+  it('retained logic (default) resumes the out-of-sequence work after its predecessor', () => {
+    const r = runCpm(input(acts, links, { dataDate: '2026-03-09' }))
+    expect(r.progressMode).toBe('retained')
+    expect(r.times.A.earlyFinish).toBe('2026-03-13')
+    expect(r.times.B.earlyFinish).toBe('2026-03-18')
+    expect(r.times.C.earlyFinish).toBe('2026-03-19')
+    expect(r.longestPath).toEqual(['A', 'B', 'C'])
+  })
+  it('progress override continues the remaining work from the data date', () => {
+    const r = runCpm(input(acts, links, { dataDate: '2026-03-09', progressMode: 'override' }))
+    expect(r.times.B.earlyFinish).toBe('2026-03-11')
+    expect(r.times.C.earlyFinish).toBe('2026-03-12')
+  })
+})
+
+describe('runCpm: longest path with a later required finish', () => {
+  it('finds the driving path even when no activity has zero float', () => {
+    const r = runCpm(input([act('A', 5), act('B', 3), act('C', 1)], [fs('A', 'B'), fs('A', 'C')], { mustFinishBy: '2026-04-30' }))
+    expect(r.criticalPath).toEqual([])
+    expect(r.longestPath).toEqual(['A', 'B'])
+  })
+})

@@ -6,7 +6,7 @@ import type { GeneratedSchedule, LinkType, ConstraintType, WorkCalendar } from '
 import { buildWbs } from './wbs'
 
 const PRED: Record<LinkType, string> = { FS: 'PR_FS', SS: 'PR_SS', FF: 'PR_FF', SF: 'PR_SF' }
-const CSTR: Record<ConstraintType, string> = { SNET: 'CS_MSOA', SNLT: 'CS_MSOB', FNET: 'CS_MEOA', FNLT: 'CS_MEOB', MSO: 'CS_MSO', MFO: 'CS_MEO' }
+const CSTR: Record<ConstraintType, string> = { SNET: 'CS_MSOA', SNLT: 'CS_MSOB', FNET: 'CS_MEOA', FNLT: 'CS_MEOB', SO: 'CS_MSO', FO: 'CS_MEO', MSO: 'CS_MANDSTART', MFO: 'CS_MANDFIN' }
 
 /** Characters P6 handles in XER (Windows-1252); others are replaced with ASCII equivalents. */
 export function xerText(v: unknown): string {

@@ -290,6 +290,30 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS email_tokens_user_idx ON email_tokens(user_id);
     `,
   },
+  {
+    id: 5, name: 'schedule_analysis_versions_source_files',
+    sql: `
+    -- Planora's own analysis of an uploaded schedule (forecast vs reported finish, finish-milestone
+    -- variance, status, recalculation differences) so lists and alerts don't depend on file headers.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS analysis JSONB;
+    -- Uploads of the same project (P6 project short name / MS Project title) form one update series.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS project_key TEXT;
+    CREATE INDEX IF NOT EXISTS schedules_project_key_idx ON schedules(org_id, project_key);
+    -- Whether this schedule's actuals may calibrate the firm's history (as-built projects only by default).
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS in_history BOOLEAN NOT NULL DEFAULT TRUE;
+    -- The original uploaded file and its SHA-256, kept for chain of custody.
+    CREATE TABLE IF NOT EXISTS schedule_files (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      content BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS schedule_files_org_idx ON schedule_files(org_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

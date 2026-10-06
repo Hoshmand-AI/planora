@@ -215,7 +215,8 @@ describe('runDcma: n/a handling', () => {
 
 describe('helpers', () => {
   it('normalizes constraint names', () => {
-    expect(normalizeConstraintType('CS_MSO')).toBe('MSO')
+    expect(normalizeConstraintType('CS_MSO')).toBe('SO')
+    expect(normalizeConstraintType('CS_MANDFIN')).toBe('MFO')
     expect(normalizeConstraintType('CS_MEOB')).toBe('FNLT')
     expect(normalizeConstraintType('Start No Earlier Than')).toBe('SNET')
     expect(normalizeConstraintType('weird')).toBeNull()
@@ -248,5 +249,50 @@ describe('custom thresholds change the verdict', () => {
     expect(check(r, 8).result).toBe('pass')
     expect(check(r, 8).threshold).toBe('≤ 10% with remaining > 70d')
     expect(check(runDcma(s, { minFsPct: 100 }), 4).threshold).toBe('≥ 100% FS')
+  })
+})
+
+describe('runDcma: pilot findings', () => {
+  it('CPLI fails when a mandatory finish hides negative float on the path to completion', () => {
+    // 10-day chain finishing Fri 03/13 into a completion milestone pinned (MFO) to Wed 03/11.
+    const s: AnalyzableSchedule = {
+      projectStart: '2026-03-02', dataDate: '2026-03-02', calendars: [cal], defaultCalendarId: cal.id,
+      activities: [ms('S'), task('A', 10), ms('F', { constraint: { type: 'MFO', date: '2026-03-11' } })],
+      links: [fs('S', 'A'), fs('A', 'F')],
+    }
+    const r = runDcma(s)
+    expect(check(r, 7).result).toBe('fail')
+    expect(check(r, 13).result).toBe('fail')
+    expect(Number(check(r, 13).metric)).toBeLessThan(1)
+  })
+  it('a fresh baseline does not fail Missed Tasks or BEI', () => {
+    const s: AnalyzableSchedule = {
+      projectStart: '2026-03-02', dataDate: '2026-03-02', calendars: [cal], defaultCalendarId: cal.id,
+      activities: [ms('NTP', { baselineStart: '2026-03-02', baselineFinish: '2026-03-02' }), task('A', 5, { baselineStart: '2026-03-03', baselineFinish: '2026-03-09' }), ms('F', { baselineFinish: '2026-03-09' })],
+      links: [fs('NTP', 'A'), fs('A', 'F')],
+    }
+    const r = runDcma(s)
+    expect(check(r, 11).result).toBe('n/a')
+    expect(check(r, 14).result).toBe('n/a')
+  })
+  it('Logic: a completed start milestone does not exempt an open dangling activity, and a dangling last task is flagged', () => {
+    const s: AnalyzableSchedule = {
+      projectStart: '2026-03-02', dataDate: '2026-03-09', calendars: [cal], defaultCalendarId: cal.id,
+      activities: [
+        ms('NTP', { actualStart: '2026-03-02', actualFinish: '2026-03-02' }),
+        task('A', 5), task('ORPHAN', 3), task('B', 5), ms('F'), task('LATE', 40),
+      ],
+      links: [fs('NTP', 'A'), fs('A', 'B'), fs('B', 'F'), fs('A', 'LATE')],
+    }
+    const offenders = check(runDcma(s), 1).offenders
+    expect(offenders).toContain('ORPHAN')
+    expect(offenders).toContain('LATE')
+    expect(offenders).not.toContain('F')
+  })
+  it('Critical path test runs on the longest path even when a later required finish leaves positive float', () => {
+    const s = goodSchedule()
+    const r = runDcma(s)
+    expect(check(r, 12).result).toBe('pass')
+    expect(check(r, 12).metric).toMatch(/\+600d finish/)
   })
 })

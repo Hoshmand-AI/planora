@@ -25,7 +25,16 @@ export interface WorkCalendar {
 /* ─── CPM ────────────────────────────────────────────── */
 
 export type LinkType = 'FS' | 'SS' | 'FF' | 'SF'
-export type ConstraintType = 'SNET' | 'SNLT' | 'FNET' | 'FNLT' | 'MSO' | 'MFO'
+/**
+ * SNET/SNLT/FNET/FNLT: one-sided date limits. SO/FO: P6 "Start On" / "Finish On" (no earlier AND no
+ * later than the date; logic still drives the early dates, so a late predecessor shows negative
+ * float). MSO/MFO: mandatory dates that override logic (P6 Mandatory Start/Finish, MS Project
+ * Must Start/Finish On); the logic they overrule is reported as a constraint violation.
+ */
+export type ConstraintType = 'SNET' | 'SNLT' | 'FNET' | 'FNLT' | 'SO' | 'FO' | 'MSO' | 'MFO'
+export const CONSTRAINT_TYPES: readonly ConstraintType[] = ['SNET', 'SNLT', 'FNET', 'FNLT', 'SO', 'FO', 'MSO', 'MFO']
+/** Out-of-sequence progress: P6 Retained Logic (default) or Progress Override. */
+export type ProgressMode = 'retained' | 'override'
 
 export interface CpmActivity {
   id: string
@@ -60,6 +69,8 @@ export interface CpmInput {
   defaultCalendarId?: string
   /** Optional imposed finish date used as the backward-pass anchor */
   mustFinishBy?: string
+  /** How in-progress work that started out of sequence is scheduled. Defaults to 'retained' (P6 default). */
+  progressMode?: ProgressMode
 }
 
 export interface CpmTimes {
@@ -76,8 +87,15 @@ export interface CpmTimes {
 export interface CpmResult {
   times: Record<string, CpmTimes>
   projectFinish: string
-  /** Activity ids of the longest path, in sequence from start to finish */
+  /** Latest finish logic alone produces (equals projectFinish unless a mandatory constraint pins the end earlier) */
+  logicFinish: string
+  /** Activity ids of the critical path (total float <= 0), in sequence from start to finish */
   criticalPath: string[]
+  /** Activity ids of the longest (driving) path to the project finish, regardless of float */
+  longestPath: string[]
+  /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
+  violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
+  progressMode: ProgressMode
   /** Any cycles found (activity ids). If non-empty, times are best-effort. */
   cycles: string[][]
   warnings: string[]

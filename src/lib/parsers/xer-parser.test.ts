@@ -78,7 +78,7 @@ describe('parseXER', () => {
   it('maps constraints, milestones, status and WBS path', () => {
     expect(byCode('A1040')).toMatchObject({ constraintType: 'SNET', constraintDate: '2026-04-01', isCritical: true })
     expect(byCode('A1060')).toMatchObject({ constraintType: 'FNLT', constraintDate: '2026-04-15' })
-    expect(byCode('A1070')).toMatchObject({ constraintType: 'MFO', constraintDate: '2026-06-30', activityType: 'milestone' })
+    expect(byCode('A1070')).toMatchObject({ constraintType: 'FO', constraintDate: '2026-06-30', activityType: 'milestone' })
     expect(byCode('A1000')).toMatchObject({ activityType: 'milestone', status: 'complete', percentComplete: 100 })
     expect(byCode('A1010')).toMatchObject({ status: 'complete', actualFinish: '2026-03-06', constraintType: null })
     expect(byCode('A1030').wbs).toBe('SITE.FDN Foundations')
