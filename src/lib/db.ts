@@ -4,6 +4,7 @@ import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/pl
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
 import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
+import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
@@ -221,6 +222,14 @@ export interface Schedule {
   inHistory?: boolean
   /** Contract/finish milestone the scheduler designated (activity id or activity code); null = automatic */
   finishMilestoneId?: string | null
+  /** Security classification set on this upload (same values as plans); null = not set */
+  classification?: 'unclassified' | 'cui' | 'classified' | null
+  /** The firm's own project or a third-party schedule it reviews; null = not stated */
+  uploadOrigin?: 'own' | 'third_party' | null
+  /** Included in firm history although not as-built (explicit override) */
+  historyOverride?: boolean
+  /** The file is a re-imported Planora export */
+  planoraExport?: boolean
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -236,6 +245,10 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     analysis: (row.analysis as ScheduleAnalysis) ?? null, projectKey: (row.project_key as string) ?? null,
     inHistory: row.in_history == null ? true : Boolean(row.in_history),
     finishMilestoneId: (row.finish_milestone_id as string) ?? null,
+    classification: row.classification === 'cui' || row.classification === 'classified' || row.classification === 'unclassified' ? row.classification : null,
+    uploadOrigin: row.upload_origin === 'own' || row.upload_origin === 'third_party' ? row.upload_origin : null,
+    historyOverride: row.history_override === true,
+    planoraExport: row.planora_export === true,
   }
 }
 
@@ -278,6 +291,36 @@ export async function setScheduleFinishMilestone(id: string, orgId: string, fini
 export async function setScheduleInHistory(id: string, orgId: string, inHistory: boolean): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
+}
+
+/** Upload metadata set after the row is created (origin, classification, Planora re-import, history override). */
+export async function updateScheduleMeta(id: string, orgId: string, m: { classification?: Schedule['classification']; uploadOrigin?: Schedule['uploadOrigin']; planoraExport?: boolean; historyOverride?: boolean }): Promise<void> {
+  await initSchema()
+  const sets: string[] = []
+  const vals: unknown[] = [id, orgId]
+  const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col}=$${vals.length}`) }
+  if (m.classification !== undefined) add('classification', m.classification)
+  if (m.uploadOrigin !== undefined) add('upload_origin', m.uploadOrigin)
+  if (m.planoraExport !== undefined) add('planora_export', m.planoraExport)
+  if (m.historyOverride !== undefined) add('history_override', m.historyOverride)
+  if (!sets.length) return
+  await query(`UPDATE schedules SET ${sets.join(', ')} WHERE id=$1 AND org_id=$2`, vals)
+}
+
+/** Relabel an upload (its version label, e.g. "Update 3" or "Baseline"). */
+export async function setScheduleVersion(id: string, orgId: string, version: string): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET version=$3 WHERE id=$1 AND org_id=$2', [id, orgId, version])
+}
+
+/**
+ * True when a file with this SHA-256 was exported by Planora for this organization (the export audit
+ * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of Planora output.
+ */
+export async function isPlanoraExportSha(orgId: string, sha256: string): Promise<boolean> {
+  await initSchema()
+  const res = await query(`SELECT 1 FROM audit_events WHERE org_id=$1 AND action IN ('schedule.export', 'plan.export') AND detail->>'sha256' = $2 LIMIT 1`, [orgId, sha256])
+  return res.rows.length > 0
 }
 
 /** Every upload in the same update series, oldest data date first. */
@@ -470,16 +513,34 @@ export interface HistoryRow {
 /**
  * Activities from the firm's OWN past schedules, used to ground durations.
  * The org_id filter is the privacy boundary: competitors' data is never read.
+ * Only uploads selectHistorySchedules accepts count (as-built, one per project, no Planora re-imports,
+ * no third-party schedules), and none when the organization turned firm history off for its uploads.
  */
-export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]> }> {
+export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]>; selection: HistorySelection }> {
   await initSchema()
+  const org = await query('SELECT settings FROM organizations WHERE id=$1', [orgId])
+  const orgOptOut = (org.rows[0]?.settings as Record<string, unknown> | null)?.historyExcludeUploads === true
+  const cand = await query(`
+    SELECT s.id, s.name, s.version, s.project_key, s.data_date, s.uploaded_at, s.in_history, s.history_override, s.planora_export, s.upload_origin,
+           COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary')) AS work_count,
+           COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary') AND a.actual_finish IS NULL) AS open_count
+    FROM schedules s LEFT JOIN activities a ON a.schedule_id = s.id
+    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'
+    GROUP BY s.id`, [orgId, excludeScheduleId ?? null])
+  const selection = selectHistorySchedules(cand.rows.map(r => ({
+    id: r.id, name: r.name, version: r.version, projectKey: r.project_key ?? null, dataDate: r.data_date ?? null, uploadedAt: String(r.uploaded_at),
+    inHistory: r.in_history !== false, historyOverride: r.history_override === true, planoraExport: r.planora_export === true,
+    uploadOrigin: r.upload_origin === 'own' || r.upload_origin === 'third_party' ? r.upload_origin : null,
+    workCount: Number(r.work_count), openCount: Number(r.open_count),
+  })), { orgOptOut })
+  if (!selection.included.length) return { rows: [], calendars: {}, selection }
   const res = await query(`
     SELECT a.schedule_id, s.project_type, s.region, s.gross_sqft, a.category, a.name, a.calendar_id, a.duration,
            a.baseline_start, a.baseline_finish, a.actual_start, a.actual_finish
     FROM activities a JOIN schedules s ON s.id = a.schedule_id
-    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated' AND s.in_history
-      AND a.category IS NOT NULL AND a.category <> 'other' AND a.activity_type = 'task'`, [orgId, excludeScheduleId ?? null])
-  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND source_type <> 'generated' AND in_history`, [orgId])
+    WHERE s.org_id = $1 AND s.id = ANY($2::text[])
+      AND a.category IS NOT NULL AND a.category <> 'other' AND a.activity_type = 'task'`, [orgId, selection.included])
+  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND id = ANY($2::text[])`, [orgId, selection.included])
   return {
     rows: res.rows.map(r => ({
       scheduleId: r.schedule_id, projectType: r.project_type, region: r.region, grossSqft: r.gross_sqft != null ? Number(r.gross_sqft) : null,
@@ -487,6 +548,7 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
       baselineStart: r.baseline_start, baselineFinish: r.baseline_finish, actualStart: r.actual_start, actualFinish: r.actual_finish,
     })),
     calendars: Object.fromEntries(cal.rows.map(r => [r.id, r.calendars as WorkCalendar[]])),
+    selection,
   }
 }
 

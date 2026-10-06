@@ -22,6 +22,8 @@ export interface OrgSettings {
   projectRetentionDays: number
   /** Quality-check thresholds (DCMA 14-point), defaulting to the published values */
   quality: DcmaRules
+  /** Never use this organization's uploaded schedules to calibrate firm history */
+  historyExcludeUploads: boolean
 }
 
 export const DEFAULT_SETTINGS: OrgSettings = {
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   chatRetentionDays: 365,
   projectRetentionDays: 0,
   quality: DEFAULT_DCMA_RULES,
+  historyExcludeUploads: false,
 }
 
 /**
@@ -62,5 +65,6 @@ export function normalizeSettings(raw: unknown): OrgSettings {
     chatRetentionDays: clamp(r.chatRetentionDays, 0, 3650, DEFAULT_SETTINGS.chatRetentionDays),
     projectRetentionDays: clamp(r.projectRetentionDays, 0, 3650, DEFAULT_SETTINGS.projectRetentionDays),
     quality: normalizeDcmaRules(r.quality),
+    historyExcludeUploads: b('historyExcludeUploads'),
   }
 }

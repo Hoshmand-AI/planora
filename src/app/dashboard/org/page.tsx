@@ -13,6 +13,7 @@ interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
   quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
+  historyExcludeUploads: boolean
 }
 interface OrgData {
   org: { id: string; name: string; createdAt: string }
@@ -201,6 +202,7 @@ export default function OrgPage() {
               ['requireMfa', 'Require two-step verification', 'Members without it are asked to set it up before they can continue. Turn it on for your own account first.'],
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
+              ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never Planora re-imports or third-party schedules).'],
               ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (OpenAI on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">

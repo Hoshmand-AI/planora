@@ -8,6 +8,23 @@ import ExcelJS from 'exceljs'
 import type { ConstraintType, GeneratedSchedule } from '@/lib/planning/types'
 import { buildWbs, type WbsRow } from './wbs'
 import { fmtDate } from '@/lib/format'
+import { markingRows, type ExportMarking } from './markings'
+
+/**
+ * CUI marking: the banner and designation as the first rows of a sheet (call before adding content)
+ * and in its print header/footer. Returns the number of rows used.
+ */
+function markSheet(ws: ExcelJS.Worksheet, m: ExportMarking | null | undefined): number {
+  if (!m) return 0
+  const rows = markingRows(m)
+  rows.forEach((r, i) => {
+    const row = ws.getRow(i + 1)
+    row.getCell(1).value = r[0]
+    row.font = i === 0 ? { bold: true, size: 12, color: { argb: 'FF7A1F12' } } : { size: 9, color: { argb: 'FF4A4540' } }
+  })
+  ws.headerFooter = { oddHeader: `&C&B${m.banner}`, oddFooter: `&C&B${m.banner}&R&P / &N` }
+  return rows.length
+}
 
 const DATE_FMT = 'mm/dd/yyyy'
 const toDate = (iso?: string | null) => (iso ? new Date(iso.slice(0, 10) + 'T00:00:00Z') : null)
@@ -31,19 +48,24 @@ function header(ws: ExcelJS.Worksheet, row: number, fill = 'FF0F2140') {
 
 /* ─── 1. Import-ready workbook ───────────────────────── */
 
-export async function exportImportXlsx(s: GeneratedSchedule, projectName: string): Promise<Buffer> {
+export async function exportImportXlsx(s: GeneratedSchedule, projectName: string, opts: { marking?: ExportMarking | null } = {}): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
+  const mk = opts.marking ?? null
   wb.creator = 'Planora'
   const { root, rows } = buildWbs(s, projectName)
   const t = s.cpm?.times || {}
 
   // MS Project: one row per task, outline levels create the WBS summary tasks; predecessors by row ID.
   const msp = wb.addWorksheet('MS Project Import')
-  msp.columns = [
+  const mspCols = [
     { header: 'ID', key: 'id', width: 6 }, { header: 'Name', key: 'name', width: 60 }, { header: 'Outline Level', key: 'lvl', width: 8 },
     { header: 'Duration', key: 'dur', width: 12 }, { header: 'Predecessors', key: 'pred', width: 28 }, { header: 'WBS', key: 'wbs', width: 16 },
     { header: 'Text1', key: 'code', width: 10 }, { header: 'Notes', key: 'notes', width: 60 },
   ]
+  // With a CUI marking the banner rows come first and the header row follows them.
+  const mspOff = markSheet(msp, mk)
+  msp.columns = mspOff ? mspCols.map(({ key, width }) => ({ key, width })) : mspCols
+  if (mspOff) msp.getRow(mspOff + 1).values = mspCols.map(c => c.header)
   const rowOf = new Map<string, number>()
   rows.forEach((r, i) => { if (r.activity) rowOf.set(r.activity.id, i + 1) })
   rows.forEach((r, i) => {
@@ -54,14 +76,15 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
       pred: a ? predString(s, a.id, rowOf, 'msp') : '', code: a ? a.code : '', notes: a ? a.rationale.summary : '',
     })
   })
-  header(msp, 1)
-  msp.views = [{ state: 'frozen', ySplit: 1 }]
+  header(msp, mspOff + 1)
+  msp.views = [{ state: 'frozen', ySplit: mspOff + 1 }]
 
   // P6 spreadsheet import layout: row 1 = field names, row 2 = column titles, data from row 3.
   const p6 = wb.addWorksheet('TASK')
+  const p6Off = markSheet(p6, mk)
   const taskFields = ['task_code', 'status_code', 'wbs_id', 'task_name', 'task_type', 'clndr_id', 'target_drtn_hr_cnt', 'start_date', 'end_date', 'total_float_hr_cnt', 'cstr_type', 'cstr_date']
   const taskTitles = ['Activity ID', 'Activity Status', 'WBS Code', 'Activity Name', 'Activity Type', 'Calendar', 'Original Duration (d)', 'Start', 'Finish', 'Total Float (d)', 'Primary Constraint', 'Primary Constraint Date']
-  p6.addRow(taskFields); p6.addRow(taskTitles)
+  p6.getRow(p6Off + 1).values = taskFields; p6.getRow(p6Off + 2).values = taskTitles
   const cstr: Record<ConstraintType, string> = { SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before', SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish' }
   for (const r of rows) {
     const a = r.activity
@@ -72,31 +95,34 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
       s.calendars.find(c => c.id === (a.calendarId || s.defaultCalendarId))?.name || '', a.duration,
       toDate(tm?.earlyStart), toDate(tm?.earlyFinish), tm?.totalFloat ?? '', a.constraint ? cstr[a.constraint.type] : '', toDate(a.constraint?.date)])
   }
-  p6.getRow(1).font = { color: { argb: 'FF8A8178' }, size: 9 }
-  header(p6, 2)
+  p6.getRow(p6Off + 1).font = { color: { argb: 'FF8A8178' }, size: 9 }
+  header(p6, p6Off + 2)
   p6.columns.forEach((c, i) => { c.width = [12, 12, 16, 60, 16, 30, 10, 12, 12, 10, 18, 14][i] })
   ;[8, 9, 12].forEach(i => { p6.getColumn(i).numFmt = DATE_FMT })
-  p6.views = [{ state: 'frozen', ySplit: 2 }]
+  p6.views = [{ state: 'frozen', ySplit: p6Off + 2 }]
 
   const pred = wb.addWorksheet('TASKPRED')
-  pred.addRow(['task_id', 'pred_task_id', 'pred_type', 'lag_hr_cnt'])
-  pred.addRow(['Activity ID', 'Predecessor', 'Relationship Type', 'Lag (d)'])
+  const predOff = markSheet(pred, mk)
+  pred.getRow(predOff + 1).values = ['task_id', 'pred_task_id', 'pred_type', 'lag_hr_cnt']
+  pred.getRow(predOff + 2).values = ['Activity ID', 'Predecessor', 'Relationship Type', 'Lag (d)']
   const codeOf = new Map(s.activities.map(a => [a.id, a.code]))
   for (const l of s.links) pred.addRow([codeOf.get(l.to), codeOf.get(l.from), l.type, l.lag])
-  pred.getRow(1).font = { color: { argb: 'FF8A8178' }, size: 9 }
-  header(pred, 2)
+  pred.getRow(predOff + 1).font = { color: { argb: 'FF8A8178' }, size: 9 }
+  header(pred, predOff + 2)
   pred.columns.forEach(c => { c.width = 18 })
 
   const wbs = wb.addWorksheet('PROJWBS')
-  wbs.addRow(['wbs_short_name', 'wbs_name', 'parent_wbs'])
-  wbs.addRow(['WBS Code', 'WBS Name', 'Parent WBS'])
+  const wbsOff = markSheet(wbs, mk)
+  wbs.getRow(wbsOff + 1).values = ['wbs_short_name', 'wbs_name', 'parent_wbs']
+  wbs.getRow(wbsOff + 2).values = ['WBS Code', 'WBS Name', 'Parent WBS']
   wbs.addRow([root, projectName, ''])
   for (const r of rows) if (r.kind === 'wbs') wbs.addRow([r.code, r.name, r.code.split('.').slice(0, -1).join('.')])
-  wbs.getRow(1).font = { color: { argb: 'FF8A8178' }, size: 9 }
-  header(wbs, 2)
+  wbs.getRow(wbsOff + 1).font = { color: { argb: 'FF8A8178' }, size: 9 }
+  header(wbs, wbsOff + 2)
   wbs.columns.forEach((c, i) => { c.width = [18, 40, 18][i] })
 
   const readme = wb.addWorksheet('How to import')
+  const readmeOff = markSheet(readme, mk)
   const lines = [
     [`${projectName} — import workbook generated by Planora ${fmtDate(new Date().toISOString())}`],
     [''],
@@ -110,11 +136,12 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
     ['Spreadsheet route: File › Import › Spreadsheet (XLSX). Sheets TASK, TASKPRED and PROJWBS follow P6\'s layout (field names in row 1, titles in row 2). Map the fields on first import and save the template.'],
     [''],
     ['Durations are in work days on each activity\'s calendar; "edays" / 7-day calendar items are calendar days (agency reviews, fabrication).'],
+    ...(mk ? [[''], [`${mk.banner} markings: every sheet starts with ${readmeOff} marking rows. Delete them from a copy only if your import tool requires the field names in row 1, and keep the marked original.`]] : []),
   ]
   lines.forEach(l => readme.addRow(l))
   readme.getColumn(1).width = 140
-  readme.getRow(1).font = { bold: true, size: 13 }
-  ;[3, 8].forEach(r => { readme.getRow(r).font = { bold: true } })
+  readme.getRow(readmeOff + 1).font = { bold: true, size: 13 }
+  ;[3, 8].forEach(r => { readme.getRow(readmeOff + r).font = { bold: true } })
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 4, visibility: 'visible' }]
 
   return Buffer.from(await wb.xlsx.writeBuffer())
@@ -134,13 +161,16 @@ function mondayOf(iso: string): number {
   return d.getTime() - wd * 86_400_000
 }
 
-export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: string): Promise<Buffer> {
+export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: string, opts: { marking?: ExportMarking | null } = {}): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Planora'
   const ws = wb.addWorksheet('Schedule', {
     properties: { outlineLevelRow: 3 },
-    pageSetup: { orientation: 'landscape', paperSize: 5 as unknown as ExcelJS.PaperSize, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '4:5' },
+    pageSetup: { orientation: 'landscape', paperSize: 5 as unknown as ExcelJS.PaperSize, fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   })
+  // A CUI marking takes the first rows; everything else moves down by `off`.
+  const off = markSheet(ws, opts.marking)
+  ws.pageSetup.printTitlesRow = `${4 + off}:${5 + off}`
   const { rows } = buildWbs(s, projectName)
   const t = s.cpm?.times || {}
   const finish = s.cpm?.projectFinish || s.projectStart
@@ -152,13 +182,13 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   const FIXED = ['Activity ID', 'Activity Name', 'Original Duration', 'Start', 'Finish', 'Total Float', 'Critical']
   const G0 = FIXED.length + 1 // first Gantt column (1-based)
 
-  ws.getCell(1, 1).value = projectName
-  ws.getCell(1, 1).font = { bold: true, size: 16, color: { argb: 'FF0F2140' } }
-  ws.getCell(2, 1).value = `Data date ${fmtDate(s.dataDate || s.projectStart)} · Finish ${fmtDate(finish)} · ${s.activities.length} activities · Printed ${fmtDate(new Date().toISOString())} · Planora`
-  ws.getCell(2, 1).font = { size: 10, color: { argb: 'FF6B6359' } }
+  ws.getCell(off + 1, 1).value = projectName
+  ws.getCell(off + 1, 1).font = { bold: true, size: 16, color: { argb: 'FF0F2140' } }
+  ws.getCell(off + 2, 1).value = `Data date ${fmtDate(s.dataDate || s.projectStart)} · Finish ${fmtDate(finish)} · ${s.activities.length} activities · Printed ${fmtDate(new Date().toISOString())} · Planora`
+  ws.getCell(off + 2, 1).font = { size: 10, color: { argb: 'FF6B6359' } }
 
   // Row 4: months, Row 5: column titles + week starts.
-  const HR1 = 4, HR2 = 5
+  const HR1 = off + 4, HR2 = off + 5
   FIXED.forEach((h, i) => { ws.getCell(HR2, i + 1).value = h })
   let monthStartCol = G0, curMonth = ''
   for (let w = 0; w <= weeks; w++) {

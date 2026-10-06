@@ -117,7 +117,7 @@ export async function loadScheduleData(id: string, orgId: string) {
     activities: done.activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm,
     reportedFinish, mustFinishBy: prior?.mustFinishBy ?? null, fileValues: done.fileValues ?? null, today: new Date().toISOString().slice(0, 10),
     dataDate: schedule.dataDate, finishMilestoneId: schedule.finishMilestoneId ?? null, seriesBaseline,
-    calendars: schedule.calendars, defaultCalendarId: schedule.defaultCalendarId,
+    calendars: schedule.calendars, defaultCalendarId: schedule.defaultCalendarId, fileProgressMode: prior?.fileProgressMode ?? null,
   })
   // After the first upload the stored dates are Planora's own recalculation, so a fresh comparison
   // would compare Planora with itself; the upload-time comparison with the file stays authoritative.

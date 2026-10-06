@@ -41,7 +41,8 @@
 // FF/SF predecessors can push the finish in both modes. A milestone with only actualStart is
 // treated as complete on that date.
 //
-// Constraints: SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
+// Constraints: start constraints (SNET/SNLT/SO/MSO) are ignored once an activity has an actual start
+// (as P6). SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
 // do both, so logic still drives the early date and a late predecessor shows negative float.
 // MSO/MFO are mandatory (as P6): they fix the early dates (never earlier than the data date) and the
 // late dates (on the constraint date, even one before the data date) against logic. The
@@ -97,6 +98,8 @@ interface Edge {
 }
 
 const INF = Number.POSITIVE_INFINITY
+/** Constraints on an activity's start: P6 ignores them once the activity has an actual start. */
+const START_CONSTRAINTS = new Set<string>(['SNET', 'SNLT', 'SO', 'MSO'])
 
 /** Move an instant by `lag` work days on calendar c (see header). */
 function shift(t: number, lag: number, c: CompiledCalendar): number {
@@ -239,7 +242,14 @@ export function runCpm(input: CpmInput): CpmResult {
   const msInstant = (node: Node, day: number) => (node.startLike ? day : day + 1)
   // A start milestone sits at the start of a work day; a finish milestone on a work-day boundary.
   const msSnap = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapFwd(t, node.c))
-  const msSnapLate = (node: Node, t: number) => (node.startLike ? node.c.next(t) : msSnapBack(t, node.c))
+  // A finish milestone's late date sits at the END of its last work day (not the start of the next
+  // one across a weekend), so LF - EF shown on screen equals its total float.
+  // (Unless that would put it before its early instant, e.g. a finish milestone driven to the start of a day.)
+  const msSnapLate = (node: Node, t: number) => {
+    if (node.startLike) return node.c.next(t)
+    const end = node.c.prev(t - 1) + 1
+    return end >= node.ef || end >= t ? end : msSnapBack(t, node.c)
+  }
   const msDisplay = (node: Node, t: number): number => {
     const preferStart = node.startLike || node.pinnedLow
     if (preferStart) return node.c.isWork(t) || !node.c.isWork(t - 1) ? t : t - 1
@@ -308,6 +318,9 @@ export function runCpm(input: CpmInput): CpmResult {
     const kd = constraintDay(node)
     const hasK = !!k && !Number.isNaN(kd)
     node.mand = node.state === 'open' && hasK && (k!.type === 'MSO' || k!.type === 'MFO')
+    if (node.state === 'progress' && hasK && START_CONSTRAINTS.has(k!.type)) {
+      warnings.push(`Activity ${a.code}: ${k!.type} start constraint ignored because the activity has an actual start (as P6).`)
+    }
 
     if (node.state === 'progress') {
       const as = dateNum(a.actualStart)
@@ -449,7 +462,8 @@ export function runCpm(input: CpmInput): CpmResult {
     }
 
     const d = node.state === 'progress' ? remainingOf(node) : node.dur
-    if (hasK) {
+    // P6 ignores start constraints (SNET/SNLT/Start On/MSO) once an activity has an actual start.
+    if (hasK && !(node.state === 'progress' && START_CONSTRAINTS.has(k!.type))) {
       if (k!.type === 'SNLT' || k!.type === 'SO') startUB = Math.min(startUB, kd)
       else if (k!.type === 'FNLT' || k!.type === 'FO') finishUB = Math.min(finishUB, kd + 1)
     }

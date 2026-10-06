@@ -362,6 +362,21 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS schedule_risk_inputs_org_idx ON schedule_risk_inputs(org_id);
     `,
   },
+  {
+    id: 8, name: 'upload_history_series_cui',
+    sql: `
+    -- Security classification of an uploaded schedule (same values as plans: unclassified, cui,
+    -- classified); NULL = not set. CUI/classified uploads never reach a cloud model and their exports
+    -- carry CUI markings.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS classification TEXT;
+    -- Firm history: whose schedule it is ('own' / 'third_party', NULL = not stated), an explicit
+    -- override to include a schedule that is not as-built, and whether the file is a re-imported
+    -- Planora export (never used to calibrate history). Additive: older code ignores the columns.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS upload_origin TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS history_override BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS planora_export BOOLEAN NOT NULL DEFAULT FALSE;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

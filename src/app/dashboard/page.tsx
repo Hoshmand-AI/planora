@@ -187,6 +187,8 @@ export default function DashboardPage() {
           progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
           inHistory={selectedSchedule.inHistory ?? true}
           canEdit={can('schedule.write')} editsCount={editsCount}
+          version={selectedSchedule.version} classification={selectedSchedule.classification ?? null}
+          origin={selectedSchedule.uploadOrigin ?? null} historyOverride={selectedSchedule.historyOverride ?? false}
           onChanged={() => { refreshSchedules(); refreshMetrics() }} />
       )}
 

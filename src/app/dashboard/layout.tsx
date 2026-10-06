@@ -19,6 +19,9 @@ interface Schedule {
   projectStart: string | null; projectFinish: string | null; dataDate: string | null
   analysis?: { progressMode?: string; status?: string } | null
   inHistory?: boolean
+  classification?: string | null
+  uploadOrigin?: string | null
+  historyOverride?: boolean
 }
 
 interface AppContextType {
@@ -380,9 +383,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach Planora how your projects really perform. Used only for your firm.</p>
                 </div>
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  <label className="block text-[12px] text-warm-600">Whose schedule
+                    <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                      <option value="">Not stated</option>
+                      <option value="own">Our own project</option>
+                      <option value="third_party">Third-party (we review it)</option>
+                    </select>
+                  </label>
+                  <label className="block text-[12px] text-warm-600">Classification
+                    <select name="classification" defaultValue="unclassified" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                      <option value="unclassified">Unclassified</option>
+                      <option value="cui">CUI</option>
+                      <option value="classified">Classified</option>
+                    </select>
+                  </label>
+                  <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and Planora re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
+                </div>
                 <div className="mb-5">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
-                  <input type="text" name="version" defaultValue="v1.0"
+                  <input type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}

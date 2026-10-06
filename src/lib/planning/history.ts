@@ -148,3 +148,6 @@ export function historyOptedOut(answers: Record<string, Answer> | null | undefin
 export function historyForPlan(h: FirmHistory | null | undefined, answers: Record<string, Answer> | null | undefined): FirmHistory | null {
   return h && !historyOptedOut(answers) ? h : null
 }
+
+
+export { selectHistorySchedules, isAsBuilt, historyInclusionWarning, type HistoryCandidate, type HistorySelection, type HistoryExclusion, type UploadOrigin } from './history-selection'

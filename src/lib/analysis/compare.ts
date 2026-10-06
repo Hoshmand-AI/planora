@@ -177,7 +177,8 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
       floatErosion.push({ ...base, before: b.totalFloat, after: a.totalFloat, delta: a.totalFloat - b.totalFloat })
     }
   }
-  floatErosion.sort((x, y) => x.delta - y.delta)
+  // Most negative resulting float first (the work now driving a slip), then the largest drop.
+  floatErosion.sort((x, y) => Math.min(0, x.after) - Math.min(0, y.after) || x.delta - y.delta)
   const calendarChanges = before.calendars && after.calendars ? compareCalendars(before.calendars, after.calendars) : []
 
   const relMap = (rels: Relationship[], codeOf: Map<string, string>) => {
@@ -265,7 +266,10 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   if (calCh.length) summary.push(`${n(calCh.length, 'activity', 'activities')} moved to a different calendar (e.g. ${calCh[0].code}: "${calCh[0].before}" → "${calCh[0].after}").`)
   if (calendarChanges.length) summary.push(`Calendar changes: ${calendarChanges.slice(0, 5).map(describeCalendarChange).join('; ')}${calendarChanges.length > 5 ? `; and ${calendarChanges.length - 5} more` : ''}.`)
   if (actualsRewritten.length) summary.push(`${n(actualsRewritten.length, 'previously reported actual date')} changed; actuals should not be rewritten in a later update.`)
-  if (floatErosion.length) summary.push(`Float dropped on ${n(floatErosion.length, 'open activity', 'open activities')}; the largest drop is ${floatErosion[0].code} (${floatErosion[0].before} → ${floatErosion[0].after} work days).`)
+  if (floatErosion.length) {
+    const biggest = floatErosion.reduce((m, f) => (f.delta < m.delta ? f : m))
+    summary.push(`Float dropped on ${n(floatErosion.length, 'open activity', 'open activities')}; the largest drop is ${biggest.code} (${biggest.before} → ${biggest.after} work days).`)
+  }
   if (entered.length || left.length) summary.push(`Driving path: ${entered.length} joined, ${left.length} left${leftDeleted.length ? ` (${leftDeleted.join(', ')} deleted)` : ''}.`)
 
   return {

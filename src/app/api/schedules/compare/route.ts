@@ -5,6 +5,8 @@ import { getScheduleById, getScheduleSeries } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
 import { compareSchedules, orderSeries, pickDefaultBase, type CompareSide } from '@/lib/analysis/compare'
 import { exportComparisonCsv } from '@/lib/export/csv'
+import { CSV_CUI_REFUSAL } from '@/lib/export/markings'
+import { isRestrictedClassification, mostRestrictive, scheduleClassification } from '@/lib/server/classification'
 
 /**
  * Compare two uploads of a project. GET ?id=<later upload>&base=<earlier upload>.
@@ -45,6 +47,9 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
   const comparison = compareSchedules(side(b), side(a))
   await audit({ action: 'schedule.compare', targetType: 'schedule', targetId: after.id, detail: { name: after.name, after: after.version, before: before.version, baseId: before.id, format } })
   if (format === 'csv') {
+    // A CSV cannot carry CUI markings: refused when either upload is CUI or classified.
+    const c = mostRestrictive(...await Promise.all([after.id, before.id].map(id => scheduleClassification(id, auth.orgId).catch(() => 'classified' as const))))
+    if (isRestrictedClassification(c)) return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
     const slug = `${after.name}-${before.version}-vs-${after.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'comparison'
     return new NextResponse(exportComparisonCsv(comparison), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.csv"` } })
   }
