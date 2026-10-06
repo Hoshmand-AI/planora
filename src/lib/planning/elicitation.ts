@@ -12,6 +12,7 @@ import { listLongLeadItems } from '@/lib/knowledge/long-lead'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
+import { civilOptionsFrom, civilQuestions, featuresFrom } from './civil-options'
 
 export interface HistorySummary {
   /** Firm's own past schedules with categorized activities */
@@ -104,8 +105,11 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const stories = floors ? floors.length : ti ? undefined : num(known(answers, 'project.stories'))
   const acres = ti ? undefined : num(known(answers, 'site.acres_disturbed'))
   const classification = str(known(answers, 'security.classification')) as Classification | undefined
+  const projectType = type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined
+  const state = answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase()
+  const civilOpts = civil && projectType ? civilOptionsFrom(projectType, answers, state, str(known(answers, 'project.scope'))) : undefined
   return {
-    projectType: type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined,
+    projectType,
     // A typed location ("Ontario, Canada") is kept for the record but uses generic permitting.
     state: answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase(),
     city: str(known(answers, 'project.city')),
@@ -122,6 +126,7 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
     ...(floors ? { floors } : {}),
     ...(outsideUS ? { outsideUS } : {}),
+    ...(civilOpts && projectType ? { civil: civilOpts, features: featuresFrom(projectType, civilOpts) } : {}),
   }
 }
 
@@ -237,12 +242,19 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
 
   // Outside the US there are no US federal funding / property questions (or their Davis-Bacon, NEPA follow-ups).
   if (p.projectType !== 'federal_defense' && !intl) {
-    qs.push({
-      id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
-      prompt: 'Is this federally funded or on federal property?',
-      why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
-      fallback: { value: false, explanation: 'Assumed not federal.' },
-    })
+    qs.push(civil
+      ? {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this a federal or federally funded project (for example FHWA federal-aid, FTA, FAA AIP, USACE or EPA funding)?',
+          why: 'Federal funding adds NEPA/Section 106 reviews, Davis-Bacon certified payrolls, Buy America and agency concurrence. Whether the work is on federal property (a base or federal campus) is asked separately: federal-aid work in public right-of-way needs no base access.',
+          fallback: { value: false, explanation: 'Assumed not federally funded.' },
+        }
+      : {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this federally funded or on federal property?',
+          why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
+          fallback: { value: false, explanation: 'Assumed not federal.' },
+        })
     // Federal money is not federal land: base access and installation work clearances only apply on an installation.
     if (p.isFederal === true) {
       qs.push({
@@ -255,6 +267,9 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       })
     }
   }
+
+  // Civil networks: staging, utility owners, in-water windows, guideway type, facility and scope variants.
+  qs.push(...civilQuestions(p, answers))
 
   // Data centers are usually precast or insulated-panel boxes; curtain wall only when the design has it.
   if (p.projectType === 'data_center' && p.scope !== 'renovation' && p.scope !== 'renovation_occupied') {
@@ -452,7 +467,8 @@ function regulationQuestions(regs: RegulationSpec[], p: ProjectProfile): Questio
 
 /* ─── Milestone targets & date logic ─────────────────── */
 
-export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string }[] = [
+/** `activityKey`: the template activity (key) that reaches the milestone, when its category has several. */
+export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string; activityKey?: string }[] = [
   { key: 'foundations', label: 'Foundations complete', category: 'foundations', rank: 1, impact: 22, why: 'Foundations gate the structure.' },
   { key: 'structure', label: 'Structure complete (topped out)', category: 'structure_steel', rank: 2, impact: 22, why: 'Topping out gates the envelope and roof.' },
   { key: 'dry_in', label: 'Building dried-in', category: 'dry_in', rank: 3, impact: 24, why: 'Interior finishes and sensitive equipment wait for a watertight building.' },
@@ -489,6 +505,23 @@ const CIVIL_MILESTONES: Partial<Record<ProjectType, MilestoneTarget[]>> = {
     { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
     SC_TARGET,
   ],
+  aviation: [
+    { key: 'airfield_reopen', label: 'Runway / taxiway reopened to aircraft', category: 'cutover', rank: 4, impact: 28, why: 'Closures are negotiated with the airport and airlines; reopening dates usually carry liquidated damages.' },
+    SC_TARGET,
+  ],
+  marine_civil_works: [
+    { key: 'cofferdam_removed', label: 'In-water work complete', category: 'in_water_work', rank: 3, impact: 24, why: 'In-water work must finish inside the permit window.' },
+    SC_TARGET,
+  ],
+  environmental_remediation: [
+    { key: 'excavation_complete', label: 'Excavation & disposal complete', category: 'remediation', rank: 3, impact: 24, why: 'Regulators and consent orders often set the date contaminated material must be removed.' },
+    SC_TARGET,
+  ],
+  epc_industrial: [
+    { key: 'mechanical_completion', label: 'Mechanical completion', category: 'inspections', activityKey: 'mc', rank: 3, impact: 24, why: 'Mechanical completion hands each system to commissioning.' },
+    { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
+    SC_TARGET,
+  ],
 }
 /** Milestone targets the interview asks about for this project type. */
 export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
@@ -508,6 +541,7 @@ const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
   substructure: 'substructure', superstructure: 'deck', deck: 'deck', track_systems: 'track', process_structures: 'process_structures',
   process_equipment: 'startup', power_equipment: 'energization', conductors: 'energization', controls_scada: 'startup', pipeline: 'mechanical_completion',
+  remediation: 'excavation_complete', tunneling: 'substantial_completion', mass_concrete: 'substantial_completion',
   substantial_completion: 'substantial_completion',
 }
 

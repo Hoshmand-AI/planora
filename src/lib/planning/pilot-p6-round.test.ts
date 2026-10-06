@@ -172,7 +172,9 @@ describe('DCMA #12 critical path test on seasonal calendars', () => {
     const c = runDcma(s).checks.find(x => x.id === 12)!
     expect(c.result).toBe('pass')
     expect(c.metric).not.toBe('+600d finish for +600d on A')
-    expect(c.explanation).toMatch(/nonwork periods, such as seasonal shutdowns/)
+    // The 12/15-03/15 run is a seasonal shutdown (a holiday run of two weeks or more), which the test
+    // lifts, so the finish moves within the allowance and the path reads as continuous.
+    expect(c.explanation).toMatch(/so the driving path is continuous/)
   })
   it('still fails, naming where the delay stops, when the path is broken', () => {
     // A drives B only through its START (SS): lengthening A cannot move B or the finish.

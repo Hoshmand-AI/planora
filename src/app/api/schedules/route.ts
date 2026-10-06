@@ -7,7 +7,7 @@ import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
-import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
+import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
@@ -158,12 +158,13 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       : latestInSeries.workspaceId ?? null
 
     // Semantic normalization: firms label activities and calendars differently; map them to shared meaning.
+    // Highway, bridge and airfield uploads are read with the road vocabulary (paving, signals, seeding, cure).
     let classified = 0
-    for (const a of parsed.activities) {
-      const c = classifyActivity(a.name, a.wbs)
-      a.category = c.category
-      if (c.category !== 'other') classified++
-    }
+    const { results: classes } = classifySchedule(parsed.activities, projectType)
+    parsed.activities.forEach((a, i) => {
+      a.category = classes[i].category
+      if (classes[i].category !== 'other') classified++
+    })
     const warnings = [...parsed.warnings]
     for (const cal of parsed.calendars) {
       const n = normalizeCalendar({ name: cal.name, workDays: cal.workDays, hoursPerDay: cal.hoursPerDay })

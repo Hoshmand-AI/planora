@@ -311,6 +311,43 @@ const FEDERAL: RegionSpec = {
   climate: { adverseMonths: [], adverseNote: 'No national climate default; see state region.', weatherDaysPerAdverseMonth: 0 },
 }
 extra('us-icd705-csp', { classification: ['classified'] })
+
+// Federal contract front end (USACE / NAVFAC / AFCEC): nothing starts on site before the preconstruction
+// conference, an accepted Accident Prevention Plan and QC Plan, and the submittal register; the
+// baseline network analysis schedule must be accepted before the first progress payment.
+const FED_CONTRACT = { federalOnly: true, federalInstallationOnly: true, civil: true } as const
+FEDERAL.regulations.push(
+  {
+    id: 'us-fed-precon', name: 'Preconstruction conference (contract Section 01 31 19)', appliesWhen: FED_CONTRACT,
+    scheduleImpact: 'The contracting officer holds the preconstruction conference after award; site work starts only after it and the acceptance of the safety and quality plans.',
+    source: 'UFGS 01 31 19.05 20 Post-Award Conference; FAR 52.236-7 / 52.236-15',
+    addsActivity: { name: 'Preconstruction conference with the contracting officer', category: 'permit_other', days: { low: 1, typical: 5, high: 10 }, after: 'ntp', before: 'mobilization' },
+  },
+  {
+    id: 'us-em385-app', name: 'Accident Prevention Plan (APP) per EM 385-1-1', appliesWhen: FED_CONTRACT,
+    scheduleImpact: 'The APP (with activity hazard analyses) must be accepted by the government before work on site; typical review 2–3 weeks with one resubmittal.',
+    source: 'USACE EM 385-1-1 Safety and Health Requirements (Appendix A, Accident Prevention Plan); UFGS 01 35 26',
+    addsActivity: { name: 'Accident Prevention Plan (EM 385-1-1) & AHAs — prepare, submit & government acceptance', category: 'submittals', days: { low: 15, typical: 25, high: 45 }, after: 'ntp', before: 'mobilization' },
+  },
+  {
+    id: 'us-ufgs-qc-plan', name: 'Contractor Quality Control Plan (UFGS 01 45 00)', appliesWhen: FED_CONTRACT,
+    scheduleImpact: 'The QC Plan and QC manager must be accepted before construction starts (a coordination and mutual-understanding meeting follows).',
+    source: 'UFGS 01 45 00 Quality Control (Army / Navy / Air Force versions)',
+    addsActivity: { name: 'Quality Control Plan (UFGS 01 45 00) — submit, coordination meeting & acceptance', category: 'submittals', days: { low: 15, typical: 20, high: 40 }, after: 'ntp', before: 'mobilization' },
+  },
+  {
+    id: 'us-ufgs-submittal-register', name: 'Submittal register (UFGS 01 33 00)', appliesWhen: FED_CONTRACT,
+    scheduleImpact: 'The submittal register (ENG Form 4288) is submitted with the QC Plan and drives the government review cycle for every submittal.',
+    source: 'UFGS 01 33 00 Submittal Procedures',
+    addsActivity: { name: 'Submittal register (ENG 4288) & submittal schedule — prepare and submit', category: 'submittals', days: { low: 5, typical: 10, high: 20 }, after: 'ntp', before: 'mobilization' },
+  },
+  {
+    id: 'us-ufgs-nas', name: 'Baseline network analysis schedule (UFGS 01 32 17 / 01 32 01)', appliesWhen: FED_CONTRACT,
+    scheduleImpact: 'A preliminary schedule is due shortly after NTP and the baseline NAS within about six weeks; the government withholds progress payments until the baseline is accepted.',
+    source: 'UFGS 01 32 17.00 20 Cost-Loaded Critical Path Method Scheduling (NAVFAC); UFGS 01 32 01.00 10 Project Schedule (USACE)',
+    addsActivity: { name: 'Baseline network analysis schedule (UFGS 01 32 17 / 01 32 01) — submit & government acceptance', category: 'submittals', days: { low: 20, typical: 30, high: 45 }, after: 'ntp', before: 'foundations', beforeAlternatives: ['earthwork', 'mobilization'] },
+  },
+)
 extra('us-icd705-accreditation', { classification: ['classified'] })
 
 /* ─── US-DEFAULT (generic local jurisdiction) ──────────── */
@@ -385,7 +422,7 @@ const DEFAULT: RegionSpec = {
     {
       id: 'def-special-inspections',
       name: 'IBC Chapter 17 special inspections & testing',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'Statement of Special Inspections must be approved with the permit; special inspector reports and final report are prerequisites to certificate of occupancy. Reference default — verify with the AHJ.',
       source: 'International Building Code Chapter 17',
@@ -483,7 +520,7 @@ const CA: RegionSpec = {
     {
       id: 'ca-title24-energy',
       name: 'Title 24 Part 6 Energy Code compliance',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'Energy compliance forms (NRCC) required at permit; acceptance testing by a certified Acceptance Test Technician (NRCA forms) before final inspection. Reference default — verify with the AHJ.',
       source: 'California Energy Code, Title 24 Part 6 (2022 edition; 2025 edition effective Jan 1, 2026)',
@@ -498,7 +535,7 @@ const CA: RegionSpec = {
     {
       id: 'ca-calgreen',
       name: 'CALGreen (Title 24 Part 11) mandatory measures',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'Construction waste diversion documentation, and for new nonresidential buildings ≥10,000 sf, owner project requirements/basis of design and commissioning per CALGreen §5.410.2. Reference default — verify with the AHJ.',
       source: 'California Green Building Standards Code, Title 24 Part 11',
@@ -559,7 +596,7 @@ const TX: RegionSpec = {
       name: 'TDLR Texas Accessibility Standards project registration & RAS plan review',
       authority: 'Texas Department of Licensing and Regulation / Registered Accessibility Specialist',
       jurisdiction: 'state',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       reviewWeeks: { low: 2, typical: 4, high: 8 },
       gates: 'framing_drywall',
       submitAfter: 'design_cd',
@@ -583,7 +620,7 @@ const TX: RegionSpec = {
     {
       id: 'tx-ras-inspection',
       name: 'TDLR RAS final accessibility inspection',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'A RAS inspection must be requested within one year of construction completion; deficiencies must be corrected and reported. Does not usually gate certificate of occupancy. Reference default — verify with TDLR.',
       source: '16 TAC §68.51; Gov. Code Ch. 469',
@@ -598,7 +635,7 @@ const TX: RegionSpec = {
     {
       id: 'tx-tdlr-elevator',
       name: 'TDLR elevator/escalator registration & acceptance inspection',
-      appliesWhen: { minStories: 2 },
+      appliesWhen: { minStories: 2, nonInstallationOnly: true },
       scheduleImpact:
         'New conveyances require TDLR registration and an acceptance inspection by a licensed inspector before use. Reference default — verify with TDLR.',
       source: 'Texas Health & Safety Code Ch. 754; 16 TAC Ch. 74',
@@ -772,7 +809,7 @@ const FL: RegionSpec = {
     {
       id: 'fl-product-approval',
       name: 'Florida Product Approval / Miami-Dade NOA for envelope products',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'Windows, doors, storefront, curtain wall, roofing and shutters must carry Florida Product Approval (or Miami-Dade Notice of Acceptance in the High-Velocity Hurricane Zone) with impact/pressure ratings; non-approved products require engineering evaluation and lengthen submittal review. Reference default — verify with the AHJ.',
       source: 'Florida Building Code; Rule 61G20-3, F.A.C.; Miami-Dade County Product Control (HVHZ)',
@@ -780,7 +817,7 @@ const FL: RegionSpec = {
     {
       id: 'fl-threshold-inspection',
       name: 'Threshold building special inspector',
-      appliesWhen: { minStories: 4 },
+      appliesWhen: { minStories: 4, nonInstallationOnly: true },
       scheduleImpact:
         'Threshold buildings (>3 stories or >50 ft, or assembly occupancy >5,000 sf with >500 occupants) require a threshold inspection plan and a special inspector for structural work; shoring/reshoring inspections affect structure cycle time. Reference default — verify with the AHJ.',
       source: 'F.S. §553.71(12) and §553.79(5)',
@@ -837,7 +874,7 @@ const WA: RegionSpec = {
       name: 'L&I elevator/conveyance installation permit & plan review',
       authority: 'Washington State Department of Labor & Industries',
       jurisdiction: 'state',
-      appliesWhen: { minStories: 2 },
+      appliesWhen: { minStories: 2, nonInstallationOnly: true },
       reviewWeeks: { low: 4, typical: 8, high: 14 },
       gates: 'elevators',
       submitAfter: 'submittals',
@@ -849,7 +886,7 @@ const WA: RegionSpec = {
       name: 'L&I electrical permit & inspections',
       authority: 'Washington State Department of Labor & Industries (or city electrical program)',
       jurisdiction: 'state',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       reviewWeeks: { low: 1, typical: 2, high: 6 },
       gates: 'mep_rough',
       submitAfter: 'design_cd',
@@ -872,7 +909,7 @@ const WA: RegionSpec = {
     {
       id: 'wa-energy-code',
       name: 'Washington State Energy Code (commercial) and commissioning',
-      appliesWhen: {},
+      appliesWhen: { nonInstallationOnly: true },
       scheduleImpact:
         'WSEC-C requires functional testing and a commissioning report for many systems; final approval can depend on the preliminary commissioning report. Reference default — verify with the AHJ.',
       source: 'WAC 51-11C (Washington State Energy Code — Commercial), Section C408',
@@ -1046,7 +1083,7 @@ extra('az-building', { replaces: ['def-building'] })
 /* ─── Civil / infrastructure ──────────────────────────── */
 
 const HB_T: ProjectType[] = ['highway_bridge']
-const WATERS: ProjectType[] = ['highway_bridge', 'water_wastewater', 'transit_rail', 'utility_power', 'industrial_process']
+const WATERS: ProjectType[] = ['highway_bridge', 'water_wastewater', 'transit_rail', 'utility_power', 'industrial_process', 'aviation', 'marine_civil_works', 'epc_industrial']
 const CIVIL_VERIFY = 'Reference durations — confirm with the agency; many depend on the project\'s environmental class and the agency\'s workload.'
 
 FEDERAL.permits.push(
@@ -1058,7 +1095,7 @@ FEDERAL.permits.push(
   }),
   permit({
     id: 'us-usace-404-utility', name: 'USACE Section 404 / Section 10 permit (crossings and outfalls)', authority: 'U.S. Army Corps of Engineers (District)', jurisdiction: 'federal',
-    appliesWhen: { projectTypes: ['water_wastewater', 'transit_rail', 'utility_power', 'industrial_process'], civil: true }, reviewWeeks: { low: 6, typical: 12, high: 52 }, gates: 'earthwork', submitAfter: 'design_dd',
+    appliesWhen: { projectTypes: ['water_wastewater', 'transit_rail', 'utility_power', 'industrial_process', 'aviation', 'epc_industrial'], civil: true }, reviewWeeks: { low: 6, typical: 12, high: 52 }, gates: 'earthwork', submitAfter: 'design_dd',
     source: 'Clean Water Act §404; 33 CFR Parts 320–332', notes: `Answer "Not required" if no waters or wetlands are affected. ${CIVIL_VERIFY}`,
   }),
   permit({
@@ -1104,8 +1141,63 @@ FEDERAL.permits.push(
   }),
   permit({
     id: 'us-air-construction', name: 'Air construction permit (state permit / NSR)', authority: 'State or local air agency (EPA where delegated)', jurisdiction: 'state',
-    appliesWhen: { projectTypes: ['industrial_process'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 78 }, gates: 'foundations', submitAfter: 'design_dd',
+    appliesWhen: { projectTypes: ['industrial_process', 'epc_industrial'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 78 }, gates: 'foundations', submitAfter: 'design_dd',
     source: 'Clean Air Act New Source Review (40 CFR 51.165–166, 52.21); state air permit rules', notes: `Construction of an emission unit generally cannot begin before the permit. ${CIVIL_VERIFY}`,
+  }),
+)
+
+/* Aviation, marine / locks / dams / tunnels, remediation */
+const MARINE: ProjectType[] = ['marine_civil_works']
+FEDERAL.permits.push(
+  permit({
+    id: 'us-faa-cspp', name: 'FAA review of the Construction Safety and Phasing Plan (CSPP) & Safety Plan Compliance Document', authority: 'FAA Airports District Office / airport sponsor', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: ['aviation'], civil: true, features: ['airside'] }, reviewWeeks: { low: 3, typical: 6, high: 12 }, gates: 'traffic_control', submitAfter: 'design_cd',
+    source: 'FAA AC 150/5370-2G Operational Safety on Airports During Construction; 14 CFR Part 139', notes: `No airside work, closure or NOTAM before the CSPP is approved and the SPCD accepted. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-faa-7460-construction', name: 'FAA Form 7460-1 airspace determinations for construction equipment, cranes & haul routes', authority: 'FAA Obstruction Evaluation / Airport Airspace Analysis', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: ['aviation'], civil: true, features: ['airside'] }, reviewWeeks: { low: 4, typical: 7, high: 12 }, gates: 'mobilization', submitAfter: 'design_cd',
+    source: '14 CFR Part 77; FAA AC 150/5370-2G §2.13', notes: `File at least 45 days before equipment is on the airfield. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-faa-navaid-agreement', name: 'FAA Technical Operations reimbursable agreement for NAVAID shutdowns, relocation & restoration', authority: 'FAA Technical Operations (ATO)', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: ['aviation'], civil: true, features: ['airside'] }, reviewWeeks: { low: 12, typical: 26, high: 52 }, gates: 'controls_scada', submitAfter: 'design_dd',
+    source: 'FAA Order 6000.15 (maintenance of NAS systems); FAA reimbursable agreement process', notes: `Answer "Not required" if no FAA-owned NAVAID (ILS, PAPI, REIL, ALS) is affected. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-usace-404-marine', name: 'USACE Section 404 / Section 10 permit (in-water structures, dredging & fill)', authority: 'U.S. Army Corps of Engineers (District)', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: MARINE, civil: true, features: ['in_water'] }, reviewWeeks: { low: 8, typical: 20, high: 52 }, gates: 'in_water_work', submitAfter: 'design_dd',
+    source: 'Clean Water Act §404; Rivers and Harbors Act §10; 33 CFR Parts 320–332', notes: `Answer "Not required" when USACE itself is the owner (civil works projects are authorized, not permitted). ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-usace-408', name: 'Section 408 permission to alter a USACE civil works project', authority: 'U.S. Army Corps of Engineers (District / Division)', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: MARINE, civil: true, features: ['lock_dam'] }, reviewWeeks: { low: 12, typical: 26, high: 52 }, gates: 'in_water_work', submitAfter: 'design_dd',
+    source: '33 U.S.C. §408; EC 1165-2-220', notes: `Applies when a non-federal sponsor alters a federal lock, dam or levee; "Not required" for USACE-owned work. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-esa-section7', name: 'ESA Section 7 consultation (NMFS / USFWS) for in-water work', authority: 'NOAA Fisheries / U.S. Fish and Wildlife Service', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: ['highway_bridge', 'marine_civil_works'], civil: true, features: ['in_water'] }, reviewWeeks: { low: 6, typical: 20, high: 52 }, gates: 'in_water_work', submitAfter: 'design_dd',
+    source: 'Endangered Species Act §7 (16 U.S.C. §1536); 50 CFR Part 402', notes: `Formal consultation runs up to 135 days after initiation and sets the in-water work window. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-dam-safety', name: 'State dam safety plan approval', authority: 'State dam safety agency', jurisdiction: 'state',
+    appliesWhen: { projectTypes: MARINE, civil: true, features: ['lock_dam'] }, reviewWeeks: { low: 8, typical: 16, high: 40 }, gates: 'earthwork', submitAfter: 'design_cd',
+    source: 'State dam safety statutes (Model State Dam Safety Program, FEMA P-316)', notes: `"Not required" for federally owned dams. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-blasting-permit', name: 'Explosives storage & blasting permit (blast plan, vibration limits)', authority: 'State fire marshal / local fire department; ATF (storage)', jurisdiction: 'state',
+    appliesWhen: { projectTypes: MARINE, civil: true, features: ['drill_blast'] }, reviewWeeks: { low: 3, typical: 6, high: 12 }, gates: 'tunneling', submitAfter: 'design_cd',
+    source: '27 CFR Part 555 (explosives storage); NFPA 495; state blasting regulations', notes: CIVIL_VERIFY,
+  }),
+  permit({
+    id: 'us-waste-disposal-approval', name: 'Disposal facility waste profile approval & acceptance', authority: 'Permitted disposal facility (RCRA Subtitle C / D) and state agency', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['environmental_remediation'], civil: true }, reviewWeeks: { low: 2, typical: 4, high: 8 }, gates: 'remediation', submitAfter: 'design_cd',
+    source: 'RCRA (40 CFR Parts 261–268); CERCLA Off-Site Rule (40 CFR 300.440)', notes: `Off-site disposal under CERCLA needs a facility the EPA region has found acceptable. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-remediation-discharge', name: 'Treated groundwater discharge authorization (NPDES or POTW pretreatment permit)', authority: 'State NPDES program / local sewer authority', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['environmental_remediation'], civil: true, features: ['groundwater'] }, reviewWeeks: { low: 6, typical: 12, high: 26 }, gates: 'startup_testing', submitAfter: 'design_cd',
+    source: 'Clean Water Act §402 / §307(b); CERCLA §121(e) permit equivalency for on-site actions', notes: CIVIL_VERIFY,
   }),
 )
 

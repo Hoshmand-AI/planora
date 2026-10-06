@@ -393,17 +393,26 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
 
   /* 12. Critical path test */
   {
-    // Seasonal work windows (e.g. a winter paving shutdown) move dates by calendar, not by logic, and a
-    // 600-day shift lands work in a different season: the test runs with those windows lifted.
+    // Seasonal nonwork moves dates by calendar, not by logic, and a 600-day shift lands work in a
+    // different season, moving the finish by more or less than 600 days with the logic intact. The test
+    // is about logic, so it runs with both kinds of seasonal nonwork lifted: seasonal-window calendars
+    // (seasonalBaseId, e.g. a northern winter window) fall back to their base calendar, and long
+    // shutdown runs (holiday runs of two weeks or more, e.g. no paving December-March) are taken out.
     const raw = scheduleToCpmInput(s)
-    const seasonal = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId).map((c) => [c.id, c.seasonalBaseId!]))
-    const inp = raw && seasonal.size
-      ? { ...raw, activities: raw.activities.map((a) => (a.calendarId && seasonal.has(a.calendarId) ? { ...a, calendarId: seasonal.get(a.calendarId) } : a)) }
+    const seasonalBase = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId).map((c) => [c.id, c.seasonalBaseId!]))
+    const shutdowns = !!raw && raw.calendars.some((c) => shutdownDays(c).size > 0)
+    const seasonal = seasonalBase.size > 0 || shutdowns
+    const inp = raw && seasonal
+      ? {
+          ...raw,
+          calendars: shutdowns ? raw.calendars.map(withoutShutdowns) : raw.calendars,
+          activities: seasonalBase.size
+            ? raw.activities.map((a) => (a.calendarId && seasonalBase.has(a.calendarId) ? { ...a, calendarId: seasonalBase.get(a.calendarId) } : a))
+            : raw.activities,
+        }
       : raw
-    let base = cpm()
-    if (inp && seasonal.size) {
-      try { base = runCpm(inp) } catch { base = null }
-    }
+    let base: CpmResult | null
+    try { base = seasonal && inp ? runCpm(inp) : cpm() } catch { base = null }
     const thr = `finish moves ${CP_TEST_DAYS}d`
     const tol = Math.max(2, Math.round(CP_TEST_DAYS * 0.02))
     // Mandatory constraints (MSO/MFO) on the driving path hold dates by typing them in, not by logic.
@@ -435,14 +444,17 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
         }
         try {
           const after = runCpm(bumped)
+          // Counted on the calendars the test ran with (seasonal nonwork lifted).
+          const testCals = new Map(inp.calendars.map((c) => [c.id, c]))
+          const testDefault = (s.defaultCalendarId && testCals.get(s.defaultCalendarId)) || inp.calendars[0] || defaultCal
           const calOf = (id: string | undefined) => {
             const a = id ? inp.activities.find((x) => x.id === id) : undefined
-            return (a?.calendarId && calById.get(a.calendarId)) || defaultCal
+            return (a?.calendarId && testCals.get(a.calendarId)) || testDefault
           }
           const cal = calOf(targetId)
           const endId = base.longestPath[base.longestPath.length - 1] ?? path[path.length - 1]
-          // Counted in the target's work days, and in the finish activity's: seasonal shutdowns or other
-          // nonwork periods that only one of the calendars has make the two counts differ.
+          // Counted in the target's work days, and in the finish activity's: nonwork periods that only
+          // one of the calendars has make the two counts differ.
           const delta = workDaysBetween(base.projectFinish, after.projectFinish, cal)
           const deltaAtFinish = workDaysBetween(base.projectFinish, after.projectFinish, calOf(endId))
           const within = (d: number) => Math.abs(d - CP_TEST_DAYS) <= tol
@@ -572,3 +584,21 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   return { checks, passed, applicable, score: applicable ? Math.round((100 * passed) / applicable) : 0 }
 }
 
+/** Holidays that form a run of at least two weeks of consecutive days: a seasonal shutdown, not a holiday. */
+const SHUTDOWN_RUN_DAYS = 14
+function shutdownDays(cal: WorkCalendar): Set<string> {
+  const days = [...new Set((cal.holidays ?? []).map((h) => h.slice(0, 10)))].map((h) => ({ h, n: toDayNumber(h) })).filter((x) => !Number.isNaN(x.n)).sort((a, b) => a.n - b.n)
+  const out = new Set<string>()
+  let run: string[] = []
+  const flush = () => { if (run.length >= SHUTDOWN_RUN_DAYS) run.forEach((h) => out.add(h)); run = [] }
+  days.forEach((x, i) => {
+    if (i > 0 && x.n !== days[i - 1].n + 1) flush()
+    run.push(x.h)
+  })
+  flush()
+  return out
+}
+function withoutShutdowns(cal: WorkCalendar): WorkCalendar {
+  const off = shutdownDays(cal)
+  return off.size ? { ...cal, holidays: (cal.holidays ?? []).filter((h) => !off.has(h.slice(0, 10))) } : cal
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PROJECT_TYPES, type ProjectProfile } from '@/lib/planning/types'
+import { PROJECT_TYPES, isCivilType, type ProjectProfile } from '@/lib/planning/types'
 import {
   computeTemplateDuration,
   estimateTemplateNetwork,
@@ -18,11 +18,12 @@ describe('template network', () => {
     expect(v.checked).toBeGreaterThan(500)
   })
 
-  it('returns one activity per category', () => {
+  it('returns one activity per category (per key for civil networks, which hold staged / per-structure activities)', () => {
     for (const projectType of PROJECT_TYPES) {
       const acts = templatesFor({ projectType, grossSqft: 120000, stories: 3, scope: 'new_construction' })
-      const cats = acts.map((a) => a.category)
-      expect(new Set(cats).size).toBe(cats.length)
+      const ids = acts.map((a) => a.key ?? a.category)
+      expect(new Set(ids).size).toBe(ids.length)
+      if (!isCivilType(projectType)) expect(acts.every((a) => a.key === undefined)).toBe(true)
     }
   })
 

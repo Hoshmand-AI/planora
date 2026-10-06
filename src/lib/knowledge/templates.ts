@@ -15,7 +15,7 @@ import type {
   TemplateActivity,
 } from '@/lib/planning/types'
 import { CANONICAL_CATEGORIES, PROJECT_TYPES, isCivilType } from '@/lib/planning/types'
-import { CIVIL_CATALOG } from './templates-civil'
+import { CIVIL_CATALOG, civilTemplatesFor } from './templates-civil'
 import { appliesTri, type Tri } from './applicability'
 import { phaseOf } from '@/lib/semantic/taxonomy'
 
@@ -296,6 +296,8 @@ function resolvePreds(
 
 /** Filtered, one-activity-per-category template network with predecessors resolved for this profile. */
 export function templatesFor(profile: ProjectProfile): TemplateActivity[] {
+  // Civil networks are keyed (several activities per category) and shaped by the civil interview answers.
+  if (isCivilType(profile.projectType)) return civilTemplatesFor(profile)
   const raw = selectRaw(profile)
   const selected = new Set(raw.map((v) => v.category))
   const structure = raw.find((v) => isStructure(v.category))?.category
@@ -322,7 +324,8 @@ export function templatesFor(profile: ProjectProfile): TemplateActivity[] {
  * cannot finish before P finishes). Keeps the network free of redundant logic ties.
  */
 function pruneRedundant(acts: TemplateActivity[]): TemplateActivity[] {
-  const order = topoOrder(acts)
+  // Building networks only (one activity per category, so keys are categories).
+  const order = topoOrder(acts) as CanonicalCategory[] | null
   if (!order) return acts
   const byCat = new Map(acts.map((a) => [a.category, a]))
   // F(q): activities guaranteed to finish no later than q finishes; S(q): ... no later than q starts
@@ -376,16 +379,19 @@ export function computeTemplateDuration(t: TemplateActivity, profile: ProjectPro
 /* ─── Quick forward pass (planning estimate only; the real CPM engine lives elsewhere) ── */
 
 export interface TemplateNetworkEstimate {
-  /** Early start / early finish in work days from NTP (day 0) */
-  times: Partial<Record<CanonicalCategory, { es: number; ef: number; duration: number }>>
+  /** Early start / early finish in work days from NTP (day 0), by activity key (the category unless keyed) */
+  times: Partial<Record<string, { es: number; ef: number; duration: number }>>
   finish: number
 }
+
+/** Activity identity in a template network: its key when keyed (civil), otherwise its category. */
+const keyOf = (a: { key?: string; category: CanonicalCategory }): string => a.key ?? a.category
 
 export function estimateTemplateNetwork(profile: ProjectProfile): TemplateNetworkEstimate {
   const acts = templatesFor(profile)
   const order = topoOrder(acts)
   if (!order) throw new Error('Template network contains a cycle')
-  const byCat = new Map(acts.map((a) => [a.category, a]))
+  const byCat = new Map(acts.map((a) => [keyOf(a), a]))
   const times: TemplateNetworkEstimate['times'] = {}
   let finish = 0
   for (const c of order) {
@@ -393,7 +399,7 @@ export function estimateTemplateNetwork(profile: ProjectProfile): TemplateNetwor
     const dur = computeTemplateDuration(a, profile)
     let es = 0
     for (const p of a.preds) {
-      const pt = times[p.category]!
+      const pt = times[keyOf(p)]!
       const cand = linkStart(p.type, pt.es, pt.ef, p.lag, dur)
       if (cand > es) es = cand
     }
@@ -412,18 +418,18 @@ function linkStart(type: LinkType, pes: number, pef: number, lag: number, dur: n
   }
 }
 
-function topoOrder(acts: TemplateActivity[]): CanonicalCategory[] | null {
-  const indeg = new Map<CanonicalCategory, number>()
-  const succ = new Map<CanonicalCategory, CanonicalCategory[]>()
+function topoOrder(acts: TemplateActivity[]): string[] | null {
+  const indeg = new Map<string, number>()
+  const succ = new Map<string, string[]>()
   for (const a of acts) {
-    indeg.set(a.category, indeg.get(a.category) ?? 0)
+    indeg.set(keyOf(a), indeg.get(keyOf(a)) ?? 0)
     for (const p of a.preds) {
-      indeg.set(a.category, (indeg.get(a.category) ?? 0) + 1)
-      succ.set(p.category, [...(succ.get(p.category) ?? []), a.category])
+      indeg.set(keyOf(a), (indeg.get(keyOf(a)) ?? 0) + 1)
+      succ.set(keyOf(p), [...(succ.get(keyOf(p)) ?? []), keyOf(a)])
     }
   }
-  const queue = acts.filter((a) => indeg.get(a.category) === 0).map((a) => a.category)
-  const out: CanonicalCategory[] = []
+  const queue = acts.filter((a) => indeg.get(keyOf(a)) === 0).map((a) => keyOf(a))
+  const out: string[] = []
   while (queue.length) {
     const c = queue.shift()!
     out.push(c)
@@ -470,8 +476,9 @@ export function validateTemplates(extraProfiles: ProjectProfile[] = []): Templat
     const tag = JSON.stringify(p)
     const acts = templatesFor(p)
     const cats = acts.map((a) => a.category)
-    const set = new Set(cats)
-    if (set.size !== cats.length) errors.push(`${tag}: duplicate categories`)
+    const keys = acts.map(keyOf)
+    const set = new Set(keys)
+    if (set.size !== keys.length) errors.push(`${tag}: duplicate activities`)
     if (cats.filter(isStructure).length > 1) errors.push(`${tag}: more than one structural system`)
     for (const req of ['ntp', 'substantial_completion', 'final_completion'] as CanonicalCategory[]) {
       if (!set.has(req)) errors.push(`${tag}: missing ${req}`)
@@ -480,15 +487,15 @@ export function validateTemplates(extraProfiles: ProjectProfile[] = []): Templat
       if (!valid.has(a.category)) errors.push(`${tag}: invalid category ${a.category}`)
       if (a.category !== 'ntp' && a.preds.length === 0) errors.push(`${tag}: ${a.category} has no predecessors (open start)`)
       for (const pr of a.preds) {
-        if (!set.has(pr.category)) errors.push(`${tag}: ${a.category} pred ${pr.category} does not resolve`)
+        if (!set.has(keyOf(pr))) errors.push(`${tag}: ${keyOf(a)} pred ${keyOf(pr)} does not resolve`)
       }
       const d = computeTemplateDuration(a, p)
       if (!Number.isFinite(d) || d < 0) errors.push(`${tag}: ${a.category} bad duration ${d}`)
       if (a.milestone && d !== 0) errors.push(`${tag}: milestone ${a.category} has duration`)
     }
     // every non-final activity should have a successor (no open ends except final_completion)
-    const hasSucc = new Set(acts.flatMap((a) => a.preds.map((pr) => pr.category)))
-    for (const a of acts) if (a.category !== 'final_completion' && !hasSucc.has(a.category)) errors.push(`${tag}: ${a.category} has no successor (open end)`)
+    const hasSucc = new Set(acts.flatMap((a) => a.preds.map(keyOf)))
+    for (const a of acts) if (a.category !== 'final_completion' && !hasSucc.has(keyOf(a))) errors.push(`${tag}: ${keyOf(a)} has no successor (open end)`)
     if (!topoOrder(acts)) errors.push(`${tag}: cycle detected`)
   }
   return { ok: errors.length === 0, errors, checked: profiles.length }
