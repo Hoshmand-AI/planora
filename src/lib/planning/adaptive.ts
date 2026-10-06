@@ -76,7 +76,8 @@ export function prerequisitesOf(q: Question): string[] {
   if (q.section === 'milestones') return ['project.target_start']
   if (q.section === 'cost') return ['project.required_finish']
   if (q.id === 'design.review_weeks' || q.id === 'design.percent') return ['design.drawings']
-  if (q.id === 'project.stories' || q.id === 'site.acres_disturbed') return ['project.scope']
+  if (q.id === 'project.stories' || q.id === 'project.floors' || q.id === 'site.acres_disturbed') return ['project.scope']
+  if (q.id === 'project.area_unit') return ['project.state']
   if (q.id === 'calendar.weather') return ['project.state']
   return []
 }
@@ -93,6 +94,7 @@ export function probeValues(q: Question): AnswerValue[] | null {
   if (q.kind === 'number') {
     switch (q.unit) {
       case 'sf': return [20_000, 80_000, 250_000]
+      case 'm²': return [2_000, 8_000, 25_000]
       case 'USD millions': return [5, 25, 150]
       case 'stories': return [1, 3, 8]
       case '%': return [0, 50, 100]

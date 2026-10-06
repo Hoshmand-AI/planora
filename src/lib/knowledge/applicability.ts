@@ -38,6 +38,10 @@ export function appliesTri(a: Applicability, p: ProjectProfile): Tri {
   // Building catalog items never apply to civil/infrastructure work unless marked (or listing the type).
   if (isCivilType(p.projectType) && !a.civil && !(Array.isArray(a.projectTypes) && a.projectTypes.includes(p.projectType!))) return 'no'
 
+  if (a.excludeTypes?.length) {
+    if (p.projectType && a.excludeTypes.includes(p.projectType)) return 'no'
+  }
+
   if (a.projectTypes !== undefined && a.projectTypes !== 'all') {
     if (!p.projectType) r.push('unknown')
     else r.push(a.projectTypes.includes(p.projectType) ? 'yes' : 'no')

@@ -20,6 +20,11 @@ export interface WorkCalendar {
   canonical?: string
   /** Original label as written in the source file */
   sourceName?: string
+  /**
+   * A seasonal variant of another calendar (same work week, plus a winter shutdown window off): the
+   * base calendar's id. The DCMA critical path test lifts seasonal windows, which move dates by calendar, not logic.
+   */
+  seasonalBaseId?: string
 }
 
 /* ─── CPM ────────────────────────────────────────────── */
@@ -154,6 +159,7 @@ export const PROJECT_TYPES = [
   'retail',
   'lab_research',
   'federal_defense',
+  'interiors_ti',
   'highway_bridge',
   'transit_rail',
   'water_wastewater',
@@ -185,6 +191,7 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   retail: 'Retail',
   lab_research: 'Laboratory / research',
   federal_defense: 'Federal / defense facility',
+  interiors_ti: 'Interiors / tenant improvement (TI)',
   highway_bridge: 'Highway / bridge',
   transit_rail: 'Transit / rail',
   water_wastewater: 'Water / wastewater (plant, pump station, pipeline)',
@@ -215,6 +222,13 @@ export interface ProjectProfile {
   deliveryMethod?: DeliveryMethod
   /** Civil types: construction value in USD millions (their size measure instead of floor area) */
   valueMusd?: number
+  /**
+   * Interiors / TI: the actual floor numbers in scope (e.g. [12, 13, 14, 15]), ascending. Work is
+   * sequenced and labelled by these floors; `stories` is their count.
+   */
+  floors?: number[]
+  /** The project is outside the United States: no US federal/state permits, regulations or holidays. */
+  outsideUS?: boolean
 }
 
 /* ─── Knowledge catalogs (grounding) ─────────────────── */
@@ -223,6 +237,8 @@ export interface DurationRange { low: number; typical: number; high: number }
 
 export interface Applicability {
   projectTypes?: ProjectType[] | 'all'
+  /** Never applies to these project types (e.g. site, structure and envelope work on an interiors / TI project) */
+  excludeTypes?: ProjectType[]
   scopes?: WorkScope[]
   minSqft?: number
   minStories?: number
@@ -279,7 +295,22 @@ export interface RegionSpec {
     adverseNote: string
     /** Typical weather days per adverse month */
     weatherDaysPerAdverseMonth: number
+    /**
+     * Seasonal windows when weather-sensitive work does not run (e.g. asphalt plants closed, cold-weather
+     * roofing and concrete limits). Activities in `categories` use a calendar with these days off.
+     */
+    seasonal?: SeasonalWindow[]
   }
+}
+
+export interface SeasonalWindow {
+  id: string
+  label: string
+  /** Inclusive start and end as MM-DD; a window may wrap the new year (12-01 → 03-31) */
+  start: string
+  end: string
+  categories: CanonicalCategory[]
+  note: string
 }
 
 export interface LongLeadSpec {

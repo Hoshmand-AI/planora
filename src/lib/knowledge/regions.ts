@@ -7,6 +7,7 @@
 
 import type {
   Classification,
+  SeasonalWindow,
   PermitSpec,
   ProjectProfile,
   RegionSpec,
@@ -56,6 +57,87 @@ function extraOk(id: string, p: ProjectProfile): boolean {
   if (e.city === 'nyc' && !isNYC(p.city)) return false
   if (e.city === 'not_nyc' && isNYC(p.city)) return false
   return true
+}
+
+/* ─── Seasonal climate windows ─────────────────────────── */
+
+/**
+ * Winter windows for northern states: asphalt plants close and planting stops, and deep cold stops
+ * slab-on-grade and membrane roofing (in the severe north, all exterior concrete), or makes it a
+ * heated-enclosure operation the schedule should not assume. Activities in these categories use a
+ * calendar with the window off.
+ */
+const COLD_WORK: SeasonalWindow['categories'] = ['foundations', 'slab_on_grade', 'structure_concrete', 'roofing']
+function northernWindows(): SeasonalWindow[] {
+  return [
+    { id: 'paving', label: 'Winter paving & landscaping shutdown', start: '12-15', end: '03-15', categories: ['paving_landscape'],
+      note: 'Hot-mix asphalt plants close and the ground freezes mid-December to mid-March; paving, striping and planting wait for spring.' },
+    { id: 'cold', label: 'Cold-weather window for slab-on-grade concrete & roofing', start: '01-01', end: '02-15', categories: ['slab_on_grade', 'roofing'],
+      note: 'Deep-winter cold (January to mid-February): slabs need frost-free subgrade and heated enclosures (ACI 306) and membrane roofing falls below adhesive and torch minimums, so that work is planned around the window. Footings and elevated concrete continue with cold-weather protection.' },
+  ]
+}
+function severeWindows(): SeasonalWindow[] {
+  return [
+    { id: 'paving', label: 'Winter paving & landscaping shutdown', start: '11-15', end: '04-15', categories: ['paving_landscape'],
+      note: 'Hot-mix asphalt plants close and the ground is frozen mid-November to mid-April; paving, striping and planting wait for spring.' },
+    { id: 'cold', label: 'Winter shutdown for exterior concrete & roofing', start: '12-15', end: '02-28', categories: COLD_WORK,
+      note: 'Sustained sub-freezing temperatures (mid-December through February): exterior concrete and membrane roofing are not planned without full heated enclosures (ACI 306).' },
+  ]
+}
+
+type Climate = RegionSpec['climate']
+const SOUTHEAST: Climate = {
+  adverseMonths: [6, 7, 8, 9],
+  adverseNote: 'Southern climate: no frozen-ground season. Summer afternoon thunderstorms and heat (work/rest cycles, hot-weather concreting) reduce productivity Jun–Sep; coastal sites carry hurricane-season risk Jun–Nov. Occasional winter ice events are short.',
+  weatherDaysPerAdverseMonth: 3,
+}
+const NORTHERN: Climate = {
+  adverseMonths: [12, 1, 2],
+  adverseNote: 'Northern winter: frozen ground, snow and cold-weather concrete protection reduce exterior productivity Dec–Feb; paving and landscaping shut down for the winter.',
+  weatherDaysPerAdverseMonth: 3,
+}
+const SEVERE_NORTH: Climate = {
+  adverseMonths: [11, 12, 1, 2, 3],
+  adverseNote: 'Severe northern winter: frozen ground and sustained sub-freezing temperatures Nov–Mar; exterior concrete, roofing and paving shut down in deep winter.',
+  weatherDaysPerAdverseMonth: 3,
+}
+const MID_ATLANTIC: Climate = {
+  adverseMonths: [12, 1, 2],
+  adverseNote: 'Mid-latitude winter: cold snaps, snow/ice and short frozen-ground periods Dec–Feb need cold-weather concrete protection on some days, without a seasonal shutdown.',
+  weatherDaysPerAdverseMonth: 3,
+}
+const MOUNTAIN_DESERT: Climate = {
+  adverseMonths: [7, 8],
+  adverseNote: 'Desert Southwest: extreme summer heat and monsoon storms (Jul–Aug) reduce productivity; higher elevations have short winter cold periods.',
+  weatherDaysPerAdverseMonth: 2,
+}
+const PACIFIC_WET: Climate = {
+  adverseMonths: [11, 12, 1, 2, 3],
+  adverseNote: 'Pacific Northwest wet season (Nov–Mar): rain limits earthwork and roofing; wet-weather erosion control is required.',
+  weatherDaysPerAdverseMonth: 4,
+}
+const TROPICAL: Climate = {
+  adverseMonths: [8, 9, 10],
+  adverseNote: 'Tropical climate: no cold season; heavy rain and hurricane-season risk peak Aug–Oct.',
+  weatherDaysPerAdverseMonth: 2,
+}
+
+/** Climate for states without a detailed regional catalog (their permitting stays generic US). */
+const STATE_CLIMATE: Record<string, Climate> = {
+  ...Object.fromEntries(['GA', 'AL', 'MS', 'LA', 'SC', 'NC', 'TN', 'AR', 'OK'].map((c) => [c, SOUTHEAST])),
+  ...Object.fromEntries(['CT', 'MA', 'RI', 'NJ', 'PA', 'OH', 'IN', 'IL', 'IA', 'NE', 'ID', 'CO', 'UT'].map((c) => [c, { ...NORTHERN, seasonal: northernWindows() }])),
+  ...Object.fromEntries(['AK', 'ME', 'NH', 'VT', 'MN', 'ND', 'SD', 'WI', 'MI', 'MT', 'WY'].map((c) => [c, { ...SEVERE_NORTH, seasonal: severeWindows() }])),
+  ...Object.fromEntries(['DE', 'DC', 'WV', 'KY', 'MO', 'KS'].map((c) => [c, MID_ATLANTIC])),
+  ...Object.fromEntries(['NM', 'NV'].map((c) => [c, MOUNTAIN_DESERT])),
+  OR: PACIFIC_WET,
+  HI: TROPICAL,
+}
+
+/** Outside the US: no US permits or climate assumptions; generic local approvals only. */
+const INTERNATIONAL_CLIMATE: Climate = {
+  adverseMonths: [],
+  adverseNote: 'Project outside the US: no regional weather allowance is assumed. Add one from local climate data (or answer the weather question and add a contingency activity).',
+  weatherDaysPerAdverseMonth: 0,
 }
 
 /* ─── US-FEDERAL ───────────────────────────────────────── */
@@ -633,7 +715,8 @@ const NY: RegionSpec = {
   climate: {
     adverseMonths: [12, 1, 2, 3],
     adverseNote: 'Winter cold, snow and frozen ground (Dec–Mar) require cold-weather concrete protection, temporary heat and enclosure; upstate and western NY lake-effect snow is more severe.',
-    weatherDaysPerAdverseMonth: 5,
+    weatherDaysPerAdverseMonth: 4,
+    seasonal: northernWindows(),
   },
 }
 extra('ny-nyc-dob', { city: 'nyc', replaces: ['def-building'] })
@@ -1060,6 +1143,7 @@ export interface ResolvedRegional {
  * entirely when the state is unknown/unsupported), then filter by applicability.
  */
 export function resolveRegional(profile: ProjectProfile): ResolvedRegional {
+  if (profile.outsideUS) return resolveInternational(profile)
   const stateCode = profile.state?.trim().toUpperCase()
   const state = stateCode && stateCode !== 'US-FEDERAL' && stateCode !== 'US-DEFAULT' ? BY_CODE.get(stateCode) : undefined
 
@@ -1077,8 +1161,56 @@ export function resolveRegional(profile: ProjectProfile): ResolvedRegional {
 
   return {
     regionCode: state?.code ?? 'US-DEFAULT',
-    permits: [...basePermits, ...statePermits],
+    permits: [...basePermits, ...statePermits].filter((p) => !(profile.projectType === 'interiors_ti' && NOT_FOR_TI(p))),
     regulations: [...baseRegs, ...stateRegs],
-    climate: { ...(state ?? DEFAULT).climate },
+    climate: climateFor(state, stateCode),
+  }
+}
+
+/** The climate for a state: its regional catalog, else its climate zone, else the generic default. */
+function climateFor(state: RegionSpec | undefined, stateCode: string | undefined): Climate {
+  const c = state?.climate ?? (stateCode ? STATE_CLIMATE[stateCode] : undefined) ?? DEFAULT.climate
+  return { ...c, seasonal: c.seasonal?.map((w) => ({ ...w, categories: [...w.categories] })) }
+}
+
+/**
+ * An interiors / TI fit-out has no site work and ties into the base building's existing service, so
+ * site, grading, stormwater, tap and new-service applications do not apply.
+ */
+const NOT_FOR_TI = (p: PermitSpec) => p.gates === 'earthwork' || p.gates === 'utilities_site' || p.id === 'def-electric-service' || p.id === 'ny-coned'
+
+const INTERNATIONAL_PERMITS: PermitSpec[] = [
+  permit({
+    id: 'intl-building',
+    name: 'Building permit / construction approval',
+    authority: 'Local building authority',
+    jurisdiction: 'local',
+    appliesWhen: { civil: true },
+    reviewWeeks: { low: 4, typical: 12, high: 26 },
+    gates: 'foundations',
+    submitAfter: 'design_cd',
+    source: 'Generic placeholder for jurisdictions outside the US (no US catalog applies)',
+    notes: 'Outside the US Planora has no permit catalog: replace this with the local approvals (planning consent, building approval, fire authority) and their review times.',
+  }),
+  permit({
+    id: 'intl-utility',
+    name: 'Utility power connection application',
+    authority: 'Local electricity network operator',
+    jurisdiction: 'local',
+    appliesWhen: { civil: true, excludeTypes: ['interiors_ti'] },
+    reviewWeeks: { low: 8, typical: 20, high: 52 },
+    gates: 'electrical_service',
+    submitAfter: 'design_dd',
+    source: 'Generic placeholder for jurisdictions outside the US (no US catalog applies)',
+    notes: 'Network operator connection offers and transformer supply commonly control permanent power.',
+  }),
+]
+
+function resolveInternational(profile: ProjectProfile): ResolvedRegional {
+  return {
+    regionCode: 'INTL',
+    permits: INTERNATIONAL_PERMITS.filter((p) => appliesTri(p.appliesWhen, profile) !== 'no'),
+    regulations: [],
+    climate: { ...INTERNATIONAL_CLIMATE },
   }
 }

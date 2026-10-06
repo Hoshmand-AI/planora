@@ -393,8 +393,17 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
 
   /* 12. Critical path test */
   {
-    const inp = scheduleToCpmInput(s)
-    const base = cpm()
+    // Seasonal work windows (e.g. a winter paving shutdown) move dates by calendar, not by logic, and a
+    // 600-day shift lands work in a different season: the test runs with those windows lifted.
+    const raw = scheduleToCpmInput(s)
+    const seasonal = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId).map((c) => [c.id, c.seasonalBaseId!]))
+    const inp = raw && seasonal.size
+      ? { ...raw, activities: raw.activities.map((a) => (a.calendarId && seasonal.has(a.calendarId) ? { ...a, calendarId: seasonal.get(a.calendarId) } : a)) }
+      : raw
+    let base = cpm()
+    if (inp && seasonal.size) {
+      try { base = runCpm(inp) } catch { base = null }
+    }
     const thr = `finish moves ${CP_TEST_DAYS}d`
     const tol = Math.max(2, Math.round(CP_TEST_DAYS * 0.02))
     // Mandatory constraints (MSO/MFO) on the driving path hold dates by typing them in, not by logic.
