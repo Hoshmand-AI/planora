@@ -132,8 +132,17 @@ export const PROJECT_TYPES = [
   'retail',
   'lab_research',
   'federal_defense',
+  'highway_bridge',
+  'transit_rail',
+  'water_wastewater',
+  'utility_power',
+  'industrial_process',
 ] as const
 export type ProjectType = typeof PROJECT_TYPES[number]
+
+/** Horizontal / infrastructure types: their own networks, permits and long-lead items; sized by construction value, not floor area. */
+export const CIVIL_PROJECT_TYPES: readonly ProjectType[] = ['highway_bridge', 'transit_rail', 'water_wastewater', 'utility_power', 'industrial_process']
+export const isCivilType = (t: string | null | undefined): boolean => !!t && (CIVIL_PROJECT_TYPES as readonly string[]).includes(t)
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   commercial_office: 'Commercial office',
@@ -145,6 +154,11 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   retail: 'Retail',
   lab_research: 'Laboratory / research',
   federal_defense: 'Federal / defense facility',
+  highway_bridge: 'Highway / bridge',
+  transit_rail: 'Transit / rail',
+  water_wastewater: 'Water / wastewater (plant, pump station, pipeline)',
+  utility_power: 'Power / substation / transmission',
+  industrial_process: 'Industrial / process plant',
 }
 
 export type WorkScope = 'new_construction' | 'renovation' | 'renovation_occupied' | 'addition'
@@ -163,6 +177,8 @@ export interface ProjectProfile {
   isFederal?: boolean
   classification?: Classification
   deliveryMethod?: DeliveryMethod
+  /** Civil types: construction value in USD millions (their size measure instead of floor area) */
+  valueMusd?: number
 }
 
 /* ─── Knowledge catalogs (grounding) ─────────────────── */
@@ -177,6 +193,11 @@ export interface Applicability {
   minAcresDisturbed?: number
   federalOnly?: boolean
   nonFederalOnly?: boolean
+  /**
+   * Also applies to civil/infrastructure project types. Without it, an item that does not list the
+   * civil type explicitly is treated as building-only and does not apply to bridges, plants, etc.
+   */
+  civil?: boolean
 }
 
 export interface PermitSpec {
@@ -259,6 +280,10 @@ export const CANONICAL_CATEGORIES = [
   'mep_rough', 'electrical_service', 'mechanical_equipment', 'elevators', 'fire_protection', 'low_voltage',
   'framing_drywall', 'finishes', 'specialties', 'paving_landscape',
   'commissioning', 'inspections', 'punchlist', 'substantial_completion', 'closeout', 'final_completion',
+  // Civil / infrastructure work
+  'row_utilities', 'traffic_control', 'in_water_work', 'substructure', 'superstructure', 'deck', 'roadway', 'drainage',
+  'pipeline', 'process_structures', 'process_equipment', 'power_equipment', 'controls_scada', 'track_systems', 'conductors',
+  'startup_testing', 'cutover',
   'contingency', 'other',
 ] as const
 export type CanonicalCategory = typeof CANONICAL_CATEGORIES[number]

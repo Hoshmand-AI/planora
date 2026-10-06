@@ -14,12 +14,14 @@ import type {
   ProjectProfile,
   TemplateActivity,
 } from '@/lib/planning/types'
-import { CANONICAL_CATEGORIES, PROJECT_TYPES } from '@/lib/planning/types'
+import { CANONICAL_CATEGORIES, PROJECT_TYPES, isCivilType } from '@/lib/planning/types'
+import { CIVIL_CATALOG } from './templates-civil'
 import { appliesTri, type Tri } from './applicability'
 import { phaseOf } from '@/lib/semantic/taxonomy'
 
 export const DEFAULT_SQFT = 50000
 export const DEFAULT_STORIES = 1
+export const DEFAULT_VALUE_MUSD = 20
 
 export const STRUCTURE_CATEGORIES: CanonicalCategory[] = ['structure_steel', 'structure_concrete', 'structure_wood']
 const isStructure = (c: CanonicalCategory) => STRUCTURE_CATEGORIES.includes(c)
@@ -173,6 +175,11 @@ const CATALOG: TemplateActivity[] = [
 /** Default (definition) variant per category: the last, most generic variant in the catalog. */
 const DEFINITION = new Map<CanonicalCategory, TemplateActivity>()
 for (const v of CATALOG) DEFINITION.set(v.category, v)
+const CIVIL_DEFINITION = new Map<CanonicalCategory, TemplateActivity>()
+for (const v of CIVIL_CATALOG) CIVIL_DEFINITION.set(v.category, v)
+/** Civil/infrastructure types use their own catalog. */
+const catalogFor = (p: ProjectProfile) => (isCivilType(p.projectType) ? CIVIL_CATALOG : CATALOG)
+const definitionsFor = (p: ProjectProfile) => (isCivilType(p.projectType) ? CIVIL_DEFINITION : DEFINITION)
 
 function pick(variants: TemplateActivity[], p: ProjectProfile): TemplateActivity | undefined {
   let firstUnknown: TemplateActivity | undefined
@@ -186,14 +193,15 @@ function pick(variants: TemplateActivity[], p: ProjectProfile): TemplateActivity
 
 /** The structural-system category selected for this profile (undefined for pure renovations). */
 export function selectedStructure(p: ProjectProfile): CanonicalCategory | undefined {
-  return pick(CATALOG.filter((v) => isStructure(v.category)), p)?.category
+  return pick(catalogFor(p).filter((v) => isStructure(v.category)), p)?.category
 }
 
 function selectRaw(p: ProjectProfile): TemplateActivity[] {
+  const CAT = catalogFor(p)
   const out: TemplateActivity[] = []
   const seen = new Set<CanonicalCategory>()
-  const structure = pick(CATALOG.filter((v) => isStructure(v.category)), p)
-  for (const v of CATALOG) {
+  const structure = pick(CAT.filter((v) => isStructure(v.category)), p)
+  for (const v of CAT) {
     if (seen.has(v.category)) continue
     if (isStructure(v.category)) {
       if (structure && v === structure) {
@@ -202,7 +210,7 @@ function selectRaw(p: ProjectProfile): TemplateActivity[] {
       }
       continue
     }
-    const chosen = pick(CATALOG.filter((x) => x.category === v.category), p)
+    const chosen = pick(CAT.filter((x) => x.category === v.category), p)
     seen.add(v.category)
     if (chosen) out.push(chosen)
   }
@@ -220,6 +228,7 @@ function resolvePreds(
   selected: Set<CanonicalCategory>,
   structure: CanonicalCategory | undefined,
   visiting: Set<CanonicalCategory>,
+  defs: Map<CanonicalCategory, TemplateActivity> = DEFINITION,
 ): Pred[] {
   const out: Pred[] = []
   for (const pr of preds) {
@@ -230,11 +239,11 @@ function resolvePreds(
       continue
     }
     if (visiting.has(cat)) continue
-    const def = DEFINITION.get(cat)
+    const def = defs.get(cat)
     if (!def) continue
     visiting.add(cat)
     // Inherit the missing activity's own predecessors (keeping their link types/lags).
-    out.push(...resolvePreds(def.preds, selected, structure, visiting))
+    out.push(...resolvePreds(def.preds, selected, structure, visiting, defs))
     visiting.delete(cat)
   }
   return out
@@ -246,7 +255,7 @@ export function templatesFor(profile: ProjectProfile): TemplateActivity[] {
   const selected = new Set(raw.map((v) => v.category))
   const structure = raw.find((v) => isStructure(v.category))?.category
   const out = raw.map((v) => {
-    const resolved = resolvePreds(v.preds, selected, structure, new Set([v.category])).filter((pr) => pr.category !== v.category)
+    const resolved = resolvePreds(v.preds, selected, structure, new Set([v.category]), definitionsFor(profile)).filter((pr) => pr.category !== v.category)
     const seen = new Set<string>()
     const preds = resolved.filter((pr) => {
       const k = `${pr.category}|${pr.type}|${pr.lag}`
@@ -302,7 +311,10 @@ const INTERIOR_PHASES = new Set(['mep', 'interiors'])
 /** Work days for a template given the profile (milestones = 0). */
 export function computeTemplateDuration(t: TemplateActivity, profile: ProjectProfile): number {
   if (t.milestone) return 0
-  const ksf = (profile.grossSqft && profile.grossSqft > 0 ? profile.grossSqft : DEFAULT_SQFT) / 1000
+  // Civil templates are sized per USD 1M of construction value (default $20M); buildings per 1,000 sf.
+  const ksf = isCivilType(profile.projectType)
+    ? (profile.valueMusd && profile.valueMusd > 0 ? profile.valueMusd : DEFAULT_VALUE_MUSD)
+    : (profile.grossSqft && profile.grossSqft > 0 ? profile.grossSqft : DEFAULT_SQFT) / 1000
   const stories = profile.stories && profile.stories > 0 ? profile.stories : DEFAULT_STORIES
   const d = t.duration
   let days = d.base + (d.perKsf ?? 0) * ksf + (d.perStory ?? 0) * stories

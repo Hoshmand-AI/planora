@@ -6,9 +6,10 @@ import type {
   Answer, Assumption, CanonicalCategory, CpmResult, GeneratedSchedule, LinkType, Override, PlanActivity, PlanLink,
   ProjectProfile, Rationale, SourceRef, TemplateActivity, WorkCalendar, Weekday,
 } from './types'
+import { isCivilType } from './types'
 import { runCpm } from './cpm'
 import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
-import { elicit, known, profileFrom, questionBank, unansweredAssumption, MILESTONE_TARGETS } from './elicitation'
+import { elicit, known, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
 import { historyDuration, type FirmHistory } from './history'
 import { templatesFor, computeTemplateDuration, mapToSelected } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
@@ -132,6 +133,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const designSource = drawings === undefined ? src('assumption', 'Drawing status unknown', 'Assumed no drawings') : src('user', `Drawings ${drawings ? pct + '% complete' : 'not started'}`)
 
   /* ── Template activities ── */
+  const civil = isCivilType(profile.projectType)
   const templates = templatesFor(profile)
   const skip = new Set<CanonicalCategory>(['ntp', 'permit_site', 'permit_building', 'permit_other', 'procurement', 'submittals', 'design_review'])
   const tmplByCat = new Map<CanonicalCategory, TemplateActivity>(templates.map(t => [t.category, t]))
@@ -158,13 +160,14 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     } else {
       duration = Math.max(1, Math.round(tmplDays * hoursFactor * (rem ?? 1)))
       const parts = [`base ${t.duration.base}`]
-      if (t.duration.perKsf && profile.grossSqft) parts.push(`${t.duration.perKsf}/1,000 sf × ${Math.round(profile.grossSqft / 1000)}`)
+      if (t.duration.perKsf && civil && profile.valueMusd) parts.push(`${t.duration.perKsf}/$1M × ${profile.valueMusd}`)
+      else if (t.duration.perKsf && profile.grossSqft) parts.push(`${t.duration.perKsf}/1,000 sf × ${Math.round(profile.grossSqft / 1000)}`)
       if (t.duration.perStory && profile.stories) parts.push(`${t.duration.perStory}/story × ${profile.stories}`)
       rationale = {
         summary: `${duration} work days from the ${labelType(profile)} template (${parts.join(' + ')}, clamped ${t.duration.min}–${t.duration.max}).${calNote}${rem !== undefined && rem < 1 ? ` Only ${Math.round(rem * 100)}% of this design phase remains (drawings ${pct}% complete).` : ''}${useHistory && history && !hist ? ' Not enough firm history for this activity (need 2+ projects).' : ''}`,
         sources: [src('template', 'Planora activity template', t.note), ...(rem !== undefined ? [designSource] : [])],
-        confidence: profile.grossSqft ? 'medium' : 'low',
-        assumptions: profile.grossSqft ? undefined : ['Building area unknown — template minimums used.'],
+        confidence: (civil ? profile.valueMusd : profile.grossSqft) ? 'medium' : 'low',
+        assumptions: (civil ? profile.valueMusd : profile.grossSqft) ? undefined : [civil ? 'Construction value unknown — sized for a $20M reference project.' : 'Building area unknown — template minimums used.'],
       }
     }
     b.add({
@@ -438,7 +441,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
 
   /* ── Milestone targets: held as finish-no-later-than so lateness shows as negative float ── */
   const milestoneTargets: NonNullable<GeneratedSchedule['milestoneTargets']> = []
-  for (const m of MILESTONE_TARGETS) {
+  for (const m of milestoneTargetsFor(profile)) {
     const target = known(answers, `milestone.${m.key}.target`)
     if (typeof target !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target)) continue
     const cat = mapToSelected(m.category, profile)

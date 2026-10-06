@@ -18,6 +18,7 @@
 // probing is capped by a time budget and falls back to static impact for anything not probed.
 
 import type { Answer, AnswerValue, ElicitationResult, Question } from './types'
+import { isCivilType } from './types'
 import type { FirmHistory } from './history'
 import { generateSchedule } from './generator'
 
@@ -65,7 +66,8 @@ export interface AdaptiveInterview {
 }
 
 /** Answered first, in this order: everything else depends on them. */
-export const FOUNDATIONS = ['project.type', 'project.state', 'project.scope', 'project.gross_sqft', 'project.target_start']
+/** Civil projects ask construction value (project.value_musd) where buildings ask area; only the one in the bank is used. */
+export const FOUNDATIONS = ['project.type', 'project.state', 'project.scope', 'project.gross_sqft', 'project.value_musd', 'project.target_start']
 
 /** Prerequisites a question waits for (answered with any status counts, except where noted). */
 export function prerequisitesOf(q: Question): string[] {
@@ -81,7 +83,7 @@ export function prerequisitesOf(q: Question): string[] {
 
 const PRETTY: Record<string, string> = {
   'project.type': 'the facility type', 'project.state': 'the location', 'project.scope': 'the scope of work', 'project.target_start': 'the start date',
-  'project.required_finish': 'the required completion date', 'design.drawings': 'whether drawings exist', 'project.gross_sqft': 'the building size',
+  'project.required_finish': 'the required completion date', 'design.drawings': 'whether drawings exist', 'project.gross_sqft': 'the building size', 'project.value_musd': 'the construction value',
 }
 
 /** Plausible answers to try for a question, or null when it can't be probed meaningfully. */
@@ -91,6 +93,7 @@ export function probeValues(q: Question): AnswerValue[] | null {
   if (q.kind === 'number') {
     switch (q.unit) {
       case 'sf': return [20_000, 80_000, 250_000]
+      case 'USD millions': return [5, 25, 150]
       case 'stories': return [1, 3, 8]
       case '%': return [0, 50, 100]
       case 'weeks': return [2, 6, 12]
@@ -216,7 +219,9 @@ export function adaptiveInterview(answers: Record<string, Answer>, el: Elicitati
   const finishUncertaintyDays = Math.round(Math.sqrt(swings.reduce((s, x) => s + x * x, 0)) / 2)
   // A group counts once: it is one checklist for the user.
   const remainingThatMatter = ask.filter(q => ['foundation', 'driver', 'unprobed'].includes(insights[q.id]?.role ?? '')).length + groups.length
-  const foundationsDone = FOUNDATIONS.every(f => answers[f])
+  // The size question differs by type (area for buildings, value for civil): only the one asked counts.
+  const sizeKey = isCivilType(answers['project.type']?.value as string) ? 'project.gross_sqft' : 'project.value_musd'
+  const foundationsDone = FOUNDATIONS.filter(f => f !== sizeKey).every(f => answers[f])
 
   return {
     ask, optional, deferred, groups, insights, remainingThatMatter, thresholdDays, finishUncertaintyDays, baselineFinish,

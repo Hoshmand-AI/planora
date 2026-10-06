@@ -222,6 +222,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   const byUid = new Map<string, Activity>()
   const hpdByUid = new Map<string, number>()
   let projectSummaryName = ''
+  const outlineStack: string[] = []
   const pendingLinks: { succUid: string; block: string }[] = []
 
   for (const block of taskBlocks) {
@@ -234,6 +235,19 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     if (!name) continue
 
     const isSummary = tagText(own, 'Summary') === '1'
+    // Outline: a work task belongs to the nearest summary above it; its WBS is that summary's path
+    // ("1.2 Foundations", like the P6 parser's WBS path) so the hierarchy can be rebuilt on export.
+    const level = parseInt(outlineLevel, 10)
+    const ownWbs = tagText(own, 'WBS') || tagText(own, 'OutlineNumber')
+    let parentWbs = ''
+    if (level > 0) {
+      outlineStack.length = Math.min(outlineStack.length, level - 1)
+      for (let k = outlineStack.length - 1; k >= 0 && !parentWbs; k--) parentWbs = outlineStack[k] || ''
+      if (isSummary) {
+        while (outlineStack.length < level - 1) outlineStack.push('')
+        outlineStack.push(ownWbs ? `${ownWbs} ${name}` : '')
+      }
+    }
     const calUidRaw = tagText(own, 'CalendarUID')
     const hasOwnCal = !!calUidRaw && calUidRaw !== '-1' && calMap.has(calUidRaw)
     if (calUidRaw && calUidRaw !== '-1' && !calMap.has(calUidRaw)) warnings.push(`Task "${name}": calendar UID ${calUidRaw} not found; using project calendar`)
@@ -287,7 +301,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     const a = makeActivity(scheduleId, {
       activityId: code || `A${idTxt}`,
       name,
-      wbs: tagText(own, 'WBS') || tagText(own, 'OutlineNumber'),
+      wbs: isSummary ? ownWbs : parentWbs || ownWbs,
       duration,
       remainingDuration: remTxt ? days(remTxt) : status === 'complete' ? 0 : duration,
       percentComplete: pct,

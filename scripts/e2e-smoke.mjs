@@ -214,7 +214,10 @@ async function main() {
   x = await A.req('GET', `/api/plans/${planId}/export?format=xml`, undefined, true)
   ok(x.status === 200 && /<Project xmlns="http:\/\/schemas.microsoft.com\/project"/.test(x.text), 'MS Project XML export')
   const xml = x.text
-  const xmlCount = g.activities.length
+  // The export nests activities under WBS summary tasks (one per phase / work package); the importer
+  // keeps those as summary rows, so they count too. UID 0 is the project summary, which it skips.
+  const xmlSummaries = (xml.match(/<Summary>1<\/Summary>/g) || []).length - 1
+  const xmlCount = g.activities.length + xmlSummaries
   x = await A.req('GET', `/api/plans/${planId}/export?format=csv`, undefined, true)
   ok(x.status === 200 && /Activity ID/.test(x.text), 'CSV export')
 
