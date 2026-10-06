@@ -84,7 +84,7 @@ const relKey = (p: string, s: string, t: string) => `${p}→${s}|${t}`
 const calKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ')
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const weekLabel = (c: WorkCalendar) => [...c.workDays].sort((x, y) => x - y).map(d => WD[d]).join(', ') || 'none'
-const dateList = (ds: string[]) => (ds.length > 6 ? `${ds.slice(0, 6).map(fmtDate).join(', ')} and ${ds.length - 6} more` : ds.map(fmtDate).join(', '))
+const dateList = (ds: string[]) => (ds.length > 6 ? `${ds.slice(0, 6).map(d => fmtDate(d)).join(', ')} and ${ds.length - 6} more` : ds.map(d => fmtDate(d)).join(', '))
 
 /** Compare the calendars of two updates by name (ids are renumbered by P6 exports and round trips). */
 export function compareCalendars(before: WorkCalendar[], after: WorkCalendar[]): CalendarChange[] {
