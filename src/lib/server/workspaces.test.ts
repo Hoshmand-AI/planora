@@ -93,6 +93,14 @@ function fakeQuery(sql: string, params: unknown[] = []) {
     return ok([{ restricted: u.restricted, member_of: u.member_of, walled: db.workspaces.filter(w => w.walled).map(w => w.id) }])
   }
   if (/FROM workspaces w/.test(sql)) return ok(db.workspaces as Row[])
+  if (/FROM audit_events/.test(sql)) {
+    const ev = (seq: number, action: string, target_type: string, target_id: string, name: string): Row => ({
+      seq, id: `e${seq}`, org_id: ORG, at: '2026-01-01T00:00:00Z', actor_id: 'u-admin', actor_email: 'a@firm.test', action, target_type, target_id,
+      detail: { name }, ip: null, user_agent: null, request_id: null, prev_hash: '0', hash: '1',
+    })
+    return ok([ev(5, 'schedule.export', 'schedule', 'sB', 'Project sB'), ev(4, 'plan.answer', 'plan', 'pB', 'Plan pB'), ev(3, 'workspace.created', 'workspace', 'wsB', 'Matter B'),
+      ev(2, 'schedule.upload', 'schedule', 'sA', 'Project sA'), ev(1, 'auth.signin', 'user', 'u-res', '')])
+  }
   if (/FROM organizations/.test(sql)) return ok([{ id: ORG, name: 'Firm', settings: {}, created_at: '2026-01-01T00:00:00Z', plan: 'enterprise', sso: {} }])
   if (/^\s*SELECT/.test(sql) && /FROM schedule_files/.test(sql)) return ok([]) // no original files kept in this fixture
   if (/^\s*SELECT/.test(sql) && /FROM schedules\b/.test(sql) && !/COUNT/.test(sql)) return ok(select(db.schedules, sql, params))
@@ -225,6 +233,21 @@ describe('ethical walls on every endpoint family', () => {
     const reads = log.filter(q => /^\s*SELECT/.test(q.sql) && /FROM (schedules|plans)\b/.test(q.sql) && !/security\.classification|COUNT/.test(q.sql))
     expect(reads.length).toBeGreaterThan(2)
     for (const q of reads) expect(q.sql).toMatch(/workspace_id = ANY/)
+  })
+
+  it('audit log: a restricted reviewer does not see events about walled schedules, plans or workspaces', async () => {
+    currentUser = { userId: 'u-res', role: 'reviewer' }
+    const auditRoute = await import('@/app/api/audit/route')
+    const r = await call(auditRoute.GET, '/api/audit')
+    expect(r.status).toBe(200)
+    const body = JSON.parse(r.text)
+    expect((body.events as { seq: number }[]).map(e => e.seq)).toEqual([2, 1])
+    expect(body.nextBefore).toBe(1)
+    for (const n of ['Project sB', 'Plan pB', 'Matter B']) expect(r.text).not.toContain(n)
+    const csv = await call(auditRoute.GET, '/api/audit?format=csv')
+    for (const n of ['Project sB', 'Plan pB', 'Matter B']) expect(csv.text).not.toContain(n)
+    currentUser = { userId: 'u-admin', role: 'admin' }
+    expect(JSON.parse((await call(auditRoute.GET, '/api/audit')).text).events).toHaveLength(5)
   })
 
   it('workspace pickers only list what the member can see', async () => {

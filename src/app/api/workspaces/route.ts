@@ -35,9 +35,9 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
   })
 })
 
-function dedupeSeries<T extends { projectKey?: string | null; id: string }>(rows: T[]): T[] {
+function dedupeSeries<T extends { projectKey?: string | null; workspaceId?: string | null; id: string }>(rows: T[]): T[] {
   const seen = new Set<string>()
-  return rows.filter(r => { const k = r.projectKey || r.id; if (seen.has(k)) return false; seen.add(k); return true })
+  return rows.filter(r => { const k = r.projectKey ? `${r.workspaceId ?? ''}|${r.projectKey}` : r.id; if (seen.has(k)) return false; seen.add(k); return true })
 }
 
 type Body = {

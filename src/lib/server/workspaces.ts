@@ -147,8 +147,10 @@ export async function assignToWorkspace(orgId: string, item: { type: 'schedule' 
       const cur = await q('SELECT id, name, project_key, workspace_id FROM schedules WHERE id=$1 AND org_id=$2 FOR UPDATE', [item.id, orgId])
       const s = cur.rows[0]
       if (!s) throw new ApiError(404, 'Schedule not found.')
+      // Only the series' uploads in the same workspace move: two matters can share a project key, and
+      // moving one must never drag the other matter's uploads across its wall.
       const moved = s.project_key
-        ? await q(`UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND (id=$2 OR (project_key=$4 AND source_type <> 'generated'))`, [orgId, s.id, workspaceId, s.project_key])
+        ? await q(`UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND (id=$2 OR (project_key=$4 AND source_type <> 'generated' AND workspace_id IS NOT DISTINCT FROM $5))`, [orgId, s.id, workspaceId, s.project_key, s.workspace_id ?? null])
         : await q('UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND id=$2', [orgId, s.id, workspaceId])
       return { name: String(s.name), before: (s.workspace_id as string) ?? null, schedules: moved.rowCount ?? 0, plans: 0 }
     }
@@ -159,6 +161,24 @@ export async function assignToWorkspace(orgId: string, item: { type: 'schedule' 
     const moved = await q('UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND plan_id=$2', [orgId, p.id, workspaceId])
     return { name: String(p.name), before: (p.workspace_id as string) ?? null, schedules: moved.rowCount ?? 0, plans: 1 }
   })
+}
+
+/**
+ * Audit-log visibility for callers who don't see every workspace (e.g. a restricted reviewer): events
+ * about a schedule, plan or workspace they can't see are left out, so names and details of a walled
+ * matter don't leak through the log. Events about deleted items are left out too (fail closed).
+ */
+export async function auditEventFilter(orgId: string, access: WorkspaceAccess): Promise<(e: { targetType: string | null; targetId: string | null }) => boolean> {
+  if (access.all) return () => true
+  const { getSchedules, listPlans } = await import('@/lib/db')
+  const [schedules, plans] = await Promise.all([getSchedules(orgId), listPlans(orgId)])
+  const visible = { schedule: new Set(schedules.map(s => s.id)), plan: new Set(plans.map(p => p.id)) }
+  return e => {
+    if (e.targetType === 'schedule') return !!e.targetId && visible.schedule.has(e.targetId)
+    if (e.targetType === 'plan') return !!e.targetId && visible.plan.has(e.targetId)
+    if (e.targetType === 'workspace') return canSeeWorkspace(access, e.targetId)
+    return true
+  }
 }
 
 /**
