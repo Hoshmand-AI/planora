@@ -8,6 +8,7 @@ import type {
 } from './types'
 import { isCivilType } from './types'
 import { runCpm } from './cpm'
+import { nextActivityCode } from './overrides'
 import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
 import { elicit, known, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
 import { historyDuration, historyForPlan, type FirmHistory } from './history'
@@ -349,6 +350,17 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     b.link(fab.id, gate, 'FS', 0, { summary: `Installation needs ${midSentence(it.name)} on site.`, sources: [catalogSrc], confidence: 'high' })
   }
 
+  /* ── Systems the team said are not in scope: drop their installation work too ── */
+  // e.g. elevators answered "Not in scope" must not leave an elevator install and inspection behind.
+  for (const cat of ['elevators', 'windows_curtainwall', 'mechanical_equipment'] as CanonicalCategory[]) {
+    const items = bank.longLead.filter(it => it.gates === cat)
+    if (!items.length || !items.every(it => known(answers, `procure.${it.id}.status`) === 'not_in_scope')) continue
+    const id = `t-${cat}`
+    if (!b.acts.has(id)) continue
+    removeActivityBridging(b, id, { field: 'remove', reason: `${items.map(it => it.name).join(', ')} answered "Not in scope" in the interview`, by: 'Planora', at: today })
+    assumptions.push({ questionId: `procure.${items[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${items.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
+  }
+
   /* ── Regulations that add activities ── */
   for (const r of bank.regulations) {
     if (!r.addsActivity) continue
@@ -480,7 +492,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const removed = reapplyOverrides(b, input.previous)
 
   cpm = cpmOf(b, calendars, start, mustFinishBy)
-  assignCodes(b, cpm)
+  assignCodes(b, cpm, input.previous)
 
   return {
     generatedAt: new Date().toISOString(),
@@ -653,13 +665,26 @@ function monthsBetween(a: string, b: string): number[] {
   return out
 }
 
-function assignCodes(b: Builder, cpm: CpmResult) {
+/**
+ * Activity IDs. A first generation numbers activities A1000, A1010, … in early-start order. On
+ * regeneration every activity keeps the ID it already had (schedulers, contracts and P6 imports
+ * refer to them); only new activities get the next free ID in the same series.
+ */
+function assignCodes(b: Builder, cpm: CpmResult, previous?: GeneratedSchedule | null) {
   const phaseOrder = ['preconstruction', 'design', 'permitting', 'procurement', 'sitework', 'structure', 'envelope', 'mep', 'interiors', 'commissioning', 'closeout']
   const list = [...b.acts.values()].sort((x, y) => {
     const tx = cpm.times[x.id]?.earlyStart || '9999', ty = cpm.times[y.id]?.earlyStart || '9999'
     return tx.localeCompare(ty) || phaseOrder.indexOf(x.phase) - phaseOrder.indexOf(y.phase) || x.id.localeCompare(y.id)
   })
-  list.forEach((a, i) => { a.code = `A${1000 + i * 10}` })
+  const prevCode = new Map((previous?.activities || []).map(a => [a.id, a.code]))
+  if (!prevCode.size) { list.forEach((a, i) => { a.code = `A${1000 + i * 10}` }); return }
+  const used: string[] = []
+  const fresh: PlanActivity[] = []
+  for (const a of list) {
+    const c = prevCode.get(a.id)
+    if (c && !used.includes(c)) { a.code = c; used.push(c) } else fresh.push(a)
+  }
+  for (const a of fresh) { a.code = nextActivityCode(used); used.push(a.code) }
 }
 
 function reapplyOverrides(b: Builder, prev: GeneratedSchedule | null | undefined): NonNullable<GeneratedSchedule['removed']> {
