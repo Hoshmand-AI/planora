@@ -7,6 +7,7 @@ import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import { exportXer } from '@/lib/export/xer'
+import { exportMspXml } from '@/lib/export/msp-xml'
 import { runSra } from '@/lib/planning/sra'
 
 const xer = fs.readFileSync(path.join(__dirname, '../parsers/__fixtures__/sample.xer'), 'latin1')
@@ -38,5 +39,11 @@ describe('uploaded schedules are first-class', () => {
     const r = runSra(g, {}, null, { iterations: 200, seed: 7 })
     expect(r.iterations).toBe(200)
     expect(r.percentiles.p80 >= r.percentiles.p50).toBe(true)
+  })
+
+  it('exports an uploaded schedule to MS Project XML when the upload time is a Date (round-2 finding: HTTP 500)', () => {
+    const fromDb = { ...a.schedule, uploadedAt: new Date('2026-10-01T12:00:00Z') } as unknown as Schedule
+    const xml = exportMspXml(uploadedToGenerated(fromDb, a.done.activities, a.p.relationships, a.done.cpm, a.analysis), a.p.projectName)
+    expect(xml).toMatch(/<CreationDate>2026-10-01T00:00:00<\/CreationDate>/)
   })
 })

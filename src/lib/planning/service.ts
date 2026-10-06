@@ -54,7 +54,8 @@ export async function loadScheduleData(id: string, orgId: string) {
     activities: done.activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm,
     reportedFinish, mustFinishBy: prior?.mustFinishBy ?? null, fileValues: done.fileValues ?? null, today: new Date().toISOString().slice(0, 10),
   })
-  if (prior?.recalc && !analysis.recalc) analysis.recalc = prior.recalc
+  // The file-vs-Planora comparison exists only at upload (afterwards the stored dates ARE Planora's); keep it.
+  if (prior?.recalc) analysis.recalc = prior.recalc
   const criticalCount = done.activities.filter(a => a.isCritical).length
   if (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status) {
     const { updateScheduleAnalysis } = await import('@/lib/db')

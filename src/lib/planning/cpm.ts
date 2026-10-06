@@ -419,7 +419,7 @@ export function runCpm(input: CpmInput): CpmResult {
     const over = node.isMs ? wdInstants(node.es, node.logicEs, node.c) : wdInstants(node.ef, node.logicEf, node.c)
     if (over <= 0) continue
     node.tf = Math.min(node.tf, -over)
-    const logicDay = node.isMs ? msDisplay(node, node.logicEs) : node.logicEf - 1
+    const logicDay = node.isMs ? msDisplay(node, node.logicEs) : k.type === 'MSO' ? node.logicEs : node.logicEf - 1
     violations.push({ id: node.a.id, type: k.type, constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
     warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
