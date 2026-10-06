@@ -350,6 +350,13 @@ export interface PlanActivity extends CpmActivity {
   category: CanonicalCategory
   phase: Phase
   rationale: Rationale
+  /** Source WBS path ("1.2.3 Name") for uploaded schedules; exports rebuild this hierarchy */
+  wbs?: string
+  /** Progress carried from an uploaded update */
+  status?: 'not_started' | 'in_progress' | 'complete'
+  percentComplete?: number
+  baselineStart?: string | null
+  baselineFinish?: string | null
   /** Placeholder for a withheld/classified constraint */
   placeholder?: boolean
   overrides?: Override[]
@@ -364,6 +371,8 @@ export interface PlanLink extends CpmLink {
 export interface GeneratedSchedule {
   generatedAt: string
   projectStart: string
+  /** Status date for progressed (uploaded) schedules */
+  dataDate?: string
   /** Owner-required completion; the backward pass anchors here so float can go negative */
   mustFinishBy?: string
   calendars: WorkCalendar[]

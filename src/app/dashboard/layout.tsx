@@ -17,6 +17,8 @@ interface Schedule {
   uploadedAt: string; varianceDays: number | null; criticalCount: number
   percentComplete: number; sourceType: string
   projectStart: string | null; projectFinish: string | null; dataDate: string | null
+  analysis?: { progressMode?: string; status?: string } | null
+  inHistory?: boolean
 }
 
 interface AppContextType {

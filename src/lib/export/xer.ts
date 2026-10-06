@@ -18,6 +18,15 @@ export function xerText(v: unknown): string {
 }
 
 const dt = (d: string | null | undefined, time: string) => (d ? `${d.slice(0, 10)} ${time}` : '')
+/** Finish time of day for a calendar: 08:00 start, its work hours, plus a lunch hour on 8h+ days. */
+const finishTime = (hours: number) => {
+  const end = 8 + hours + (hours >= 8 ? 1 : 0)
+  return end >= 24 ? '23:59' : `${String(Math.floor(end)).padStart(2, '0')}:${String(Math.round((end % 1) * 60)).padStart(2, '0')}`
+}
+/** P6 project short name: keep the project's name (P6 allows 40 characters). */
+export function projShortName(name: string): string {
+  return xerText(name).replace(/[^A-Za-z0-9 ._()-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'PLANORA'
+}
 
 /** Excel serial day number used by P6 calendar exceptions (days since 1899-12-30). */
 function serial(iso: string): number {
@@ -64,7 +73,9 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     s.calendars.map(c => [calId.get(c.id)!, c.id === s.defaultCalendarId ? 'Y' : 'N', c.name, PROJ, '', dt(today, '00:00'), 'CA_Project', c.hoursPerDay, c.hoursPerDay * c.workDays.length, Math.round(c.hoursPerDay * c.workDays.length * 4.33), c.hoursPerDay * c.workDays.length * 52, 'N', clndrData(c)]))
 
   table('PROJECT', ['proj_id', 'fy_start_month_num', 'rsrc_self_add_flag', 'allow_complete_flag', 'rsrc_multi_assign_flag', 'checkout_flag', 'project_flag', 'step_complete_flag', 'cost_qty_recalc_flag', 'batch_sum_flag', 'name_sep_char', 'def_complete_pct_type', 'proj_short_name', 'acct_id', 'orig_proj_id', 'source_proj_id', 'base_type_id', 'clndr_id', 'sum_base_proj_id', 'task_code_base', 'task_code_step', 'priority_num', 'wbs_max_sum_level', 'strgy_priority_num', 'last_checksum', 'critical_drtn_hr_cnt', 'def_cost_per_qty', 'last_recalc_date', 'plan_start_date', 'plan_end_date', 'scd_end_date', 'add_date', 'last_tasksum_date', 'fcst_start_date', 'def_duration_type', 'task_code_prefix', 'guid', 'def_qty_type', 'add_by_name', 'web_local_root_path', 'proj_url', 'def_rate_type', 'add_act_remain_flag', 'act_this_per_link_flag', 'def_task_type', 'act_pct_link_flag', 'critical_path_type', 'task_code_prefix_flag', 'def_rollup_dates_flag', 'use_project_baseline_flag', 'rem_target_link_flag', 'reset_planned_flag', 'allow_neg_act_flag', 'sum_assign_level', 'last_fin_dates_id', 'last_baseline_update_date', 'cr_external_key', 'apply_actuals_date', 'location_id', 'loaded_scope_level', 'export_flag', 'new_fin_dates_id', 'baselines_to_export', 'baseline_names_to_export', 'next_data_date', 'close_period_flag', 'sum_refresh_date', 'trsrcsum_loaded'],
-    [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', root, '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0, dt(s.projectStart, '08:00'), dt(s.projectStart, '08:00'), dt(s.cpm?.projectFinish, '17:00'), dt(s.cpm?.projectFinish, '17:00'), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Planora'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', '', 'N', '', 'N']])
+    [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', projShortName(projectName), '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0,
+      // last_recalc_date = data date; plan_end_date = P6 "Must Finish By" (the required finish, so float after F9 matches); scd_end_date = forecast
+      dt(s.dataDate || s.projectStart, '08:00'), dt(s.projectStart, '08:00'), s.mustFinishBy ? dt(s.mustFinishBy, finishTime(hoursOf())) : '', dt(s.cpm?.projectFinish, finishTime(hoursOf())), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Planora'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', dt(s.dataDate || s.projectStart, '08:00'), 'N', '', 'N']])
 
   // WBS: project node + phases + work packages.
   const wbsId = new Map<string, number>()
@@ -93,16 +104,22 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     const id = nextTask++
     taskId.set(a.id, id)
     const h = hoursOf(a.calendarId)
+    const fin = finishTime(h)
     const type = a.type === 'milestone' ? (hasPred.has(a.id) ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
     const dur = a.duration * h
+    const done = !!a.actualFinish || a.status === 'complete'
+    const active = !done && !!a.actualStart
+    const remaining = done ? 0 : active ? (a.remaining ?? a.duration) * h : dur
+    const pct = done ? 100 : active ? Math.max(0, Math.min(99, Math.round(a.percentComplete ?? (dur ? 100 * (1 - remaining / dur) : 0)))) : 0
+    const constraintTime = a.constraint && (a.constraint.type === 'FNET' || a.constraint.type === 'FNLT' || a.constraint.type === 'FO' || a.constraint.type === 'MFO') ? fin : '08:00'
     taskRows.push([
       id, PROJ, wbsId.get(r.wbsCode) ?? projNode, calId.get(a.calendarId || s.defaultCalendarId) ?? calId.get(s.defaultCalendarId)!,
-      0, 'N', 1, 'N', 'N', 'CP_Drtn', type, 'DT_FixedDUR2', 'TK_NotStart', a.code, a.name, '',
-      (tm?.totalFloat ?? 0) * h, (tm?.freeFloat ?? 0) * h, dur, 0, 0, 0, dur, 0, 0, 0,
-      a.constraint ? dt(a.constraint.date, '08:00') : '', '', '',
-      dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, '17:00'), '',
-      dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, '17:00'), dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, '17:00'),
-      dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, '17:00'), dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, '17:00'),
+      pct, 'N', 1, 'N', 'N', 'CP_Drtn', type, 'DT_FixedDUR2', done ? 'TK_Complete' : active ? 'TK_Active' : 'TK_NotStart', a.code, a.name, '',
+      (tm?.totalFloat ?? 0) * h, (tm?.freeFloat ?? 0) * h, remaining, 0, 0, 0, dur, 0, 0, 0,
+      a.constraint ? dt(a.constraint.date, constraintTime) : '', dt(a.actualStart, '08:00'), dt(a.actualFinish, fin),
+      dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, fin), '',
+      dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, fin), dt(tm?.earlyStart, '08:00'), dt(tm?.earlyFinish, fin),
+      dt(a.baselineStart || tm?.earlyStart, '08:00'), dt(a.baselineFinish || tm?.earlyFinish, fin), dt(tm?.lateStart, '08:00'), dt(tm?.lateFinish, fin),
       a.constraint ? CSTR[a.constraint.type] : '', 'PT_Normal', tm?.critical ? 'Y' : 'N',
     ])
   }

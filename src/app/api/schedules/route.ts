@@ -59,7 +59,10 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     })
   }
 
-  const schedules = await getSchedules(ctx.orgId)
+  // The list carries the headline analysis only (no driving-path ids or recalculation samples).
+  const schedules = (await getSchedules(ctx.orgId)).map(s => s.analysis
+    ? { ...s, analysis: { ...s.analysis, longestPath: [], recalc: s.analysis.recalc ? { ...s.analysis.recalc, samples: [] } : null } }
+    : s)
   return NextResponse.json({ schedules })
 })
 

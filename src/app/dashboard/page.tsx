@@ -6,9 +6,10 @@ import { Upload } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
 import Link from 'next/link'
 import { Portfolio } from '@/components/Portfolio'
+import { ScheduleTools } from '@/components/ScheduleTools'
 
 export default function DashboardPage() {
-  const { selectedSchedule, metrics } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules } = useApp()
 
   if (!selectedSchedule) {
     return (
@@ -187,6 +188,13 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {selectedSchedule.sourceType !== 'generated' && (
+        <ScheduleTools scheduleId={selectedSchedule.id}
+          progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
+          inHistory={selectedSchedule.inHistory ?? true}
+          onChanged={() => { refreshSchedules(); refreshMetrics() }} />
+      )}
 
     </div>
   )

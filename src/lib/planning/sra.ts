@@ -152,7 +152,7 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, hi
   const finishes: number[] = []
   const samples: number[][] = acts.map(() => [])
   const critical = new Array<number>(acts.length).fill(0)
-  const base = { projectStart: s.projectStart, links: s.links, calendars: s.calendars, defaultCalendarId: s.defaultCalendarId }
+  const base = { projectStart: s.projectStart, dataDate: s.dataDate, links: s.links, calendars: s.calendars, defaultCalendarId: s.defaultCalendarId }
 
   for (let it = 0; it < budget; it++) {
     const zg = normal(rand)
