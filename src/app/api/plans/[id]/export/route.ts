@@ -7,6 +7,7 @@ import { basisOfSchedule } from '@/lib/export/narrative'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
 import { exportXer } from '@/lib/export/xer'
+import { encodeXer } from '@/lib/parsers/xer-codec'
 import { exportPdf } from '@/lib/export/pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
 import { profileFrom } from '@/lib/planning/elicitation'
@@ -44,7 +45,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   switch (format) {
     case 'xer':
       // P6 reads XER in Windows-1252; exportXer only emits characters in that range.
-      body = Buffer.from(exportXer(g, plan.name, { exportedBy: ctx.name }), 'latin1'); type = 'application/octet-stream'; file = `${slug}.xer`; break
+      body = encodeXer(exportXer(g, plan.name, { exportedBy: ctx.name })); type = 'application/octet-stream'; file = `${slug}.xer`; break
     case 'xml':
       body = exportMspXml(g, plan.name); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv':

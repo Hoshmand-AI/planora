@@ -12,7 +12,11 @@ export async function loadFirmHistory(orgId: string, projectType?: ProjectType):
 
 const CONSTRAINTS: readonly string[] = CONSTRAINT_TYPES
 
-export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Relationship[]): AnalyzableSchedule {
+/**
+ * @param resourceCounts resource assignments per source id (P6 task_id) when the source file carries
+ *   them (XER TASKRSRC); lets DCMA #10 assess resource loading instead of reporting "no resource data".
+ */
+export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Relationship[], resourceCounts?: Record<string, number> | null): AnalyzableSchedule {
   return {
     dataDate: s.dataDate,
     projectStart: s.projectStart,
@@ -27,6 +31,7 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
       actualStart: a.actualStart, actualFinish: a.actualFinish, baselineStart: a.baselineStart, baselineFinish: a.baselineFinish,
       totalFloat: a.totalFloat,
       constraint: a.constraintType && CONSTRAINTS.includes(a.constraintType) ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : null,
+      ...(resourceCounts ? { resourceCount: (a.sourceId && resourceCounts[a.sourceId]) || 0 } : {}),
     })),
   }
 }

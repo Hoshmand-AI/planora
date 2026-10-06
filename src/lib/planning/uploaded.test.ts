@@ -8,6 +8,9 @@ import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import { exportXer } from '@/lib/export/xer'
 import { runSra } from '@/lib/planning/sra'
+import ExcelJS from 'exceljs'
+import { exportP6LayoutXlsx } from '@/lib/export/xlsx'
+import { exportScheduleCsv } from '@/lib/export/csv'
 
 const xer = fs.readFileSync(path.join(__dirname, '../parsers/__fixtures__/sample.xer'), 'latin1')
 
@@ -32,6 +35,25 @@ describe('uploaded schedules are first-class', () => {
     expect(b.analysis.forecastFinish).toBe(a.analysis.forecastFinish)
     const status = (x: typeof a) => Object.fromEntries(x.done.activities.map(t => [t.activityId, t.status]))
     expect(status(b)).toMatchObject(Object.fromEntries(Object.entries(status(a)).filter(([k]) => codes(a).includes(k))))
+  })
+
+  it('P6-layout workbook shows the data date, not the project start', async () => {
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(await exportP6LayoutXlsx(g, a.p.projectName) as unknown as ArrayBuffer)
+    expect(String(wb.getWorksheet('Schedule')!.getCell(2, 1).value)).toMatch(/^Data date 03\/16\/2026 /)
+  })
+
+  it('CSV export keeps the WBS and progress', () => {
+    const lines = exportScheduleCsv(g).trim().split('\r\n')
+    const head = lines[0].split(',')
+    for (const c of ['WBS', 'Status', 'Percent Complete', 'Remaining Duration', 'Actual Start', 'Actual Finish', 'Baseline Start', 'Baseline Finish']) expect(head).toContain(c)
+    const row = (code: string) => { const r = lines.find(l => l.startsWith(code + ','))!.split(','); return (col: string) => r[head.indexOf(col)] }
+    expect(row('A1020')('Status')).toBe('In Progress')
+    expect(row('A1020')('Percent Complete')).toBe('40')
+    expect(row('A1020')('Actual Start')).toBe('03/09/2026')
+    expect(row('A1020')('WBS')).toBe('SITE Sitework')
+    expect(row('A1010')('Actual Finish')).toBe('03/06/2026')
+    expect(row('A1010')('Baseline Finish')).toBe('03/06/2026')
   })
 
   it('runs a Monte Carlo risk analysis on the uploaded network', () => {

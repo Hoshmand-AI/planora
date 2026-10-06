@@ -4,7 +4,7 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, setScheduleInHistory, updateScheduleAnalysis } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, updateScheduleAnalysis } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -12,6 +12,7 @@ import { checkInputs } from '@/lib/analysis/input-checks'
 import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES } from '@/lib/planning/types'
+import { fmtDay } from '@/lib/format'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -84,6 +85,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const projectType = formData.get('projectType') as string | null
     const region = formData.get('region') as string | null
     const grossSqft = Number(formData.get('grossSqft')) || null
+    const allowDuplicate = formData.get('allowDuplicate') === 'true'
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
@@ -96,6 +98,28 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 })
+    }
+
+    // Uploads of the same project form an update series.
+    const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
+    const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
+
+    // The same bytes uploaded again are not a new update: point at the existing one instead of adding a
+    // duplicate to the series (send allowDuplicate=true to store it anyway).
+    const same = allowDuplicate ? [] : await findScheduleFilesBySha(ctx.orgId, sha256, series.map(s => s.id))
+    const existing = same.length ? series.find(s => s.id === same[0]) : undefined
+    if (existing) {
+      const warning = `This file is identical to ${existing.version} uploaded ${fmtDay(existing.uploadedAt)} (same SHA-256); no new update was created.`
+      await audit({ action: 'schedule.upload_duplicate', targetType: 'schedule', targetId: existing.id, detail: { name: existing.name, version: existing.version, fileName: file.name, sha256 } })
+      return NextResponse.json({
+        success: true, duplicate: true, duplicateOf: { id: existing.id, version: existing.version, uploadedAt: existing.uploadedAt }, warning, schedule: existing,
+        summary: {
+          activitiesImported: existing.activityCount, relationshipsImported: existing.relationshipCount, calendarsImported: existing.calendars.length,
+          criticalCount: existing.criticalCount, projectStart: existing.projectStart, projectFinish: existing.projectFinish, forecastFinish: existing.analysis?.forecastFinish ?? existing.projectFinish,
+          varianceDays: existing.varianceDays, status: existing.analysis?.status ?? null, sha256, series: series.length, classifiedPct: 0, dataQuestions: 0,
+          warnings: [warning],
+        },
+      })
     }
 
     // Semantic normalization: firms label activities and calendars differently; map them to shared meaning.
@@ -135,9 +159,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     }
     const varianceDays = analysis.varianceDays
 
-    // Uploads of the same project form an update series; label versions automatically when not given.
-    const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
-    const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
+    // Label versions automatically when not given.
     const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
     const percentComplete = parsed.activities.length > 0
       ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
