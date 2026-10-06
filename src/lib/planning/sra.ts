@@ -168,7 +168,8 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, hi
       return { ...a, duration: dur, remaining: a.remaining != null ? Math.max(1, Math.round(a.remaining * m)) : undefined }
     })
     const r = runCpm({ ...base, activities: simActs })
-    finishes.push(toDayNumber(r.projectFinish))
+    // The logic-driven finish: a mandatory constraint must not hide the simulated spread.
+    finishes.push(toDayNumber(r.logicFinish || r.projectFinish))
     acts.forEach((a, i) => { if (r.times[a.id]?.critical) critical[i]++ })
   }
 
