@@ -56,6 +56,15 @@ export function appliesTri(a: Applicability, p: ProjectProfile): Tri {
   if (a.federalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'yes' : 'no')
   if (a.nonFederalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'no' : 'yes')
   if (a.federalInstallationOnly) r.push(onInstallation(p, fed))
+  if (a.nonInstallationOnly) {
+    const on = onInstallation(p, fed)
+    // Only federal work can be on an installation: unknown federal status keeps the state rules.
+    r.push(on === 'yes' ? 'no' : on === 'unknown' && fed === true ? 'unknown' : 'yes')
+  }
+  if (a.features?.length) {
+    if (!p.features) r.push('unknown')
+    else r.push(a.features.every((f) => p.features!.includes(f)) ? 'yes' : 'no')
+  }
 
   return combine(r)
 }
@@ -71,6 +80,11 @@ function onInstallation(p: ProjectProfile, fed: boolean | undefined): Tri {
   if (p.projectType === 'federal_defense') return 'yes'
   if (isCivilType(p.projectType)) return 'no'
   return 'unknown'
+}
+
+/** Whether the work is on a federal installation (tri-state, with the same defaults as the catalogs). */
+export function federalInstallationTri(p: ProjectProfile): Tri {
+  return onInstallation(p, effectiveFederal(p))
 }
 
 export function applies(a: Applicability, p: ProjectProfile): boolean {

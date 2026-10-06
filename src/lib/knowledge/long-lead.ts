@@ -118,7 +118,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'rtu',
     name: 'Packaged rooftop units (RTUs) / DOAS',
-    appliesWhen: { projectTypes: ['commercial_office', 'retail', 'warehouse_industrial', 'multifamily', 'k12_school'] },
+    appliesWhen: { projectTypes: ['commercial_office', 'retail', 'warehouse_industrial', 'multifamily', 'k12_school', 'federal_defense'] },
     leadWeeks: { low: 12, typical: 20, high: 36 },
     submittalWeeks: 3,
     gates: 'mechanical_equipment',
@@ -157,7 +157,7 @@ const CATALOG: LongLeadSpec[] = [
   item({
     id: 'structural-steel',
     name: 'Structural steel (mill order + shop drawings + fabrication)',
-    appliesWhen: { projectTypes: ['commercial_office', 'healthcare', 'data_center', 'k12_school', 'warehouse_industrial', 'retail'] },
+    appliesWhen: { projectTypes: ['commercial_office', 'healthcare', 'data_center', 'k12_school', 'warehouse_industrial', 'retail', 'federal_defense'] },
     leadWeeks: { low: 12, typical: 20, high: 30 },
     submittalWeeks: 8,
     gates: 'structure_steel',
@@ -318,9 +318,16 @@ const CIVIL_ITEMS: LongLeadSpec[] = [
   item({ id: 'civ-hv-breakers', name: 'High-voltage circuit breakers & GIS', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 8, gates: 'power_equipment', source: SURVEY }),
   item({ id: 'civ-relay-panels', name: 'Protection & control relay panels', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 45 }, submittalWeeks: 6, gates: 'controls_scada', source: SURVEY }),
   item({ id: 'civ-steel-structures', name: 'Substation steel structures / transmission towers & poles', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 52 }, submittalWeeks: 6, gates: 'superstructure', source: SURVEY }),
-  item({ id: 'civ-process-vessels', name: 'Pressure vessels, columns & packaged process units', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 78 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
-  item({ id: 'civ-rotating-equipment', name: 'Large compressors, motors & rotating equipment', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
-  item({ id: 'civ-mv-switchgear', name: 'Medium-voltage switchgear, MCCs & VFDs', appliesWhen: { projectTypes: ['water_wastewater', 'industrial_process', 'transit_rail'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 6, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-process-vessels', name: 'Pressure vessels, columns & packaged process units', appliesWhen: { projectTypes: ['industrial_process', 'epc_industrial'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 78 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-rotating-equipment', name: 'Large compressors, motors & rotating equipment', appliesWhen: { projectTypes: ['industrial_process', 'epc_industrial'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-mv-switchgear', name: 'Medium-voltage switchgear, MCCs & VFDs', appliesWhen: { projectTypes: ['water_wastewater', 'industrial_process', 'transit_rail', 'epc_industrial'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 6, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-station-elevators', name: 'Station elevators & escalators (transit duty)', appliesWhen: { projectTypes: ['transit_rail'], civil: true, features: ['stations'] }, leadWeeks: { low: 30, typical: 40, high: 60 }, submittalWeeks: 8, gates: 'elevators', source: SURVEY, notes: 'Heavy-duty transit escalators and outdoor-rated elevators run longer than commercial units.' }),
+  item({ id: 'civ-launching-gantry', name: 'Segmental launching gantry (new or refurbished) & segment molds', appliesWhen: { projectTypes: ['transit_rail'], civil: true, features: ['elevated_segmental'] }, leadWeeks: { low: 30, typical: 45, high: 65 }, submittalWeeks: 8, gates: 'superstructure', source: SURVEY, notes: 'Gantry design is checked against the span lengths and segment weights; refurbished gantries still need modification and load testing.' }),
+  item({ id: 'civ-airfield-lighting', name: 'Airfield lighting fixtures, constant-current regulators & ALCMS', appliesWhen: { projectTypes: ['aviation'], civil: true, features: ['airside'] }, leadWeeks: { low: 12, typical: 20, high: 32 }, submittalWeeks: 6, gates: 'signals_lighting', source: SURVEY, notes: 'FAA-certified equipment (AC 150/5345-53 Airport Lighting Equipment Certification Program) only.' }),
+  item({ id: 'civ-gate-machinery', name: 'Lock / dam gates, valves & operating machinery (fabricated)', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['lock_dam'] }, leadWeeks: { low: 52, typical: 78, high: 110 }, submittalWeeks: 12, gates: 'mechanical_equipment', source: SURVEY, notes: 'Large fabricated gates and hydraulic machinery have long shop and shop-test durations; embedded metals ship first.' }),
+  item({ id: 'civ-sheet-piling', name: 'Sheet piling & cofferdam steel', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['lock_dam'] }, leadWeeks: { low: 8, typical: 14, high: 26 }, submittalWeeks: 4, gates: 'in_water_work', source: SURVEY }),
+  item({ id: 'civ-tbm', name: 'Tunnel boring machine (design, fabrication, factory test & shipping)', appliesWhen: { projectTypes: ['marine_civil_works'], civil: true, features: ['tbm'] }, leadWeeks: { low: 40, typical: 56, high: 78 }, submittalWeeks: 8, gates: 'tunneling', source: SURVEY, notes: 'Refurbished machines save months but still need modification for the geology and diameter.' }),
+  item({ id: 'civ-gw-treatment', name: 'Groundwater treatment system (packaged skids, vessels & controls)', appliesWhen: { projectTypes: ['environmental_remediation'], civil: true, features: ['groundwater'] }, leadWeeks: { low: 12, typical: 20, high: 32 }, submittalWeeks: 6, gates: 'process_equipment', source: SURVEY }),
 ]
 CATALOG.push(...CIVIL_ITEMS)
 

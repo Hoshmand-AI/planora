@@ -17,6 +17,7 @@ import { resolveRegional } from '@/lib/knowledge/regions'
 import { appliesTri } from '@/lib/knowledge/applicability'
 import { categoryLabel, phaseOf } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
+import { applyEarthworkQuantity, applyFederalInstallation, applyInWaterWindow, applySeasonalCalendar } from './civil-plan'
 
 export interface GenerateInput {
   answers: Record<string, Answer>
@@ -152,12 +153,18 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const skip = new Set<CanonicalCategory>(['ntp', 'permit_site', 'permit_building', 'permit_other', 'procurement', 'submittals', 'design_review'])
   if (civilDbb) skip.add('row_utilities')
   const tmplByCat = new Map<CanonicalCategory, TemplateActivity>(templates.map(t => [t.category, t]))
+  // Civil networks key several activities per category (t-<key>); keyed activities in a skipped
+  // category (remediation work plans, EPC PO award) are real work, not placeholders.
+  const tid = (t: TemplateActivity) => `t-${t.key ?? t.category}`
+  const seasonal = new Set<string>()
 
   for (const t of templates) {
-    if (skip.has(t.category)) continue
+    if (skip.has(t.category) && (t.key ?? t.category) === t.category) continue
     const rem = designRemaining[t.category]
     if (rem !== undefined && rem <= 0) continue
     const isMs = !!t.milestone
+    const cal7 = t.calendar === '7d'
+    if (t.calendar === 'season') seasonal.add(tid(t))
     let duration = 0
     let rationale: Rationale
     const tmplDays = computeTemplateDuration(t, profile)
@@ -173,7 +180,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
         confidence: s.projects >= 3 && s.sameType ? 'high' : 'medium',
       }
     } else {
-      duration = Math.max(1, Math.round(tmplDays * hoursFactor * (rem ?? 1)))
+      duration = Math.max(1, Math.round(tmplDays * (cal7 ? 1 : hoursFactor) * (rem ?? 1)))
       const parts = [`base ${t.duration.base}`]
       if (t.duration.perKsf && civil && profile.valueMusd) parts.push(`${t.duration.perKsf}/$1M × ${profile.valueMusd}`)
       else if (t.duration.perKsf && profile.grossSqft) parts.push(`${t.duration.perKsf}/1,000 sf × ${Math.round(profile.grossSqft / 1000)}`)
@@ -186,8 +193,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       }
     }
     b.add({
-      id: `t-${t.category}`, name: t.name, category: t.category, phase: t.phase, type: isMs ? 'milestone' : 'task',
-      duration, calendarId: FIELD, rationale,
+      id: tid(t), name: t.name, category: t.category, phase: t.phase, type: isMs ? 'milestone' : 'task',
+      duration, calendarId: cal7 ? CAL7 : FIELD, rationale,
     })
   }
 
@@ -241,11 +248,14 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const t = tmplByCat.get(cat)
     return t ? t.preds.flatMap(p => resolvePred(p.category, seen)) : []
   }
+  // A keyed predecessor (civil) links to that activity; design phases resolve through their reviews.
+  const predIds = (p: TemplateActivity['preds'][number]): string[] =>
+    p.key && b.acts.has(`t-${p.key}`) && !(p.key === p.category && p.category.startsWith('design')) ? [`t-${p.key}`] : resolvePred(p.category)
   for (const t of templates) {
-    const id = `t-${t.category}`
+    const id = tid(t)
     if (!b.acts.has(id) || designChain.includes(id)) continue
     for (const p of t.preds) {
-      for (const from of resolvePred(p.category)) b.link(from, id, p.type, p.type === 'FS' ? p.lag : Math.round(p.lag * hoursFactor), tmplLogic(t, p.category, p.type, p.lag))
+      for (const from of predIds(p)) b.link(from, id, p.type, p.type === 'FS' ? p.lag : Math.round(p.lag * hoursFactor), tmplLogic(t, p.category, p.type, p.lag))
     }
   }
 
@@ -317,7 +327,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   }
 
   /* ── Long-lead procurement ── */
-  const submittalStart = earlyPackages ? ddDone : designDone
+  // EPC: long-lead equipment is bought off the process design basis (its own PO-award activity).
+  const submittalStart = b.acts.has('t-ll_po_award') ? 't-ll_po_award' : earlyPackages ? ddDone : designDone
   // The activity an item is installed in: a more specific one when this network has it (a data
   // center's generator set-in), otherwise the catalog's gate.
   const installCategory = (it: LongLeadSpec): CanonicalCategory => it.installsIn?.find(c => b.acts.has(`t-${c}`)) ?? it.gates
@@ -378,7 +389,9 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const outOfScope = (it: LongLeadSpec) => known(answers, `procure.${it.id}.status`) === 'not_in_scope'
   for (const cat of NOT_IN_SCOPE_REMOVABLE) {
     const id = `t-${cat}`
-    if (!b.acts.has(id)) continue
+    // Civil networks can hold several activities of the category (staged girder sets, equipment by structure).
+    const ids = civil ? [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-')).map(a => a.id) : b.acts.has(id) ? [id] : []
+    if (!ids.length) continue
     const items = bank.longLead.filter(it => installCategory(it) === cat)
     if (!items.length) continue
     const out = items.filter(outOfScope)
@@ -390,14 +403,16 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const reason = `${out.map(it => it.name).join(', ')} answered "Not in scope" in the interview`
     if (inScope.length) {
       // The defining system is out but others installed here are not: keep the work, named for what remains.
-      const act = b.acts.get(id)!
-      act.name = `Install ${inScope.map(it => midSentence(it.name)).join(' and ')}`
-      act.rationale = { ...act.rationale, assumptions: [...(act.rationale.assumptions || []), `${reason}; this activity now covers only the items still in scope.`] }
+      for (const aid of ids) {
+        const act = b.acts.get(aid)!
+        act.name = `Install ${inScope.map(it => midSentence(it.name)).join(' and ')}`
+        act.rationale = { ...act.rationale, assumptions: [...(act.rationale.assumptions || []), `${reason}; this activity now covers only the items still in scope.`] }
+      }
       assumptions.push({ questionId: `procure.${definer}.status`, text: `${categoryLabel(cat)}: ${reason}; the activity covers only ${inScope.map(it => midSentence(it.name)).join(' and ')}.`, bufferDays: 0, kind: 'inferred' })
       continue
     }
-    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Planora', at: today })
-    if (b.byCat.get(cat) === id) b.byCat.delete(cat)
+    for (const aid of ids) removeActivityBridging(b, aid, { field: 'remove', reason, by: 'Planora', at: today })
+    if (b.byCat.has(cat) && !b.acts.has(b.byCat.get(cat)!)) b.byCat.delete(cat)
     assumptions.push({ questionId: `procure.${out[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${out.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
   }
 
@@ -448,16 +463,24 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     }
   }
 
+  /* ── Civil quantities and federal-installation wording ── */
+  if (civil) applyEarthworkQuantity(b.acts, answers, profile, hoursFactor)
+  applyFederalInstallation(b.acts, profile, assumptions)
+
   /* ── Close open ends so every activity has a predecessor and successor ── */
   const finishId = resolveCat('final_completion') || scId || [...b.acts.keys()].pop()!
   closeOpenEnds(b, ntp.id, finishId, scId)
   decompose(b, profile)
   // Splitting at an overlap point can leave a tail segment whose only successor was the overlap.
   closeOpenEnds(b, ntp.id, finishId, scId)
+  // Paving, striping and seeding in a northern winter shutdown: seasonal calendar (after splitting).
+  if (civil) applySeasonalCalendar(b.acts, calendars, seasonal, calendars[0], notes, assumptions)
 
   /* ── First CPM pass (needed to place weather + contingency) ── */
   const mustFinishBy = known(answers, 'project.required_finish') as string | undefined
   let cpm = cpmOf(b, calendars, start, mustFinishBy)
+  // In-water work held to the permit window (needs the first pass to find the season the work is ready in).
+  if (civil) cpm = applyInWaterWindow(b.acts, cpm, () => cpmOf(b, calendars, start, mustFinishBy), answers, notes, assumptions)
 
   /* ── Weather allowance from regional climate ── */
   const earth = resolveCat('earthwork') || resolveCat('foundations')
@@ -503,9 +526,12 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const target = known(answers, `milestone.${m.key}.target`)
     if (typeof target !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target)) continue
     const cat = mapToSelected(m.category, profile)
-    // The last segment of the category's work package is where the milestone is reached.
-    const candidates = [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-'))
-    const endAct = candidates.sort((x, y) => x.id.localeCompare(y.id, undefined, { numeric: true })).pop()
+    // The last segment of the category's work package is where the milestone is reached. Civil networks
+    // with several activities in the category use the named activity, else the one that finishes last.
+    const byKey = m.activityKey ? [...b.acts.values()].filter(a => a.id === `t-${m.activityKey}` || a.id.startsWith(`t-${m.activityKey}#`)) : []
+    const candidates = byKey.length ? byKey : [...b.acts.values()].filter(a => a.category === cat && a.id.startsWith('t-'))
+    const ef = (a: PlanActivity) => (civil ? cpm.times[a.id]?.earlyFinish ?? '' : '')
+    const endAct = candidates.sort((x, y) => ef(x).localeCompare(ef(y)) || x.id.localeCompare(y.id, undefined, { numeric: true })).pop()
     if (!endAct) continue
     endAct.constraint = { type: 'FNLT', date: target }
     endAct.rationale = { ...endAct.rationale, assumptions: [...(endAct.rationale.assumptions || []), `Must finish by the “${m.label}” target of ${target} (from the interview).`] }

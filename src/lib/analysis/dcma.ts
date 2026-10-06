@@ -387,8 +387,14 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
 
   /* 12. Critical path test */
   {
-    const inp = scheduleToCpmInput(s)
-    const base = cpm()
+    // Seasonal shutdowns (e.g. no paving December–March) make a 600-day shift land in a different
+    // season and move the finish by more or less than 600 days with the logic intact. The test is about
+    // logic, so it runs with long shutdown runs taken out of the calendars.
+    const raw = scheduleToCpmInput(s)
+    const seasonal = !!raw && raw.calendars.some((c) => shutdownDays(c).size > 0)
+    const inp = raw && seasonal ? { ...raw, calendars: raw.calendars.map(withoutShutdowns) } : raw
+    let base: CpmResult | null
+    try { base = seasonal && inp ? runCpm(inp) : cpm() } catch { base = null }
     const thr = `finish moves ${CP_TEST_DAYS}d`
     const tol = Math.max(2, Math.round(CP_TEST_DAYS * 0.02))
     // Mandatory constraints (MSO/MFO) on the driving path hold dates by typing them in, not by logic.
@@ -420,7 +426,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
         }
         try {
           const after = runCpm(bumped)
-          const cal = (target.calendarId && calById.get(target.calendarId)) || defaultCal
+          const testCals = new Map(inp.calendars.map((c) => [c.id, c]))
+          const cal = (target.calendarId && testCals.get(target.calendarId)) || (s.defaultCalendarId && testCals.get(s.defaultCalendarId)) || defaultCal
           const delta = workDaysBetween(base.projectFinish, after.projectFinish, cal)
           // A 600-day shift moves work into different years, so holiday placement and 5-day/7-day
           // calendar transitions add a little noise; a broken path absorbs far more than 2%.
@@ -529,3 +536,21 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   return { checks, passed, applicable, score: applicable ? Math.round((100 * passed) / applicable) : 0 }
 }
 
+/** Holidays that form a run of at least two weeks of consecutive days: a seasonal shutdown, not a holiday. */
+const SHUTDOWN_RUN_DAYS = 14
+function shutdownDays(cal: WorkCalendar): Set<string> {
+  const days = [...new Set((cal.holidays ?? []).map((h) => h.slice(0, 10)))].map((h) => ({ h, n: toDayNumber(h) })).filter((x) => !Number.isNaN(x.n)).sort((a, b) => a.n - b.n)
+  const out = new Set<string>()
+  let run: string[] = []
+  const flush = () => { if (run.length >= SHUTDOWN_RUN_DAYS) run.forEach((h) => out.add(h)); run = [] }
+  days.forEach((x, i) => {
+    if (i > 0 && x.n !== days[i - 1].n + 1) flush()
+    run.push(x.h)
+  })
+  flush()
+  return out
+}
+function withoutShutdowns(cal: WorkCalendar): WorkCalendar {
+  const off = shutdownDays(cal)
+  return off.size ? { ...cal, holidays: (cal.holidays ?? []).filter((h) => !off.has(h.slice(0, 10))) } : cal
+}

@@ -369,6 +369,19 @@ async function bulkInsert(table: string, columns: string[], rows: unknown[][]) {
   }
 }
 
+/**
+ * Correct the category of one activity on an uploaded schedule (firm-scoped through the schedule).
+ * Returns the activity's name and previous category, or undefined when it is not in this firm's schedule.
+ */
+export async function setActivityCategory(orgId: string, scheduleId: string, activityId: string, category: string): Promise<{ name: string; previous: string | null } | undefined> {
+  await initSchema()
+  const cur = await query('SELECT a.name, a.category FROM activities a JOIN schedules s ON s.id = a.schedule_id WHERE s.org_id=$1 AND a.schedule_id=$2 AND a.id=$3', [orgId, scheduleId, activityId])
+  const r = cur.rows[0]
+  if (!r) return undefined
+  await query('UPDATE activities a SET category=$4 FROM schedules s WHERE s.id = a.schedule_id AND s.org_id=$1 AND a.schedule_id=$2 AND a.id=$3', [orgId, scheduleId, activityId, category])
+  return { name: String(r.name ?? ''), previous: (r.category as string) ?? null }
+}
+
 export async function createActivities(activities: Activity[]): Promise<void> {
   await initSchema()
   await bulkInsert('activities',
