@@ -3,7 +3,8 @@
 import { useApp } from './layout'
 import { StickyBar } from '@/components/StickyBar'
 import { Upload } from 'lucide-react'
-import { fmtDate, fmtDay } from '@/lib/format'
+import { fmtDate, fmtDates, fmtDay } from '@/lib/format'
+import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
 import Link from 'next/link'
 import { Portfolio } from '@/components/Portfolio'
 import { ScheduleTools } from '@/components/ScheduleTools'
@@ -44,10 +45,10 @@ export default function DashboardPage() {
   const criticalCount = Number(m?.criticalCount ?? 0)
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
-  const nearTermTasks = (m?.nearTermTasks as ActivityRow[]) ?? []
+  const nearTerm = (mx.nearTerm as NearTermOutlook | undefined) ?? null
   const drivingTasks  = (m?.drivingTasks as ActivityRow[])  ?? []
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean }[] } | null) ?? null
-  const warnings = (((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculate|relationships/i.test(w))
+  const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
   return (
     <div className="p-5 md:p-6 space-y-6">
@@ -100,7 +101,7 @@ export default function DashboardPage() {
               {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
             </div>
           )}
-          {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-2 text-[12px] text-warm-500 border-l-2 border-status-info pl-2">{w}</p>)}
+          {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-2 text-[12px] text-warm-500 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
         </div>
       )}
 
@@ -120,9 +121,9 @@ export default function DashboardPage() {
           context={totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'}
         />
         <MetricCard
-          label="Near-Term Tasks"
-          value={String(nearTermTasks.length)}
-          context="starting in 14 days"
+          label="Near-Term Starts"
+          value={String(nearTerm?.startingCount ?? 0)}
+          context={nearTerm ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'}
         />
         <MetricCard
           label="Progress"
@@ -135,29 +136,18 @@ export default function DashboardPage() {
       {/* Two-column data section */}
       <div className="grid md:grid-cols-2 gap-5">
 
-        {nearTermTasks.length > 0 && (
-          <section>
-            <h2 className="font-display text-[18px] text-navy-950 mb-3">Near-Term Outlook</h2>
-            <div className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
-              {nearTermTasks.slice(0, 8).map((task, i) => (
-                <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < nearTermTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>
-                  <div className="min-w-0 pr-3">
-                    <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-warm-400">
-                        {task.earlyStart ? fmtDate(task.earlyStart) : 'TBD'}
-                      </span>
-                      {task.isCritical && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
-                          Priority
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0">{task.duration}d</div>
-                </div>
-              ))}
-            </div>
+        {nearTerm && (nearTerm.inProgress.length > 0 || nearTerm.starting.length > 0) && (
+          <section aria-labelledby="near-term-h">
+            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-1">Near-Term Outlook</h2>
+            <p className="text-[12px] text-warm-500 mb-3">
+              {nearTerm.basis === 'data_date' ? 'Data date' : 'Today'} {fmtDate(nearTerm.windowStart)} to {fmtDate(nearTerm.windowEnd)} (14 days). Durations are remaining work days.
+            </p>
+            {nearTerm.inProgress.length > 0 && (
+              <NearTermList title={`In progress (${nearTerm.inProgressCount})`} rows={nearTerm.inProgress.slice(0, 5)} inProgress />
+            )}
+            {nearTerm.starting.length > 0 && (
+              <NearTermList title={`Starting by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
+            )}
           </section>
         )}
 
@@ -182,7 +172,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {nearTermTasks.length === 0 && drivingTasks.length === 0 && (
+        {!nearTerm?.inProgress.length && !nearTerm?.starting.length && drivingTasks.length === 0 && (
           <div className="col-span-2 text-center py-12 text-warm-400 text-[14px]">
             No task data available for this schedule.
           </div>
@@ -210,6 +200,39 @@ interface ActivityRow {
   earlyFinish?: string
   isCritical: boolean
   status: string
+}
+
+/* ─── Near-term list ─────────────────────────────── */
+function NearTermList({ title, rows, inProgress = false }: { title: string; rows: NearTermRow[]; inProgress?: boolean }) {
+  return (
+    <div className="mb-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{title}</h3>
+      <ul className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
+        {rows.map((task, i) => (
+          <li key={task.activityId + i} className={`flex items-center justify-between px-4 py-3 ${i < rows.length - 1 ? 'border-b border-warm-200' : ''}`}>
+            <div className="min-w-0 pr-3">
+              <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] text-warm-500">
+                  {inProgress
+                    ? `Started ${fmtDate(task.actualStart || task.earlyStart)} · finishes ${fmtDate(task.earlyFinish)}`
+                    : task.startOverdue
+                    ? `Should have started ${fmtDate(task.earlyStart)} (not started)`
+                    : `Starts ${fmtDate(task.earlyStart)}`}
+                </span>
+                {task.isCritical && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
+                    Critical
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0" title="Remaining duration (work days)">{task.remainingDuration}d left</div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 /* ─── Metric Card ────────────────────────────────── */
