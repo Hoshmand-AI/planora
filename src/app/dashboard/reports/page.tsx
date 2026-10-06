@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../layout'
 import { BarChart3, Activity, FileText, CheckCircle, Download, X, Loader2, Upload } from 'lucide-react'
 import { fmtDates, fmtDateTime } from '@/lib/format'
@@ -12,8 +12,20 @@ const REPORT_TYPES = [
   { id: 'qa_qc',             icon: CheckCircle, title: 'Schedule QA/QC Audit',           desc: 'DCMA 14-point compliance check with logic issues and specific fixes.' },
 ]
 
+type AiMode = 'cloud' | 'local' | 'offline'
+
+/** What actually writes the report, from the deployment's AI mode and the organization's AI setting (/api/system). */
+function reportMethod(llm: { mode: AiMode; error?: string } | null): string {
+  if (!llm) return 'Select a report type to generate a report'
+  if (llm.mode === 'cloud') return 'Select a report type to generate a narrative written by the cloud AI model from the computed schedule facts'
+  if (llm.mode === 'local') return 'Select a report type to generate a narrative written by your on-prem AI model from the computed schedule facts'
+  return `AI is offline${llm.error ? ` (${llm.error.replace(/\.$/, '')})` : ''}, so reports are built by Planora's rules directly from the schedule data, with no AI model. Select a report type`
+}
+
 export default function ReportsPage() {
   const { selectedSchedule } = useApp()
+  const [llm, setLlm] = useState<{ mode: AiMode; error?: string } | null>(null)
+  useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setLlm(d.llm || null)).catch(() => {}) }, [])
   const [generating, setGenerating] = useState<string | null>(null)
   const [report, setReport] = useState<{ type: string; content: string; scheduleName: string; generatedAt: string } | null>(null)
 
@@ -27,10 +39,10 @@ export default function ReportsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reportType, scheduleId: selectedSchedule.id }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       setReport({
         type: reportType,
-        content: data.content || 'Report generation failed.',
+        content: data.content || data.error || 'Report generation failed.',
         scheduleName: data.scheduleName,
         generatedAt: data.generatedAt,
       })
@@ -97,7 +109,7 @@ export default function ReportsPage() {
   return (
     <div className="p-5 md:p-6">
       <h2 className="font-display text-[22px] text-navy-950 mb-1">Generate Reports</h2>
-      <p className="text-[13.5px] text-warm-500 mb-5">Select a report type to generate an AI-powered narrative for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
+      <p className="text-[13.5px] text-warm-500 mb-5">{reportMethod(llm)} for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
       <div className="grid md:grid-cols-2 gap-3">
         {REPORT_TYPES.map(rt => (
           <button

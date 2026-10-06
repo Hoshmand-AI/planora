@@ -13,7 +13,7 @@ import type { DcmaReport } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleComparison } from '@/lib/analysis/compare'
 import type { ProjectBrief } from '@/lib/analysis/brief'
-import { fmtDate } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
 
 export type ReportType = 'executive_summary' | 'critical_path' | 'variance' | 'qa_qc'
 export const REPORT_TITLES: Record<ReportType, string> = {
@@ -71,13 +71,26 @@ function statusSection(r: ReportInput): string[] {
   ]
 }
 
+/**
+ * The forecast an activity's logic produces. Where a mandatory constraint (MFO/MSO) pins the
+ * displayed date earlier than logic allows, the logic date is the forecast — the same rule the
+ * headline variance uses (src/lib/analysis/schedule-analysis.ts), so tables agree with it.
+ */
+function forecastOf(r: ReportInput, a: Activity): { start: string | null; finish: string | null; pinned: ScheduleAnalysis['violations'][number] | null } {
+  if (!open(a)) return { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish, pinned: null }
+  const v = r.analysis.violations.find(x => x.id === a.id) ?? null
+  if (!v) return { start: a.actualStart || a.earlyStart, finish: a.earlyFinish, pinned: null }
+  // The CPM's logicDate is the logic-driven finish (a milestone's date) for MFO and MSO alike.
+  return { start: a.actualStart || (a.activityType === 'milestone' ? v.logicDate : a.earlyStart), finish: v.logicDate, pinned: v }
+}
+
 function milestoneRows(r: ReportInput) {
   return r.activities.filter(a => a.activityType === 'milestone')
-    .sort((x, y) => (x.earlyFinish || x.actualFinish || '').localeCompare(y.earlyFinish || y.actualFinish || ''))
-    .map(m => {
-      const f = m.actualFinish || m.earlyFinish
-      return [m.activityId, m.name, d(m.baselineFinish), d(f), m.actualFinish ? 'Actual' : 'Forecast', signed(calDays(m.baselineFinish, f)), open(m) ? m.totalFloat : '—']
-    })
+    .map(m => ({ m, f: forecastOf(r, m) }))
+    .sort((x, y) => (x.f.finish || '').localeCompare(y.f.finish || ''))
+    .map(({ m, f }) => [m.activityId, m.name, d(m.baselineFinish), d(f.finish),
+      m.actualFinish ? 'Actual' : f.pinned ? `Forecast by logic (${f.pinned.type} ${d(f.pinned.constraintDate)} overruled)` : 'Forecast',
+      signed(calDays(m.baselineFinish, f.finish)), open(m) ? m.totalFloat : '—'])
 }
 
 function drivingPath(r: ReportInput): Activity[] {
@@ -155,8 +168,7 @@ function variance(r: ReportInput): string[] {
   const work = r.activities.filter(isWork)
   const withBl = work.filter(a => a.baselineFinish)
   const rows = withBl.map(a => {
-    const f = a.actualFinish || a.earlyFinish
-    const s = a.actualStart || a.earlyStart
+    const { start: s, finish: f } = forecastOf(r, a)
     return { a, startVar: calDays(a.baselineStart, s), finishVar: calDays(a.baselineFinish, f), f, s }
   })
   const late = rows.filter(x => (x.finishVar ?? 0) > 0).sort((x, y) => (y.finishVar ?? 0) - (x.finishVar ?? 0))
@@ -204,9 +216,10 @@ function qaqc(r: ReportInput): string[] {
 export function buildReport(type: string, r: ReportInput): string {
   const t = (type in REPORT_TITLES ? type : 'executive_summary') as ReportType
   const body = t === 'critical_path' ? criticalPath(r) : t === 'variance' ? variance(r) : t === 'qa_qc' ? qaqc(r) : executiveSummary(r)
-  return [
+  // Analysis reasons, variance basis, comparisons and findings carry ISO dates; people read MM/DD/YYYY.
+  return fmtDates([
     `# ${REPORT_TITLES[t]} — ${r.schedule.name} (${r.schedule.version})`, '',
     `_Prepared by Planora from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
     ...body,
-  ].join('\n')
+  ].join('\n'))
 }

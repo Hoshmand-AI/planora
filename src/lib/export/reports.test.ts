@@ -46,3 +46,27 @@ describe('buildReport (offline, per type)', () => {
     expect(out.qa_qc).toMatch(/\| 14 \| BEI \|/)
   })
 })
+
+describe('buildReport: overruled mandatory constraints and date format', () => {
+  // M900 carries an MFO 03/30 that logic overrules: the file shows 03/30, logic says 04/01.
+  const pinnedActs = done.activities.map(x => x.id === f.id ? { ...x, earlyStart: '2026-03-30', earlyFinish: '2026-03-30', constraintType: 'MFO', constraintDate: '2026-03-30' } : x)
+  const pinnedAnalysis = {
+    ...analysis, violations: [{ id: f.id, type: 'MFO' as const, constraintDate: '2026-03-30', logicDate: '2026-04-01', days: 2 }], varianceDays: 2,
+    statusReasons: ['Forecast finish 2026-04-01 is after the required finish 2026-03-30.'],
+    varianceBasis: 'M900 Substantial Completion: forecast 2026-04-01 vs baseline 2026-03-30 (calendar days).',
+  }
+  const pinned = { ...input, activities: pinnedActs, analysis: pinnedAnalysis }
+  it('shows the logic date and its variance for the milestone, agreeing with the headline', () => {
+    const out = buildReport('variance', pinned)
+    const row = out.split('\n').find(l => l.startsWith('| M900 |'))!
+    expect(row).toContain('04/01/2026')
+    expect(row).toContain('MFO 03/30/2026 overruled')
+    expect(row).toMatch(/\| \+2 \|/)
+  })
+  it('writes every date MM/DD/YYYY, including analysis text', () => {
+    for (const t of ['executive_summary', 'critical_path', 'variance', 'qa_qc']) {
+      expect(buildReport(t, pinned)).not.toMatch(/\b\d{4}-\d{2}-\d{2}\b/)
+    }
+    expect(buildReport('variance', pinned)).toContain('forecast 04/01/2026 vs baseline 03/30/2026')
+  })
+})

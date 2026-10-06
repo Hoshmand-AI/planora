@@ -9,6 +9,9 @@ import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
+import { nearTermOutlook } from '@/lib/analysis/near-term'
+import { recalcWarning } from '@/lib/analysis/recalc-warning'
+import { fmtDate } from '@/lib/format'
 import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES } from '@/lib/planning/types'
@@ -28,10 +31,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
     const byId = new Map(activities.map(a => [a.id, a]))
     const longest = analysis.longestPath.map(id => byId.get(id)).filter((a): a is NonNullable<typeof a> => !!a && a.status !== 'complete')
-    const nearTermTasks = activities
-      .filter(a => a.status !== 'complete' && a.earlyStart)
-      .sort((a, b) => (a.earlyStart || '').localeCompare(b.earlyStart || ''))
-      .slice(0, 10)
+    // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
+    const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
     const percentComplete = activities.length > 0
       ? Math.round((completedCount / activities.length) * 100)
@@ -53,7 +54,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         status: analysis.status,
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,
-        nearTermTasks,
+        nearTerm,
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
       },
     })
@@ -127,11 +128,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
       reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
     })
-    if (analysis.recalc && analysis.recalc.differing > 0) {
-      warnings.unshift(`${analysis.recalc.differing} of ${analysis.recalc.compared} open activities have a finish or total float in the file that differs from Planora's recalculation by more than 1 day (e.g. ${analysis.recalc.samples.slice(0, 3).map(d => `${d.code}: file ${d.fileFloat ?? '?'}d / Planora ${d.planoraFloat}d float`).join('; ')}).`)
-    }
+    const recalcNote = recalcWarning(analysis.recalc)
+    if (recalcNote) warnings.unshift(recalcNote)
     if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
-      warnings.unshift(`The file's header finish is ${reportedFinish}; Planora's recalculated forecast finish is ${analysis.forecastFinish}. Planora reports its own forecast.`)
+      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
 

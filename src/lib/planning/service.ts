@@ -1,5 +1,6 @@
 import { getOrgHistory, type Activity, type Relationship, type Schedule } from '@/lib/db'
 import { computeFirmHistory, type FirmHistory } from './history'
+import { importNotes } from '@/lib/analysis/recalc-warning'
 import { CONSTRAINT_TYPES, type AnalyzableSchedule, type ConstraintType, type ProjectType } from './types'
 
 /** Firm history for grounding. Reads ONLY the caller's organization. */
@@ -54,14 +55,15 @@ export async function loadScheduleData(id: string, orgId: string) {
     activities: done.activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm,
     reportedFinish, mustFinishBy: prior?.mustFinishBy ?? null, fileValues: done.fileValues ?? null, today: new Date().toISOString().slice(0, 10),
   })
-  // The file-vs-Planora comparison exists only at upload (afterwards the stored dates ARE Planora's); keep it.
-  if (prior?.recalc) analysis.recalc = prior.recalc
+  // After the first upload the stored dates are Planora's own recalculation, so a fresh comparison
+  // would compare Planora with itself; the upload-time comparison with the file stays authoritative.
+  if (prior) analysis.recalc = prior.recalc ?? analysis.recalc
   const criticalCount = done.activities.filter(a => a.isCritical).length
   if (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status) {
     const { updateScheduleAnalysis } = await import('@/lib/db')
     await updateScheduleAnalysis(schedule.id, orgId, { analysis, projectFinish: analysis.forecastFinish, varianceDays: analysis.varianceDays, criticalCount }).catch(() => {})
   }
-  const warnings = done.note && !schedule.warnings.includes(done.note) ? [done.note, ...schedule.warnings] : schedule.warnings
+  const warnings = importNotes(schedule.warnings, done.note, !!prior, analysis.recalc)
   // Location and size for the overview: from the plan interview when this schedule was built in Planora.
   let extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null } = {}
   if (schedule.planId) {

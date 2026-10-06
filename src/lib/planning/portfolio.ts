@@ -5,6 +5,7 @@
 import type { Plan, Schedule } from '@/lib/db'
 import { elicit } from './elicitation'
 import { reviewStatusOf, scheduleDateChecks } from './evaluation'
+import { fmtDates } from '@/lib/format'
 
 export type AlertSeverity = 'error' | 'warning' | 'info'
 export interface PortfolioAlert { code: string; severity: AlertSeverity; text: string }
@@ -21,8 +22,14 @@ export interface PortfolioRow {
   gapDays: number | null
   readiness: number | null
   updatedAt: string
-  status: 'on_track' | 'attention' | 'at_risk' | 'not_started'
+  status: 'on_track' | 'attention' | 'at_risk' | 'not_started' | 'complete'
   alerts: PortfolioAlert[]
+  /** Uploaded schedules: how many updates of this project are on file (the row shows the latest) */
+  updates?: number
+  /** Uploaded schedules: the latest update's data date */
+  dataDate?: string | null
+  /** Uploaded schedules: what the variance was measured against (Planora's analysis) */
+  varianceBasis?: string | null
 }
 
 export interface Portfolio {
@@ -78,39 +85,75 @@ export function planRow(p: Plan, today: string): PortfolioRow {
   }
 }
 
-export function scheduleRow(s: Schedule, today: string): PortfolioRow {
+/**
+ * One uploaded schedule. Status, variance and their reasons come from Planora's stored analysis
+ * (src/lib/analysis/schedule-analysis.ts) — the same numbers the dashboard overview shows — never
+ * from a separate computation here. Uploads without a stored analysis show no status until opened.
+ */
+export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioRow {
   const alerts: PortfolioAlert[] = []
-  const an = s.analysis
-  const v = an ? an.varianceDays : s.varianceDays
+  const an = s.analysis ?? null
+  const v = an ? an.varianceDays : null
   if (an) {
-    // Planora's own analysis: negative float, overruled constraints, variance on the finish milestone.
-    if (an.negativeFloatCount > 0) alerts.push({ code: 'negative_float', severity: 'error', text: `${an.negativeFloatCount} open ${an.negativeFloatCount === 1 ? 'activity has' : 'activities have'} negative float (lowest ${an.minFloat} work days).` })
-    if (an.violations.length) alerts.push({ code: 'constraint_overrules_logic', severity: 'error', text: `${an.violations.length} mandatory constraint${an.violations.length === 1 ? ' hides' : 's hide'} a logic-driven slip of up to ${Math.max(...an.violations.map(x => x.days))} work days.` })
-    if (an.mustFinishBy && an.forecastFinish && an.forecastFinish > an.mustFinishBy) alerts.push({ code: 'late', severity: 'error', text: `Forecast finish ${us(an.forecastFinish)} is after the required ${us(an.mustFinishBy)}.` })
+    for (const reason of an.statusReasons ?? []) alerts.push(reasonAlert(reason, an.varianceDays))
+  } else {
+    alerts.push({ code: 'not_analyzed', severity: 'info', text: 'Planora has not analyzed this upload yet; open it to calculate status and variance.' })
   }
-  const basis = an?.finishMilestone?.varianceDays != null ? ` (${an.finishMilestone.code} ${an.finishMilestone.name})` : ''
-  if (v != null && v > 14) alerts.push({ code: 'behind', severity: 'error', text: `Finish has slipped ${v} calendar days against the baseline${basis}.` })
-  else if (v != null && v > 0) alerts.push({ code: 'behind', severity: 'warning', text: `Finish has slipped ${v} calendar days against the baseline${basis}.` })
   if (s.dataDate) {
     const age = days(s.dataDate, today)
-    if (age > STALE_DATA_DATE_DAYS && s.percentComplete < 100) alerts.push({ code: 'stale_status', severity: 'warning', text: `Data date ${us(s.dataDate)} is ${age} days old; a status update is overdue.` })
+    if (age > STALE_DATA_DATE_DAYS && s.percentComplete < 100 && an?.status !== 'complete') alerts.push({ code: 'stale_status', severity: 'warning', text: `Data date ${us(s.dataDate)} is ${age} days old; a status update is overdue.` })
   }
-  const finish = an?.forecastFinish ?? s.projectFinish
-  if (finish && s.percentComplete < 100 && finish < today) alerts.push({ code: 'finish_passed', severity: 'error', text: `Forecast finish ${us(finish)} has passed but the schedule is ${s.percentComplete}% complete.` })
   if (s.warnings.length) alerts.push({ code: 'import_warnings', severity: 'info', text: `${s.warnings.length} import warning${s.warnings.length > 1 ? 's' : ''}.` })
+  const finish = an?.forecastFinish ?? s.projectFinish
+  // Exactly the analysis status (the overview badge); 'not_started' = not analyzed yet.
+  const status: PortfolioRow['status'] = an ? an.status : 'not_started'
   return {
     kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
-    gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status: statusOf(alerts, true), alerts,
+    gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status, alerts,
+    updates, dataDate: s.dataDate, varianceBasis: an?.varianceBasis ?? null,
   }
 }
 
-const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, not_started: 3 }
+/** One analysis status reason as an alert, with the severity the analysis gave it. */
+function reasonAlert(reason: string, varianceDays: number | null): PortfolioAlert {
+  const text = fmtDates(reason)
+  if (/negative float/i.test(reason)) return { code: 'negative_float', severity: 'error', text }
+  if (/constraint/i.test(reason)) return { code: 'constraint_overrules_logic', severity: 'error', text }
+  if (/behind baseline/i.test(reason)) return { code: 'behind', severity: varianceDays != null && varianceDays > 14 ? 'error' : 'warning', text }
+  if (/required finish/i.test(reason)) return { code: 'late', severity: 'error', text }
+  if (/already passed/i.test(reason)) return { code: 'finish_passed', severity: 'error', text }
+  return { code: 'analysis', severity: 'warning', text }
+}
+
+/** Latest update first: by data date, then upload time. */
+const newer = (a: Schedule, b: Schedule) =>
+  (b.dataDate || '').localeCompare(a.dataDate || '') || (Date.parse(b.uploadedAt) || 0) - (Date.parse(a.uploadedAt) || 0)
+
+/**
+ * Uploads of one project (same project_key) form an update series; the portfolio shows only the
+ * latest update of each, with the count. Uploads without a project key stay separate.
+ */
+export function latestUpdates(schedules: Schedule[]): { schedule: Schedule; updates: number }[] {
+  const series = new Map<string, Schedule[]>()
+  const out: { schedule: Schedule; updates: number }[] = []
+  for (const s of schedules) {
+    if (s.sourceType === 'generated') continue
+    if (!s.projectKey) { out.push({ schedule: s, updates: 1 }); continue }
+    const list = series.get(s.projectKey) ?? []
+    list.push(s)
+    series.set(s.projectKey, list)
+  }
+  for (const list of series.values()) out.push({ schedule: [...list].sort(newer)[0], updates: list.length })
+  return out
+}
+
+const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, not_started: 3, complete: 4 }
 
 export function buildPortfolio(plans: Plan[], schedules: Schedule[], today = new Date().toISOString().slice(0, 10)): Portfolio {
   // A published plan's generated schedule is represented by the plan row.
   const rows = [
     ...plans.map(p => planRow(p, today)),
-    ...schedules.filter(s => s.sourceType !== 'generated').map(s => scheduleRow(s, today)),
+    ...latestUpdates(schedules).map(({ schedule, updates }) => scheduleRow(schedule, today, updates)),
   ].sort((a, b) => RANK[a.status] - RANK[b.status] || b.alerts.length - a.alerts.length || b.updatedAt.localeCompare(a.updatedAt))
   return {
     rows,

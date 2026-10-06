@@ -15,7 +15,10 @@ const STATUS: Record<PortfolioRow['status'], { label: string; cls: string }> = {
   attention: { label: 'Attention', cls: 'text-status-attention bg-status-attention-bg border-status-attention' },
   on_track: { label: 'On track', cls: 'text-status-on-track bg-status-on-track-bg border-status-on-track' },
   not_started: { label: 'In interview', cls: 'text-warm-600 bg-warm-100 border-warm-300' },
+  complete: { label: 'Complete', cls: 'text-status-on-track bg-status-on-track-bg border-status-on-track' },
 }
+// An uploaded schedule without a stored analysis has no status until it is opened.
+const statusLabel = (r: PortfolioRow) => r.kind === 'schedule' && r.status === 'not_started' ? 'Not analyzed' : STATUS[r.status].label
 const ICON = { error: XCircle, warning: AlertTriangle, info: Info }
 const ICON_CLS = { error: 'text-status-at-risk', warning: 'text-status-attention', info: 'text-warm-500' }
 
@@ -43,7 +46,7 @@ export function Portfolio({ compact = false }: { compact?: boolean }) {
     if (r.kind === 'plan') return router.push(r.href)
     const s = schedules.find(x => x.id === r.id)
     if (s) setSelectedSchedule(s)
-    router.push('/dashboard')
+    router.push(r.href)
   }
   const rows = compact ? data.rows.slice(0, 5) : data.rows
   const t = data.totals
@@ -64,14 +67,16 @@ export function Portfolio({ compact = false }: { compact?: boolean }) {
               <div className="min-w-0">
                 <button onClick={() => open(r)} className="text-[14px] font-semibold text-navy-950 hover:underline text-left">{r.name}</button>
                 <div className="text-[12px] text-warm-500 mt-0.5">
-                  {r.kind === 'plan' ? 'Planora plan' : 'Uploaded schedule'}
+                  {r.kind === 'plan' ? 'Planora plan' : r.updates && r.updates > 1 ? `Uploaded schedule · latest of ${r.updates} updates` : 'Uploaded schedule'}
+                  {r.dataDate && <> · data date <span className="tabular-nums text-warm-700">{fmtDate(r.dataDate)}</span></>}
                   {r.finish && <> · finish <span className="tabular-nums text-warm-700">{fmtDate(r.finish)}</span></>}
                   {r.required && <> · required <span className="tabular-nums text-warm-700">{fmtDate(r.required)}</span></>}
                   {r.readiness != null && <> · interview {r.readiness}%</>}
+                  {r.kind === 'schedule' && r.gapDays != null && <> · variance <span className="tabular-nums text-warm-700">{r.gapDays > 0 ? '+' : ''}{r.gapDays}d</span></>}
                   {' · '}updated {fmtDay(r.updatedAt)}
                 </div>
               </div>
-              <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 whitespace-nowrap ${STATUS[r.status].cls}`}>{STATUS[r.status].label}</span>
+              <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 whitespace-nowrap ${STATUS[r.status].cls}`}>{statusLabel(r)}</span>
             </div>
             {r.alerts.length > 0 ? (
               <ul className="mt-2 space-y-1">
