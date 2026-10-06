@@ -6,9 +6,15 @@ import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-e
 import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
 import type { FindingDisposition, ReviewState, SubmissionDisposition } from '@/lib/analysis/review'
+import { currentWorkspaceAccess, workspaceClause } from '@/lib/server/workspace-scope'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
+//
+// Workspaces (ethical walls): inside an organization, every schedule and plan read below also applies
+// the caller's workspace access (src/lib/server/workspace-scope.ts) through workspaceScope(). This is
+// the single enforcement point: routes, services and exports all read through these functions, so a
+// restricted member gets "not found" for another workspace's schedule or plan on every endpoint.
 
 /**
  * TLS for remote databases always verifies the server certificate and host name (verify-full).
@@ -115,6 +121,15 @@ export async function withTransaction<T>(fn: (q: (text: string, params?: unknown
 }
 
 export async function closePool() { await pool.end() }
+
+/**
+ * " AND <condition>" limiting `column` to the current caller's visible workspaces (empty when the
+ * caller sees everything), plus its parameters numbered from `firstParam`.
+ */
+async function workspaceScope(column: string, firstParam: number): Promise<{ and: string; params: unknown[] }> {
+  const c = workspaceClause(await currentWorkspaceAccess(), column, firstParam)
+  return { and: c.sql ? ` AND ${c.sql}` : '', params: c.params }
+}
 
 /* ─── Organizations & users ─────────────────────────── */
 
@@ -231,6 +246,8 @@ export interface Schedule {
   historyOverride?: boolean
   /** The file is a re-imported Planora export */
   planoraExport?: boolean
+  /** Matter / engagement workspace; null = organization-wide */
+  workspaceId?: string | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -250,29 +267,40 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     uploadOrigin: row.upload_origin === 'own' || row.upload_origin === 'third_party' ? row.upload_origin : null,
     historyOverride: row.history_override === true,
     planoraExport: row.planora_export === true,
+    workspaceId: (row.workspace_id as string) ?? null,
   }
 }
 
+/** The organization's schedules the caller may see (organization and workspace scoped). */
 export async function getSchedules(orgId: string): Promise<Schedule[]> {
   await initSchema()
-  const res = await query('SELECT * FROM schedules WHERE org_id=$1 ORDER BY uploaded_at DESC', [orgId])
+  const ws = await workspaceScope('workspace_id', 2)
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1${ws.and} ORDER BY uploaded_at DESC`, [orgId, ...ws.params])
   return res.rows.map(rowToSchedule)
 }
 
-/** Always scoped to the caller's organization — a schedule id alone never grants access. */
+/** Uploaded (not generated) schedules in the whole organization, for plan limits only — not workspace scoped. */
+export async function countUploadedSchedules(orgId: string): Promise<number> {
+  await initSchema()
+  const res = await query(`SELECT COUNT(*)::int AS n FROM schedules WHERE org_id=$1 AND source_type <> 'generated'`, [orgId])
+  return Number(res.rows[0]?.n ?? 0)
+}
+
+/** Always scoped to the caller's organization and workspaces — a schedule id alone never grants access. */
 export async function getScheduleById(id: string, orgId: string): Promise<Schedule | undefined> {
   await initSchema()
-  const res = await query('SELECT * FROM schedules WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return res.rows[0] ? rowToSchedule(res.rows[0]) : undefined
 }
 
 export async function createSchedule(s: Schedule): Promise<Schedule> {
   await initSchema()
-  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft,analysis,project_key,in_history)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
+  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft,analysis,project_key,in_history,workspace_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
     [s.id, s.userId, s.orgId, s.name, s.version, s.sourceType, s.fileName, s.uploadedAt, s.activityCount, s.relationshipCount, s.projectStart, s.projectFinish, s.dataDate, s.varianceDays, s.criticalCount, s.percentComplete,
       JSON.stringify(s.calendars), s.defaultCalendarId, JSON.stringify(s.warnings), s.planId, s.projectType, s.region, s.grossSqft,
-      s.analysis ? JSON.stringify(s.analysis) : null, s.projectKey ?? null, s.inHistory ?? true])
+      s.analysis ? JSON.stringify(s.analysis) : null, s.projectKey ?? null, s.inHistory ?? true, s.workspaceId ?? null])
   return s
 }
 
@@ -327,8 +355,9 @@ export async function isPlanoraExportSha(orgId: string, sha256: string): Promise
 /** Every upload in the same update series, oldest data date first. */
 export async function getScheduleSeries(orgId: string, projectKey: string): Promise<Schedule[]> {
   await initSchema()
-  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'
-    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'${ws.and}
+    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey, ...ws.params])
   return res.rows.map(rowToSchedule)
 }
 
@@ -348,7 +377,9 @@ export async function findScheduleFilesBySha(orgId: string, sha256: string, sche
 
 export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
   await initSchema()
-  const res = await query('SELECT file_name, sha256, content, created_at FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const ws = await workspaceScope('s.workspace_id', 3)
+  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
+    WHERE f.schedule_id=$1 AND f.org_id=$2${ws.and}`, [scheduleId, orgId, ...ws.params])
   const r = res.rows[0]
   return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
 }
@@ -368,7 +399,8 @@ export async function updateScheduleProfile(id: string, orgId: string, p: { proj
 
 export async function deleteSchedule(id: string, orgId: string): Promise<boolean> {
   await initSchema()
-  const res = await query('DELETE FROM schedules WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`DELETE FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return (res.rowCount ?? 0) > 0
 }
 
@@ -524,9 +556,11 @@ export interface HistoryRow {
  * The org_id filter is the privacy boundary: competitors' data is never read.
  * Only uploads selectHistorySchedules accepts count (as-built, one per project, no Planora re-imports,
  * no third-party schedules), and none when the organization turned firm history off for its uploads.
+ * Workspace walls apply too: a member never gets durations from a matter they are walled off from.
  */
 export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]>; selection: HistorySelection }> {
   await initSchema()
+  const ws = await workspaceScope('s.workspace_id', 3)
   const org = await query('SELECT settings FROM organizations WHERE id=$1', [orgId])
   const orgOptOut = (org.rows[0]?.settings as Record<string, unknown> | null)?.historyExcludeUploads === true
   const cand = await query(`
@@ -534,8 +568,8 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
            COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary')) AS work_count,
            COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary') AND a.actual_finish IS NULL) AS open_count
     FROM schedules s LEFT JOIN activities a ON a.schedule_id = s.id
-    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'
-    GROUP BY s.id`, [orgId, excludeScheduleId ?? null])
+    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'${ws.and}
+    GROUP BY s.id`, [orgId, excludeScheduleId ?? null, ...ws.params])
   const selection = selectHistorySchedules(cand.rows.map(r => ({
     id: r.id, name: r.name, version: r.version, projectKey: r.project_key ?? null, dataDate: r.data_date ?? null, uploadedAt: String(r.uploaded_at),
     inHistory: r.in_history !== false, historyOverride: r.history_override === true, planoraExport: r.planora_export === true,
@@ -609,6 +643,8 @@ export interface Plan {
   /** Scheduler decisions on quality findings, e.g. { "dcma:6": { decision: 'accept', note, by, at } } */
   decisions: Record<string, PlanDecision>
   scheduleId: string | null
+  /** Matter / engagement workspace; null = organization-wide */
+  workspaceId?: string | null
   createdAt: string; updatedAt: string
   /** Optimistic-locking version; incremented on every save. */
   version: number
@@ -624,6 +660,7 @@ function rowToPlan(r: Record<string, unknown>): Plan {
     id: r.id as string, orgId: r.org_id as string, userId: r.user_id as string, name: r.name as string,
     answers: (r.answers as Record<string, Answer>) || {}, extraQuestions: (r.extra_questions as Question[]) || [], generated: (r.generated as GeneratedSchedule) || null,
     reviews: (r.reviews as ExpertReview[]) || [], decisions: (r.decisions as Record<string, PlanDecision>) || {}, audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
+    workspaceId: (r.workspace_id as string) ?? null,
     createdAt: isoTs(r.created_at), updatedAt: isoTs(r.updated_at), version: Number(r.version ?? 1),
   }
 }
@@ -633,21 +670,25 @@ function trackPlan(p: Plan): Plan {
   return p
 }
 
+/** The organization's plans the caller may see (organization and workspace scoped). */
 export async function listPlans(orgId: string): Promise<Plan[]> {
   await initSchema()
-  const res = await query('SELECT * FROM plans WHERE org_id=$1 ORDER BY updated_at DESC', [orgId])
+  const ws = await workspaceScope('workspace_id', 2)
+  const res = await query(`SELECT * FROM plans WHERE org_id=$1${ws.and} ORDER BY updated_at DESC`, [orgId, ...ws.params])
   return res.rows.map(r => trackPlan(rowToPlan(r)))
 }
 
+/** Organization and workspace scoped: another firm's or another walled matter's plan is "not found". */
 export async function getPlan(id: string, orgId: string): Promise<Plan | undefined> {
   await initSchema()
-  const res = await query('SELECT * FROM plans WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM plans WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return res.rows[0] ? trackPlan(rowToPlan(res.rows[0])) : undefined
 }
 
-export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name'>): Promise<Plan> {
+export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name'> & { workspaceId?: string | null }): Promise<Plan> {
   await initSchema()
-  const res = await query('INSERT INTO plans (id, org_id, user_id, name) VALUES ($1,$2,$3,$4) RETURNING *', [p.id, p.orgId, p.userId, p.name])
+  const res = await query('INSERT INTO plans (id, org_id, user_id, name, workspace_id) VALUES ($1,$2,$3,$4,$5) RETURNING *', [p.id, p.orgId, p.userId, p.name, p.workspaceId ?? null])
   return trackPlan(rowToPlan(res.rows[0]))
 }
 
@@ -684,7 +725,8 @@ export async function savePlan(p: Plan): Promise<Plan> {
 
 export async function deletePlan(id: string, orgId: string): Promise<boolean> {
   await initSchema()
-  const res = await query('DELETE FROM plans WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`DELETE FROM plans WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return (res.rowCount ?? 0) > 0
 }
 

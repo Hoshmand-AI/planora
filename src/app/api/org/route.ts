@@ -1,5 +1,5 @@
 import { api, json, body, ApiError } from '@/lib/server/api'
-import { getOrganization, listMembers, query, exportOrganization, deleteOrganization, getUserById, getSchedules } from '@/lib/db'
+import { getOrganization, listMembers, query, exportOrganization, deleteOrganization, getUserById, countUploadedSchedules } from '@/lib/db'
 import { verifyPassword, clearSessionCookie } from '@/lib/auth'
 import { audit } from '@/lib/server/audit'
 import { can, canAssign, isRole, ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, permissionsOf, type Role } from '@/lib/server/permissions'
@@ -34,7 +34,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
       aiUsageToday: await peek(aiQuotaKey(auth.orgId), 86_400),
       sso: publicSso(normalizeSso(org.sso)),
     } : {}),
-    plan: { id: org.plan, ...entitlementsFor(org.plan), uploadedSchedules: (await getSchedules(auth.orgId)).filter(s => s.sourceType !== 'generated').length },
+    plan: { id: org.plan, ...entitlementsFor(org.plan), uploadedSchedules: await countUploadedSchedules(auth.orgId) },
     service: { deployment: deploymentKind(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
   })
 })

@@ -46,6 +46,23 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 - An unknown, expired or revoked key gets `401` with code `invalid_api_key`.
 - Every error response includes a `requestId`. Quote it when you contact support.
 
+### Workspaces (ethical walls)
+
+Schedules and plans can belong to a workspace (a client matter or engagement). Every endpoint above
+returns only what the caller may see: a schedule or plan in a walled workspace the caller is not a
+member of is `404`, exactly like another organization's. **API keys are not workspace members, so
+they never see walled workspaces.** List responses include `workspaceId` (null = organization-wide).
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/workspaces` | any member (session only) | Workspaces the caller can see. Owners and admins also get members, limited members and every schedule and plan with its workspace |
+| POST | `/api/workspaces` | owner / admin | `{ "action": "create", "name", "walled" }`, `update` (`workspaceId`, `name`, `walled`), `delete` (empty workspaces only), `add_member` / `remove_member` (`workspaceId`, `userId`), `set_restricted` (`userId`, `restricted`), `assign` (`itemType`: `schedule` or `plan`, `itemId`, `workspaceId` or null). Moving a schedule moves its whole update series; moving a plan moves the schedules published from it. All audited as `workspace.*` |
+
+`POST /api/plans` and `POST /api/schedules` (upload) accept an optional `workspaceId`. A member
+limited to their workspaces must give one when they belong to more than one (`400`
+`workspace_required`); an upload to an existing update series goes into that series' workspace by
+default.
+
 ## Webhooks
 
 - Add an HTTPS endpoint and pick the events you want (`GET /api/org/integrations` lists them).
@@ -104,3 +121,6 @@ The signing secret (`whsec_…`) is shown once when you add the endpoint.
 | `PLANORA_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
 | `PLANORA_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
 | `PLANORA_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
+| `PLANORA_SIGNUP=invite_only` | After the first account, sign-up needs an invitation (SSO into a verified domain still provisions members). Intended for on-premises instances |
+
+Every other setting, including on-premises and air-gapped ones, is listed in [operations/ON-PREM-INSTALL.md](operations/ON-PREM-INSTALL.md).

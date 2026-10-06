@@ -2,7 +2,7 @@
 
 _Last updated 10/06/2026._
 
-Planora's commercial cloud service (Vercel + Neon, optional OpenAI) is **not** authorized for Controlled Unclassified Information (CUI) or classified information. CUI belongs in an on-premises or air-gapped Planora deployment inside the customer's assessed boundary (see the NIST SP 800-171 section of [CONTROL-MATRIX.md](CONTROL-MATRIX.md)).
+Planora's commercial cloud service (Vercel + Neon, optional OpenAI) is **not** authorized for Controlled Unclassified Information (CUI) or classified information. CUI belongs in an on-premises or air-gapped Planora deployment inside the customer's assessed boundary (see the NIST SP 800-171 section of [CONTROL-MATRIX.md](CONTROL-MATRIX.md), the requirement-by-requirement [NIST-800-171-MAPPING.md](NIST-800-171-MAPPING.md), and the install guide [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)).
 
 ## How a deployment is identified
 

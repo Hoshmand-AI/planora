@@ -1,0 +1,123 @@
+# Planora on-premises / air-gapped reference deployment. See docs/operations/ON-PREM-INSTALL.md.
+#
+#   cp .env.onprem.example .env      # then fill in the secrets
+#   docker compose up -d             # app on 127.0.0.1:3000 — put your TLS reverse proxy in front
+#   docker compose --profile ops run --rm backup                 # backup + manifest into ./backups
+#   docker compose --profile ops run --rm restore-drill <dump>   # prove a backup restores
+#
+# Defaults are the secure ones: AI offline, air-gapped mode on, the database on an internal network
+# with no route out, the app container read-only and non-root with no Linux capabilities.
+
+name: planora
+
+x-db-url: &db-url postgres://planora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/planora
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: planora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: planora
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planora -d planora"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt: ["no-new-privileges:true"]
+    shm_size: 256mb
+
+  app:
+    image: planora:${PLANORA_VERSION:-local}
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: *db-url
+      # The app and database share a private Docker network on one host. If the database runs
+      # elsewhere, remove this and use TLS (PGSSLROOTCERT for a private CA).
+      PGSSLMODE: disable
+      PG_POOL_MAX: ${PG_POOL_MAX:-10}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (64+ random characters)}
+      PLANORA_ENCRYPTION_KEY: ${PLANORA_ENCRYPTION_KEY:?set PLANORA_ENCRYPTION_KEY in .env (32+ random characters)}
+      APP_URL: ${APP_URL:?set APP_URL in .env, e.g. https://planora.example.internal}
+      PLANORA_DEPLOYMENT: onprem
+      PLANORA_AIRGAPPED: ${PLANORA_AIRGAPPED:-true}
+      # offline = no model at all. For an on-prem model set PLANORA_AI_MODE=local, LLM_BASE_URL, LLM_MODEL.
+      PLANORA_AI_MODE: ${PLANORA_AI_MODE:-offline}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      PLANORA_ALLOWED_HOSTS: ${PLANORA_ALLOWED_HOSTS:-}
+      PLANORA_APPROVED_MODELS: ${PLANORA_APPROVED_MODELS:-}
+      PLANORA_DEFAULT_PLAN: ${PLANORA_DEFAULT_PLAN:-free}
+      # Only invited people (and SSO users of verified domains) get accounts; the first sign-up becomes the owner.
+      PLANORA_SIGNUP: ${PLANORA_SIGNUP:-invite_only}
+      PLANORA_AI_DAILY_LIMIT: ${PLANORA_AI_DAILY_LIMIT:-300}
+      PLANORA_RELEASE: ${PLANORA_VERSION:-local}
+      # Trust a private CA for an on-prem OpenID Connect provider or model host: uncomment this and
+      # the volume below.
+      # NODE_EXTRA_CA_CERTS: /etc/planora/ca.pem
+    ports:
+      # Loopback only: terminate TLS in a reverse proxy on this host (see the install guide).
+      - "${PLANORA_BIND:-127.0.0.1}:${PLANORA_PORT:-3000}:3000"
+    networks: [backend, edge]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /app/.next/cache:size=256m,uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # volumes:
+    #   - ./certs/ca.pem:/etc/planora/ca.pem:ro
+
+  # ── Operations (run on demand: docker compose --profile ops run --rm <service>) ─────────────
+  backup:
+    profiles: [ops]
+    image: planora-ops:${PLANORA_VERSION:-local}
+    build:
+      context: .
+      target: ops
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://planora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/planora?sslmode=disable
+    volumes:
+      - ./backups:/backups
+    networks: [backend]
+    command: ["node", "scripts/backup.mjs", "/backups"]
+
+  restore-drill:
+    profiles: [ops]
+    image: planora-ops:${PLANORA_VERSION:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ADMIN_DATABASE_URL: postgres://planora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/postgres?sslmode=disable
+    volumes:
+      - ./backups:/backups:ro
+    networks: [backend]
+    entrypoint: ["node", "scripts/restore-drill.mjs"]
+
+volumes:
+  pgdata:
+
+networks:
+  # No route outside the host: the database is reachable only from the app and ops containers.
+  backend:
+    internal: true
+  # The app's published port. Outbound traffic from this network is not blocked by Docker: block it
+  # on the host (DOCKER-USER chain) or at your firewall — see "Hardening" in the install guide.
+  edge: {}

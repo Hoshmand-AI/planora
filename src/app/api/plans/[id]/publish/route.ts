@@ -59,6 +59,8 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
     criticalCount: activities.filter(a => a.isCritical).length, percentComplete: 0,
     calendars: g.calendars, defaultCalendarId: g.defaultCalendarId, warnings: [],
     planId: plan.id, projectType: profile.projectType ?? null, region: profile.state ?? null, grossSqft: profile.grossSqft ?? null,
+    // The published schedule stays inside the plan's workspace (ethical wall).
+    workspaceId: plan.workspaceId ?? null,
   })
   await createActivities(activities)
   await createRelationships(g.links.map(l => ({ id: `${scheduleId}:${l.id}`, scheduleId, predecessorId: idMap.get(l.from)!, successorId: idMap.get(l.to)!, type: l.type, lag: l.lag })))

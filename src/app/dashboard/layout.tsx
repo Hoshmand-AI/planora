@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
+import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 
 /* ─── Types ─────────────────────────────────────────── */
 interface User     { id: string; email: string; name: string; plan: string; role?: string }
@@ -383,6 +384,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach Planora how your projects really perform. Used only for your firm.</p>
                 </div>
+                <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4 grid grid-cols-2 gap-2">
                   <label className="block text-[12px] text-warm-600">Whose schedule
                     <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">

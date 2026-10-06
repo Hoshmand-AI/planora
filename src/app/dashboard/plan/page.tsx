@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ClipboardList, Plus, ArrowRight, Loader2, Sparkles } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
+import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 
 interface PlanRow {
   id: string; name: string; updatedAt: string; readiness: number
@@ -22,10 +23,11 @@ export default function PlansPage() {
     fetch('/api/plans').then(r => r.json()).then(d => setPlans(d.plans || [])).catch(() => setError('Could not load plans.'))
   }, [])
 
-  const create = async (e: React.FormEvent) => {
+  const create = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setCreating(true); setError('')
-    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    const workspaceId = (new FormData(e.currentTarget).get('workspaceId') as string | null) || undefined
+    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, workspaceId }) })
     const data = await res.json()
     setCreating(false)
     if (!res.ok) { setError(data.error || 'Could not create plan.'); return }
@@ -57,6 +59,7 @@ export default function PlansPage() {
           placeholder="Project name, e.g. Riverside Medical Office Building"
           className="flex-1 bg-warm-50 border border-warm-300 rounded-md px-3 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
         />
+        <WorkspaceSelect labelClassName="sr-only" className="bg-warm-50 border border-warm-300 rounded-md px-2 py-2.5 text-[14px] text-warm-700" />
         <button disabled={creating} className="flex items-center justify-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-4 py-2.5 rounded-md text-[14px] font-semibold transition-colors disabled:opacity-50">
           {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Start interview
         </button>

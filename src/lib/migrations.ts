@@ -406,6 +406,41 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS submission_reviews_org_idx ON submission_reviews(org_id);
     `,
   },
+  {
+    id: 10, name: 'workspaces_ethical_walls',
+    sql: `
+    -- Matter / engagement workspaces inside an organization, for project-level access control
+    -- (ethical walls). Enforcement lives in src/lib/server/workspaces.ts and the scoped reads in
+    -- src/lib/db.ts. Additive: older code ignores the new tables and columns, and every existing
+    -- schedule and plan stays organization-wide (workspace_id NULL) until an admin assigns it.
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      -- Walled: only the workspace's members (and owners/admins) can see its schedules and plans.
+      walled BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS workspaces_org_idx ON workspaces(org_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS workspaces_org_name_idx ON workspaces(org_id, LOWER(name));
+    CREATE TABLE IF NOT EXISTS workspace_members (
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      added_by TEXT,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (workspace_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members(org_id, user_id);
+    -- A restricted member sees only the schedules and plans of the workspaces they belong to.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS workspace_restricted BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    CREATE INDEX IF NOT EXISTS schedules_workspace_idx ON schedules(org_id, workspace_id);
+    CREATE INDEX IF NOT EXISTS plans_workspace_idx ON plans(org_id, workspace_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

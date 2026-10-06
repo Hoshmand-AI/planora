@@ -24,7 +24,18 @@ export interface RequestInfo {
    * provider before anything is sent to a model outside the customer's network.
    */
   dataClassification?: () => Promise<string | null>
+  /**
+   * Which workspaces (matters / engagements) the caller may see. Set by api() for every
+   * authenticated request and resolved lazily, once; the scoped reads in src/lib/db.ts apply it to
+   * every schedule and plan query. See src/lib/server/workspaces.ts.
+   */
+  workspaceAccess?: () => Promise<WorkspaceAccess>
 }
+
+/** Workspace visibility for one caller (see src/lib/server/workspaces.ts for the rules). */
+export type WorkspaceAccess =
+  | { all: true }
+  | { all: false; restricted: boolean; memberOf: string[]; walled: string[] }
 
 const storage = new AsyncLocalStorage<RequestInfo>()
 

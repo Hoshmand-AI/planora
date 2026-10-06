@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
 import { Integrations } from '@/components/Integrations'
+import { Workspaces } from '@/components/Workspaces'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
@@ -38,9 +39,10 @@ const ACTION_LABELS: Record<string, string> = {
   'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
   'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'workspace.created': 'Created workspace', 'workspace.updated': 'Changed workspace', 'workspace.deleted': 'Deleted workspace', 'workspace.member_added': 'Added to workspace', 'workspace.member_removed': 'Removed from workspace', 'workspace.member_restriction_changed': 'Changed workspace limit', 'workspace.item_assigned': 'Moved to workspace',
 }
 // Download links come from this fixed table, never from page text.
-const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'ai.', 'privacy.'] as const
+const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'workspace.', 'ai.', 'privacy.'] as const
 const AUDIT_CSV: Record<string, string> = Object.fromEntries(AUDIT_FILTERS.map(f => [f, f ? `/api/audit?format=csv&action=${f}` : '/api/audit?format=csv']))
 
 const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.override') ? 'Override' : a)
@@ -156,6 +158,8 @@ export default function OrgPage() {
           </table>
         </div>
       </Section>
+
+      {manage && <Workspaces members={data.members} />}
 
       {manage && (
         <Section title="Invite someone" description="Invitations are single-use and expire in 7 days. Send the link yourself (email, Teams, Slack); it only works for the address you enter.">
@@ -275,7 +279,7 @@ export default function OrgPage() {
             <Field label="Filter">{p => (
               <select {...p} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
                 <option value="">All activity</option><option value="auth.">Sign-ins</option><option value="plan.">Plans</option><option value="schedule.">Schedules</option>
-                <option value="member.">Members</option><option value="org.">Organization</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
+                <option value="member.">Members</option><option value="org.">Organization</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
               </select>
             )}</Field>
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {
