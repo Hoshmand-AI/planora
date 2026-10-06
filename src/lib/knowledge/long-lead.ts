@@ -300,6 +300,27 @@ function classificationOk(id: string, p: ProjectProfile): boolean {
 }
 
 /** All catalog items (unfiltered). */
+/* Civil / infrastructure long-lead items */
+const CIVIL_ITEMS: LongLeadSpec[] = [
+  item({ id: 'civ-steel-girders', name: 'Structural steel plate girders (fabricated)', appliesWhen: { projectTypes: ['highway_bridge'], civil: true }, leadWeeks: { low: 30, typical: 42, high: 60 }, submittalWeeks: 8, gates: 'superstructure', source: SURVEY, notes: 'Mill order, shop drawings and fabrication; answer "Not in scope" if girders are precast.' }),
+  item({ id: 'civ-precast-girders', name: 'Precast / prestressed concrete girders', appliesWhen: { projectTypes: ['highway_bridge'], civil: true }, leadWeeks: { low: 14, typical: 22, high: 36 }, submittalWeeks: 6, gates: 'superstructure', source: SURVEY, notes: 'Plant casting slots fill early in peak season; answer "Not in scope" if girders are steel.' }),
+  item({ id: 'civ-bearings', name: 'Bridge bearings & expansion joint assemblies', appliesWhen: { projectTypes: ['highway_bridge'], civil: true }, leadWeeks: { low: 10, typical: 18, high: 30 }, submittalWeeks: 6, gates: 'superstructure', source: SURVEY }),
+  item({ id: 'civ-special-trackwork', name: 'Special trackwork (turnouts, crossings) & rail', appliesWhen: { projectTypes: ['transit_rail'], civil: true }, leadWeeks: { low: 26, typical: 40, high: 60 }, submittalWeeks: 8, gates: 'track_systems', source: SURVEY }),
+  item({ id: 'civ-traction-power', name: 'Traction power substations (packaged) & OCS hardware', appliesWhen: { projectTypes: ['transit_rail'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-signal-equipment', name: 'Signal & train control equipment', appliesWhen: { projectTypes: ['transit_rail'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 70 }, submittalWeeks: 10, gates: 'controls_scada', source: SURVEY }),
+  item({ id: 'civ-large-pumps', name: 'Large pumps & motors (vertical turbine / submersible / split-case)', appliesWhen: { projectTypes: ['water_wastewater'], civil: true }, leadWeeks: { low: 26, typical: 40, high: 60 }, submittalWeeks: 8, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-process-valves', name: 'Large-diameter valves & actuators', appliesWhen: { projectTypes: ['water_wastewater'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 52 }, submittalWeeks: 6, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-treatment-equipment', name: 'Treatment equipment packages (membranes, UV, blowers, screens)', appliesWhen: { projectTypes: ['water_wastewater'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 70 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-power-transformer', name: 'Power transformers (substation class)', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 80, typical: 120, high: 180 }, submittalWeeks: 8, gates: 'power_equipment', source: `${SURVEY}; DOE large power transformer supply-chain assessments` }),
+  item({ id: 'civ-hv-breakers', name: 'High-voltage circuit breakers & GIS', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 8, gates: 'power_equipment', source: SURVEY }),
+  item({ id: 'civ-relay-panels', name: 'Protection & control relay panels', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 45 }, submittalWeeks: 6, gates: 'controls_scada', source: SURVEY }),
+  item({ id: 'civ-steel-structures', name: 'Substation steel structures / transmission towers & poles', appliesWhen: { projectTypes: ['utility_power'], civil: true }, leadWeeks: { low: 20, typical: 30, high: 52 }, submittalWeeks: 6, gates: 'superstructure', source: SURVEY }),
+  item({ id: 'civ-process-vessels', name: 'Pressure vessels, columns & packaged process units', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 30, typical: 45, high: 78 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-rotating-equipment', name: 'Large compressors, motors & rotating equipment', appliesWhen: { projectTypes: ['industrial_process'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 90 }, submittalWeeks: 10, gates: 'process_equipment', source: SURVEY }),
+  item({ id: 'civ-mv-switchgear', name: 'Medium-voltage switchgear, MCCs & VFDs', appliesWhen: { projectTypes: ['water_wastewater', 'industrial_process', 'transit_rail'], civil: true }, leadWeeks: { low: 40, typical: 60, high: 100 }, submittalWeeks: 6, gates: 'power_equipment', source: SURVEY }),
+]
+CATALOG.push(...CIVIL_ITEMS)
+
 export function allLongLeadItems(): LongLeadSpec[] {
   return [...CATALOG]
 }

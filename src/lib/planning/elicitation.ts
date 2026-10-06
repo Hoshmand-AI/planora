@@ -5,7 +5,7 @@ import type {
   CanonicalCategory, Answer, AnswerValue, Assumption, ElicitationResult, InterviewState, ProjectProfile, ProjectType,
   Question, SourceRef, WorkScope, DeliveryMethod, Classification, PermitSpec, LongLeadSpec, RegulationSpec,
 } from './types'
-import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from './types'
+import { PROJECT_TYPES, PROJECT_TYPE_LABELS, isCivilType } from './types'
 import { resolveRegional, SUPPORTED_STATES } from '@/lib/knowledge/regions'
 import { US_STATES } from '@/lib/knowledge/us-states'
 import { listLongLeadItems } from '@/lib/knowledge/long-lead'
@@ -41,7 +41,8 @@ const bool = (v: AnswerValue | undefined) => (typeof v === 'boolean' ? v : v ===
 export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const type = str(known(answers, 'project.type')) as ProjectType | undefined
   const federal = bool(known(answers, 'project.federal'))
-  const sqft = num(known(answers, 'project.gross_sqft'))
+  const civil = isCivilType(type)
+  const sqft = civil ? undefined : num(known(answers, 'project.gross_sqft'))
   const stories = num(known(answers, 'project.stories'))
   const acres = num(known(answers, 'site.acres_disturbed'))
   const classification = str(known(answers, 'security.classification')) as Classification | undefined
@@ -58,6 +59,7 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     isFederal: type === 'federal_defense' ? true : federal,
     classification: classification ?? (answers['security.classification']?.status === 'withheld' ? 'classified' : undefined),
     deliveryMethod: str(known(answers, 'project.delivery')) as DeliveryMethod | undefined,
+    valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
   }
 }
 
@@ -73,11 +75,12 @@ function addDays(iso: string, days: number): string {
 
 function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: ElicitationContext): Question[] {
   const today = ctx.today || new Date().toISOString().slice(0, 10)
+  const civil = isCivilType(p.projectType)
   const qs: Question[] = [
     {
       id: 'project.type', section: 'project', kind: 'choice', impact: 100, allowWithheld: false,
-      prompt: 'What type of facility is this?',
-      why: 'Facility type drives the activity network, commissioning rigor, required permits (e.g. healthcare/school state reviews) and long-lead equipment.',
+      prompt: 'What type of project is this?',
+      why: 'Project type drives the activity network, commissioning or startup rigor, required permits (e.g. healthcare/school state reviews, Section 404, utility interconnection) and long-lead equipment.',
       options: PROJECT_TYPES.map(t => ({ value: t, label: PROJECT_TYPE_LABELS[t] })),
     },
     {
@@ -95,24 +98,35 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     },
     {
       id: 'project.scope', section: 'project', kind: 'choice', impact: 80, allowWithheld: false,
-      prompt: 'Is this new construction, an addition, or a renovation?',
-      why: 'Renovations add demolition/abatement and, if occupied, phasing constraints; new construction adds full site and foundation work.',
-      options: [
-        { value: 'new_construction', label: 'New construction' }, { value: 'addition', label: 'Addition' },
-        { value: 'renovation', label: 'Renovation (vacant)' }, { value: 'renovation_occupied', label: 'Renovation (occupied / phased)' },
-      ],
+      prompt: civil ? 'Is this new work, an expansion, or rehabilitation / replacement of an existing asset?' : 'Is this new construction, an addition, or a renovation?',
+      why: civil
+        ? 'Rehabilitation and replacement add demolition and staging around the existing asset; work kept in service adds outages and traffic or shutdown windows.'
+        : 'Renovations add demolition/abatement and, if occupied, phasing constraints; new construction adds full site and foundation work.',
+      options: civil
+        ? [
+            { value: 'new_construction', label: 'New (greenfield / new alignment)' }, { value: 'addition', label: 'Expansion / widening' },
+            { value: 'renovation', label: 'Rehabilitation or replacement (out of service)' }, { value: 'renovation_occupied', label: 'Rehabilitation or replacement kept in service (staged)' },
+          ]
+        : [
+            { value: 'new_construction', label: 'New construction' }, { value: 'addition', label: 'Addition' },
+            { value: 'renovation', label: 'Renovation (vacant)' }, { value: 'renovation_occupied', label: 'Renovation (occupied / phased)' },
+          ],
     },
-    {
-      id: 'project.gross_sqft', section: 'project', kind: 'number', unit: 'sf', impact: 85, allowWithheld: true,
+    ...(civil ? [{
+      id: 'project.value_musd', section: 'project' as const, kind: 'number' as const, unit: 'USD millions', impact: 85, allowWithheld: true,
+      prompt: 'Roughly what is the construction value, in millions of dollars?',
+      why: 'Civil work packages are sized by construction value rather than floor area. Without it, durations use a $20M reference project.',
+    }] : [{
+      id: 'project.gross_sqft', section: 'project' as const, kind: 'number' as const, unit: 'sf', impact: 85, allowWithheld: true,
       prompt: 'What is the gross building area?',
       why: 'Work-package durations scale with area. Without it every duration is a guess.',
     },
     {
-      id: 'project.stories', section: 'project', kind: 'number', unit: 'stories', impact: 60, allowWithheld: true,
+      id: 'project.stories', section: 'project' as const, kind: 'number' as const, unit: 'stories', impact: 60, allowWithheld: true,
       prompt: 'How many stories above grade?',
       why: 'Stories drive the structure cycle, elevator scope, and deep-foundation likelihood.',
       fallback: { value: 1, explanation: 'Assumed single story.' },
-    },
+    }]),
     {
       id: 'project.target_start', section: 'project', kind: 'date', impact: 70, allowWithheld: true,
       prompt: 'When is Notice to Proceed (or the target start)?',
@@ -225,7 +239,7 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
   )
 
   if (p.projectType) {
-    for (const m of MILESTONE_TARGETS) {
+    for (const m of milestoneTargetsFor(p)) {
       qs.push({
         id: `milestone.${m.key}.target`, section: 'milestones', kind: 'date', impact: m.impact, allowWithheld: true,
         prompt: `Is there a target or contractual date for “${m.label}”?`,
@@ -337,6 +351,42 @@ export const MILESTONE_TARGETS: { key: string; label: string; category: Canonica
   { key: 'substantial_completion', label: 'Substantial completion', category: 'substantial_completion', rank: 5, impact: 30, why: 'The owner can occupy at substantial completion; it is usually the contractual date.' },
 ]
 
+type MilestoneTarget = (typeof MILESTONE_TARGETS)[number]
+const SC_TARGET = MILESTONE_TARGETS[MILESTONE_TARGETS.length - 1]
+const CIVIL_MILESTONES: Partial<Record<ProjectType, MilestoneTarget[]>> = {
+  highway_bridge: [
+    { key: 'substructure', label: 'Substructure complete', category: 'substructure', rank: 1, impact: 22, why: 'Abutments and piers gate girder erection.' },
+    { key: 'deck', label: 'Deck complete', category: 'deck', rank: 2, impact: 24, why: 'The deck gates approach work and the traffic switch.' },
+    { key: 'traffic_switch', label: 'Final traffic switch', category: 'cutover', rank: 4, impact: 26, why: 'Traffic switches are often contractual (lane-rental or incentive/disincentive dates).' },
+    SC_TARGET,
+  ],
+  transit_rail: [
+    { key: 'track', label: 'Track complete', category: 'track_systems', rank: 2, impact: 24, why: 'Track gates systems installation and testing.' },
+    { key: 'systems_testing', label: 'Systems integration testing complete', category: 'startup_testing', rank: 4, impact: 26, why: 'Revenue service waits on integrated testing and safety certification.' },
+    SC_TARGET,
+  ],
+  water_wastewater: [
+    { key: 'process_structures', label: 'Process structures complete', category: 'process_structures', rank: 2, impact: 22, why: 'Structures (and leak tests) gate equipment installation.' },
+    { key: 'startup', label: 'Startup & performance testing complete', category: 'startup_testing', rank: 4, impact: 26, why: 'Regulatory permits and consent decrees often set the date the plant must be operating.' },
+    SC_TARGET,
+  ],
+  utility_power: [
+    { key: 'energization', label: 'Energization', category: 'cutover', rank: 4, impact: 28, why: 'Energization dates are set with the utility / ISO and are hard to move.' },
+    SC_TARGET,
+  ],
+  industrial_process: [
+    { key: 'mechanical_completion', label: 'Mechanical completion', category: 'pipeline', rank: 3, impact: 24, why: 'Mechanical completion hands the plant to commissioning.' },
+    { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
+    SC_TARGET,
+  ],
+}
+/** Milestone targets the interview asks about for this project type. */
+export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
+  return (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
+}
+/** Every milestone target key across project types (for date checks on stored answers). */
+const ALL_MILESTONE_TARGETS: MilestoneTarget[] = [...MILESTONE_TARGETS, ...Object.values(CIVIL_MILESTONES).flat()].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)
+
 /** Which milestone a gated category must precede, for delivery/permit vs target checks. */
 const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   earthwork: 'foundations', deep_foundations: 'foundations', foundations: 'foundations',
@@ -344,6 +394,8 @@ const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   roofing: 'dry_in', exterior_skin: 'dry_in', windows_curtainwall: 'dry_in',
   electrical_service: 'electrical_service', mechanical_equipment: 'commissioning', fire_protection: 'commissioning',
   elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
+  substructure: 'substructure', superstructure: 'deck', deck: 'deck', track_systems: 'track', process_structures: 'process_structures',
+  process_equipment: 'startup', power_equipment: 'energization', conductors: 'energization', controls_scada: 'startup', pipeline: 'mechanical_completion',
 }
 
 export interface DateIssue { questionIds: string[]; text: string; severity: 'error' | 'warning' }
@@ -358,7 +410,7 @@ export function checkAnswerDates(answers: Record<string, Answer>, permits: Permi
   type Pt = { id: string; label: string; date: string; rank: number }
   const pts: Pt[] = []
   if (start) pts.push({ id: 'project.target_start', label: 'Notice to Proceed', date: start, rank: 0 })
-  for (const m of MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
+  for (const m of ALL_MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
   if (finish) pts.push({ id: 'project.required_finish', label: 'Required completion', date: finish, rank: 6 })
   for (const a of pts) for (const b of pts) {
     if (a.rank < b.rank && b.date <= a.date) {

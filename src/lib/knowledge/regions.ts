@@ -10,6 +10,7 @@ import type {
   PermitSpec,
   ProjectProfile,
   RegionSpec,
+  ProjectType,
   RegulationSpec,
 } from '@/lib/planning/types'
 import { appliesTri } from './applicability'
@@ -942,7 +943,80 @@ extra('az-building', { replaces: ['def-building'] })
 
 /* ─── Registry & resolution ────────────────────────────── */
 
+/* ─── Civil / infrastructure ──────────────────────────── */
+
+const HB_T: ProjectType[] = ['highway_bridge']
+const WATERS: ProjectType[] = ['highway_bridge', 'water_wastewater', 'transit_rail', 'utility_power', 'industrial_process']
+const CIVIL_VERIFY = 'Reference durations — confirm with the agency; many depend on the project\'s environmental class and the agency\'s workload.'
+
+FEDERAL.permits.push(
+  permit({
+    id: 'us-usace-404-bridge', name: 'USACE Section 404 / Section 10 permit (work in waters of the U.S.)', authority: 'U.S. Army Corps of Engineers (District)', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: HB_T, civil: true }, reviewWeeks: { low: 6, typical: 16, high: 52 }, gates: 'in_water_work', submitAfter: 'design_dd',
+    source: 'Clean Water Act §404 (33 U.S.C. §1344); Rivers and Harbors Act §10; 33 CFR Parts 320–332',
+    notes: `Nationwide permits are often 45–90 days; individual permits commonly 6–12 months. Usually paired with a state §401 water quality certification and a fish work window. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-usace-404-utility', name: 'USACE Section 404 / Section 10 permit (crossings and outfalls)', authority: 'U.S. Army Corps of Engineers (District)', jurisdiction: 'federal',
+    appliesWhen: { projectTypes: ['water_wastewater', 'transit_rail', 'utility_power', 'industrial_process'], civil: true }, reviewWeeks: { low: 6, typical: 12, high: 52 }, gates: 'earthwork', submitAfter: 'design_dd',
+    source: 'Clean Water Act §404; 33 CFR Parts 320–332', notes: `Answer "Not required" if no waters or wetlands are affected. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-401-wqc', name: 'State §401 water quality certification', authority: 'State water quality agency', jurisdiction: 'state',
+    appliesWhen: { projectTypes: WATERS, civil: true }, reviewWeeks: { low: 8, typical: 16, high: 52 }, gates: 'earthwork', submitAfter: 'design_dd',
+    source: 'Clean Water Act §401 (33 U.S.C. §1341); 40 CFR Part 121', notes: `Required with a §404 permit; the agency has up to one year. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-row-certification', name: 'Right-of-way certification & utility relocation agreements', authority: 'State DOT / FHWA (federal-aid) and utility owners', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['highway_bridge', 'transit_rail'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 78 }, gates: 'earthwork', submitAfter: 'design_dd',
+    source: '23 CFR 635.309 (ROW certification for federal-aid projects); Uniform Act (49 CFR Part 24)', notes: `Utility relocations by others are a leading cause of civil delay; track each owner separately. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-railroad-agreement', name: 'Railroad construction & maintenance agreement (flagging, force account)', authority: 'Operating railroad', jurisdiction: 'local',
+    appliesWhen: { projectTypes: ['highway_bridge', 'transit_rail'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 52 }, gates: 'substructure', submitAfter: 'design_dd',
+    source: 'Railroad public-projects manuals (e.g., UP/BNSF guidelines); 23 CFR Part 646 Subpart B', notes: `Answer "Not required" if the work does not cross or abut a railroad. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-traffic-control-plan', name: 'Traffic control / lane closure plan approval', authority: 'Road owner (state DOT / county / city)', jurisdiction: 'local',
+    appliesWhen: { projectTypes: HB_T, civil: true }, reviewWeeks: { low: 2, typical: 4, high: 8 }, gates: 'traffic_control', submitAfter: 'design_cd',
+    source: 'MUTCD Part 6; agency work zone policy (23 CFR Part 630 Subpart J)', notes: CIVIL_VERIFY,
+  }),
+  permit({
+    id: 'us-water-construction-permit', name: 'State drinking water / wastewater construction permit (plan approval)', authority: 'State health department or environmental agency', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['water_wastewater'], civil: true }, reviewWeeks: { low: 6, typical: 12, high: 30 }, gates: 'process_structures', submitAfter: 'design_cd',
+    source: 'Safe Drinking Water Act state primacy programs; state wastewater construction permit rules', notes: CIVIL_VERIFY,
+  }),
+  permit({
+    id: 'us-transit-safety-cert', name: 'Safety certification plan & State Safety Oversight review', authority: 'Transit agency safety office / State Safety Oversight Agency (FTA)', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['transit_rail'], civil: true }, reviewWeeks: { low: 8, typical: 16, high: 40 }, gates: 'startup_testing', submitAfter: 'design_cd',
+    source: '49 CFR Part 674 (State Safety Oversight); 49 CFR Part 673 (PTASP)', notes: CIVIL_VERIFY,
+  }),
+  permit({
+    id: 'us-interconnection', name: 'Utility / ISO interconnection approval & outage scheduling', authority: 'Interconnecting utility / ISO-RTO', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['utility_power'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 104 }, gates: 'cutover', submitAfter: 'design_dd',
+    source: 'FERC Order 2023 interconnection procedures; utility outage coordination procedures', notes: `Outage windows are often granted months ahead and only in low-load seasons. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-siting-cpcn', name: 'State siting approval / certificate of public convenience and necessity', authority: 'State public utility commission / siting board', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['utility_power'], civil: true }, reviewWeeks: { low: 26, typical: 52, high: 104 }, gates: 'earthwork', submitAfter: 'design_sd',
+    source: 'State utility siting statutes', notes: `Answer "Not required" when the facility is within an existing substation footprint. ${CIVIL_VERIFY}`,
+  }),
+  permit({
+    id: 'us-air-construction', name: 'Air construction permit (state permit / NSR)', authority: 'State or local air agency (EPA where delegated)', jurisdiction: 'state',
+    appliesWhen: { projectTypes: ['industrial_process'], civil: true }, reviewWeeks: { low: 12, typical: 26, high: 78 }, gates: 'foundations', submitAfter: 'design_dd',
+    source: 'Clean Air Act New Source Review (40 CFR 51.165–166, 52.21); state air permit rules', notes: `Construction of an emission unit generally cannot begin before the permit. ${CIVIL_VERIFY}`,
+  }),
+)
+
+// Generic environmental and labor requirements that also apply to civil work.
+const CIVIL_OK = new Set([
+  'us-npdes-cgp', 'us-nepa', 'us-nhpa-106', 'us-fed-installation', 'us-davis-bacon', 'us-baba',
+  'def-site-grading', 'ca-site-grading', 'ca-cgp', 'ca-ceqa', 'ca-calosha', 'tx-tceq-cgp', 'ny-spdes', 'ny-seqra',
+  'fl-fdep-cgp', 'fl-erp', 'fl-hurricane-prep', 'wa-sepa', 'wa-ecology-cswgp', 'va-vesmp', 'md-mde-cgp', 'md-esc', 'az-azpdes-cgp', 'az-dust', 'az-heat',
+])
+
 const REGIONS: RegionSpec[] = [FEDERAL, DEFAULT, CA, TX, NY, FL, WA, VA, MD, AZ]
+for (const r of REGIONS) for (const x of [...r.permits, ...r.regulations]) if (CIVIL_OK.has(x.id)) x.appliesWhen = { ...x.appliesWhen, civil: true }
 const BY_CODE = new Map(REGIONS.map((r) => [r.code, r]))
 
 export const SUPPORTED_STATES = ['CA', 'TX', 'NY', 'FL', 'WA', 'VA', 'MD', 'AZ'] as const

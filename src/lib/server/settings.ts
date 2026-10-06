@@ -36,6 +36,14 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   quality: DEFAULT_DCMA_RULES,
 }
 
+/**
+ * Written onto every organization created from now on. Cloud AI (OpenAI as a subprocessor) is
+ * opt-in: a new organization starts rules-only until an admin turns AI on in Organization settings.
+ * Organizations created before this default changed have no stored aiEnabled value and keep
+ * DEFAULT_SETTINGS.aiEnabled (on), so their behavior doesn't change underneath them.
+ */
+export const NEW_ORGANIZATION_SETTINGS: Partial<OrgSettings> = { aiEnabled: false }
+
 const clamp = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Number(v)
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d

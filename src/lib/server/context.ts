@@ -18,6 +18,12 @@ export interface RequestInfo {
   aiEnabled?: boolean
   aiDailyLimit?: number
   plan?: string
+  /**
+   * Security classification of the project data this request works on ('cui', 'classified',
+   * 'unclassified', or null when unknown / not project-scoped). Resolved lazily, once, by the model
+   * provider before anything is sent to a model outside the customer's network.
+   */
+  dataClassification?: () => Promise<string | null>
 }
 
 const storage = new AsyncLocalStorage<RequestInfo>()

@@ -18,6 +18,7 @@ function AuthForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const invite = searchParams.get('invite')
+  const [cuiWarning, setCuiWarning] = useState('')
   const [invitation, setInvitation] = useState<{ email?: string; role?: string; orgName?: string; invalid?: boolean } | null>(null)
   // Second step when two-step verification is on
   const [challenge, setChallenge] = useState<string | null>(null)
@@ -42,8 +43,9 @@ function AuthForm() {
   }
 
   useEffect(() => {
-    if (!invite) return
-    fetch(`/api/auth?invite=${encodeURIComponent(invite)}`).then(r => r.json()).then(d => {
+    fetch(invite ? `/api/auth?invite=${encodeURIComponent(invite)}` : '/api/auth').then(r => r.json()).then(d => {
+      if (typeof d.service?.cuiWarning === 'string') setCuiWarning(d.service.cuiWarning)
+      if (!invite) return
       setInvitation(d.invitation ?? { invalid: true })
       if (d.invitation?.email) { setEmail(d.invitation.email); setMode('signup') }
     }).catch(() => {})
@@ -121,6 +123,12 @@ function AuthForm() {
                   ? `You've been invited as ${invitation.role === 'admin' ? 'an' : 'a'} ${invitation.role}. Create your account with ${invitation.email}.`
                   : 'Start analyzing construction schedules with Planora.'}
           </p>
+
+          {cuiWarning && mode === 'signup' && !challenge && (
+            <div role="note" aria-label="Controlled information warning" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
+              <strong className="font-semibold text-navy-950">No CUI or classified information.</strong> {cuiWarning}
+            </div>
+          )}
 
           {invitation?.invalid && !challenge && (
             <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">

@@ -34,20 +34,29 @@ export async function beginEnrollment(user: User): Promise<{ secret: string; uri
   return { secret, uri, qrSvg }
 }
 
-/** Confirms enrollment with a code from the app; returns the recovery codes (shown once). */
+/**
+ * Confirms enrollment with a code from the app; returns the recovery codes (shown once).
+ * Only a pending enrollment can be confirmed (an active one would otherwise let a single code rotate
+ * the recovery codes without re-authentication), and the code's time step must not have been used
+ * before. The update is conditional, so two concurrent requests with the same code can't both win.
+ */
 export async function confirmEnrollment(user: User, code: string): Promise<string[] | null> {
-  if (!user.mfaSecret) return null
-  const step = verifyTotp(decrypt(user.mfaSecret), normCode(code))
+  if (!user.mfaSecret || user.mfaEnabledAt) return null
+  const step = verifyTotp(decrypt(user.mfaSecret), normCode(code), { lastStep: user.mfaLastStep })
   if (step == null) return null
   const codes = newRecoveryCodes()
-  await query('UPDATE users SET mfa_enabled_at=NOW(), mfa_last_step=$2, mfa_recovery=$3 WHERE id=$1', [user.id, step, JSON.stringify(codes.map(c => sha256(normCode(c))))])
-  return codes
+  const res = await query(
+    `UPDATE users SET mfa_enabled_at=NOW(), mfa_last_step=$2, mfa_recovery=$3
+      WHERE id=$1 AND mfa_secret=$4 AND mfa_enabled_at IS NULL AND (mfa_last_step IS NULL OR mfa_last_step < $2)`,
+    [user.id, step, JSON.stringify(codes.map(c => sha256(normCode(c)))), user.mfaSecret])
+  return (res.rowCount ?? 0) > 0 ? codes : null
 }
 
-export async function regenerateRecoveryCodes(user: User): Promise<string[]> {
+/** Replaces the recovery codes. Callers must re-authenticate first (password + current second factor). */
+export async function regenerateRecoveryCodes(user: User): Promise<string[] | null> {
   const codes = newRecoveryCodes()
-  await query('UPDATE users SET mfa_recovery=$2 WHERE id=$1', [user.id, JSON.stringify(codes.map(c => sha256(normCode(c))))])
-  return codes
+  const res = await query('UPDATE users SET mfa_recovery=$2 WHERE id=$1 AND mfa_enabled_at IS NOT NULL', [user.id, JSON.stringify(codes.map(c => sha256(normCode(c))))])
+  return (res.rowCount ?? 0) > 0 ? codes : null
 }
 
 export async function disableMfa(userId: string) {

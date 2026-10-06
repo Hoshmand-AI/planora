@@ -8,9 +8,13 @@
 // ranking (Spearman rank correlation between an activity's sampled duration and the finish).
 //
 // Uncertainty sources, per activity (multipliers of the planned duration):
-//   - agency reviews and fabrication: the regional permit / supplier lead-time catalog
+//   - the scheduler's own inputs come first: a duration override (e.g. a vendor quote) is centered
+//     on the overridden duration (−5% / +15%), and a permit review with an expected issuance date
+//     or a fabrication step with a committed delivery date is held near-deterministic (0 / +5%);
+//   - other agency reviews and fabrication: the regional permit / supplier lead-time catalog
 //     (low / typical / high) relative to the planned duration;
-//   - categories with firm history: the firm's own actual/planned ratios (median and P80);
+//   - categories with firm history: the firm's own actual/planned ratios (median and P80), unless
+//     the team opted out of firm history in the interview (history.use = No);
 //   - otherwise by kind of work (design, field, other), widened for low-confidence estimates
 //     and narrowed for high-confidence ones.
 // Correlation: field activities share a common productivity/weather factor through a Gaussian
@@ -20,7 +24,7 @@
 // Sampling is seeded from the schedule, so the same schedule always gives the same result.
 
 import type { GeneratedSchedule, PlanActivity, Answer } from './types'
-import type { FirmHistory } from './history'
+import { historyForPlan, type FirmHistory } from './history'
 import { runCpm } from './cpm'
 import { toDayNumber, fromDayNumber } from './calendar'
 import { questionBank } from './elicitation'
@@ -107,16 +111,41 @@ export function spearman(x: number[], y: number[]): number {
 
 const isField = (a: PlanActivity) => a.phase !== 'design' && a.calendarId !== 'cal-7d' && a.category !== 'contingency' && !a.category.startsWith('permit') && a.category !== 'procurement' && a.category !== 'submittals'
 
+/** True when the scheduler overrode this activity's duration (e.g. with a vendor quote). */
+export function hasDurationOverride(a: PlanActivity): boolean {
+  return !!a.overrides?.some(o => o.field === 'duration') || a.rationale.sources.some(s => s.kind === 'override')
+}
+
+export interface DistributionContext {
+  history: FirmHistory | null
+  catalog: Map<string, { low: number; typical: number; high: number; label: string }>
+  /** Activities whose timing follows a date the team gave in the interview (activity id → basis) */
+  committed?: Map<string, string>
+}
+
+/** Activities whose duration follows a date the team gave: expected permit issuance, committed delivery. */
+export function committedActivities(answers: Record<string, Answer>, bank: { permits: { id: string; name: string }[]; longLead: { id: string; name: string }[] }): Map<string, string> {
+  const out = new Map<string, string>()
+  const given = (id: string) => answers[id]?.status === 'known' && typeof answers[id].value === 'string' && !!answers[id].value
+  for (const p of bank.permits) if (given(`permit.${p.id}.expected`)) out.set(`permit-${p.id}`, `${p.name}: expected issuance date from the interview`)
+  for (const l of bank.longLead) if (given(`procure.${l.id}.delivery`)) out.set(`ll-${l.id}-fab`, `${l.name}: committed delivery date from the interview`)
+  return out
+}
+
 /** The three-point estimate for one activity, as multipliers of its planned duration. */
-export function distributionFor(a: PlanActivity, ctx: { history: FirmHistory | null; catalog: Map<string, { low: number; typical: number; high: number; label: string }> }): Triangular | null {
+export function distributionFor(a: PlanActivity, ctx: DistributionContext): Triangular | null {
   if (a.type === 'milestone' || a.duration <= 0 || a.actualFinish || a.category === 'contingency') return null
+  // The scheduler's inputs win over catalog ranges and history: they are what the team actually knows.
+  if (hasDurationOverride(a)) return { min: 0.95, mode: 1, max: 1.15, basis: 'Scheduler override: −5% / +15% around the overridden duration' }
+  const committed = ctx.committed?.get(a.id)
+  if (committed) return { min: 1, mode: 1, max: 1.05, basis: `${committed}, held near-deterministic (0 / +5%)` }
   const planned = a.duration
   const cat = ctx.catalog.get(a.id)
   let d: Triangular
   if (cat && a.calendarId === 'cal-7d') {
     const lo = (cat.low * 7) / planned, ty = (cat.typical * 7) / planned, hi = (cat.high * 7) / planned
     d = { min: Math.min(lo, ty, 1), mode: Math.max(Math.min(ty, hi), lo), max: Math.max(hi, ty, 1), basis: `${cat.label}: catalog ${cat.low}–${cat.typical}–${cat.high} weeks` }
-  } else if (a.rationale.sources.some(s => s.kind === 'firm_history')) {
+  } else if (ctx.history && a.rationale.sources.some(s => s.kind === 'firm_history')) {
     d = { min: 0.9, mode: 1, max: 1.2, basis: 'Duration from your firm’s actuals' }
   } else if (ctx.history?.byCategory[a.category]?.overrunMedian) {
     const st = ctx.history.byCategory[a.category]!
@@ -135,15 +164,18 @@ export function distributionFor(a: PlanActivity, ctx: { history: FirmHistory | n
   return d
 }
 
-export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, opts: { iterations?: number; seed?: number } = {}): SraResult {
+export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, opts: { iterations?: number; seed?: number } = {}): SraResult {
   const started = Date.now()
+  // Opting out of firm history in the interview (history.use = No) means it shapes no distribution.
+  const history = historyForPlan(firmHistory, answers)
   const bank = questionBank({ answers })
   const catalog = new Map<string, { low: number; typical: number; high: number; label: string }>()
   for (const p of bank.permits) catalog.set(`permit-${p.id}`, { ...p.reviewWeeks, label: `${p.name} review` })
   for (const l of bank.longLead) catalog.set(`ll-${l.id}-fab`, { ...l.leadWeeks, label: `${l.name} lead time` })
 
   const acts = s.activities
-  const dists = acts.map(a => distributionFor(a, { history, catalog }))
+  const committed = committedActivities(answers, bank)
+  const dists = acts.map(a => distributionFor(a, { history, catalog, committed }))
   const field = acts.map(isField)
   const budget = opts.iterations ?? Math.max(200, Math.min(1000, Math.floor(400_000 / Math.max(1, acts.length))))
   const seed = opts.seed ?? hashSeed(`${s.generatedAt}|${acts.length}|${s.links.length}`)
@@ -207,8 +239,10 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, hi
     criticality,
     sensitivity,
     assumptions: [
-      'Agency review and fabrication ranges come from the regional permit and supplier lead-time catalogs (verify with the AHJ and suppliers).',
-      history?.overallOverrunMedian ? 'Categories with firm history use your firm’s actual/planned ratios.' : 'No firm history yet: field and design ranges use standard three-point assumptions; upload completed projects to calibrate them.',
+      'Scheduler duration overrides (e.g. vendor quotes) are simulated −5% / +15% around the overridden duration; permit reviews with an expected issuance date and fabrication with a committed delivery date are held near-deterministic (0 / +5%).',
+      'Other agency review and fabrication ranges come from the regional permit and supplier lead-time catalogs (verify with the AHJ and suppliers).',
+      firmHistory && !history ? 'Firm history is not used: the team opted out in the interview, so field and design ranges use standard three-point assumptions.'
+        : history?.overallOverrunMedian ? 'Categories with firm history use your firm’s actual/planned ratios.' : 'No firm history yet: field and design ranges use standard three-point assumptions; upload completed projects to calibrate them.',
       'Field activities share a common productivity/weather factor (correlation 0.4).',
       contingency ? `The ${contingency.duration}-day contingency activity is excluded; the simulated uncertainty replaces it.` : 'No contingency activity in the schedule.',
       'Discrete risk events (e.g. a failed inspection) are not modeled separately; they are reflected only through the duration ranges.',

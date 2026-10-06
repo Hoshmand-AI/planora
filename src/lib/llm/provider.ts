@@ -11,11 +11,14 @@ import { currentRequest } from '@/lib/server/context'
 //   LLM_API_KEY       key for the local endpoint if it needs one
 //   PLANORA_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
 //   PLANORA_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/governance/MODEL-REGISTRY.md)
+//   PLANORA_DEPLOYMENT  commercial (default) | onprem — where this Planora instance itself runs. Air-gapped implies on-prem.
 //
 // Governance (enforced in chat(), the single choke point for every model call):
 //   - organizations can switch AI off entirely (nothing is sent to any model);
 //   - per-organization daily and per-user per-minute quotas cap spend and abuse;
 //   - only approved, version-pinned models are used;
+//   - content of a project marked CUI or classified is never sent to a model outside the customer's
+//     network (cloud mode, or a public LLM_BASE_URL) — see docs/security/CUI-HANDLING.md;
 //   - every call is recorded in the audit log with model, purpose, sizes, latency and a SHA-256 of
 //     the prompt — never the prompt or answer text itself.
 //
@@ -23,6 +26,27 @@ import { currentRequest } from '@/lib/server/context'
 // questions. Scheduling logic, CPM, DCMA and grounding are deterministic and run without it.
 
 export type AiMode = 'cloud' | 'local' | 'offline'
+
+/** Where this Planora instance runs. Only an on-prem / air-gapped instance may hold CUI. */
+export type Deployment = 'commercial_cloud' | 'on_prem' | 'airgapped'
+
+export function deploymentKind(env: Record<string, string | undefined> = process.env): Deployment {
+  if (/^(1|true|yes)$/i.test(env.PLANORA_AIRGAPPED || '')) return 'airgapped'
+  return /^(on-?prem(ises)?|on_prem|self-?hosted)$/i.test((env.PLANORA_DEPLOYMENT || '').trim()) ? 'on_prem' : 'commercial_cloud'
+}
+
+/** Shown wherever project data is entered on the commercial cloud service. */
+export const CUI_CLOUD_WARNING = 'This is the commercial cloud service. Do not enter or store Controlled Unclassified Information (CUI) or classified information here: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped Planora deployment for CUI and classified projects.'
+
+/** Returned (and audited) when a model call for a CUI/classified project would leave the customer's network. */
+export const CUI_AI_REFUSAL = 'This project is marked CUI or classified, so its content is never sent to a cloud AI model. Scheduling, quality checks and reports still work without AI. Use an on-premises / air-gapped deployment with an on-prem model for AI on controlled projects.'
+
+/** A model call was refused because the project's data is CUI or classified and the model is outside the network. */
+export class RestrictedDataError extends Error {
+  constructor(message = CUI_AI_REFUSAL) { super(message) }
+}
+
+const RESTRICTED = new Set(['cui', 'classified'])
 
 export interface LlmStatus {
   mode: AiMode
@@ -32,6 +56,10 @@ export interface LlmStatus {
   /** Small self-hosted models get tighter, structured prompts */
   smallModel: boolean
   error?: string
+  /** Where this instance runs; on 'commercial_cloud' the UI must warn against entering CUI */
+  deployment?: Deployment
+  /** Present on the commercial cloud: CUI / classified information must not be stored here */
+  cuiWarning?: string
 }
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
@@ -91,8 +119,33 @@ function orgAiOff(): boolean {
 
 export function llmStatus(): LlmStatus {
   const { baseURL: _b, apiKey: _k, ...status } = resolveLlmConfig()
-  if (orgAiOff()) return { mode: 'offline', airgapped: status.airgapped, model: null, host: null, smallModel: true, error: 'AI is turned off for your organization' }
-  return status
+  const deployment = deploymentKind()
+  const where = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
+  if (orgAiOff()) return { mode: 'offline', airgapped: status.airgapped, model: null, host: null, smallModel: true, error: 'AI is turned off for your organization', ...where }
+  return { ...status, ...where }
+}
+
+/**
+ * True when the model is outside the customer's network: the cloud provider, or an
+ * OpenAI-compatible endpoint on a public host. Only private / on-prem hosts count as inside.
+ */
+export function isExternalModel(cfg: Pick<LlmStatus, 'mode' | 'host'>, env: Record<string, string | undefined> = process.env): boolean {
+  if (cfg.mode === 'cloud') return true
+  if (cfg.mode === 'local') return !cfg.host || !isAllowedAirgapHost(cfg.host, (env.PLANORA_ALLOWED_HOSTS || '').split(','))
+  return false
+}
+
+/** Refuses (and audits, without content) a call that would send CUI/classified project data to an external model. */
+async function guardRestrictedData(cfg: ReturnType<typeof resolveLlmConfig>, purpose: string) {
+  if (!isExternalModel(cfg)) return
+  const r = currentRequest()
+  const classification = r?.dataClassification ? await r.dataClassification() : null
+  if (!classification || !RESTRICTED.has(classification)) return
+  if (r?.orgId) {
+    const { auditQuietly } = await import('@/lib/server/audit')
+    await auditQuietly({ action: 'ai.blocked_restricted_data', targetType: 'model', targetId: cfg.model ?? 'unknown', detail: { purpose, classification, mode: cfg.mode, host: cfg.host } })
+  }
+  throw new RestrictedDataError()
 }
 
 let client: { key: string; c: OpenAI } | null = null
@@ -132,6 +185,7 @@ async function recordCall(e: { purpose: string; model: string; mode: string; hos
 export async function chat(messages: ChatMessage[], opts: { temperature?: number; maxTokens?: number; purpose?: string } = {}): Promise<string | null> {
   const cl = getClient()
   if (!cl) return null
+  await guardRestrictedData(cl.cfg, opts.purpose || 'chat')
   await enforceQuota()
   const prompt = messages.map(m => `${m.role}:${m.content}`).join('\n')
   const started = Date.now()
@@ -187,7 +241,7 @@ export async function chatJson<T>(messages: ChatMessage[], validate: (v: unknown
       if (!reply) return null
       return validate(extractJson(reply))
     } catch (err) {
-      if (err instanceof AiQuotaError) throw err
+      if (err instanceof AiQuotaError || err instanceof RestrictedDataError) throw err
       if (!reply) return null
       convo.push({ role: 'assistant', content: reply })
       convo.push({ role: 'user', content: `That was not valid: ${(err as Error).message}. Reply with ONLY the corrected JSON.` })

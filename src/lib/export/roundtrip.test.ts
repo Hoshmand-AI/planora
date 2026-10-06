@@ -71,7 +71,11 @@ describe.each(CORPUS)('round trip: $name', ({ answers }) => {
     expectSameSchedule(g, parseXER(exportXer(g, 'Round trip'), 'rt'))
   })
   it('MS Project .xml → import → reschedule gives the same dates and float', () => {
-    expectSameSchedule(g, parseMSProjectXML(exportMspXml(g, 'Round trip'), 'rt'))
+    const p = parseMSProjectXML(exportMspXml(g, 'Round trip'), 'rt')
+    // WBS summary tasks carry the outline; like the upload pipeline, scheduling uses only the work tasks.
+    const summaries = p.activities.filter(a => a.activityType === 'summary')
+    expect(summaries.length).toBeGreaterThan(0)
+    expectSameSchedule(g, { ...p, activities: p.activities.filter(a => a.activityType !== 'summary') })
   })
   it('Excel import workbook → import keeps every activity, duration and link (WBS summary rows are not activities)', async () => {
     const p = await parseSpreadsheet(await exportImportXlsx(g, 'Round trip'), 'rt.xlsx', 'rt')

@@ -5,7 +5,7 @@
 import type { SraResult } from '@/lib/planning/sra'
 import type { GeneratedSchedule } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
-import type { Evaluation } from '@/lib/planning/evaluation'
+import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import type { ExpertReview } from '@/lib/db'
 import { PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import type { ProjectProfile } from '@/lib/planning/types'
@@ -49,11 +49,12 @@ export function basisOfSchedule(opts: {
   L.push(`| Milestone | Date |`, `|---|---|`)
   L.push(`| Notice to Proceed | ${s.projectStart} |`)
   for (const a of s.activities.filter(a => a.type === 'milestone' && a.category !== 'ntp')) L.push(`| ${esc(a.name)} | ${t[a.id]?.earlyFinish ?? '—'} |`)
-  L.push(`| Deterministic finish | ${ev.forecast.deterministic} |`)
-  L.push(`| Rule-based scenario P50 / P80 | ${ev.forecast.p50} / ${ev.forecast.p80} |`)
-  if (opts.sra) L.push(`| Monte Carlo P50 / P80 / P90 | ${opts.sra.percentiles.p50} / ${opts.sra.percentiles.p80} / ${opts.sra.percentiles.p90} |`)
-  if (ev.forecast.requiredFinish) L.push(`| Required finish | ${ev.forecast.requiredFinish}${opts.sra?.required ? ` (probability of meeting it: ${Math.round(opts.sra.required.probability * 100)}%)` : ''} |`)
-  L.push('', `Scenario basis: ${ev.forecast.basis}`, '')
+  // One forecast: Monte Carlo when it was run for this export, otherwise the rule-based estimate, labeled as such.
+  const fc = headlineForecast(ev.forecast, opts.sra)!
+  L.push(`| Deterministic finish | ${fc.deterministic} |`)
+  L.push(`| P50 / P80${fc.p90 ? ' / P90' : ''} (${fc.label}) | ${fc.p50} / ${fc.p80}${fc.p90 ? ` / ${fc.p90}` : ''} |`)
+  if (fc.requiredFinish) L.push(`| Required finish | ${fc.requiredFinish}${fc.probabilityOfRequired != null ? ` (probability of meeting it: ${Math.round(fc.probabilityOfRequired * 100)}%)` : ''} |`)
+  L.push('', `Forecast method: ${fc.method === 'monte_carlo' ? 'Monte Carlo schedule risk analysis (details below).' : fc.basis}`, '')
   if (opts.sra) {
     const r = opts.sra
     L.push('### Schedule risk analysis', '', r.method, '')
@@ -132,7 +133,8 @@ export function basisOfSchedule(opts: {
     }
     L.push('')
   }
-  if (ev.findings.length) { L.push('Findings:', ''); for (const f of ev.findings) L.push(`- ${esc(f)}`); L.push('') }
+  const findings = findingsFor(ev, opts.sra)
+  if (findings.length) { L.push('Findings:', ''); for (const f of findings) L.push(`- ${esc(f)}`); L.push('') }
 
   const overrides = [
     ...s.activities.flatMap(a => (a.overrides || []).map(o => ({ what: `${a.code} ${a.name}`, o }))),

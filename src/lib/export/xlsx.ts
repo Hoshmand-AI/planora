@@ -5,7 +5,7 @@
 //     level colors, indented names, collapsible outline, critical/non-critical bars, month/week scale.
 
 import ExcelJS from 'exceljs'
-import type { GeneratedSchedule } from '@/lib/planning/types'
+import type { ConstraintType, GeneratedSchedule } from '@/lib/planning/types'
 import { buildWbs, type WbsRow } from './wbs'
 import { fmtDate } from '@/lib/format'
 
@@ -62,12 +62,13 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
   const taskFields = ['task_code', 'status_code', 'wbs_id', 'task_name', 'task_type', 'clndr_id', 'target_drtn_hr_cnt', 'start_date', 'end_date', 'total_float_hr_cnt', 'cstr_type', 'cstr_date']
   const taskTitles = ['Activity ID', 'Activity Status', 'WBS Code', 'Activity Name', 'Activity Type', 'Calendar', 'Original Duration (d)', 'Start', 'Finish', 'Total Float (d)', 'Primary Constraint', 'Primary Constraint Date']
   p6.addRow(taskFields); p6.addRow(taskTitles)
-  const cstr: Record<string, string> = { SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before', MSO: 'Mandatory Start', MFO: 'Mandatory Finish' }
+  const cstr: Record<ConstraintType, string> = { SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before', SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish' }
   for (const r of rows) {
     const a = r.activity
     if (!a) continue
     const tm = t[a.id]
-    p6.addRow([a.code, 'Not Started', `${r.wbsCode}`, a.name, a.type === 'milestone' ? 'Finish Milestone' : 'Task Dependent',
+    const status = a.actualFinish || a.status === 'complete' ? 'Completed' : a.actualStart ? 'In Progress' : 'Not Started'
+    p6.addRow([a.code, status, `${r.wbsCode}`, a.name, a.type === 'milestone' ? 'Finish Milestone' : 'Task Dependent',
       s.calendars.find(c => c.id === (a.calendarId || s.defaultCalendarId))?.name || '', a.duration,
       toDate(tm?.earlyStart), toDate(tm?.earlyFinish), tm?.totalFloat ?? '', a.constraint ? cstr[a.constraint.type] : '', toDate(a.constraint?.date)])
   }

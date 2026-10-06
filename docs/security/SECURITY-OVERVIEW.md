@@ -1,6 +1,6 @@
 # Planora security overview
 
-_For customers' security reviews and procurement. Last updated 10/04/2026._
+_For customers' security reviews and procurement. Last updated 10/06/2026._
 
 ## Architecture
 
@@ -8,22 +8,22 @@ _For customers' security reviews and procurement. Last updated 10/04/2026._
 |---|---|---|
 | Application | Next.js 16 (React 19), TypeScript strict, Node.js 22 | Hosted on Vercel (cloud) or run on-premises with `npm start` |
 | Database | PostgreSQL 14+ (Neon in the cloud) | TLS with certificate and host-name verification; encrypted at rest by the provider |
-| AI (optional) | OpenAI API (cloud), any OpenAI-compatible on-prem model, or none | Organization-level switch; air-gapped mode refuses non-private hosts |
+| AI (optional) | OpenAI API (cloud), any OpenAI-compatible on-prem model, or none | Organization-level switch, off by default for new organizations; air-gapped mode refuses non-private hosts; CUI/classified projects are never sent to a cloud model |
 
 The scheduling engine (interview, CPM, DCMA checks, Monte Carlo risk analysis, recovery modeling, exports) is deterministic code that never depends on a model. Models only phrase answers and suggest extra interview questions.
 
 ## Identity and access
 
 - **Passwords:** at least 12 characters, common and personal passwords blocked (NIST SP 800-63B). Stored as bcrypt (cost 12).
-- **Two-step verification:** TOTP authenticator apps, replay-protected, with 10 single-use recovery codes (hashed). The secret is encrypted with AES-256-GCM. Organizations can require it for every member.
+- **Two-step verification:** TOTP authenticator apps, with 10 single-use recovery codes (hashed). Each time step is accepted once per user (the last used step is stored), at sign-in, at re-authentication and at enrollment. Enrollment can only be confirmed while it is pending. New recovery codes require the current password plus a current code. The secret is encrypted with AES-256-GCM. Organizations can require it for every member.
 - **Single sign-on:** OpenID Connect (Entra ID, Okta, Google Workspace…). Authorization code + PKCE, state and nonce, ID-token signature verified against the provider's JWKS, issuer/audience/expiry checks, verified email in a DNS-verified domain. Just-in-time provisioning with a default role. Can be enforced (owners keep a break-glass password).
 - **Sessions:** server-side and revocable. Each request re-checks the session, so sign-out, "sign out everywhere", password change and member removal take effect immediately. Idle timeout is 12 hours by default (an admin can set 1–24), with an absolute limit of 7 days. Cookie: `HttpOnly`, `Secure`, `SameSite=Lax`.
 - **Abuse controls:** database-backed rate limits that hold across all servers:
-  - Sign-in: 30 per 15 minutes per IP and 10 per email. The account locks for 15 minutes after 8 consecutive failures.
+  - Sign-in: 10 attempts per 15 minutes per account (email), and the account locks for 15 minutes after 8 consecutive failures. Per network, only **failed** sign-ins count, up to 300 per 15 minutes per IP, so offices and job sites behind one shared IP aren't locked out by their own successful sign-ins.
   - Also limited: sign-up, two-step codes, API calls (600 per minute per user), uploads (60 per hour per organization), exports, and AI (daily organization quota plus 20 per minute per user).
   - Sign-in errors are generic and timing-equalized.
 - **Roles (least privilege):** Owner, Admin, Scheduler, Reviewer, Viewer. Every API route declares the permission it needs. An automated test fails the build if a route skips the check or a new public endpoint appears.
-- **Separation of duties (optional policies):** the person who built a plan can't approve it, and publishing a baseline requires an independent approving review of that exact version.
+- **Separation of duties (optional policies):** the person who built a plan can't approve it, and publishing a baseline requires an independent approving review of that exact version. Each review is bound to a SHA-256 fingerprint of the generated schedule's content. Any later override, regeneration or other change makes the approval stale, and publishing is refused until a fresh independent review (`src/lib/server/approval.ts`).
 - **Email verification:** self sign-ups confirm their address with a single-use, 48-hour link (token stored as SHA-256). Until then they can't invite people, create API keys or webhooks, or export organization data. Invited and SSO members are confirmed on creation. Active when an email provider is configured.
 - **API keys (integrations):** organization keys with a viewer or scheduler role (never admin), optional expiry, revocable, stored as SHA-256 only, last use tracked, accepted only by endpoints that opt in, rate-limited per key, and audited. See [docs/API.md](../API.md).
 - **Webhooks:** HTTPS only; destinations that resolve to private, loopback, link-local or metadata addresses are refused (SSRF); redirects are not followed; 5-second timeout; deliveries signed with HMAC-SHA256 over a timestamp and the body; endpoints auto-disable after 20 consecutive failures. Signing secrets are encrypted at rest.
@@ -53,7 +53,7 @@ Every material event is appended to `audit_events`: sign-ins (and failures), mem
 
 ## Data protection and privacy
 
-- **AI data:** answers marked "Can't share" never reach a model (covered by tests). AI calls log metadata and a SHA-256 of the prompt, never the content.
+- **AI data:** cloud AI is opt-in. New organizations start rules-only until an admin turns AI on. Answers marked "Can't share" never reach a model (covered by tests). Projects marked CUI or classified are never sent to a model outside the customer's network, and the commercial cloud service warns that CUI must not be stored there (see [CUI-HANDLING.md](CUI-HANDLING.md)). AI calls log metadata and a SHA-256 of the prompt, never the content.
 - **Retention:** configurable per organization (AI history, inactive projects). Sessions, rate counters and invitations are purged automatically.
 - **Portability:** personal data export, full organization export (JSON), account erasure, and organization deletion.
 - See [docs/privacy/DATA-MAP.md](../privacy/DATA-MAP.md) and [SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md).

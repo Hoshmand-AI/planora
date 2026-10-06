@@ -10,7 +10,7 @@
 //
 // applies() === (appliesTri() !== 'no').
 
-import type { Applicability, ProjectProfile } from '@/lib/planning/types'
+import { isCivilType, type Applicability, type ProjectProfile } from '@/lib/planning/types'
 
 export type Tri = 'yes' | 'no' | 'unknown'
 
@@ -35,6 +35,8 @@ function threshold(min: number | undefined, value: number | undefined): Tri {
 
 export function appliesTri(a: Applicability, p: ProjectProfile): Tri {
   const r: Tri[] = []
+  // Building catalog items never apply to civil/infrastructure work unless marked (or listing the type).
+  if (isCivilType(p.projectType) && !a.civil && !(Array.isArray(a.projectTypes) && a.projectTypes.includes(p.projectType!))) return 'no'
 
   if (a.projectTypes !== undefined && a.projectTypes !== 'all') {
     if (!p.projectType) r.push('unknown')

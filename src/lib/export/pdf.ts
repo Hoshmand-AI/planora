@@ -5,7 +5,7 @@
 import type { SraResult } from '@/lib/planning/sra'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { GeneratedSchedule } from '@/lib/planning/types'
-import type { Evaluation } from '@/lib/planning/evaluation'
+import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import { buildWbs } from './wbs'
 import { fmtDate, fmtDates } from '@/lib/format'
 
@@ -68,11 +68,11 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
     let y = H - M - 10
     p.drawText(fit(projectName, bold, 22, W - 2 * M), { x: M, y, size: 22, font: bold, color: NAVY }); y -= 20
     p.drawText(pdfSafe(`Schedule report · prepared ${printed}${opts.preparedBy ? ' by ' + opts.preparedBy : ''}`), { x: M, y, size: 10, font, color: GREY }); y -= 30
+    // One forecast: Monte Carlo when available, otherwise the rule-based estimate, labeled as such.
+    const fc = headlineForecast(ev?.forecast, opts.sra)
     const stats: [string, string][] = [
       ['Start (NTP)', fmtDate(s.projectStart)], ['Deterministic finish', fmtDate(finish)],
-      opts.sra
-        ? ['Monte Carlo P50 / P80', `${fmtDate(opts.sra.percentiles.p50)} / ${fmtDate(opts.sra.percentiles.p80)}`]
-        : ['Scenario P50 / P80', ev ? `${fmtDate(ev.forecast.p50)} / ${fmtDate(ev.forecast.p80)}` : '—'],
+      [`P50 / P80 (${fc?.label ?? 'forecast'})`, fc ? `${fmtDate(fc.p50)} / ${fmtDate(fc.p80)}` : '—'],
       ['Activities', `${s.activities.length} (${s.activities.filter(a => t[a.id]?.critical).length} critical)`],
       ['Quality', ev ? `${ev.grade} (${ev.score}/100) · DCMA ${ev.dcma.passed}/${ev.dcma.applicable}` : '—'],
     ]
@@ -102,7 +102,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
       }
       y -= 12
     }
-    if (ev) section('Findings', ev.findings, 14)
+    if (ev) section('Findings', findingsFor(ev, opts.sra), 14)
     section('Assumptions and open items', s.assumptions.filter(a => a.kind !== 'inferred').map(a => `${a.text}${a.bufferDays ? ` (+${a.bufferDays} work days)` : ''}`), 18)
     section('Notes', s.notes || [], 6)
     footer(p, pageNo)
