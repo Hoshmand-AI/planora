@@ -10,7 +10,12 @@ export interface ParsedSchedule {
   projectName: string
   dataDate: string | null
   projectStart: string | null
+  /** Finish date the file reports (P6 scheduled finish / MSP finish); Planora recalculates its own */
   projectFinish: string | null
+  /** Required finish the file imposes (P6 PROJECT.plan_end_date "Must Finish By") */
+  mustFinishBy?: string | null
+  /** Stable project identity across updates (P6 proj_short_name, MSP title) */
+  projectKey?: string | null
   /** Activity.id is a fresh uuid; Activity.sourceId is the source-system id (P6 task_id, MSP UID, row code) */
   activities: Activity[]
   /** predecessorId / successorId reference Activity.id (uuid) */
@@ -100,8 +105,10 @@ export function constraintFromLabel(label: string | null | undefined): Constrain
     snlt: 'SNLT', startnolaterthan: 'SNLT', startonorbefore: 'SNLT', csmsob: 'SNLT',
     fnet: 'FNET', finishnoearlierthan: 'FNET', finishonorafter: 'FNET', csmeoa: 'FNET',
     fnlt: 'FNLT', finishnolaterthan: 'FNLT', finishonorbefore: 'FNLT', csmeob: 'FNLT',
-    mso: 'MSO', muststarton: 'MSO', starton: 'MSO', mandatorystart: 'MSO', csmso: 'MSO', csmandstart: 'MSO',
-    mfo: 'MFO', mustfinishon: 'MFO', finishon: 'MFO', mandatoryfinish: 'MFO', csmeo: 'MFO', csmandfin: 'MFO', csmandfinish: 'MFO',
+    // P6 "Start On" / "Finish On" (CS_MSO / CS_MEO) keep logic in charge; only the mandatory types overrule it.
+    starton: 'SO', csmso: 'SO', finishon: 'FO', csmeo: 'FO',
+    mso: 'MSO', muststarton: 'MSO', mandatorystart: 'MSO', csmandstart: 'MSO',
+    mfo: 'MFO', mustfinishon: 'MFO', mandatoryfinish: 'MFO', csmandfin: 'MFO', csmandfinish: 'MFO',
   }
   return table[n] ?? null
 }

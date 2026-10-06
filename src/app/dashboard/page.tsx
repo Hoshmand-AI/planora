@@ -6,9 +6,10 @@ import { Upload } from 'lucide-react'
 import { fmtDate, fmtDay } from '@/lib/format'
 import Link from 'next/link'
 import { Portfolio } from '@/components/Portfolio'
+import { ScheduleTools } from '@/components/ScheduleTools'
 
 export default function DashboardPage() {
-  const { selectedSchedule, metrics } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules } = useApp()
 
   if (!selectedSchedule) {
     return (
@@ -30,7 +31,16 @@ export default function DashboardPage() {
 
   const m = metrics as Record<string, number | unknown[]> | null
 
-  const varianceDays  = Number(m?.varianceDays ?? 0)
+  const mx = (m as Record<string, unknown> | null) ?? {}
+  // Status and variance come from Planora's recalculation (src/lib/analysis/schedule-analysis.ts).
+  const varianceDays: number | null = mx.varianceDays == null ? null : Number(mx.varianceDays)
+  const varianceBasis = (mx.varianceBasis as string) || ''
+  const status = (mx.status as 'on_track' | 'attention' | 'at_risk' | 'complete' | undefined) ?? (varianceDays != null && varianceDays > 14 ? 'at_risk' : varianceDays != null && varianceDays > 0 ? 'attention' : 'on_track')
+  const statusReasons = (mx.statusReasons as string[]) ?? []
+  const forecastFinish = (mx.forecastFinish as string) || null
+  const reportedFinish = (mx.reportedFinish as string) || null
+  const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete' } as const
+  const STATUS_TONE = { on_track: 'on-track', attention: 'attention', at_risk: 'at-risk', complete: 'on-track' } as const
   const criticalCount = Number(m?.criticalCount ?? 0)
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
@@ -52,18 +62,27 @@ export default function DashboardPage() {
             {selectedSchedule.dataDate && ` · data date ${fmtDate(selectedSchedule.dataDate)}`}
           </div>
         </div>
-        <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 ${
-          varianceDays > 14
+        <span title={statusReasons.join(' ')} className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 ${
+          status === 'at_risk'
             ? 'text-status-at-risk bg-status-at-risk-bg border-status-at-risk'
-            : varianceDays > 0
+            : status === 'attention'
             ? 'text-status-attention bg-status-attention-bg border-status-attention'
             : 'text-status-on-track bg-status-on-track-bg border-status-on-track'
         }`}>
-          {varianceDays > 14 ? 'At Risk' : varianceDays > 0 ? 'Attention' : 'On Track'}
+          {STATUS_LABEL[status]}
         </span>
       </div>
       </StickyBar>
       <Link href="/dashboard/portfolio" className="inline-block text-[13px] font-medium text-accent-600 hover:underline">All projects and alerts (portfolio) →</Link>
+
+      {(statusReasons.length > 0 || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish)) && (
+        <div className={`border-l-2 pl-3 py-1 text-[13px] text-warm-700 space-y-1 ${status === 'at_risk' ? 'border-status-at-risk' : status === 'attention' ? 'border-status-attention' : 'border-status-info'}`}>
+          {statusReasons.map((r, i) => <p key={i}>{r}</p>)}
+          {reportedFinish && forecastFinish && reportedFinish !== forecastFinish && (
+            <p className="text-warm-500">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
+          )}
+        </div>
+      )}
 
       {/* About this project — what, where, when, what must be achieved */}
       {brief && (
@@ -90,9 +109,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="Schedule Variance"
-          value={varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
-          context="from baseline"
-          color={varianceDays > 14 ? 'at-risk' : varianceDays > 0 ? 'attention' : 'on-track'}
+          value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
+          context={varianceDays == null ? 'no usable baseline' : 'calendar days vs baseline'}
+          title={varianceBasis}
+          color={varianceDays == null ? undefined : STATUS_TONE[varianceDays > 14 ? 'at_risk' : varianceDays > 0 ? 'attention' : 'on_track']}
         />
         <MetricCard
           label="Critical Activities"
@@ -169,6 +189,13 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {selectedSchedule.sourceType !== 'generated' && (
+        <ScheduleTools scheduleId={selectedSchedule.id}
+          progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
+          inHistory={selectedSchedule.inHistory ?? true}
+          onChanged={() => { refreshSchedules(); refreshMetrics() }} />
+      )}
+
     </div>
   )
 }
@@ -188,12 +215,14 @@ interface ActivityRow {
 /* ─── Metric Card ────────────────────────────────── */
 function MetricCard({
   label, value, context,
-  color,
+  color, title,
 }: {
   label: string
   value: string
   context: string
   color?: 'at-risk' | 'attention' | 'on-track'
+  /** Explains how the value was measured */
+  title?: string
 }) {
   const valueColor =
     color === 'at-risk'   ? 'text-status-at-risk'   :
@@ -202,10 +231,11 @@ function MetricCard({
     'text-navy-950'
 
   return (
-    <div className="bg-warm-50 border border-warm-200 rounded-lg p-4">
+    <div className="bg-warm-50 border border-warm-200 rounded-lg p-4" title={title}>
       <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">{label}</div>
       <div className={`text-[26px] font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
       <div className="text-[11px] text-warm-400 mt-1.5">{context}</div>
+      {title && <div className="text-[11px] text-warm-500 mt-1 leading-snug">{title}</div>}
     </div>
   )
 }

@@ -10,18 +10,38 @@ import {
 
 type Row = Record<string, string>
 
-export function parseXER(content: string, scheduleId: string): ParsedSchedule {
+export function parseXER(content: string, scheduleId: string, opts: { projectId?: string | null } = {}): ParsedSchedule {
   const warnings: string[] = []
   const tables = readTables(content)
 
   /* ── Project ─────────────────────────────────────────── */
   const projects = tables['PROJECT'] || []
-  const project = projects[0] || {}
-  if (projects.length > 1) warnings.push(`XER contains ${projects.length} projects; all activities were imported, project dates taken from "${project['proj_short_name'] || project['proj_id']}"`)
+  // A P6 export often carries the update together with its baseline project(s). Import one project:
+  // the requested one, else a non-baseline project (no orig_proj_id) with the most activities.
+  const taskCount = (pid: string) => (tables['TASK'] || []).filter(t => !t['proj_id'] || t['proj_id'] === pid).length
+  const candidates = projects.filter(p => !p['orig_proj_id'])
+  const pool = candidates.length ? candidates : projects
+  const project = (opts.projectId && projects.find(p => p['proj_id'] === opts.projectId || p['proj_short_name'] === opts.projectId))
+    || [...pool].sort((a, b) => taskCount(b['proj_id']) - taskCount(a['proj_id']))[0] || {}
+  const projId = project['proj_id'] || null
+  if (projects.length > 1) {
+    const others = projects.filter(p => p !== project).map(p => `"${p['proj_short_name'] || p['proj_id']}"${p['orig_proj_id'] ? ' (baseline)' : ''}`)
+    warnings.push(`XER contains ${projects.length} projects; imported "${project['proj_short_name'] || projId}" only. Not imported: ${others.join(', ')}.`)
+  }
+  const inProject = (r: Row) => !projId || !r['proj_id'] || r['proj_id'] === projId
+  if (projId) {
+    tables['TASK'] = (tables['TASK'] || []).filter(inProject)
+    tables['PROJWBS'] = (tables['PROJWBS'] || []).filter(inProject)
+    const keep = new Set(tables['TASK'].map(t => t['task_id']))
+    tables['TASKPRED'] = (tables['TASKPRED'] || []).filter(p => keep.has(p['task_id']))
+  }
   const projectName = project['proj_short_name'] || project['proj_long_name'] || 'Imported Schedule'
+  const projectKey = project['proj_short_name'] || project['proj_id'] || null
   const projectStart = isoDatePrefix(project['plan_start_date'])
   const dataDate = isoDatePrefix(project['last_recalc_date']) || isoDatePrefix(project['next_data_date']) || projectStart
   const projectFinish = isoDatePrefix(project['scd_end_date']) || isoDatePrefix(project['plan_end_date'])
+  // P6 stores the project's "Must Finish By" date in plan_end_date.
+  const mustFinishBy = isoDatePrefix(project['plan_end_date'])
 
   /* ── Calendars ───────────────────────────────────────── */
   const calendars: WorkCalendar[] = []
@@ -155,7 +175,7 @@ export function parseXER(content: string, scheduleId: string): ParsedSchedule {
   }
 
   return {
-    projectName, dataDate, projectStart, projectFinish,
+    projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey,
     activities, relationships, calendars, defaultCalendarId, warnings,
     sourceType: 'p6_xer',
   }

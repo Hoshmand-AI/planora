@@ -80,17 +80,26 @@ export function planRow(p: Plan, today: string): PortfolioRow {
 
 export function scheduleRow(s: Schedule, today: string): PortfolioRow {
   const alerts: PortfolioAlert[] = []
-  const v = s.varianceDays
-  if (v != null && v > 14) alerts.push({ code: 'behind', severity: 'error', text: `Finish has slipped ${v} days against the baseline.` })
-  else if (v != null && v > 0) alerts.push({ code: 'behind', severity: 'warning', text: `Finish has slipped ${v} days against the baseline.` })
+  const an = s.analysis
+  const v = an ? an.varianceDays : s.varianceDays
+  if (an) {
+    // Planora's own analysis: negative float, overruled constraints, variance on the finish milestone.
+    if (an.negativeFloatCount > 0) alerts.push({ code: 'negative_float', severity: 'error', text: `${an.negativeFloatCount} open ${an.negativeFloatCount === 1 ? 'activity has' : 'activities have'} negative float (lowest ${an.minFloat} work days).` })
+    if (an.violations.length) alerts.push({ code: 'constraint_overrules_logic', severity: 'error', text: `${an.violations.length} mandatory constraint${an.violations.length === 1 ? ' hides' : 's hide'} a logic-driven slip of up to ${Math.max(...an.violations.map(x => x.days))} work days.` })
+    if (an.mustFinishBy && an.forecastFinish && an.forecastFinish > an.mustFinishBy) alerts.push({ code: 'late', severity: 'error', text: `Forecast finish ${us(an.forecastFinish)} is after the required ${us(an.mustFinishBy)}.` })
+  }
+  const basis = an?.finishMilestone?.varianceDays != null ? ` (${an.finishMilestone.code} ${an.finishMilestone.name})` : ''
+  if (v != null && v > 14) alerts.push({ code: 'behind', severity: 'error', text: `Finish has slipped ${v} calendar days against the baseline${basis}.` })
+  else if (v != null && v > 0) alerts.push({ code: 'behind', severity: 'warning', text: `Finish has slipped ${v} calendar days against the baseline${basis}.` })
   if (s.dataDate) {
     const age = days(s.dataDate, today)
     if (age > STALE_DATA_DATE_DAYS && s.percentComplete < 100) alerts.push({ code: 'stale_status', severity: 'warning', text: `Data date ${us(s.dataDate)} is ${age} days old; a status update is overdue.` })
   }
-  if (s.projectFinish && s.percentComplete < 100 && s.projectFinish < today) alerts.push({ code: 'finish_passed', severity: 'error', text: `Forecast finish ${us(s.projectFinish)} has passed but the schedule is ${s.percentComplete}% complete.` })
+  const finish = an?.forecastFinish ?? s.projectFinish
+  if (finish && s.percentComplete < 100 && finish < today) alerts.push({ code: 'finish_passed', severity: 'error', text: `Forecast finish ${us(finish)} has passed but the schedule is ${s.percentComplete}% complete.` })
   if (s.warnings.length) alerts.push({ code: 'import_warnings', severity: 'info', text: `${s.warnings.length} import warning${s.warnings.length > 1 ? 's' : ''}.` })
   return {
-    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish: s.projectFinish, required: null,
+    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
     gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status: statusOf(alerts, true), alerts,
   }
 }

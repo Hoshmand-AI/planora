@@ -4,6 +4,10 @@ import { log } from '@/lib/server/log'
 import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import type { ProjectBrief } from '@/lib/analysis/brief'
+import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import type { ScheduleComparison } from '@/lib/analysis/compare'
+import { buildReport } from '@/lib/export/reports'
+import { checkInputs } from '@/lib/analysis/input-checks'
 
 // Model calls go through the provider (cloud, on-prem, or offline). When no model is available,
 // answers and reports fall back to deterministic summaries computed from the schedule itself.
@@ -16,6 +20,10 @@ interface ScheduleContext {
   hasLogic?: boolean
   /** The organization's quality thresholds */
   rules?: Partial<DcmaRules>
+  /** Planora's recalculated analysis (forecast, variance basis, status, driving path) */
+  analysis?: ScheduleAnalysis
+  /** Change since the previous upload of the same project */
+  comparison?: ScheduleComparison | null
 }
 
 export async function askScheduleQuestion(
@@ -225,7 +233,9 @@ Use formal, professional language suitable for presentation to project executive
 Data Date: ${schedule.dataDate} | Start: ${schedule.projectStart} | Finish: ${schedule.projectFinish}
 Activities: ${stats.total} | Critical: ${stats.critical} | Complete: ${stats.complete}
 In Progress: ${stats.inProgress} | Not Started: ${stats.notStarted}
-Variance: ${schedule.varianceDays || 'Unknown'} days
+Variance: ${context.analysis ? `${context.analysis.varianceDays ?? 'not measurable'} calendar days (${context.analysis.varianceBasis})` : `${schedule.varianceDays ?? 'not measurable'} calendar days`}
+${context.analysis ? `Status: ${context.analysis.status} — ${context.analysis.statusReasons.join(' ') || 'no issues'}\nForecast finish (recalculated): ${context.analysis.forecastFinish} | Header finish in file: ${context.analysis.reportedFinish ?? 'none'} | Required: ${context.analysis.mustFinishBy ?? 'none'}` : ''}
+${context.comparison ? `Since the previous update (${context.comparison.before.version}): ${context.comparison.summary.join(' ')}` : ''}
 Missing Predecessors: ${stats.missingPred} | Missing Successors: ${stats.missingSucc}
 Negative Float: ${stats.negFloat}
 
@@ -247,7 +257,13 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
   } catch (error: unknown) {
     log('warn', 'model call failed', { purpose: 'report', error: (error as Error).message })
   }
-  // Deterministic report (offline / air-gapped / model failure).
+  // Deterministic report (offline / air-gapped / model failure): each type has its own content.
+  if (context.analysis) {
+    return buildReport(reportType, {
+      schedule, activities, relationships, analysis: context.analysis, dcma, brief: context.brief, comparison: context.comparison ?? null,
+      dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)),
+    })
+  }
   return [
     `# ${reportType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${schedule.name}`,
     '',

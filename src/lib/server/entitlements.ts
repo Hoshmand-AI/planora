@@ -18,15 +18,17 @@ export interface Entitlements {
   sso: boolean
   /** API keys and outbound webhooks */
   integrations: boolean
+  /** Monte Carlo schedule risk analysis */
+  sra: boolean
 }
 
 const ALL_REPORTS = ['executive_summary', 'critical_path', 'variance', 'qa_qc']
 const ALL_EXPORTS = ['xer', 'xml', 'pdf', 'xlsx-p6', 'xlsx-import', 'csv', 'md']
 
 export const PLANS: Record<PlanId, Entitlements> = {
-  free: { label: 'Free', maxUploadedSchedules: 3, aiPerDay: 10, reports: ['executive_summary'], exports: ['xer', 'xml', 'csv', 'md'], sso: false, integrations: false },
-  pro: { label: 'Pro', maxUploadedSchedules: null, aiPerDay: 1000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: false, integrations: true },
-  enterprise: { label: 'Enterprise', maxUploadedSchedules: null, aiPerDay: 10_000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: true, integrations: true },
+  free: { label: 'Free', maxUploadedSchedules: 3, aiPerDay: 10, reports: ['executive_summary'], exports: ['xer', 'xml', 'csv', 'md'], sso: false, integrations: false, sra: false },
+  pro: { label: 'Pro', maxUploadedSchedules: null, aiPerDay: 1000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: false, integrations: true, sra: true },
+  enterprise: { label: 'Enterprise', maxUploadedSchedules: null, aiPerDay: 10_000, reports: ALL_REPORTS, exports: ALL_EXPORTS, sso: true, integrations: true, sra: true },
 }
 
 export const isPlanId = (p: unknown): p is PlanId => typeof p === 'string' && (PLAN_IDS as readonly string[]).includes(p)

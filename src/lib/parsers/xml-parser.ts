@@ -346,6 +346,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     dataDate,
     projectStart,
     projectFinish,
+    projectKey: title || projectSummaryName || fileName || null,
     activities,
     relationships,
     // base calendars plus any (resource) calendar a task actually uses

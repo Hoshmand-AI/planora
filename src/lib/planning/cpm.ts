@@ -31,12 +31,22 @@
 // relationships into an in-progress successor (its start has already happened).
 //
 // Progress: actualFinish => complete (times = actuals). actualStart without actualFinish => in
-// progress: ES = actualStart, remaining (default duration) is scheduled from max(dataDate,
-// actualStart) — i.e. "progress override" for the start; FF/SF predecessors can still push the
-// finish. A milestone with only actualStart is treated as complete on that date.
+// progress: ES = actualStart. Out-of-sequence work follows input.progressMode:
+//   'retained' (default, as P6): the remaining work cannot resume until its FS/SS predecessors
+//     allow it, so remaining = scheduled from max(dataDate, actualStart, logic).
+//   'override': the remaining work continues from max(dataDate, actualStart), ignoring FS/SS logic.
+// FF/SF predecessors can push the finish in both modes. A milestone with only actualStart is
+// treated as complete on that date.
 //
-// Constraints: SNET/FNET push early dates, MSO/MFO fix early and late dates (but never earlier than
-// the data date), SNLT/FNLT cap late dates.
+// Constraints: SNET/FNET push early dates; SNLT/FNLT cap late dates; SO/FO (P6 Start On / Finish On)
+// do both, so logic still drives the early date and a late predecessor shows negative float.
+// MSO/MFO are mandatory: they fix early and late dates (never earlier than the data date) even
+// against logic; each overruled relationship is reported in `violations` and the constrained
+// activity carries the overrun as negative float.
+//
+// Longest path: from the latest early finish, walk back through driving relationships regardless
+// of float (P6 "longest path"). The critical path is the TF <= 0 chain and can be empty when a
+// required finish leaves positive float everywhere.
 
 import type { CpmActivity, CpmInput, CpmLink, CpmResult, CpmTimes, WorkCalendar } from '@/lib/planning/types'
 import { compileCalendar, defaultCalendar, fromDayNumber, toDayNumber, type CompiledCalendar } from '@/lib/planning/calendar'
@@ -54,6 +64,11 @@ interface Node {
   lf: number
   /** display-as-start for finish milestones pinned at the data date */
   pinnedLow: boolean
+  /** early start/finish instants logic alone would give (differs only under MSO/MFO) */
+  logicEs: number
+  logicEf: number
+  /** in-progress work: the instant the remaining duration resumes */
+  resume: number
   tf: number
   ff: number
 }
@@ -125,6 +140,7 @@ export function runCpm(input: CpmInput): CpmResult {
     dataDay = projectStartDay
   }
   const lower = Math.max(projectStartDay, dataDay)
+  const retained = input.progressMode !== 'override'
 
   /* ── activities ── */
   const idx = new Map<string, number>()
@@ -141,7 +157,7 @@ export function runCpm(input: CpmInput): CpmResult {
     if (a.actualFinish && Number.isNaN(af)) warnings.push(`Activity ${a.code}: invalid actual finish '${a.actualFinish}' ignored.`)
     if (a.actualStart && Number.isNaN(as)) warnings.push(`Activity ${a.code}: invalid actual start '${a.actualStart}' ignored.`)
     const state: Node['state'] = !Number.isNaN(af) || (isMs && !Number.isNaN(as)) ? 'complete' : !Number.isNaN(as) ? 'progress' : 'open'
-    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, tf: 0, ff: 0 })
+    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, tf: 0, ff: 0 })
   }
   const n = nodes.length
 
@@ -257,11 +273,16 @@ export function runCpm(input: CpmInput): CpmResult {
       const rem = remainingOf(node)
       node.es = as
       let f: number
-      if (rem > 0) f = c.add(c.next(Math.max(dataDay, as)), rem - 1)
+      // Retained logic: the remaining work waits for FS/SS predecessors (startLB already holds them).
+      const resume = retained ? Math.max(dataDay, as, startLB) : Math.max(dataDay, as)
+      if (rem > 0) f = c.add(c.next(resume), rem - 1)
       else f = Math.max(as, c.prev(dataDay - 1))
+      node.resume = rem > 0 ? c.next(resume) : as
       if (finishLB > f + 1) f = c.next(finishLB - 1)
-      if (hasK && k!.type === 'FNET' && kd > f) f = c.next(kd)
+      if (hasK && (k!.type === 'FNET' || k!.type === 'FO') && kd > f) f = c.next(kd)
       node.ef = f + 1
+      node.logicEs = node.es
+      node.logicEf = node.ef
       continue
     }
 
@@ -271,8 +292,12 @@ export function runCpm(input: CpmInput): CpmResult {
         // A constraint date on a milestone means "displayed on that date": the instant depends on
         // whether it is a start or finish milestone (see msInstant).
         const ki = msInstant(node, kd)
-        if (k!.type === 'SNET' || k!.type === 'FNET') t = Math.max(t, ki)
-        else if (k!.type === 'MSO' || k!.type === 'MFO') t = ki
+        if (k!.type === 'SNET' || k!.type === 'FNET' || k!.type === 'SO' || k!.type === 'FO') t = Math.max(t, ki)
+        else if (k!.type === 'MSO' || k!.type === 'MFO') {
+          const logicT = msSnapFwd(Math.max(t, lower), c)
+          node.logicEs = node.logicEf = logicT
+          t = ki
+        }
       }
       if (t < lower) {
         if (hasK && (k!.type === 'MSO' || k!.type === 'MFO')) warnings.push(`Activity ${a.code}: mandatory constraint before the data date was moved to the data date.`)
@@ -281,15 +306,18 @@ export function runCpm(input: CpmInput): CpmResult {
       t = msSnapFwd(t, c)
       node.pinnedLow = !node.startLike && t <= lower
       node.es = node.ef = t
+      if (!(hasK && (k!.type === 'MSO' || k!.type === 'MFO'))) node.logicEs = node.logicEf = t
       continue
     }
 
     if (hasK) {
-      if (k!.type === 'SNET') startLB = Math.max(startLB, kd)
-      else if (k!.type === 'FNET') finishLB = Math.max(finishLB, kd + 1)
+      if (k!.type === 'SNET' || k!.type === 'SO') startLB = Math.max(startLB, kd)
+      else if (k!.type === 'FNET' || k!.type === 'FO') finishLB = Math.max(finishLB, kd + 1)
     }
     let s = c.next(startLB)
     if (finishLB > -INF) s = Math.max(s, taskStart(c.next(finishLB - 1), node.dur, c))
+    node.logicEs = s
+    node.logicEf = taskFinish(s, node.dur, c) + 1
     if (hasK && (k!.type === 'MSO' || k!.type === 'MFO')) {
       s = k!.type === 'MSO' ? c.next(kd) : taskStart(c.prev(kd), node.dur, c)
       if (s < lower) {
@@ -332,7 +360,7 @@ export function runCpm(input: CpmInput): CpmResult {
       const ed = edges[e]
       const q = nodes[ed.to]
       if (q.state === 'complete') continue
-      if (q.state === 'progress' && (ed.type === 'FS' || ed.type === 'SS')) continue
+      if (q.state === 'progress' && !retained && (ed.type === 'FS' || ed.type === 'SS')) continue
       switch (ed.type) {
         case 'FS': finishUB = Math.min(finishUB, shift(q.ls, -ed.lag, q.c)); break
         case 'SS': startUB = Math.min(startUB, shift(q.ls, -ed.lag, q.c)); break
@@ -348,7 +376,7 @@ export function runCpm(input: CpmInput): CpmResult {
     if (node.isMs) {
       let t = Math.min(startUB, finishUB)
       if (hasK) {
-        if (k!.type === 'SNLT' || k!.type === 'FNLT') t = Math.min(t, msInstant(node, kd))
+        if (k!.type === 'SNLT' || k!.type === 'FNLT' || k!.type === 'SO' || k!.type === 'FO') t = Math.min(t, msInstant(node, kd))
         else if (k!.type === 'MSO' || k!.type === 'MFO') t = node.es
       }
       t = msSnapBack(t, c)
@@ -358,8 +386,8 @@ export function runCpm(input: CpmInput): CpmResult {
 
     const d = node.state === 'progress' ? remainingOf(node) : node.dur
     if (hasK) {
-      if (k!.type === 'SNLT') startUB = Math.min(startUB, kd)
-      else if (k!.type === 'FNLT') finishUB = Math.min(finishUB, kd + 1)
+      if (k!.type === 'SNLT' || k!.type === 'SO') startUB = Math.min(startUB, kd)
+      else if (k!.type === 'FNLT' || k!.type === 'FO') finishUB = Math.min(finishUB, kd + 1)
     }
     let f: number
     if (hasK && (k!.type === 'MSO' || k!.type === 'MFO') && node.state === 'open') {
@@ -381,6 +409,19 @@ export function runCpm(input: CpmInput): CpmResult {
     const finishFloat = wdInstants(node.ef, node.lf, c)
     if (node.isMs || node.state === 'progress') node.tf = finishFloat
     else node.tf = Math.min(wdInstants(node.es, node.ls, c), finishFloat)
+  }
+  /* ── mandatory constraints that overrule logic ── */
+  const violations: CpmResult['violations'] = []
+  for (let i = 0; i < n; i++) {
+    const node = nodes[i]
+    const k = node.a.constraint
+    if (node.state !== 'open' || !k || (k.type !== 'MSO' && k.type !== 'MFO')) continue
+    const over = node.isMs ? wdInstants(node.es, node.logicEs, node.c) : wdInstants(node.ef, node.logicEf, node.c)
+    if (over <= 0) continue
+    node.tf = Math.min(node.tf, -over)
+    const logicDay = node.isMs ? msDisplay(node, node.logicEs) : node.logicEf - 1
+    violations.push({ id: node.a.id, type: k.type, constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
+    warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
   for (let i = 0; i < n; i++) {
     const node = nodes[i]
@@ -436,45 +477,62 @@ export function runCpm(input: CpmInput): CpmResult {
   }
   const projectFinish = finishNode >= 0 ? times[nodes[finishNode].a.id].earlyFinish : fromDayNumber(projectStartDay)
 
-  /* ── critical path: walk driving predecessors back from the latest critical finish ── */
-  const criticalPath: string[] = []
-  let end = -1
-  let endEf = -INF
-  for (const i of order) {
-    const node = nodes[i]
-    if (node.state !== 'complete' && node.tf <= 0 && node.ef >= endEf) { endEf = node.ef; end = i }
-  }
-  if (end >= 0) {
+  /* ── driving paths: walk driving predecessors back from an end activity ── */
+  // A relationship is driving when it alone would put the successor's (logic) early date where it
+  // is. Mandatory constraints are judged on the logic dates they overrule, so the walk follows the
+  // real sequence through them; retained-logic progress is judged on where the remaining work resumes.
+  const walk = (endIdx: number, eligible: (i: number) => boolean): string[] => {
+    const path: string[] = []
     const visited = new Uint8Array(n)
-    let cur = end
+    let cur = endIdx
     while (cur >= 0 && !visited[cur]) {
       visited[cur] = 1
-      criticalPath.push(nodes[cur].a.id)
+      path.push(nodes[cur].a.id)
       const q = nodes[cur]
       let best = -1
       let bestScore = INF
       for (const e of ins[cur]) {
         const ed = edges[e]
         const p = nodes[ed.from]
-        if (p.state === 'complete' || visited[ed.from]) continue
-        if (q.state === 'progress' && (ed.type === 'FS' || ed.type === 'SS')) continue
+        if (p.state === 'complete' || visited[ed.from] || !eligible(ed.from)) continue
+        const startLink = ed.type === 'FS' || ed.type === 'SS'
+        if (q.state === 'progress' && startLink && !retained) continue
         const src = ed.type === 'FS' || ed.type === 'FF' ? p.ef : p.es
         const bound = shift(src, ed.lag, q.c)
-        // driving: the relationship alone would put the successor's early date where it is
         let driving: boolean
-        if (q.isMs) driving = msSnapFwd(bound, q.c) >= q.es
-        else if (ed.type === 'FS' || ed.type === 'SS') driving = q.c.next(bound) >= q.es
-        else driving = q.c.next(bound - 1) + 1 >= q.ef
+        if (q.isMs) driving = msSnapFwd(bound, q.c) >= q.logicEs
+        else if (startLink) driving = q.c.next(bound) >= (q.state === 'progress' ? q.resume : q.logicEs)
+        else driving = q.c.next(bound - 1) + 1 >= q.logicEf
         if (!driving) continue
-        const score = p.tf
+        // prefer the most critical driver; on ties, the one that finishes latest
+        const score = p.tf * 1e6 - p.ef
         if (score < bestScore) { bestScore = score; best = ed.from }
       }
       cur = best
     }
-    criticalPath.reverse()
+    return path.reverse()
   }
 
-  return { times, projectFinish, criticalPath, cycles, warnings: Array.from(new Set(warnings)) }
+  let critEnd = -1
+  let critEf = -INF
+  for (const i of order) {
+    const node = nodes[i]
+    if (node.state !== 'complete' && node.tf <= 0 && node.ef >= critEf) { critEf = node.ef; critEnd = i }
+  }
+  const criticalPath = critEnd >= 0 ? walk(critEnd, (i) => nodes[i].tf <= 0) : []
+  // Longest path: from the latest-finishing open activity (logic dates), whatever its float.
+  let longEnd = -1
+  let longEf = -INF
+  for (const i of order) {
+    const node = nodes[i]
+    if (node.state !== 'complete' && node.logicEf >= longEf) { longEf = node.logicEf; longEnd = i }
+  }
+  const longestPath = longEnd >= 0 ? walk(longEnd, () => true) : []
+  const logicFinish = longEnd >= 0
+    ? fromDayNumber(nodes[longEnd].isMs ? msDisplay(nodes[longEnd], nodes[longEnd].logicEs) : nodes[longEnd].logicEf - 1)
+    : projectFinish
+
+  return { times, projectFinish, logicFinish, criticalPath, longestPath, violations, progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)) }
 }
 
 /* ─── graph helpers ───────────────────────────────────── */

@@ -148,10 +148,17 @@ describe('uploaded files without calculated results', () => {
   })
 
   it('writes a short project overview', () => {
-    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Ashburn DC Phase 1', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 4, relationshipCount: 3, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: null, region: 'VA', grossSqft: 250000 } as Schedule
+    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Ashburn DC Phase 1', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 4, relationshipCount: 3, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: 'data_center', region: 'VA', grossSqft: 250000 } as Schedule
     const b = projectBrief(s, [{ ...mk('M', 0), name: 'Substantial Completion', activityType: 'milestone', earlyFinish: '2028-02-15' }, { ...mk('F', 20), category: 'foundations', earlyStart: '2026-10-01' }])
     expect(b.summary).toMatch(/data center project in VA/)
     expect(b.summary).toMatch(/09\/01\/2026 to 03\/01\/2028/)
     expect(b.summary).toMatch(/Substantial Completion by 02\/15\/2028/)
+  })
+
+  it('does not guess a project type from names', () => {
+    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Fox River Bridge (restore storm outfalls)', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 1, relationshipCount: 0, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: null, region: 'IL', grossSqft: null } as Schedule
+    const b = projectBrief(s, [{ ...mk('A', 5), name: 'Retail store tenant coordination' }])
+    expect(b.summary).toMatch(/a construction project in IL/)
+    expect(b.facts.find(f => f.label === 'Type')).toBeUndefined()
   })
 })

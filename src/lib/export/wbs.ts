@@ -45,6 +45,8 @@ export function buildWbs(s: GeneratedSchedule, projectName: string): { root: str
   const root = projectCode(projectName)
   const order = (a: PlanActivity, b: PlanActivity) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || '') || a.code.localeCompare(b.code)
   const nodes: WbsNode[] = []
+  // Uploaded schedules keep their own WBS (P6 PROJWBS path / MSP outline), not Planora's phases.
+  if (s.activities.some(a => a.wbs)) return buildSourceWbs(s, root, order, t)
   let pi = 0
   for (const phase of PHASES) {
     const acts = s.activities.filter(a => a.phase === phase).sort(order)
@@ -89,6 +91,10 @@ export function buildWbs(s: GeneratedSchedule, projectName: string): { root: str
     nodes.push(node)
   }
 
+  return { root, nodes, rows: emitRows(nodes, t) }
+}
+
+function emitRows(nodes: WbsNode[], t: Record<string, CpmTimes>): WbsRow[] {
   const rows: WbsRow[] = []
   const emit = (n: WbsNode) => {
     rows.push({ kind: 'wbs', level: n.level, code: n.code, name: n.name, node: n, wbsCode: n.code })
@@ -100,5 +106,50 @@ export function buildWbs(s: GeneratedSchedule, projectName: string): { root: str
     for (const it of items) it.row()
   }
   for (const n of nodes) emit(n)
-  return { root, nodes, rows }
+  return rows
+}
+
+/** WBS tree from source paths like "1.2.3 Foundations" (P6 short names joined by '.', leaf name after a space). */
+function buildSourceWbs(s: GeneratedSchedule, root: string, order: (a: PlanActivity, b: PlanActivity) => number, t: Record<string, CpmTimes>) {
+  const top: WbsNode[] = []
+  const byKey = new Map<string, WbsNode>()
+  const nodeFor = (path: string): WbsNode | null => {
+    const m = path.trim().match(/^(\S+)(?:\s+(.+))?$/)
+    if (!m) return null
+    const parts = m[1].split('.').filter(Boolean)
+    let parent: WbsNode | null = null
+    let key = ''
+    parts.forEach((part, i) => {
+      key = key ? `${key}.${part}` : part
+      let n = byKey.get(key)
+      if (!n) {
+        const name = i === parts.length - 1 && m[2] ? m[2] : part
+        n = { code: `${root}.${key}`, name, level: i + 1, start: null, finish: null, critical: false, children: [], activities: [] }
+        byKey.set(key, n)
+        if (parent) parent.children.push(n)
+        else top.push(n)
+      }
+      parent = n
+    })
+    return parent
+  }
+  const loose: PlanActivity[] = []
+  for (const a of [...s.activities].sort(order)) {
+    const n = a.wbs ? nodeFor(a.wbs) : null
+    if (n) n.activities.push(a)
+    else loose.push(a)
+  }
+  if (loose.length) top.push({ code: `${root}.UNASSIGNED`, name: 'No WBS', level: 1, start: null, finish: null, critical: false, children: [], activities: loose })
+  const roll = (n: WbsNode) => {
+    for (const c of n.children) roll(c)
+    for (const a of n.activities) {
+      const tm = t[a.id]
+      n.start = minD(n.start, tm?.earlyStart ?? null)
+      n.finish = maxD(n.finish, tm?.earlyFinish ?? null)
+      n.critical = n.critical || !!tm?.critical
+    }
+    for (const c of n.children) { n.start = minD(n.start, c.start); n.finish = maxD(n.finish, c.finish); n.critical = n.critical || c.critical }
+  }
+  top.forEach(roll)
+  return { root, nodes: top, rows: emitRows(top, t) }
 }

@@ -18,19 +18,15 @@ export interface ProjectBrief {
   text: string
 }
 
-const TYPE_HINTS: [RegExp, ProjectType][] = [
-  [/data\s*cent|\bdc\b|colo/i, 'data_center'], [/hospital|medical|clinic|health|mob\b/i, 'healthcare'], [/school|elementary|middle|high school|k-?12/i, 'k12_school'],
-  [/apartment|multifamily|residential|housing|condo/i, 'multifamily'], [/warehouse|distribution|industrial|logistics/i, 'warehouse_industrial'],
-  [/\blab\b|laborator|research/i, 'lab_research'], [/retail|store|mall/i, 'retail'], [/office|headquarter|\bhq\b/i, 'commercial_office'],
-  [/army|navy|air force|dod|federal|base\b|usace|navfac/i, 'federal_defense'],
-]
 
 function monthsBetween(a: string, b: string) {
   return Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / (30.44 * 86_400_000)))
 }
 
 export function projectBrief(s: Schedule, activities: Activity[], extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null } = {}): ProjectBrief {
-  const typeKey = (extra.type || s.projectType || TYPE_HINTS.find(([re]) => re.test(`${s.name} ${activities.slice(0, 200).map(a => a.name).join(' ')}`))?.[1] || null) as ProjectType | null
+  // Only a type the user set (upload or interview) is shown; guessing from names mislabeled bridges as
+  // retail and barracks as hospitals in client-facing text.
+  const typeKey = (extra.type || s.projectType || null) as ProjectType | null
   const typeLabel = typeKey && PROJECT_TYPE_LABELS[typeKey] ? PROJECT_TYPE_LABELS[typeKey] : null
   const where = [extra.city, extra.state || s.region].filter(Boolean).join(', ') || null
   const sqft = extra.sqft ?? s.grossSqft
