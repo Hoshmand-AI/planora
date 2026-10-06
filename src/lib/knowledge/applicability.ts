@@ -55,8 +55,22 @@ export function appliesTri(a: Applicability, p: ProjectProfile): Tri {
   const fed = effectiveFederal(p)
   if (a.federalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'yes' : 'no')
   if (a.nonFederalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'no' : 'yes')
+  if (a.federalInstallationOnly) r.push(onInstallation(p, fed))
 
   return combine(r)
+}
+
+/**
+ * On a federal installation (base access, installation work clearance). Federal funding alone is not
+ * enough: a federal-aid highway bridge or transit line is built in public right-of-way, so civil types
+ * default to "no" until the interview says otherwise; a defense facility defaults to "yes".
+ */
+function onInstallation(p: ProjectProfile, fed: boolean | undefined): Tri {
+  if (fed === false) return 'no'
+  if (typeof p.onFederalInstallation === 'boolean') return p.onFederalInstallation ? 'yes' : 'no'
+  if (p.projectType === 'federal_defense') return 'yes'
+  if (isCivilType(p.projectType)) return 'no'
+  return 'unknown'
 }
 
 export function applies(a: Applicability, p: ProjectProfile): boolean {

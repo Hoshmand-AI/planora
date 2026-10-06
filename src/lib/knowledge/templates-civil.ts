@@ -117,6 +117,7 @@ export const CIVIL_CATALOG: TemplateActivity[] = [
   t('punchlist', 'Punch list', IP, d(15, 0.1, 10, 45), [fs('startup_testing')]),
 
   /* Completion (all) */
+  t('substantial_completion', 'Substantial Completion — ready for revenue service', TR, MS, [fs('punchlist'), fs('inspections'), fs('roadway')], { milestone: true }),
   t('substantial_completion', 'Substantial Completion', ALL, MS, [fs('punchlist'), fs('inspections'), fs('roadway')], { milestone: true }),
   t('closeout', 'As-builts, O&M manuals, certified payrolls & closeout', ALL, d(30, 0.1, 20, 60), [fs('substantial_completion')]),
   t('final_completion', 'Final Completion', ALL, MS, [fs('closeout')], { milestone: true }),

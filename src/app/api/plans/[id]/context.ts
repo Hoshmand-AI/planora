@@ -2,7 +2,7 @@ import type { AuthContext } from '@/lib/auth'
 import { ApiError, ConflictError } from '@/lib/server/api'
 import { getOrganization, getPlan, type Plan } from '@/lib/db'
 import { normalizeSettings } from '@/lib/server/settings'
-import { elicit, questionBank, type ElicitationContext } from '@/lib/planning/elicitation'
+import { elicit, questionBank, HISTORY_USE_QUESTION, type ElicitationContext } from '@/lib/planning/elicitation'
 import { evaluatePlan } from '@/lib/planning/evaluation'
 import { recoveryPlan } from '@/lib/planning/recovery'
 import { adaptiveInterview } from '@/lib/planning/adaptive'
@@ -51,7 +51,7 @@ export async function planView(plan: Plan, orgId: string) {
   const planHistory = historyForPlan(history, plan.answers)
   const bank = new Map(questionBank({ answers: plan.answers }, ectx).all.map(q => [q.id, q]))
   const answered = Object.entries(plan.answers).map(([id, a]) => {
-    const q = bank.get(id)
+    const q = bank.get(id) ?? (id === 'history.use' ? HISTORY_USE_QUESTION : undefined)
     const label = a.status !== 'known' ? (a.status === 'withheld' ? 'Withheld' : "Don't know")
       : q?.options?.find(o => o.value === a.value)?.label ?? (typeof a.value === 'boolean' ? (a.value ? 'Yes' : 'No') : `${a.value}${q?.unit && q.unit !== 'sf' ? ' ' + q.unit : q?.unit === 'sf' ? ' sf' : ''}`)
     return { id, prompt: q?.prompt ?? id, section: q?.section ?? 'project', label, status: a.status, value: a.value ?? null, note: a.note ?? null, custom: !!a.custom }

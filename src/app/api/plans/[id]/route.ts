@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { deletePlan, savePlan } from '@/lib/db'
-import { coerceAnswer, elicit, questionBank, validateAnswer } from '@/lib/planning/elicitation'
+import { applyAnswers, elicit } from '@/lib/planning/elicitation'
 import type { Answer } from '@/lib/planning/types'
 import { elicitationContext, loadPlanContext, planView } from './context'
 
@@ -11,35 +11,29 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   return NextResponse.json(await planView(r.plan, r.ctx.orgId))
 })
 
-/** Record interview answers: { answers: { [questionId]: { status, value?, note? } }, name? } */
+/**
+ * Record interview answers: { answers: { [questionId]: { status, value?, note? } }, name? }
+ * An invalid value (an option that isn't listed, a non-number, a withheld answer that can't be) rejects
+ * the whole request with 400 and `errors` per question, so nothing is half-saved. Questions that don't
+ * exist (or no longer apply) are reported in `errors` and skipped.
+ */
 export const PATCH = api<{ id: string }>({ permission: 'plan.write', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const body = await req.json().catch(() => ({}))
   const incoming = (body.answers || {}) as Record<string, Partial<Answer> | null>
-  const errors: Record<string, string> = {}
   const now = new Date().toISOString()
 
-  // Apply answers one at a time so dependent questions (e.g. design % after "drawings: yes") validate.
   const originalAnswers = plan.answers
-  let answers = { ...plan.answers }
-  let { ectx } = await elicitationContext(plan, ctx.orgId)
-  for (const [qid, raw] of Object.entries(incoming)) {
-    if (raw === null) { delete answers[qid]; continue }
-    // Facility type changes which firm history is "similar", so refresh the context when it moves.
-    if (qid === 'history.use' && answers['project.type']?.value !== plan.answers['project.type']?.value) ectx = (await elicitationContext({ ...plan, answers }, ctx.orgId)).ectx
-    const bank = questionBank({ answers }, ectx).all
-    const q = bank.find(x => x.id === qid)
-    if (!q) { errors[qid] = 'Unknown or no longer relevant question.'; continue }
-    const status = raw.status === 'withheld' || raw.status === 'unknown' ? raw.status : 'known'
-    // A note qualifies the answer in the team's own words; never kept on withheld answers.
-    const note = status !== 'withheld' && typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 1000) : undefined
-    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: 'user' })
-    const err = validateAnswer(q, a)
-    if (err) { errors[qid] = err; continue }
-    answers = { ...answers, [qid]: a }
-    plan.audit.push({ at: now, by: ctx.name, action: 'answer', detail: `${qid} = ${status === 'known' ? JSON.stringify(a.value) : status}` })
+  const { ectx } = await elicitationContext(plan, ctx.orgId)
+  const result = applyAnswers(plan.answers, incoming, ectx, now)
+  if (Object.keys(result.invalid).length) {
+    const [qid, msg] = Object.entries(result.invalid)[0]
+    return NextResponse.json({ error: `${qid}: ${msg}`, code: 'invalid_answer', errors: { ...result.errors, ...result.invalid } }, { status: 400 })
   }
+  const errors = result.errors
+  let answers = result.answers
+  for (const x of result.applied) plan.audit.push({ at: now, by: ctx.name, action: 'answer', detail: x.detail })
   // Free-form information the interview didn't ask about ("add something").
   if (typeof body.addNote === 'string' && body.addNote.trim()) {
     const text = body.addNote.trim().slice(0, 2000)

@@ -13,7 +13,7 @@ import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
 import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
-import { PROJECT_TYPES } from '@/lib/planning/types'
+import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
 import { fmtDate, fmtDay } from '@/lib/format'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -86,6 +86,9 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const region = formData.get('region') as string | null
     const grossSqft = Number(formData.get('grossSqft')) || null
     const allowDuplicate = formData.get('allowDuplicate') === 'true'
+    // An unknown facility type is refused, not silently dropped (the upload would lose its grounding tag).
+    const typeErr = projectTypeError(projectType)
+    if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
@@ -242,6 +245,8 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   const body = await req.json().catch(() => ({}))
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const typeErr = projectTypeError(body.projectType)
+  if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
   if (typeof body.inHistory === 'boolean') {
     await setScheduleInHistory(s.id, ctx.orgId, body.inHistory)
     await audit({ action: 'schedule.history', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.inHistory ?? true, after: body.inHistory } })

@@ -97,11 +97,15 @@ describe('elicitation', () => {
     expect(validateAnswer(pct, coerceAnswer(pct, k('60')))).toBeNull()
     const type = bank.find(q => q.id === 'project.type')!
     expect(validateAnswer(type, withheld)).toMatch(/cannot be withheld/)
-    // Anything not listed can be typed in; it is kept verbatim and flagged.
-    const spaceport = coerceAnswer(type, k('Spaceport launch facility'))
-    expect(validateAnswer(type, spaceport)).toBeNull()
-    expect(spaceport.custom).toBe(true)
-    expect(validateAnswer(type, coerceAnswer(type, k('x')))).toMatch(/type your own/)
+    // The facility type picks the whole network: an unlisted type is refused (naming the valid ones),
+    // not planned as a generic building. A listed label is matched to its value.
+    expect(type.allowOther).toBe(false)
+    expect(validateAnswer(type, coerceAnswer(type, k('Spaceport launch facility')))).toMatch(/not a valid answer.*Valid options: commercial_office, .*industrial_process/)
+    expect(coerceAnswer(type, k('Data center'))).toMatchObject({ value: 'data_center' })
+    // Free-text "other" answers remain where the plan doesn't branch on the value (site conditions).
+    const site = bank.find(q => q.id === 'site.conditions')!
+    expect(validateAnswer(site, coerceAnswer(site, k('Karst limestone')))).toBeNull()
+    expect(validateAnswer(site, coerceAnswer(site, k('x')))).toMatch(/type your own/)
   })
 
   it('lists all 50 states + DC and accepts a typed location outside the list', () => {
@@ -119,8 +123,11 @@ describe('elicitation', () => {
     const a = r.assumptions.find(x => x.questionId === 'project.state')!
     expect(a.kind).toBe('custom')
     expect(a.text).toMatch(/Ontario, Canada/)
-    // Every choice question offers "Other".
-    for (const q of questionBank({ answers: healthcareCA() }).all.filter(x => x.kind === 'choice')) expect(q.allowOther).toBe(true)
+    // Choice questions offer "Other" except those the logic branches on (type, scope, delivery, statuses).
+    for (const q of questionBank({ answers: healthcareCA() }).all.filter(x => x.kind === 'choice')) {
+      const strict = ['project.type', 'project.scope', 'project.delivery', 'security.classification'].includes(q.id) || /^(permit|procure)\.[^.]+\.status$/.test(q.id)
+      expect(q.allowOther).toBe(!strict)
+    }
   })
 
   it('generates with custom answers and records how they were interpreted', () => {

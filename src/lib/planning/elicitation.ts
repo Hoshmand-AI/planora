@@ -36,7 +36,19 @@ export function known(answers: Record<string, Answer>, id: string): AnswerValue 
 }
 const num = (v: AnswerValue | undefined) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) ? Number(v) : undefined)
 const str = (v: AnswerValue | undefined) => (typeof v === 'string' && v ? v : undefined)
-const bool = (v: AnswerValue | undefined) => (typeof v === 'boolean' ? v : v === 'true' || v === 'yes' ? true : v === 'false' || v === 'no' ? false : undefined)
+/** Yes/no in any form a browser or API client sends: true/false, "Yes"/"No", "true"/"false", "y"/"n", 1/0. */
+export function parseBool(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v
+  if (v === 1 || v === 0) return v === 1
+  if (typeof v !== 'string') return undefined
+  const t = v.trim().toLowerCase()
+  if (['true', 'yes', 'y', '1'].includes(t)) return true
+  if (['false', 'no', 'n', '0'].includes(t)) return false
+  return undefined
+}
+const bool = (v: AnswerValue | undefined) => parseBool(v)
+/** A known yes/no answer, whatever form it was stored in (older answers may hold "false" or "No"). */
+export const knownBool = (answers: Record<string, Answer>, id: string): boolean | undefined => parseBool(known(answers, id))
 
 export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const type = str(known(answers, 'project.type')) as ProjectType | undefined
@@ -57,6 +69,7 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     // Unknown disturbed area: estimate footprint ×2 for laydown/parking so NPDES-type rules can still fire.
     siteAcresDisturbed: acres ?? (sqft && stories ? Math.round((sqft / stories / 43560) * 2 * 10) / 10 : undefined),
     isFederal: type === 'federal_defense' ? true : federal,
+    onFederalInstallation: type === 'federal_defense' ? true : federal === false ? false : bool(known(answers, 'project.federal_installation')),
     classification: classification ?? (answers['security.classification']?.status === 'withheld' ? 'classified' : undefined),
     deliveryMethod: str(known(answers, 'project.delivery')) as DeliveryMethod | undefined,
     valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
@@ -158,6 +171,27 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       prompt: 'Is this federally funded or on federal property?',
       why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
       fallback: { value: false, explanation: 'Assumed not federal.' },
+    })
+    // Federal money is not federal land: base access and installation work clearances only apply on an installation.
+    if (p.isFederal === true) {
+      qs.push({
+        id: 'project.federal_installation', section: 'regulatory', kind: 'boolean', impact: 35, allowWithheld: true,
+        prompt: 'Is the work on a federal installation or federal property (for example a military base or a federal campus with controlled access)?',
+        why: 'On an installation, work clearances, dig permits and base access (badging) replace local permits and gate mobilization. Federally funded work in public right-of-way or on non-federal land does not need them.',
+        fallback: civil
+          ? { value: false, explanation: 'Assumed built in public right-of-way, not on a federal installation (no base-access approvals).' }
+          : { value: true, explanation: 'Assumed on federal property: installation approvals and base access are planned.' },
+      })
+    }
+  }
+
+  // Data centers are usually precast or insulated-panel boxes; curtain wall only when the design has it.
+  if (p.projectType === 'data_center' && p.scope !== 'renovation' && p.scope !== 'renovation_occupied') {
+    qs.push({
+      id: 'envelope.curtain_wall', section: 'design', kind: 'boolean', impact: 20, allowWithheld: true,
+      prompt: 'Does the data center have curtain wall (for example on an office or admin block), beyond entrance storefronts?',
+      why: 'Curtain wall adds engineering, a long fabrication lead and a glazing sequence before dry-in. A precast or insulated-panel data center only needs entrance and admin storefront.',
+      fallback: { value: false, explanation: 'Assumed a precast / insulated-panel envelope with entrance and admin storefront only.' },
     })
   }
 
@@ -396,6 +430,7 @@ const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
   substructure: 'substructure', superstructure: 'deck', deck: 'deck', track_systems: 'track', process_structures: 'process_structures',
   process_equipment: 'startup', power_equipment: 'energization', conductors: 'energization', controls_scada: 'startup', pipeline: 'mechanical_completion',
+  substantial_completion: 'substantial_completion',
 }
 
 export interface DateIssue { questionIds: string[]; text: string; severity: 'error' | 'warning' }
@@ -457,9 +492,37 @@ export function questionBank(state: InterviewState, ctx: ElicitationContext = {}
     ...regulationQuestions(regulations, profile),
     ...(ctx.extraQuestions || []),
   ].map(q => (q.kind === 'choice' || q.kind === 'multi') && q.allowOther === undefined
-    ? { ...q, allowOther: true, otherPrompt: q.otherPrompt || 'Not listed? Type your answer' }
+    ? (STRICT_CHOICE(q.id) ? { ...q, allowOther: false } : { ...q, allowOther: true, otherPrompt: q.otherPrompt || 'Not listed? Type your answer' })
     : q)
   return { all, permits, longLead, regulations, profile }
+}
+
+/**
+ * Choices the plan's logic branches on (facility type, scope, delivery, permit and procurement status):
+ * only a listed option is a valid answer. A typed value there used to be kept as a "custom" answer and
+ * silently planned as the default (e.g. procure.escalators.status = "not_required" stayed in scope).
+ */
+const STRICT_CHOICE = (id: string) =>
+  ['project.type', 'project.scope', 'project.delivery', 'security.classification'].includes(id) || /^(permit|procure)\.[^.]+\.status$/.test(id)
+
+/** history.use when the firm has no completed projects yet: accepted as a preference (no effect until history exists). */
+export const HISTORY_USE_QUESTION: Question = {
+  id: 'history.use', section: 'history', kind: 'boolean', impact: 0, allowWithheld: false,
+  prompt: "Use how your firm's past projects actually performed to set durations?",
+  why: 'Recorded as a preference. It takes effect once your firm has uploaded completed schedules.',
+}
+
+/**
+ * The question an incoming answer belongs to. Answers saved together can make each other irrelevant
+ * (answering "federal: no" removes "does Davis-Bacon apply?"), so a question offered with the answers
+ * the user was looking at (`offered`) is still accepted.
+ */
+export function answerableQuestion(id: string, answers: Record<string, Answer>, ctx: ElicitationContext = {}, offered?: Record<string, Answer>): Question | null {
+  const now = questionBank({ answers }, ctx).all.find(q => q.id === id)
+  if (now) return now
+  const before = offered ? questionBank({ answers: offered }, ctx).all.find(q => q.id === id) : undefined
+  if (before) return before
+  return id === 'history.use' ? HISTORY_USE_QUESTION : null
 }
 
 const WEIGHT: Record<Answer['status'], number> = { known: 1, withheld: 0.6, unknown: 0.3 }
@@ -578,10 +641,62 @@ export function validateAnswer(q: Question, a: Answer): string | null {
     case 'choice':
       if (q.options?.some(o => o.value === v)) return null
       if (q.allowOther && typeof v === 'string' && v.trim().length >= 2) return v.length > 200 ? 'Keep it under 200 characters.' : null
-      return q.allowOther ? 'Pick an option or type your own answer.' : 'Pick one of the options.'
+      return q.allowOther ? 'Pick an option or type your own answer.' : `${v === undefined || v === '' ? 'No answer given' : `“${String(v)}” is not a valid answer`}. Valid options: ${(q.options || []).map(o => o.value).join(', ')}.`
     case 'multi': return Array.isArray(v) ? null : 'Pick one or more options.'
     default: return typeof v === 'string' && v.trim() ? null : 'Enter an answer.'
   }
+}
+
+export interface AppliedAnswers {
+  answers: Record<string, Answer>
+  /** Questions that don't exist or no longer apply (skipped, not fatal) */
+  errors: Record<string, string>
+  /** Invalid values: the caller rejects the whole request */
+  invalid: Record<string, string>
+  applied: { id: string; detail: string }[]
+}
+
+/**
+ * Apply a batch of interview answers. Order doesn't matter: dependent questions (design % after
+ * "drawings: yes", an elevator's status after the story count) are retried once the answers they depend
+ * on are in, and a question the user was offered that another answer in the same batch made irrelevant
+ * (e.g. "Does Davis-Bacon apply?" saved together with "federal: no") is still accepted.
+ */
+export function applyAnswers(current: Record<string, Answer>, incoming: Record<string, Partial<Answer> | null>, ctx: ElicitationContext = {}, now = new Date().toISOString()): AppliedAnswers {
+  let answers = { ...current }
+  const errors: Record<string, string> = {}
+  const invalid: Record<string, string> = {}
+  const applied: AppliedAnswers['applied'] = []
+  const apply = (qid: string, raw: Partial<Answer>, q: Question) => {
+    const status = raw.status === 'withheld' || raw.status === 'unknown' ? raw.status : 'known'
+    // A note qualifies the answer in the team's own words; never kept on withheld answers.
+    const note = status !== 'withheld' && typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 1000) : undefined
+    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: 'user' })
+    const err = validateAnswer(q, a)
+    if (err) { invalid[qid] = err; return }
+    answers = { ...answers, [qid]: a }
+    applied.push({ id: qid, detail: `${qid} = ${status === 'known' ? JSON.stringify(a.value) : status}` })
+  }
+  let queue = Object.entries(incoming)
+  while (queue.length) {
+    const retry: typeof queue = []
+    for (const [qid, raw] of queue) {
+      if (raw === null || typeof raw !== 'object') { delete answers[qid]; continue }
+      const q = questionBank({ answers }, ctx).all.find(x => x.id === qid)
+      if (q) apply(qid, raw, q)
+      else retry.push([qid, raw])
+    }
+    if (retry.length === queue.length) {
+      for (const [qid, raw] of retry) {
+        const q = answerableQuestion(qid, answers, ctx, current)
+        if (q) apply(qid, raw as Partial<Answer>, q)
+        else errors[qid] = 'Unknown or no longer relevant question.'
+      }
+      break
+    }
+    queue = retry
+  }
+  return { answers, errors, invalid, applied }
 }
 
 /** Normalize raw answer values from the browser (numbers/booleans arrive as strings). */
