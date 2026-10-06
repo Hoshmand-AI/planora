@@ -4,6 +4,8 @@ import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { audit } from '@/lib/server/audit'
 import { loadScheduleData } from '@/lib/planning/service'
 import { generateReport } from '@/lib/openai'
+import { getScheduleSeries } from '@/lib/db'
+import { compareSchedules } from '@/lib/analysis/compare'
 
 export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   const { reportType, scheduleId } = await req.json()
@@ -12,9 +14,25 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   requireFeature(auth.plan, entitlementsFor(auth.plan).reports.includes(String(reportType)), 'This report type')
   const data = await loadScheduleData(scheduleId, auth.orgId)
   if (!data) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
-  const { schedule, activities, relationships, brief, hasLogic } = data
+  const { schedule, activities, relationships, brief, hasLogic, analysis } = data
 
-  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality })
+  // The previous upload of the same project, for the "since the last update" sections.
+  let comparison = null
+  if (schedule.projectKey) {
+    const series = await getScheduleSeries(auth.orgId, schedule.projectKey)
+    const idx = series.findIndex(s => s.id === schedule.id)
+    const prev = idx > 0 ? await loadScheduleData(series[idx - 1].id, auth.orgId) : null
+    if (prev) {
+      const side = (d: NonNullable<typeof data>) => ({
+        schedule: { id: d.schedule.id, name: d.schedule.name, version: d.schedule.version, dataDate: d.schedule.dataDate, forecastFinish: d.analysis.forecastFinish },
+        activities: d.activities, relationships: d.relationships, longestPath: d.analysis.longestPath,
+        finishMilestone: d.analysis.finishMilestone ? { code: d.analysis.finishMilestone.code, forecastFinish: d.analysis.finishMilestone.forecastFinish } : null,
+      })
+      comparison = compareSchedules(side(prev), side(data))
+    }
+  }
+
+  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison })
 
   await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType } })
   return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: report })
