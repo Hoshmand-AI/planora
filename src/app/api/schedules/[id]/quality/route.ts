@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
-import { getDataQuestionResponses, getScheduleById, saveDataQuestionResponse } from '@/lib/db'
+import { getDataQuestionResponses, getScheduleById, getScheduleFile, saveDataQuestionResponse } from '@/lib/db'
+import { xerResourceCounts } from '@/lib/parsers/xer-parser'
+import { decodeXer } from '@/lib/parsers/xer-codec'
 import { runDcma } from '@/lib/analysis/dcma'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
@@ -13,7 +15,13 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
   const responses = await getDataQuestionResponses(schedule.id)
-  const a = analyzableFromDb(schedule, activities, relationships)
+  // P6 resource assignments (TASKRSRC) are not stored per activity; read them from the original file.
+  let resourceCounts: Record<string, number> | null = null
+  if (schedule.sourceType === 'p6_xer') {
+    const f = await getScheduleFile(schedule.id, ctx.orgId).catch(() => undefined)
+    if (f) resourceCounts = xerResourceCounts(decodeXer(f.content).text)
+  }
+  const a = analyzableFromDb(schedule, activities, relationships, resourceCounts)
   const dcma = runDcma(a, ctx.settings.quality)
   const questions = checkInputs(a)
   const byId = new Map(responses.map(r => [r.questionId, r]))

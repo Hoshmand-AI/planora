@@ -283,6 +283,14 @@ export async function saveScheduleFile(f: { scheduleId: string; orgId: string; f
     ON CONFLICT (schedule_id) DO NOTHING`, [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.content])
 }
 
+/** Uploads among `scheduleIds` whose stored original file has this SHA-256 (identical bytes). */
+export async function findScheduleFilesBySha(orgId: string, sha256: string, scheduleIds: string[]): Promise<string[]> {
+  if (!scheduleIds.length) return []
+  await initSchema()
+  const res = await query('SELECT schedule_id FROM schedule_files WHERE org_id=$1 AND sha256=$2 AND schedule_id = ANY($3::text[])', [orgId, sha256, scheduleIds])
+  return res.rows.map(r => String(r.schedule_id))
+}
+
 export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
   await initSchema()
   const res = await query('SELECT file_name, sha256, content, created_at FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])

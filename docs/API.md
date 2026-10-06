@@ -30,6 +30,8 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 | GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes) |
 | GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics |
 | GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions |
+| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with Planora's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER |
+| GET | `/api/schedules/compare?id=…&base=…[&format=csv]` | read-only | Update-to-update comparison; without `base`, the latest upload of the project with an earlier data date. `format=csv` downloads the activity-level differences |
 | PATCH | `/api/plans/{id}` | scheduler | Record interview answers: `{ "answers": { "<questionId>": { "status": "known", "value": … } } }` |
 | POST | `/api/plans/{id}/generate` | scheduler | Generate or regenerate the schedule |
 
