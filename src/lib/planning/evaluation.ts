@@ -9,7 +9,8 @@
 import type { Answer, AnalyzableSchedule, DcmaReport, GeneratedSchedule, ProjectType, WorkCalendar } from './types'
 import { runCpm } from './cpm'
 import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
-import { computeFirmHistory, scaleForSize, type FirmHistory } from './history'
+import { computeFirmHistory, historyForPlan, historyOptedOut, scaleForSize, type FirmHistory } from './history'
+import { committedActivities, hasDurationOverride, type SraResult } from './sra'
 import { questionBank, elicit, profileFrom } from './elicitation'
 import { generateSchedule } from './generator'
 import type { ExpertReview, HistoryRow } from '@/lib/db'
@@ -101,14 +102,20 @@ export interface Evaluation {
   readiness: number
   openAssumptions: number
   benchmark: { rows: BenchmarkRow[]; basis: string }
-  forecast: { deterministic: string; p50: string; p80: string; basis: string; requiredFinish?: string; p80MeetsRequired?: boolean }
+  /**
+   * Rule-based P50/P80 estimate (not a simulation). It is only the headline forecast when no Monte
+   * Carlo result is available; use headlineForecast() to pick the one forecast to show.
+   */
+  forecast: { method: 'rule_based'; label: string; deterministic: string; p50: string; p80: string; basis: string; requiredFinish?: string; p80MeetsRequired?: boolean }
   coverage: { item: string; kind: 'permit' | 'long_lead'; status: 'scheduled' | 'resolved' | 'missing'; detail: string }[]
   review: { status: 'none' | 'approved' | 'changes_requested' | 'stale'; latest?: ExpertReview; reviewedVersion?: string }
   findings: string[]
   dateChecks: ScheduleDateCheck[]
 }
 
-export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, reviews: ExpertReview[], rules?: Partial<DcmaRules>): Evaluation {
+export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, reviews: ExpertReview[], rules?: Partial<DcmaRules>): Evaluation {
+  // Opting out of firm history (history.use = No) removes it from benchmarks and forecast ratios.
+  const history = historyForPlan(firmHistory, answers)
   const profile = profileFrom(answers)
   const dcma = runDcma(toAnalyzable(s), rules)
   const elic = elicit({ answers })
@@ -142,7 +149,8 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
 
   /* Risk-adjusted forecast */
   const forecast = riskForecast(s, history, answers)
-  if (forecast.requiredFinish && forecast.p80MeetsRequired === false) findings.push(`At the P80 level the project finishes ${forecast.p80}, after the required ${forecast.requiredFinish}.`)
+  const late = forecastFinding(headlineForecast(forecast))
+  if (late) findings.push(late)
 
   /* Coverage of grounded requirements */
   const bank = questionBank({ answers })
@@ -205,7 +213,7 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
     dateChecks,
     score, grade, dcma, readiness: elic.readiness,
     openAssumptions: s.assumptions.filter(a => a.kind !== 'inferred').length,
-    benchmark: { rows, basis: history ? `${history.projectCount} of your firm's past schedules (${history.similarCount} same type). Private to your firm.` : 'No firm history uploaded yet — upload past schedules with actual dates to benchmark durations.' },
+    benchmark: { rows, basis: history ? `${history.projectCount} of your firm's past schedules (${history.similarCount} same type). Private to your firm.` : firmHistory ? 'Firm history not used: the team chose not to use it for this plan in the interview.' : 'No firm history uploaded yet — upload past schedules with actual dates to benchmark durations.' },
     forecast,
     coverage,
     review: { status: reviewStatus, latest, reviewedVersion: latest?.at },
@@ -232,7 +240,10 @@ function riskForecast(s: GeneratedSchedule, history: FirmHistory | null, answers
     defaultCalendarId: s.defaultCalendarId,
   }).projectFinish
 
+  const committed = committedActivities(answers, questionBank({ answers }))
   const permitHigh = (a: GeneratedSchedule['activities'][number], p: 'p50' | 'p80') => {
+    // The scheduler's inputs (duration overrides, expected issuance / committed delivery dates) are not inflated.
+    if (hasDurationOverride(a) || committed.has(a.id)) return 1
     // Catalog-based uncertainty for agency reviews and fabrication (no firm history needed).
     if (a.category.startsWith('permit') && a.calendarId === 'cal-7d') return p === 'p80' ? 1.35 : 1.1
     if (a.category === 'procurement' && a.calendarId === 'cal-7d') return p === 'p80' ? 1.3 : 1.05
@@ -252,10 +263,75 @@ function riskForecast(s: GeneratedSchedule, history: FirmHistory | null, answers
     basis = `Rule-based scenario (not a Monte Carlo simulation): firm actual-vs-planned ratios (median ×${history.overallOverrunMedian.toFixed(2)}, P80 ×${(history.overallOverrunP80 ?? history.overallOverrunMedian).toFixed(2)}) plus catalog review/lead-time ranges.`
   } else {
     p50 = scenario(a => permitHigh(a, 'p50'))
-    p80 = scenario(a => permitHigh(a, 'p80') * (a.calendarId === 'cal-7d' ? 1 : 1.1))
-    basis = 'Rule-based scenario (not a Monte Carlo simulation). No firm history yet: catalog high-end review and lead times, plus 10% on field work for P80.'
+    p80 = scenario(a => permitHigh(a, 'p80') * (a.calendarId === 'cal-7d' || hasDurationOverride(a) ? 1 : 1.1))
+    basis = `Rule-based scenario (not a Monte Carlo simulation). ${historyOptedOut(answers) ? 'Firm history not used (opted out in the interview)' : 'No firm history yet'}: catalog high-end review and lead times, plus 10% on field work for P80.`
   }
-  return { deterministic, p50, p80, basis, requiredFinish: required, p80MeetsRequired: required ? p80 <= required : undefined }
+  return { method: 'rule_based', label: RULE_BASED_LABEL, deterministic, p50, p80, basis, requiredFinish: required, p80MeetsRequired: required ? p80 <= required : undefined }
+}
+
+/* ─── The one forecast the product shows ── */
+
+export const RULE_BASED_LABEL = 'Rule-based estimate'
+export const MONTE_CARLO_LABEL = 'Monte Carlo'
+
+/**
+ * The single P50/P80 forecast shown in the plan header, the Basis of Schedule and the PDF.
+ * Monte Carlo when a simulation result is available; otherwise the rule-based estimate, labeled as such.
+ * The two are never shown side by side as competing forecasts.
+ */
+export interface HeadlineForecast {
+  method: 'monte_carlo' | 'rule_based'
+  /** Short label for the method, e.g. "Monte Carlo" or "Rule-based estimate" */
+  label: string
+  deterministic: string
+  p50: string
+  p80: string
+  /** Monte Carlo only */
+  p90?: string
+  basis: string
+  requiredFinish?: string
+  p80MeetsRequired?: boolean
+  /** Monte Carlo only: share of simulated finishes on or before the required date */
+  probabilityOfRequired?: number
+}
+
+export function headlineForecast(
+  forecast: Evaluation['forecast'] | null | undefined,
+  sra?: Pick<SraResult, 'method' | 'deterministic' | 'percentiles' | 'required'> | null,
+): HeadlineForecast | null {
+  if (sra) {
+    const requiredFinish = sra.required?.date ?? forecast?.requiredFinish
+    return {
+      method: 'monte_carlo', label: MONTE_CARLO_LABEL,
+      deterministic: forecast?.deterministic ?? sra.deterministic,
+      p50: sra.percentiles.p50, p80: sra.percentiles.p80, p90: sra.percentiles.p90,
+      basis: sra.method,
+      requiredFinish,
+      p80MeetsRequired: requiredFinish ? sra.percentiles.p80 <= requiredFinish : undefined,
+      probabilityOfRequired: sra.required?.probability,
+    }
+  }
+  if (!forecast) return null
+  return {
+    method: 'rule_based', label: RULE_BASED_LABEL, deterministic: forecast.deterministic, p50: forecast.p50, p80: forecast.p80,
+    basis: forecast.basis, requiredFinish: forecast.requiredFinish, p80MeetsRequired: forecast.p80MeetsRequired,
+  }
+}
+
+/** The finding raised when the forecast P80 misses the required finish (null when it doesn't). */
+export function forecastFinding(f: HeadlineForecast | null): string | null {
+  if (!f?.requiredFinish || f.p80MeetsRequired !== false) return null
+  return `At the P80 level (${f.method === 'monte_carlo' ? MONTE_CARLO_LABEL : 'rule-based estimate'}) the project finishes ${f.p80}, after the required ${f.requiredFinish}.`
+}
+
+/** Evaluation findings with the forecast finding stated from the headline forecast (Monte Carlo when available). */
+export function findingsFor(ev: Evaluation, sra?: Pick<SraResult, 'method' | 'deterministic' | 'percentiles' | 'required'> | null): string[] {
+  if (!sra) return ev.findings
+  const ruleBased = forecastFinding(headlineForecast(ev.forecast))
+  const out = ev.findings.filter(f => f !== ruleBased)
+  const mc = forecastFinding(headlineForecast(ev.forecast, sra))
+  if (mc) out.push(mc)
+  return out
 }
 
 /* ─── Backtest against the firm's completed projects ── */

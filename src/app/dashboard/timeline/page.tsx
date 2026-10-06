@@ -9,6 +9,23 @@ interface ActivityData {
   name: string; activityId: string; duration: number; remainingDuration: number
   totalFloat: number; percentComplete: number; earlyStart: string | null; earlyFinish: string | null
   isCritical: boolean; status: string; activityType: string; wbs: string
+  actualStart?: string | null; actualFinish?: string | null
+}
+
+type Progress = 'not_started' | 'in_progress' | 'complete'
+
+/** Progress comes from recorded actuals only — never from planned dates relative to today. */
+function progressOf(a: Pick<ActivityData, 'actualStart' | 'actualFinish'>): Progress {
+  if (a.actualFinish) return 'complete'
+  if (a.actualStart) return 'in_progress'
+  return 'not_started'
+}
+
+function phaseProgress(acts: Pick<ActivityData, 'actualStart' | 'actualFinish'>[]): Progress {
+  const p = acts.map(progressOf)
+  if (p.length && p.every(x => x === 'complete')) return 'complete'
+  if (p.some(x => x !== 'not_started')) return 'in_progress'
+  return 'not_started'
 }
 
 export default function TimelinePage() {
@@ -58,7 +75,8 @@ export default function TimelinePage() {
       start:           starts[0] || null,
       finish:          finishes[finishes.length - 1] || null,
       hasCritical:     acts.some(a => a.isCritical),
-      allComplete:     acts.every(a => a.status === 'complete'),
+      progress:        phaseProgress(acts),
+      allComplete:     phaseProgress(acts) === 'complete',
     }
   }).slice(0, 20)
 
@@ -97,13 +115,18 @@ export default function TimelinePage() {
             <div key={i} className="bg-warm-100 border border-warm-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-[14px] font-semibold text-navy-950">{phase.name}</div>
-                {phase.allComplete ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-complete bg-status-complete-bg px-2 py-0.5 rounded-md border-l-2 border-status-complete">Complete</span>
-                ) : phase.hasCritical ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-2 py-0.5 rounded-md border-l-2 border-status-attention">Attention</span>
-                ) : (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-info bg-status-info-bg px-2 py-0.5 rounded-md border-l-2 border-status-info">In Progress</span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {phase.hasCritical && !phase.allComplete && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-2 py-0.5 rounded-md border-l-2 border-status-attention">Critical</span>
+                  )}
+                  {phase.progress === 'complete' ? (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-status-complete bg-status-complete-bg px-2 py-0.5 rounded-md border-l-2 border-status-complete">Complete</span>
+                  ) : phase.progress === 'in_progress' ? (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-status-info bg-status-info-bg px-2 py-0.5 rounded-md border-l-2 border-status-info">In Progress</span>
+                  ) : (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-warm-600 bg-warm-200 px-2 py-0.5 rounded-md border-l-2 border-warm-400">Not Started</span>
+                  )}
+                </div>
               </div>
               <div className="text-[12px] text-warm-400 mb-3">
                 {phase.activityCount} activities
@@ -144,7 +167,7 @@ export default function TimelinePage() {
                     <div className="w-[200px] flex-shrink-0 text-[12px] text-warm-700 truncate pr-2">{act.name}</div>
                     <div className="flex-1 relative h-5">
                       <div
-                        className={`absolute h-3 top-1 rounded-sm ${act.isCritical ? 'bg-status-attention' : act.status === 'complete' ? 'bg-status-complete' : 'bg-accent-400'}`}
+                        className={`absolute h-3 top-1 rounded-sm ${act.isCritical ? 'bg-status-attention' : progressOf(act) === 'complete' ? 'bg-status-complete' : 'bg-accent-400'}`}
                         style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.5, Math.min(width, 100 - left))}%` }}
                       >
                         {act.percentComplete > 0 && (

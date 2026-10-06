@@ -10,7 +10,7 @@ import { isCivilType } from './types'
 import { runCpm } from './cpm'
 import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
 import { elicit, known, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
-import { historyDuration, type FirmHistory } from './history'
+import { historyDuration, historyForPlan, type FirmHistory } from './history'
 import { templatesFor, computeTemplateDuration, mapToSelected } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
 import { appliesTri } from '@/lib/knowledge/applicability'
@@ -81,7 +81,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const bank = questionBank({ answers }, {})
   const elic = elicit({ answers }, { today })
   const regional = resolveRegional(profile)
-  const useHistory = known(answers, 'history.use') !== false && !!history
+  // Opting out of firm history (history.use = No) means no duration comes from it.
+  const useHistory = !!historyForPlan(history, answers)
 
   /* ── Calendars ── */
   const requestedStart = (known(answers, 'project.target_start') as string) || addCalendarDays(today, 30)

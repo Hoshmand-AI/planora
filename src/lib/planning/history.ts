@@ -1,7 +1,7 @@
 // Grounding in how the firm's own past projects actually went.
 // Input rows come from db.getOrgHistory(orgId), which is filtered to one organization.
 
-import type { CanonicalCategory, ProjectType, WorkCalendar } from './types'
+import type { Answer, CanonicalCategory, ProjectType, WorkCalendar } from './types'
 import { countWorkDaysInclusive, defaultCalendar } from './calendar'
 import type { HistoryRow } from '@/lib/db'
 
@@ -132,4 +132,18 @@ export function historyDuration(h: FirmHistory | null | undefined, category: Can
   // Samples are normalized to REF_SQFT only when their project area was known.
   const days = sqft && s.meanSqft ? scaleForSize(s.actualMedian, REF_SQFT, sqft) : s.actualMedian
   return { days: Math.max(1, Math.round(days)), stats: s }
+}
+
+/** True when the team answered "No" to using the firm's history for this plan (`history.use`). */
+export function historyOptedOut(answers: Record<string, Answer> | null | undefined): boolean {
+  const a = answers?.['history.use']
+  return a?.status === 'known' && a.value === false
+}
+
+/**
+ * The firm history this plan may use: null when the team opted out in the interview. Every
+ * consumer that turns history into durations, risk ranges or forecast ratios goes through this.
+ */
+export function historyForPlan(h: FirmHistory | null | undefined, answers: Record<string, Answer> | null | undefined): FirmHistory | null {
+  return h && !historyOptedOut(answers) ? h : null
 }

@@ -8,6 +8,7 @@ import { recoveryPlan } from '@/lib/planning/recovery'
 import { adaptiveInterview } from '@/lib/planning/adaptive'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
 import { loadFirmHistory } from '@/lib/planning/service'
+import { historyForPlan } from '@/lib/planning/history'
 import { llmStatus } from '@/lib/llm/provider'
 import type { ProjectType } from '@/lib/planning/types'
 
@@ -40,7 +41,14 @@ export async function elicitationContext(plan: Plan, orgId: string) {
 export async function planView(plan: Plan, orgId: string) {
   const { history, llm, ectx } = await elicitationContext(plan, orgId)
   const elicitation = elicit({ answers: plan.answers }, ectx)
+  // The interview probes every answer, including history.use itself, so it gets the firm history;
+  // the generator ignores it whenever history.use is No.
   const adaptive = adaptiveInterview(plan.answers, elicitation, { history })
+  // One finish date everywhere: once a schedule exists, the brief shows its current CPM finish
+  // (including scheduler edits), the same date as the plan header.
+  if (plan.generated?.cpm?.projectFinish) adaptive.baselineFinish = plan.generated.cpm.projectFinish
+  // Firm history only shapes forecasts and recovery when the team didn't opt out (history.use).
+  const planHistory = historyForPlan(history, plan.answers)
   const bank = new Map(questionBank({ answers: plan.answers }, ectx).all.map(q => [q.id, q]))
   const answered = Object.entries(plan.answers).map(([id, a]) => {
     const q = bank.get(id)
@@ -49,8 +57,8 @@ export async function planView(plan: Plan, orgId: string) {
     return { id, prompt: q?.prompt ?? id, section: q?.section ?? 'project', label, status: a.status, value: a.value ?? null, note: a.note ?? null, custom: !!a.custom }
   })
   const rules = normalizeSettings((await getOrganization(orgId))?.settings).quality
-  const evaluation = plan.generated ? evaluatePlan(plan.generated, plan.answers, history, plan.reviews, rules) : null
-  const recovery = plan.generated ? recoveryPlan(plan.generated, plan.answers, history) : null
+  const evaluation = plan.generated ? evaluatePlan(plan.generated, plan.answers, planHistory, plan.reviews, rules) : null
+  const recovery = plan.generated ? recoveryPlan(plan.generated, plan.answers, planHistory) : null
   const offCal = new Set((plan.generated?.activities || []).filter(a => a.calendarId === 'cal-7d' || a.phase === 'design').map(a => a.code))
   const guidance = evaluation ? evaluation.dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({
     ...guidanceFor(c, {
