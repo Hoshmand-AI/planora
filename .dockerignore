@@ -1,0 +1,19 @@
+# Keep secrets, local state and build output out of the image build context.
+.git
+.github
+.claude
+node_modules
+.next
+.vercel
+.env
+.env.*
+!.env.example
+backups
+*.dump
+*.dump.manifest.json
+sbom.cdx.json
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+docker-compose*.yml
+.dockerignore

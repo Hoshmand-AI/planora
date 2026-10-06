@@ -16,6 +16,7 @@ import { ssoConfigFor } from '@/lib/server/sso'
 import { markEmailVerified, sendVerificationEmail } from '@/lib/server/email-verification'
 import { emailConfigured, appOrigin } from '@/lib/server/email'
 import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
+import { INVITE_ONLY_MESSAGE, selfSignupAllowed, signupMode } from '@/lib/server/signup-policy'
 
 const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.'
 
@@ -78,6 +79,11 @@ export const POST = publicApi(async req => {
     const invite = b.invite ? await findInvitation(String(b.invite)) : null
     if (b.invite && !invite) throw new ApiError(400, 'This invitation link is no longer valid. Ask your admin for a new one.', 'invite_invalid')
     if (invite && invite.email !== email) throw new ApiError(400, `This invitation is for ${invite.email}. Sign up with that email address.`, 'invite_email')
+    // On-prem instances can be invitation-only (PLANORA_SIGNUP=invite_only); the first account on an empty instance bootstraps the owner.
+    if (!invite && signupMode() === 'invite_only') {
+      const orgs = Number((await query('SELECT COUNT(*)::int AS n FROM organizations')).rows[0]?.n ?? 0)
+      if (!selfSignupAllowed('invite_only', orgs)) throw new ApiError(403, INVITE_ONLY_MESSAGE, 'invite_only')
+    }
     if (await getUserByEmail(email)) throw new ApiError(409, 'An account with this email already exists. Please sign in.')
     const user = await createUser({
       id: uuid(), email, name: (typeof b.name === 'string' && b.name.trim().slice(0, 120)) || email.split('@')[0],
