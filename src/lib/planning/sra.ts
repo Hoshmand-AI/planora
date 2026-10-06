@@ -4,8 +4,14 @@
 // distribution and recomputes the full CPM network (all calendars, relationship types, lags and
 // constraints), so merge bias and path switching are captured, not just the deterministic critical
 // path. Results: finish-date percentiles, probability of meeting the required date, a histogram,
-// each activity's criticality index (share of iterations it was critical) and a sensitivity
-// ranking (Spearman rank correlation between an activity's sampled duration and the finish).
+// each activity's criticality index (share of iterations in which it was on the driving path to the
+// project finish, i.e. that iteration's longest path; not TF <= 0, which a constraint or a required
+// date can produce off the driving path) and a sensitivity ranking (Spearman rank correlation
+// between an activity's sampled duration and the finish).
+//
+// Mandatory constraints (MSO/MFO) would pin the dates they constrain in every iteration and hide the
+// spread, so the simulation relaxes them to their logic-driven form (Mandatory Start -> Start On or
+// After, Mandatory Finish -> Finish On or After) and says so in `warnings`.
 //
 // Uncertainty sources, per activity (multipliers of the planned duration):
 //   - the scheduler's own inputs come first: a duration override (e.g. a vendor quote) is centered
@@ -42,6 +48,8 @@ export interface SraResult {
   criticality: { id: string; code: string; name: string; index: number }[]
   sensitivity: { id: string; code: string; name: string; correlation: number; criticality: number; basis: string }[]
   assumptions: string[]
+  /** Things the reader must know to interpret the result (e.g. mandatory constraints relaxed) */
+  warnings: string[]
   ms: number
 }
 
@@ -185,10 +193,21 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
   const samples: number[][] = acts.map(() => [])
   const critical = new Array<number>(acts.length).fill(0)
   const base = { projectStart: s.projectStart, dataDate: s.dataDate, links: s.links, calendars: s.calendars, defaultCalendarId: s.defaultCalendarId }
+  const warnings: string[] = []
+  // Relax mandatory constraints to their logic-driven form so the finish distribution reflects the
+  // network, not a pinned date.
+  const mandatory = acts.filter(a => !a.actualFinish && (a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'))
+  const relaxed = acts.map(a => a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'
+    ? { ...a, constraint: { type: a.constraint.type === 'MSO' ? 'SNET' as const : 'FNET' as const, date: a.constraint.date } }
+    : a)
+  if (mandatory.length) {
+    const names = mandatory.slice(0, 5).map(a => `${a.code} (${a.constraint!.type === 'MSO' ? 'Mandatory Start' : 'Mandatory Finish'} ${a.constraint!.date})`).join(', ')
+    warnings.push(`${mandatory.length} mandatory constraint${mandatory.length === 1 ? '' : 's'} (${names}${mandatory.length > 5 ? ', …' : ''}) ${mandatory.length === 1 ? 'was' : 'were'} relaxed for the simulation: Mandatory Start is treated as Start On or After and Mandatory Finish as Finish On or After, so logic drives the simulated finish. The deterministic finish still honours the mandatory dates.`)
+  }
 
   for (let it = 0; it < budget; it++) {
     const zg = normal(rand)
-    const simActs = acts.map((a, i) => {
+    const simActs = relaxed.map((a, i) => {
       if (a.category === 'contingency') return { ...a, duration: 0, remaining: 0 }
       const d = dists[i]
       if (!d) return a
@@ -200,9 +219,10 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       return { ...a, duration: dur, remaining: a.remaining != null ? Math.max(1, Math.round(a.remaining * m)) : undefined }
     })
     const r = runCpm({ ...base, activities: simActs })
-    // The logic-driven finish: a mandatory constraint must not hide the simulated spread.
-    finishes.push(toDayNumber(r.logicFinish || r.projectFinish))
-    acts.forEach((a, i) => { if (r.times[a.id]?.critical) critical[i]++ })
+    finishes.push(toDayNumber(r.projectFinish))
+    // Critical in this iteration = on its driving path to the project finish.
+    const onPath = new Set(r.longestPath)
+    acts.forEach((a, i) => { if (onPath.has(a.id)) critical[i]++ })
   }
 
   const sorted = [...finishes].sort((a, b) => a - b)
@@ -246,7 +266,9 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       'Field activities share a common productivity/weather factor (correlation 0.4).',
       contingency ? `The ${contingency.duration}-day contingency activity is excluded; the simulated uncertainty replaces it.` : 'No contingency activity in the schedule.',
       'Discrete risk events (e.g. a failed inspection) are not modeled separately; they are reflected only through the duration ranges.',
+      'Criticality index: the share of iterations in which the activity was on the driving (longest) path to the simulated project finish.',
     ],
+    warnings,
     ms: Date.now() - started,
   }
 }

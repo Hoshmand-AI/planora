@@ -105,7 +105,8 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     taskId.set(a.id, id)
     const h = hoursOf(a.calendarId)
     const fin = finishTime(h)
-    const type = a.type === 'milestone' ? (hasPred.has(a.id) ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
+    const msKind = a.milestoneKind ?? (hasPred.has(a.id) ? 'finish' : 'start')
+    const type = a.type === 'milestone' ? (msKind === 'finish' ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
     const dur = a.duration * h
     const done = !!a.actualFinish || a.status === 'complete'
     const active = !done && !!a.actualStart
@@ -130,8 +131,9 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
   for (const l of s.links) {
     const from = taskId.get(l.from), to = taskId.get(l.to)
     if (from === undefined || to === undefined) continue
-    const succ = s.activities.find(a => a.id === l.to)
-    predRows.push([nextPred++, to, from, PROJ, PROJ, PRED[l.type], l.lag * hoursOf(succ?.calendarId)])
+    // Lag is in work days on the predecessor's calendar (P6's default lag calendar)
+    const pred = s.activities.find(a => a.id === l.from)
+    predRows.push([nextPred++, to, from, PROJ, PROJ, PRED[l.type], l.lag * hoursOf(pred?.calendarId)])
   }
   table('TASKPRED', ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt'], predRows)
 

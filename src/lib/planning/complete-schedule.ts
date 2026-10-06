@@ -74,6 +74,7 @@ export function completeSchedule(input: {
     duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
     remaining: a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : undefined,
     type: a.activityType === 'milestone' ? 'milestone' : 'task',
+    milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
     calendarId: a.calendarId || input.defaultCalendarId || cals[0].id,
     constraint: a.constraintType && CSTR.has(a.constraintType) && a.constraintDate ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : undefined,
     actualStart: a.actualStart, actualFinish: a.actualFinish,

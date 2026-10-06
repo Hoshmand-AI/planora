@@ -35,11 +35,17 @@ describe('parseXER', () => {
     expect(byCode('A1000').id).not.toBe('1001')
   })
 
-  it('converts lag with the successor calendar hours', () => {
+  it('converts lag with the predecessor calendar hours (P6 default lag calendar)', () => {
     const rel = (p: string, s: string) => parsed.relationships.find(r => r.predecessorId === byCode(p).id && r.successorId === byCode(s).id)
-    expect(rel('A1020', 'A1030')).toMatchObject({ type: 'SS', lag: 2 }) // 16h on 8h calendar
-    expect(rel('A1030', 'A1060')).toMatchObject({ type: 'FF', lag: 2 }) // 20h on 10h calendar
+    expect(rel('A1020', 'A1030')).toMatchObject({ type: 'SS', lag: 1.6 }) // 16h on the predecessor's 10h calendar
+    expect(rel('A1030', 'A1060')).toMatchObject({ type: 'FF', lag: 2.5 }) // 20h on the predecessor's 8h calendar
     expect(rel('A1050', 'A1070')).toMatchObject({ type: 'FS', lag: 0 })
+  })
+
+  it('distinguishes P6 start milestones (TT_Mile) from finish milestones (TT_FinMile)', () => {
+    expect(byCode('A1000')).toMatchObject({ activityType: 'milestone', milestoneKind: 'start' })
+    expect(byCode('A1070')).toMatchObject({ activityType: 'milestone', milestoneKind: 'finish' })
+    expect(byCode('A1010').milestoneKind).toBeNull()
   })
 
   it('parses CALENDAR clndr_data: work days, hours, holidays and extra work days', () => {

@@ -33,6 +33,8 @@ export type LinkType = 'FS' | 'SS' | 'FF' | 'SF'
  */
 export type ConstraintType = 'SNET' | 'SNLT' | 'FNET' | 'FNLT' | 'SO' | 'FO' | 'MSO' | 'MFO'
 export const CONSTRAINT_TYPES: readonly ConstraintType[] = ['SNET', 'SNLT', 'FNET', 'FNLT', 'SO', 'FO', 'MSO', 'MFO']
+/** P6 milestone type: start (TT_Mile) or finish (TT_FinMile). */
+export type MilestoneKind = 'start' | 'finish'
 /** Out-of-sequence progress: P6 Retained Logic (default) or Progress Override. */
 export type ProgressMode = 'retained' | 'override'
 
@@ -46,6 +48,12 @@ export interface CpmActivity {
   remaining?: number
   calendarId?: string
   type: 'task' | 'milestone'
+  /**
+   * Milestones only: P6 start milestone (TT_Mile, at the start of its day) or finish milestone
+   * (TT_FinMile, at the end of its day). When absent, a milestone without predecessors is a start
+   * milestone and any other a finish milestone.
+   */
+  milestoneKind?: MilestoneKind
   constraint?: { type: ConstraintType; date: string }
   actualStart?: string | null
   actualFinish?: string | null
@@ -55,7 +63,7 @@ export interface CpmLink {
   from: string
   to: string
   type: LinkType
-  /** Lag in work days on the successor's calendar (may be negative = lead) */
+  /** Lag in work days on the predecessor's calendar (P6 default; may be negative = lead) */
   lag: number
 }
 
@@ -93,6 +101,13 @@ export interface CpmResult {
   criticalPath: string[]
   /** Activity ids of the longest (driving) path to the project finish, regardless of float */
   longestPath: string[]
+  /**
+   * Set when the longest path starts at an activity whose date a mandatory constraint (MSO/MFO)
+   * sets rather than logic: the path stops there, as in P6.
+   */
+  longestPathConstraint?: { id: string; type: 'MSO' | 'MFO'; date: string }
+  /** The path to logicFinish that logic alone would give (through mandatory constraints) */
+  logicLongestPath?: string[]
   /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
   violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
   progressMode: ProgressMode
@@ -439,6 +454,8 @@ export interface AnalyzableActivity {
   baselineFinish?: string | null
   totalFloat?: number | null
   constraint?: { type: ConstraintType | string; date?: string | null } | null
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone, when the source says */
+  milestoneKind?: MilestoneKind | null
   resourceCount?: number
 }
 

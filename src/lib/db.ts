@@ -310,6 +310,8 @@ export interface Activity {
   actualStart: string | null; actualFinish: string | null; baselineStart: string | null; baselineFinish: string | null
   totalFloat: number; freeFloat: number; isCritical: boolean
   status: 'not_started' | 'in_progress' | 'complete'; activityType: 'task' | 'milestone' | 'loe' | 'summary'
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone; null when the source does not say */
+  milestoneKind?: 'start' | 'finish' | null
   /** Source calendar id (as referenced in the schedule's calendars list) */
   calendarId?: string | null
   constraintType?: string | null; constraintDate?: string | null
@@ -327,6 +329,7 @@ function rowToActivity(row: Record<string, unknown>): Activity {
     actualStart: row.actual_start as string | null, actualFinish: row.actual_finish as string | null, baselineStart: row.baseline_start as string | null, baselineFinish: row.baseline_finish as string | null,
     totalFloat: Number(row.total_float), freeFloat: Number(row.free_float), isCritical: Boolean(row.is_critical),
     status: row.status as Activity['status'], activityType: row.activity_type as Activity['activityType'],
+    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
     calendarId: (row.calendar_id as string) ?? null, constraintType: (row.constraint_type as string) ?? null, constraintDate: (row.constraint_date as string) ?? null,
     category: (row.category as string) ?? null, sourceId: (row.source_id as string) ?? null,
   }
@@ -352,8 +355,8 @@ async function bulkInsert(table: string, columns: string[], rows: unknown[][]) {
 export async function createActivities(activities: Activity[]): Promise<void> {
   await initSchema()
   await bulkInsert('activities',
-    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id'],
-    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null]))
+    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id', 'milestone_kind'],
+    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null, a.milestoneKind ?? null]))
 }
 
 export interface Relationship {

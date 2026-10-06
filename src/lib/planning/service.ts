@@ -25,7 +25,7 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
       percentComplete: a.percentComplete, status: a.status, calendarId: a.calendarId ?? null,
       earlyStart: a.earlyStart, earlyFinish: a.earlyFinish, lateStart: a.lateStart, lateFinish: a.lateFinish,
       actualStart: a.actualStart, actualFinish: a.actualFinish, baselineStart: a.baselineStart, baselineFinish: a.baselineFinish,
-      totalFloat: a.totalFloat,
+      totalFloat: a.totalFloat, milestoneKind: a.milestoneKind ?? null,
       constraint: a.constraintType && CONSTRAINTS.includes(a.constraintType) ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : null,
     })),
   }

@@ -314,6 +314,14 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS schedule_files_org_idx ON schedule_files(org_id);
     `,
   },
+  {
+    id: 6, name: 'activity_milestone_kind',
+    sql: `
+    -- P6 start (TT_Mile) vs finish (TT_FinMile) milestones schedule differently: a start milestone
+    -- occurs at the start of its day. NULL = the source did not say (inferred from logic).
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {
