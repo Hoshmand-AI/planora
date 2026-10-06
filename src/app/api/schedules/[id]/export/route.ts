@@ -6,7 +6,7 @@ import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleFile } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
-import { exportXer, exportXerFromOriginal, xerUpdatesFrom } from '@/lib/export/xer'
+import { exportXer, exportXerFromOriginal, xerEditsFrom, xerUpdatesFrom } from '@/lib/export/xer'
 import { decodeXer, encodeXer } from '@/lib/parsers/xer-codec'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
@@ -22,6 +22,8 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * An uploaded P6 file exports as its original XER with Planora's recalculated dates and float written
  * in, so everything Planora does not model (activity codes, UDFs, resources, notebooks...) is kept;
  * &rebuild=1 builds a fresh XER from Planora's model instead.
+ * Edits made in Planora are in every export: written into the original XER (durations, constraints,
+ * TASKPRED rows), and in the other formats through the edited network, with their reasons as notes.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const format = req.nextUrl.searchParams.get('format') || 'xer'
@@ -41,7 +43,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (!['xer', 'xml', 'csv', 'xlsx-p6', 'xlsx-import'].includes(format)) return NextResponse.json({ error: 'Unknown format. Use xer, xml, csv, xlsx-p6, xlsx-import or original.' }, { status: 400 })
   requireFeature(auth.plan, entitlementsFor(auth.plan).exports.includes(format), `${format.toUpperCase()} export`)
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
-  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis)
+  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits)
 
   let body: string | Buffer, type: string, file: string
   switch (format) {
@@ -49,7 +51,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
       const original = schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId) : undefined
       if (original) {
         const { text, encoding, bom } = decodeXer(original.content)
-        body = encodeXer(exportXerFromOriginal(text, xerUpdatesFrom(data.activities, data.cpm), { forecastFinish: data.analysis.forecastFinish }), encoding, bom)
+        body = encodeXer(exportXerFromOriginal(text, xerUpdatesFrom(data.activities, data.cpm), { forecastFinish: data.analysis.forecastFinish, edits: xerEditsFrom(data.activities, data.edits) }), encoding, bom)
       } else {
         body = encodeXer(exportXer(g, schedule.name, { exportedBy: auth.name, projectShortName: schedule.name }))
       }
@@ -60,6 +62,6 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     case 'xlsx-import': body = await exportImportXlsx(g, schedule.name); type = XLSX; file = `${slug}-import.xlsx`; break
     default: body = await exportP6LayoutXlsx(g, schedule.name); type = XLSX; file = `${slug}-p6-layout.xlsx`
   }
-  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length } })
+  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, editsInPlanora: data.edits.filter(e => e.status === 'applied').length } })
   return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"` } })
 })

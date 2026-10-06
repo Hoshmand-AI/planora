@@ -86,16 +86,24 @@ export async function loadSeriesBaseline(orgId: string, current: { id: string; v
 
 /**
  * Load a firm's schedule with activities and logic, filling in dates/float Planora had to calculate
- * for files that arrived without them (older uploads are corrected on read).
+ * for files that arrived without them (older uploads are corrected on read). Edits made in Planora
+ * (schedule_edits, an override layer) are applied to the imported network before the recalculation,
+ * so every view, export and analysis works on the edited schedule; `edits` lists them.
  */
 export async function loadScheduleData(id: string, orgId: string) {
-  const { getScheduleById, getActivities, getRelationships } = await import('@/lib/db')
+  const { getScheduleById, getActivities, getRelationships, getScheduleEdits } = await import('@/lib/db')
   const { completeSchedule } = await import('./complete-schedule')
+  const { applyScheduleEdits } = await import('./uploaded-edits')
   const schedule = await getScheduleById(id, orgId)
   if (!schedule) return null
-  const [rawActivities, relationships, seriesBaseline] = await Promise.all([
+  const [importedActivities, importedRelationships, seriesBaseline, storedEdits] = await Promise.all([
     getActivities(id), getRelationships(id), loadSeriesBaseline(orgId, schedule).catch(() => null),
+    schedule.sourceType === 'generated' ? Promise.resolve([]) : getScheduleEdits(id, orgId).catch(() => []),
   ])
+  const activeEdits = storedEdits.filter(e => !e.revertedAt)
+  const edited = applyScheduleEdits(importedActivities, importedRelationships, activeEdits)
+  const rawActivities = activeEdits.length ? edited.activities : importedActivities
+  const relationships = activeEdits.length ? edited.relationships : importedRelationships
   const prior = schedule.analysis ?? null
   // Older uploads stored the file's header finish as projectFinish; keep it as the reported finish.
   const reportedFinish = prior ? prior.reportedFinish : schedule.projectFinish
@@ -139,5 +147,18 @@ export async function loadScheduleData(id: string, orgId: string) {
     hasLogic: done.hasLogic,
     analysis,
     cpm: done.cpm,
+    /** Active edits made in Planora, in order, as applied (with before/after) */
+    edits: edited.applied,
+    /** Reverted edits, kept for the record */
+    revertedEdits: storedEdits.filter(e => e.revertedAt),
+    editedActivityIds: edited.editedActivityIds,
+  }
+}
+
+/** The (edited) network of loaded schedule data, for what-if recalculation. */
+export function networkOf(data: NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>) {
+  return {
+    activities: data.activities, relationships: data.relationships, calendars: data.schedule.calendars, defaultCalendarId: data.schedule.defaultCalendarId,
+    projectStart: data.schedule.projectStart, dataDate: data.schedule.dataDate, mustFinishBy: data.analysis.mustFinishBy ?? null, progressMode: data.analysis.progressMode ?? 'retained',
   }
 }

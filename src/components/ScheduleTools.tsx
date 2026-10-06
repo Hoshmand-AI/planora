@@ -1,11 +1,13 @@
 'use client'
 
-// Tools for an uploaded schedule: compare with the previous update, Monte Carlo risk, exports back
-// to P6 / MS Project / Excel, the original file, and how Planora schedules it.
+// Tools for an uploaded schedule: compare with the previous update, edits made in Planora (with
+// reasons), what-if / recovery options, Monte Carlo risk with the scheduler's own ranges and risk
+// events, exports back to P6 / MS Project / Excel, the original file, and how Planora schedules it.
 
 import { useEffect, useState } from 'react'
 import { Disclosure } from './Disclosure'
 import { fmtDate } from '@/lib/format'
+import { EditsPanel, RecoveryPanel, RiskInputsPanel, type RiskInputsView } from './UploadedScheduleEdits'
 
 interface SeriesRow { id: string; version: string; dataDate: string | null; forecastFinish: string | null; varianceDays: number | null; status: string | null }
 interface Change { code: string; name: string; field: string; before: string | number | null; after: string | number | null; delta: number | null }
@@ -20,12 +22,17 @@ interface Comparison {
   actualsRewritten: Change[]
   floatErosion: { code: string; name: string; before: number; after: number; delta: number }[]
 }
-interface Sra { method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }; sensitivity: { code: string; name: string; correlation: number }[] }
+interface Sra {
+  method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }
+  sensitivity: { code: string; name: string; correlation: number; basis: string }[]; assumptions: string[]
+  events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
+  inputs?: RiskInputsView
+}
 
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
 
-export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }: { scheduleId: string; progressMode: 'retained' | 'override'; inHistory: boolean; onChanged: () => void }) {
+export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, canEdit = false, editsCount = 0 }: { scheduleId: string; progressMode: 'retained' | 'override'; inHistory: boolean; onChanged: () => void; canEdit?: boolean; editsCount?: number }) {
   const [series, setSeries] = useState<SeriesRow[]>([])
   const [cmp, setCmp] = useState<Comparison | null>(null)
   const [cmpMsg, setCmpMsg] = useState<string>('')
@@ -33,6 +40,14 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
   const [sra, setSra] = useState<Sra | null>(null)
   const [sraErr, setSraErr] = useState('')
   const [busy, setBusy] = useState(false)
+  // Bumped after an edit so the edits list, the options and the risk analysis reload.
+  const [rev, setRev] = useState(0)
+  // Deep link from the Quality page (…#recovery) opens the what-if and recovery options.
+  const [openRecovery] = useState(() => typeof window !== 'undefined' && window.location.hash === '#recovery')
+  useEffect(() => {
+    if (openRecovery) setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+  }, [openRecovery])
+  const edited = () => { setRev(r => r + 1); setSra(null); onChanged() }
 
   useEffect(() => {
     let live = true
@@ -61,7 +76,15 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
 
   return (
     <section aria-labelledby="tools-h" className="space-y-1">
-      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, risk and exports</h2>
+      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, edits, risk and exports</h2>
+
+      <Disclosure title="Edits made in Planora" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
+        <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
+      </Disclosure>
+
+      <Disclosure id="recovery" title="What-if and recovery options" meta="modeled on this network" defaultOpen={openRecovery}>
+        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} />
+      </Disclosure>
 
       <Disclosure title="Compare with another update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
@@ -108,6 +131,13 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged }
             <p><span className="font-semibold text-navy-950">Monte Carlo P50 {fmtDate(sra.percentiles.p50)} · P80 {fmtDate(sra.percentiles.p80)}</span> (deterministic forecast {fmtDate(sra.deterministic)}){sra.required ? `; ${Math.round(sra.required.probability * 100)}% chance of meeting ${fmtDate(sra.required.date)}` : ''}.</p>
             <p className="text-warm-600">{sra.method}</p>
             {sra.sensitivity.length > 0 && <p>Biggest drivers: {sra.sensitivity.slice(0, 5).map(s => `${s.code} ${s.name}`).join('; ')}.</p>}
+            {sra.events && sra.events.length > 0 && (
+              <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Risk events in the simulation</caption>
+                <thead><tr><th className={th}>Event</th><th className={th}>Activity</th><th className={th}>Probability</th><th className={th}>Impact (wd)</th><th className={th}>Finish when it occurs</th></tr></thead>
+                <tbody>{sra.events.map(e => <tr key={e.id}><td className={td}>{e.name}</td><td className={td}>{e.code}</td><td className={td}>{Math.round(e.probability * 100)}%</td><td className={td}>{e.impactDays}</td><td className={td}>{e.finishDeltaDays > 0 ? `+${e.finishDeltaDays} calendar days` : 'no effect on the finish'}</td></tr>)}</tbody></table></div>
+            )}
+            <ul className="list-disc pl-5 text-warm-600 space-y-0.5">{sra.assumptions.slice(0, 4).map((x, i) => <li key={i}>{x}</li>)}</ul>
+            {sra.inputs && <RiskInputsPanel key={sra.inputs.updatedAt ?? 'none'} scheduleId={scheduleId} inputs={sra.inputs} canEdit={canEdit} onSaved={runRisk} />}
           </div>
         )}
       </Disclosure>

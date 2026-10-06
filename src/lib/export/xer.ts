@@ -220,14 +220,56 @@ export function xerUpdatesFrom(activities: { id: string; sourceId?: string | nul
   return out
 }
 
+/** Edits made in Planora, keyed by P6 task_id, to write into the original XER (durations in work days). */
+export interface XerEdits {
+  tasks: Map<string, { remainingDays?: number; originalDays?: number; constraint?: { type: ConstraintType; date: string } | null }>
+  setLinks: { pred: string; succ: string; type: LinkType; lagDays: number }[]
+  removeLinks: { pred: string; succ: string }[]
+}
+
+type EditLike = { status: 'applied' | 'skipped'; change: { kind: string; activityId?: string; remaining?: number; predecessorId?: string; successorId?: string; type?: LinkType; lag?: number; constraint?: { type: ConstraintType; date: string } | null } }
+
+/** Replay the applied edits of an uploaded schedule onto P6 task ids (the last edit of a field wins). */
+export function xerEditsFrom(activities: { id: string; sourceId?: string | null; status?: string }[], edits: EditLike[]): XerEdits {
+  const byId = new Map(activities.map(a => [a.id, a]))
+  const src = (id?: string) => (id ? byId.get(id)?.sourceId || null : null)
+  const tasks: XerEdits['tasks'] = new Map()
+  const set = new Map<string, XerEdits['setLinks'][number]>()
+  const removed = new Map<string, XerEdits['removeLinks'][number]>()
+  for (const e of edits) {
+    if (e.status !== 'applied') continue
+    const c = e.change
+    if (c.kind === 'duration' || c.kind === 'constraint') {
+      const t = src(c.activityId)
+      if (!t) continue
+      const cur = tasks.get(t) || {}
+      if (c.kind === 'duration') {
+        cur.remainingDays = c.remaining
+        if (byId.get(c.activityId!)?.status !== 'in_progress') cur.originalDays = c.remaining
+      } else cur.constraint = c.constraint ?? null
+      tasks.set(t, cur)
+    } else if (c.kind === 'link_set' || c.kind === 'link_remove') {
+      const pred = src(c.predecessorId), succ = src(c.successorId)
+      if (!pred || !succ) continue
+      const key = `${pred}>${succ}`
+      if (c.kind === 'link_set') { removed.delete(key); set.set(key, { pred, succ, type: c.type || 'FS', lagDays: c.lag ?? 0 }) }
+      else { set.delete(key); removed.set(key, { pred, succ }) }
+    }
+  }
+  return { tasks, setLinks: [...set.values()], removeLinks: [...removed.values()] }
+}
+
 /**
  * Re-emit an uploaded XER with Planora's recalculated early/late dates, float and driving-path flag on
  * open activities, and Planora's forecast as the project's scheduled finish. Every other table, row
  * and field (including the file's own time of day on unchanged dates) is written back exactly as read.
+ * With `opts.edits`, the edits made in Planora are written in too: durations (target/remaining hours),
+ * primary constraints, and TASKPRED rows changed, removed or added.
  */
-export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null } = {}): string {
+export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null; edits?: XerEdits | null } = {}): string {
   const tables = readXerTables(original)
   const cal = new Map((tables['CALENDAR'] || []).map(c => [c['clndr_id'], xerCalendarTimes(c)]))
+  const edits = opts.edits && (opts.edits.tasks.size || opts.edits.setLinks.length || opts.edits.removeLinks.length) ? opts.edits : null
   const projOfTasks = new Set<string>()
   for (const t of tables['TASK'] || []) if (updates.has(t['task_id']) && t['proj_id']) projOfTasks.add(t['proj_id'])
   const projCal = new Map((tables['PROJECT'] || []).map(p => [p['proj_id'], p['clndr_id']]))
@@ -241,6 +283,34 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
     return `${iso} ${m ? m[1] : time}`
   }
   const hrs = (days: number, hpd: number) => String(Math.round(days * hpd * 100) / 100)
+  const taskRow = new Map((tables['TASK'] || []).map(t => [t['task_id'], t]))
+  const calOfTask = (taskId: string) => {
+    const t = taskRow.get(taskId)
+    return (t && (cal.get(t['clndr_id']) || cal.get(projCal.get(t['proj_id']) || ''))) || cal.get(defaultCal || '')
+  }
+  const linkKey = (pred: string, succ: string) => `${pred.trim()}>${succ.trim()}`
+  const setLinks = new Map((edits?.setLinks || []).map(l => [linkKey(l.pred, l.succ), l]))
+  const removeLinks = new Set((edits?.removeLinks || []).map(l => linkKey(l.pred, l.succ)))
+  const pendingAdds = new Map(setLinks)
+  let nextPredId = Math.max(0, ...(tables['TASKPRED'] || []).map(p => Number(p['task_pred_id']) || 0)) + 1
+  const predFields = ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt']
+  /** New TASKPRED rows for the relationships added in Planora, in the table's own column order. */
+  const addRows = (fieldIdx: Map<string, number>) => {
+    const rows: string[] = []
+    const width = Math.max(0, ...fieldIdx.values()) + 1
+    for (const l of pendingAdds.values()) {
+      const cols = new Array<string>(width).fill('')
+      cols[0] = '%R'
+      const put = (f: string, v: string) => { const i = fieldIdx.get(f); if (i !== undefined) cols[i] = v }
+      const succ = taskRow.get(l.succ), pred = taskRow.get(l.pred)
+      put('task_pred_id', String(nextPredId++)); put('task_id', l.succ); put('pred_task_id', l.pred)
+      put('proj_id', succ?.['proj_id'] || ''); put('pred_proj_id', pred?.['proj_id'] || '')
+      put('pred_type', PRED[l.type]); put('lag_hr_cnt', hrs(l.lagDays, calOfTask(l.pred)?.hoursPerDay || 8))
+      rows.push(cols.join('\t'))
+    }
+    pendingAdds.clear()
+    return rows
+  }
 
   const eol = original.includes('\r\n') ? '\r\n' : '\n'
   const endsWithNl = /(\r\n|\n|\r)$/.test(original)
@@ -248,19 +318,50 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
   if (endsWithNl && lines[lines.length - 1] === '') lines.pop()
   let table = ''
   let idx = new Map<string, number>()
-  const out = lines.map(line => {
+  let sawPredTable = false
+  const out = lines.flatMap((line): string[] => {
     const cols = line.split('\t')
     const tag = cols[0].trim()
-    if (tag === '%T') { table = (cols[1] || '').trim(); return line }
-    if (tag === '%F') { idx = new Map(cols.slice(1).map((f, i) => [f.trim(), i + 1])); return line }
-    if (tag !== '%R') return line
+    // Relationships added in Planora go at the end of the TASKPRED table (or a new one before %E).
+    const flushAdds = (): string[] => (table === 'TASKPRED' && pendingAdds.size ? addRows(idx) : [])
+    if (tag === '%T') { const added = flushAdds(); table = (cols[1] || '').trim(); if (table === 'TASKPRED') sawPredTable = true; return [...added, line] }
+    if (tag === '%E') {
+      const added = flushAdds()
+      if (!sawPredTable && pendingAdds.size) {
+        const fidx = new Map(predFields.map((f, i) => [f, i + 1]))
+        return [...added, '%T\tTASKPRED', ['%F', ...predFields].join('\t'), ...addRows(fidx), line]
+      }
+      return [...added, line]
+    }
+    if (tag === '%F') { idx = new Map(cols.slice(1).map((f, i) => [f.trim(), i + 1])); return [line] }
+    if (tag !== '%R') return [line]
     const get = (f: string) => (idx.has(f) ? (cols[idx.get(f)!] ?? '') : '')
     const set = (f: string, v: string) => { const i = idx.get(f); if (i === undefined) return; while (cols.length <= i) cols.push(''); cols[i] = v }
+    if (table === 'TASKPRED' && edits) {
+      const key = linkKey(get('pred_task_id'), get('task_id'))
+      if (removeLinks.has(key)) return []
+      const l = setLinks.get(key)
+      if (!l) return [line]
+      pendingAdds.delete(key)
+      set('pred_type', PRED[l.type])
+      set('lag_hr_cnt', hrs(l.lagDays, calOfTask(get('pred_task_id').trim())?.hoursPerDay || 8))
+      return [cols.join('\t')]
+    }
     if (table === 'TASK') {
       const u = updates.get(get('task_id').trim())
-      if (!u || get('status_code').trim() === 'TK_Complete') return line
+      const te = edits?.tasks.get(get('task_id').trim())
       const c = cal.get(get('clndr_id').trim()) || cal.get(projCal.get(get('proj_id').trim()) || '') || cal.get(defaultCal || '')
       const finish = c?.finish || '17:00', hpd = c?.hoursPerDay || 8
+      if (te) {
+        if (te.remainingDays !== undefined) set('remain_drtn_hr_cnt', hrs(te.remainingDays, hpd))
+        if (te.originalDays !== undefined) set('target_drtn_hr_cnt', hrs(te.originalDays, hpd))
+        if (te.constraint !== undefined) {
+          set('cstr_type', te.constraint ? CSTR[te.constraint.type] : '')
+          const atStart = !!te.constraint && ['SNET', 'SNLT', 'SO', 'MSO'].includes(te.constraint.type)
+          set('cstr_date', te.constraint ? `${te.constraint.date} ${atStart ? c?.start || '08:00' : finish}` : '')
+        }
+      }
+      if (!u || get('status_code').trim() === 'TK_Complete') return [te ? cols.join('\t') : line]
       // A finish milestone starts and finishes at the end of its day.
       const start = get('task_type').trim() === 'TT_FinMile' ? finish : c?.start || '08:00'
       // An in-progress activity's early start is its actual start in P6; only its finish moves.
@@ -276,14 +377,14 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
       // Free float never exceeds total float in P6 (a date constraint can limit total float alone).
       set('free_float_hr_cnt', hrs(Math.min(u.freeFloat, Math.max(0, u.totalFloat)), hpd))
       set('driving_path_flag', u.driving ? 'Y' : 'N')
-      return cols.join('\t')
+      return [cols.join('\t')]
     }
     if (table === 'PROJECT' && opts.forecastFinish && projOfTasks.has(get('proj_id').trim())) {
       const c = cal.get(get('clndr_id').trim()) || cal.get(defaultCal || '')
       set('scd_end_date', withDate(get('scd_end_date'), opts.forecastFinish, c?.finish || '17:00'))
-      return cols.join('\t')
+      return [cols.join('\t')]
     }
-    return line
+    return [line]
   })
   return out.join(eol) + (endsWithNl ? eol : '')
 }

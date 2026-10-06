@@ -403,7 +403,7 @@ export interface ElicitationResult {
 /* ─── Generated schedule ─────────────────────────────── */
 
 export interface Override {
-  field: 'duration' | 'remove' | 'lag' | 'type' | 'add_link' | 'remove_link' | 'name'
+  field: 'duration' | 'remove' | 'lag' | 'type' | 'add_link' | 'remove_link' | 'name' | 'constraint'
   from?: unknown
   to?: unknown
   reason: string

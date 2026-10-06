@@ -2,6 +2,8 @@ import { Pool } from 'pg'
 import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
+import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
@@ -392,6 +394,62 @@ export async function createRelationships(rels: Relationship[]): Promise<void> {
     rels.map(r => [r.id, r.scheduleId, r.predecessorId, r.successorId, r.type, r.lag]))
 }
 
+/* ─── Edits to uploaded schedules (override layer) and risk inputs ── */
+
+export interface StoredScheduleEdit extends ScheduleEdit {
+  revertedAt: string | null; revertedBy: string | null; revertReason: string | null
+}
+
+function rowToEdit(r: Record<string, unknown>): StoredScheduleEdit {
+  return {
+    id: String(r.id), change: r.change as ScheduleEditChange, reason: String(r.reason), by: String(r.user_id ?? ''), byName: (r.user_name as string) ?? null,
+    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' ? 'recovery' : 'manual', optionId: (r.option_id as string) ?? null,
+    revertedAt: r.reverted_at ? new Date(String(r.reverted_at)).toISOString() : null, revertedBy: (r.reverted_by as string) ?? null, revertReason: (r.revert_reason as string) ?? null,
+  }
+}
+
+/** All edits of one firm's schedule, oldest first (reverted ones included, flagged). */
+export async function getScheduleEdits(scheduleId: string, orgId: string): Promise<StoredScheduleEdit[]> {
+  await initSchema()
+  const res = await query('SELECT * FROM schedule_edits WHERE schedule_id=$1 AND org_id=$2 ORDER BY created_at, id', [scheduleId, orgId])
+  return res.rows.map(rowToEdit)
+}
+
+/** Store edits atomically (a recovery option may be several edits). */
+export async function addScheduleEdits(scheduleId: string, orgId: string, edits: ScheduleEdit[]): Promise<void> {
+  await initSchema()
+  await withTransaction(async q => {
+    for (const e of edits) {
+      await q(`INSERT INTO schedule_edits (id, schedule_id, org_id, kind, change, reason, source, option_id, user_id, user_name, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [e.id, scheduleId, orgId, e.change.kind, JSON.stringify(e.change), e.reason, e.source ?? 'manual', e.optionId ?? null, e.by, e.byName ?? null, e.at])
+    }
+  })
+}
+
+/** Revert (not delete) an edit; returns false when there is no active edit with that id in this firm's schedule. */
+export async function revertScheduleEdit(scheduleId: string, orgId: string, editId: string, by: string, reason: string): Promise<boolean> {
+  await initSchema()
+  const res = await query('UPDATE schedule_edits SET reverted_at=NOW(), reverted_by=$4, revert_reason=$5 WHERE id=$3 AND schedule_id=$1 AND org_id=$2 AND reverted_at IS NULL', [scheduleId, orgId, editId, by, reason])
+  return (res.rowCount ?? 0) > 0
+}
+
+export interface ScheduleRiskInputs { ranges: SraRange[]; events: SraRiskEvent[]; updatedBy: string | null; updatedAt: string | null }
+
+export async function getScheduleRiskInputs(scheduleId: string, orgId: string): Promise<ScheduleRiskInputs> {
+  await initSchema()
+  const res = await query('SELECT * FROM schedule_risk_inputs WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { ranges: (r.ranges as SraRange[]) || [], events: (r.events as SraRiskEvent[]) || [], updatedBy: r.updated_by ?? null, updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : null }
+    : { ranges: [], events: [], updatedBy: null, updatedAt: null }
+}
+
+export async function saveScheduleRiskInputs(scheduleId: string, orgId: string, inputs: { ranges: SraRange[]; events: SraRiskEvent[] }, by: string): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO schedule_risk_inputs (schedule_id, org_id, ranges, events, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,NOW())
+    ON CONFLICT (schedule_id) DO UPDATE SET ranges=EXCLUDED.ranges, events=EXCLUDED.events, updated_by=EXCLUDED.updated_by, updated_at=NOW()
+    WHERE schedule_risk_inputs.org_id=EXCLUDED.org_id`, [scheduleId, orgId, JSON.stringify(inputs.ranges), JSON.stringify(inputs.events), by])
+}
+
 /* ─── Firm history (private to one org) ─────────────── */
 
 export interface HistoryRow {
@@ -593,11 +651,12 @@ export async function exportOrganization(orgId: string) {
   const schedules = await getSchedules(orgId)
   const scheduleData = []
   for (const s of schedules) {
-    const [activities, relationships, responses, chats] = await Promise.all([
+    const [activities, relationships, responses, chats, edits, riskInputs] = await Promise.all([
       getActivities(s.id), getRelationships(s.id), getDataQuestionResponses(s.id),
       query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
+      getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId),
     ])
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats })
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
   return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
@@ -654,6 +713,7 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE plans SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE schedules SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE data_question_responses SET user_id=$2 WHERE user_id=$1', [userId, heir])
+    await q("UPDATE schedule_edits SET user_id=$2, user_name='Former member' WHERE user_id=$1", [userId, heir])
     await q('DELETE FROM chat_messages WHERE user_id=$1', [userId])
     await q('DELETE FROM users WHERE id=$1', [userId])
   })

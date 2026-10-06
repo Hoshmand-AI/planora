@@ -6,7 +6,7 @@ import { loadScheduleData } from '@/lib/planning/service'
 import { generateReport } from '@/lib/openai'
 import { getScheduleSeries } from '@/lib/db'
 import { compareSchedules } from '@/lib/analysis/compare'
-import { REPORT_TITLES, type ReportType } from '@/lib/export/reports'
+import { REPORT_TITLES, editsSection, type ReportType } from '@/lib/export/reports'
 import { fmtDates } from '@/lib/format'
 
 const REPORT_TYPES = Object.keys(REPORT_TITLES) as ReportType[]
@@ -40,7 +40,10 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
     }
   }
 
-  const report = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison })
+  const generated = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison })
+  // Edits made in Planora to the uploaded file are always listed (whether or not a model wrote the report).
+  const edits = editsSection(data.edits, data.revertedEdits)
+  const report = edits ? `${generated.trimEnd()}\n\n${edits}\n` : generated
 
   await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType } })
   return NextResponse.json({ success: true, reportType, scheduleName: schedule.name, version: schedule.version, generatedAt: new Date().toISOString(), content: fmtDates(report) })

@@ -28,12 +28,20 @@
 // The contingency activity is set to zero in the simulation: explicit uncertainty replaces the
 // lump buffer, so risk is not counted twice.
 // Sampling is seeded from the schedule, so the same schedule always gives the same result.
+//
+// Uploaded schedules (opts.inputs): the scheduler's own per-activity three-point ranges (work days)
+// replace every rule-based range, and discrete risk events (probability × impact on one activity)
+// are sampled each iteration on top of the ranges. With inputs.nameRules, activities are classified
+// by their names (work-kind.ts): fabrication / delivery / procurement / submittals get a procurement
+// range and no field-productivity correlation, and cure activities are fixed duration unless the
+// scheduler gives them a range.
 
 import type { GeneratedSchedule, PlanActivity, Answer } from './types'
 import { historyForPlan, type FirmHistory } from './history'
 import { runCpm } from './cpm'
 import { toDayNumber, fromDayNumber } from './calendar'
 import { questionBank } from './elicitation'
+import { workKind } from './work-kind'
 
 export interface Triangular { min: number; mode: number; max: number; basis: string }
 
@@ -50,7 +58,22 @@ export interface SraResult {
   assumptions: string[]
   /** Things the reader must know to interpret the result (e.g. mandatory constraints relaxed) */
   warnings: string[]
+  /** Discrete risk events: how often each occurred and what it did to the finish */
+  events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
+  /** How many activities used the scheduler's own ranges / were held fixed (cure) */
+  inputsUsed?: { ranges: number; events: number; fixed: number; procurementByName: number }
   ms: number
+}
+
+/** The scheduler's three-point range for one activity, in work days of remaining work. */
+export interface SraRange { activityId: string; optimistic: number; mostLikely: number; pessimistic: number }
+/** A discrete risk event: with `probability` (0–1), `impactDays` work days are added to one activity. */
+export interface SraRiskEvent { id: string; name: string; probability: number; impactDays: number; activityId: string }
+export interface SraInputs {
+  ranges?: SraRange[]
+  events?: SraRiskEvent[]
+  /** Classify activities by name (uploaded schedules): procurement ranges, fixed cure durations */
+  nameRules?: boolean
 }
 
 const FIELD_RHO = 0.4
@@ -118,6 +141,8 @@ export function spearman(x: number[], y: number[]): number {
 }
 
 const isField = (a: PlanActivity) => a.phase !== 'design' && a.calendarId !== 'cal-7d' && a.category !== 'contingency' && !a.category.startsWith('permit') && a.category !== 'procurement' && a.category !== 'submittals'
+/** Work days the simulation scales for an activity: remaining work when in progress. */
+const baseDays = (a: PlanActivity) => (a.remaining != null ? a.remaining : a.duration)
 
 /** True when the scheduler overrode this activity's duration (e.g. with a vendor quote). */
 export function hasDurationOverride(a: PlanActivity): boolean {
@@ -129,6 +154,10 @@ export interface DistributionContext {
   catalog: Map<string, { low: number; typical: number; high: number; label: string }>
   /** Activities whose timing follows a date the team gave in the interview (activity id → basis) */
   committed?: Map<string, string>
+  /** The scheduler's own three-point ranges (work days), by activity id; they win over every rule */
+  userRanges?: Map<string, SraRange>
+  /** Classify by activity name (uploaded schedules): procurement ranges and fixed cure durations */
+  nameRules?: boolean
 }
 
 /** Activities whose duration follows a date the team gave: expected permit issuance, committed delivery. */
@@ -142,11 +171,24 @@ export function committedActivities(answers: Record<string, Answer>, bank: { per
 
 /** The three-point estimate for one activity, as multipliers of its planned duration. */
 export function distributionFor(a: PlanActivity, ctx: DistributionContext): Triangular | null {
-  if (a.type === 'milestone' || a.duration <= 0 || a.actualFinish || a.category === 'contingency') return null
+  if (a.type === 'milestone' || a.actualFinish || a.category === 'contingency') return null
+  const user = ctx.userRanges?.get(a.id)
+  if (user) {
+    const b = baseDays(a)
+    if (b <= 0) return null
+    return { min: user.optimistic / b, mode: user.mostLikely / b, max: user.pessimistic / b, basis: `Scheduler's range: ${user.optimistic}–${user.mostLikely}–${user.pessimistic} work days` }
+  }
+  if (a.duration <= 0) return null
   // The scheduler's inputs win over catalog ranges and history: they are what the team actually knows.
   if (hasDurationOverride(a)) return { min: 0.95, mode: 1, max: 1.15, basis: 'Scheduler override: −5% / +15% around the overridden duration' }
   const committed = ctx.committed?.get(a.id)
   if (committed) return { min: 1, mode: 1, max: 1.05, basis: `${committed}, held near-deterministic (0 / +5%)` }
+  if (ctx.nameRules) {
+    const k = workKind(a.name, a.category, a.phase)
+    // Cure time is chemistry and spec, not productivity: fixed unless the scheduler gives a range.
+    if (k === 'cure') return null
+    if (k === 'procurement') return { min: 0.9, mode: 1, max: 1.4, basis: 'Fabrication / delivery / procurement (by activity name): −10% / +40%, supplier-driven, not field productivity' }
+  }
   const planned = a.duration
   const cat = ctx.catalog.get(a.id)
   let d: Triangular
@@ -172,7 +214,7 @@ export function distributionFor(a: PlanActivity, ctx: DistributionContext): Tria
   return d
 }
 
-export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, opts: { iterations?: number; seed?: number } = {}): SraResult {
+export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, opts: { iterations?: number; seed?: number; inputs?: SraInputs } = {}): SraResult {
   const started = Date.now()
   // Opting out of firm history in the interview (history.use = No) means it shapes no distribution.
   const history = historyForPlan(firmHistory, answers)
@@ -183,8 +225,16 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
 
   const acts = s.activities
   const committed = committedActivities(answers, bank)
-  const dists = acts.map(a => distributionFor(a, { history, catalog, committed }))
-  const field = acts.map(isField)
+  const inputs = opts.inputs || {}
+  const idx = new Map(acts.map((a, i) => [a.id, i]))
+  const userRanges = new Map((inputs.ranges || []).filter(r => idx.has(r.activityId)).map(r => [r.activityId, r]))
+  const nameRules = !!inputs.nameRules
+  const dists = acts.map(a => distributionFor(a, { history, catalog, committed, userRanges, nameRules }))
+  const kinds = acts.map(a => (nameRules ? workKind(a.name, a.category, a.phase) : null))
+  // Supplier-driven and fixed-duration work does not share the field productivity/weather factor.
+  const field = acts.map((a, i) => isField(a) && kinds[i] !== 'procurement' && kinds[i] !== 'cure' && !userRanges.has(a.id))
+  const events = (inputs.events || []).map(e => ({ e, i: idx.get(e.activityId) })).filter((x): x is { e: SraRiskEvent; i: number } => x.i != null && !acts[x.i].actualFinish && acts[x.i].type === 'task')
+  const eventHits = events.map(() => [] as boolean[])
   const budget = opts.iterations ?? Math.max(200, Math.min(1000, Math.floor(400_000 / Math.max(1, acts.length))))
   const seed = opts.seed ?? hashSeed(`${s.generatedAt}|${acts.length}|${s.links.length}`)
   const rand = mulberry32(seed)
@@ -218,6 +268,14 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       const dur = Math.max(1, Math.round(a.duration * m))
       return { ...a, duration: dur, remaining: a.remaining != null ? Math.max(1, Math.round(a.remaining * m)) : undefined }
     })
+    // Discrete risk events: each occurs with its probability and adds its impact to one activity.
+    events.forEach(({ e, i }, k) => {
+      const hit = rand() < e.probability
+      eventHits[k].push(hit)
+      if (!hit || e.impactDays <= 0) return
+      const a = simActs[i]
+      simActs[i] = { ...a, duration: a.duration + Math.round(e.impactDays), remaining: a.remaining != null ? a.remaining + Math.round(e.impactDays) : undefined }
+    })
     const r = runCpm({ ...base, activities: simActs })
     finishes.push(toDayNumber(r.projectFinish))
     // Critical in this iteration = on its driving path to the project finish.
@@ -246,6 +304,16 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
     .filter((x): x is NonNullable<typeof x> => !!x && x.criticality > 0.05)
     .sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)).slice(0, 10)
 
+  const eventStats = events.map(({ e, i }, k) => {
+    const on = finishes.filter((_, it) => eventHits[k][it]), off = finishes.filter((_, it) => !eventHits[k][it])
+    const avg = (xs: number[]) => xs.reduce((x, y) => x + y, 0) / xs.length
+    return {
+      id: e.id, name: e.name, code: acts[i].code, probability: e.probability, impactDays: e.impactDays,
+      occurred: on.length / budget, finishDeltaDays: on.length && off.length ? Math.round(avg(on) - avg(off)) : 0,
+    }
+  })
+  const fixed = nameRules ? acts.filter((a, i) => kinds[i] === 'cure' && !userRanges.has(a.id) && !a.actualFinish && a.type === 'task').length : 0
+  const procurementByName = nameRules ? acts.filter((a, i) => kinds[i] === 'procurement' && dists[i] && !userRanges.has(a.id)).length : 0
   const requiredDate = s.mustFinishBy
   const contingency = acts.find(a => a.category === 'contingency')
   return {
@@ -265,10 +333,15 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
         : history?.overallOverrunMedian ? 'Categories with firm history use your firm’s actual/planned ratios.' : 'No firm history yet: field and design ranges use standard three-point assumptions; upload completed projects to calibrate them.',
       'Field activities share a common productivity/weather factor (correlation 0.4).',
       contingency ? `The ${contingency.duration}-day contingency activity is excluded; the simulated uncertainty replaces it.` : 'No contingency activity in the schedule.',
-      'Discrete risk events (e.g. a failed inspection) are not modeled separately; they are reflected only through the duration ranges.',
+      ...(userRanges.size ? [`${userRanges.size} activit${userRanges.size === 1 ? 'y uses' : 'ies use'} the scheduler's own optimistic / most likely / pessimistic range (work days of remaining work) instead of the rule-based range.`] : []),
+      ...(nameRules ? [`Activities are classified by name: ${procurementByName} fabrication / delivery / procurement / submittal activit${procurementByName === 1 ? 'y uses' : 'ies use'} a supplier range (−10% / +40%) outside the field productivity factor; ${fixed} cure activit${fixed === 1 ? 'y is' : 'ies are'} held at fixed duration unless given a range.`] : []),
+      events.length
+        ? `${events.length} discrete risk event${events.length === 1 ? ' is' : 's are'} sampled each iteration (probability × impact on the named activity), on top of the duration ranges.`
+        : 'Discrete risk events (e.g. a failed inspection) are not modeled separately; they are reflected only through the duration ranges.',
       'Criticality index: the share of iterations in which the activity was on the driving (longest) path to the simulated project finish.',
     ],
     warnings,
+    ...(opts.inputs ? { events: eventStats, inputsUsed: { ranges: userRanges.size, events: events.length, fixed, procurementByName } } : {}),
     ms: Date.now() - started,
   }
 }

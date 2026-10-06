@@ -25,7 +25,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
     const data = await loadScheduleData(scheduleId, ctx.orgId)
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const { schedule, activities, relationships, brief, analysis } = data
+    const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds } = data
 
     const criticalActivities = activities.filter(a => a.isCritical)
     // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
@@ -39,7 +39,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
       : 0
 
     return NextResponse.json({
-      schedule, activities, relationships, brief, analysis,
+      schedule, activities, relationships, brief, analysis, edits, editedActivityIds,
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
@@ -56,6 +56,9 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         minFloat: analysis.minFloat,
         nearTerm,
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
+        // Edits made in Planora (override layer on the uploaded file)
+        editedActivityIds,
+        editsCount: edits.filter(e => e.status === 'applied').length,
       },
     })
   }

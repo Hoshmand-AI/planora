@@ -26,7 +26,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const questions = checkInputs(a)
   const byId = new Map(responses.map(r => [r.questionId, r]))
   const guidance = dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({
-    ...guidanceFor(c, { generated: false }),
+    // Uploads with logic have what-if / recovery options and Planora edits on the schedule dashboard.
+    ...guidanceFor(c, { generated: false, uploadedRecoveryHref: data.cpm && schedule.sourceType !== 'generated' ? `/dashboard?schedule=${encodeURIComponent(schedule.id)}#recovery` : undefined }),
     decision: byId.get(`dcma:${c.id}`) ?? null,
   }))
   return NextResponse.json({

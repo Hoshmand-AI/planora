@@ -10,7 +10,7 @@ import { Portfolio } from '@/components/Portfolio'
 import { ScheduleTools } from '@/components/ScheduleTools'
 
 export default function DashboardPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
 
   if (!selectedSchedule) {
     return (
@@ -47,6 +47,9 @@ export default function DashboardPage() {
   const percentComplete = Number(m?.percentComplete ?? 0)
   const nearTerm = (mx.nearTerm as NearTermOutlook | undefined) ?? null
   const drivingTasks  = (m?.drivingTasks as ActivityRow[])  ?? []
+  // Activities changed by edits made in Planora (shown with an "Edited" tag)
+  const editedIds = new Set((mx.editedActivityIds as string[] | undefined) ?? [])
+  const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean }[] } | null) ?? null
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
@@ -158,7 +161,7 @@ export default function DashboardPage() {
               {drivingTasks.slice(0, 8).map((task, i) => (
                 <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < drivingTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>
                   <div className="min-w-0 pr-3">
-                    <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
+                    <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}{editedIds.has(task.id) && <EditedTag />}</div>
                     <div className="text-[11px] text-warm-400 mt-0.5">
                       Float: {task.totalFloat}d
                       {task.earlyStart && ` · ${fmtDate(task.earlyStart)}`}
@@ -183,6 +186,7 @@ export default function DashboardPage() {
         <ScheduleTools scheduleId={selectedSchedule.id}
           progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
           inHistory={selectedSchedule.inHistory ?? true}
+          canEdit={can('schedule.write')} editsCount={editsCount}
           onChanged={() => { refreshSchedules(); refreshMetrics() }} />
       )}
 
@@ -192,6 +196,7 @@ export default function DashboardPage() {
 
 /* ─── Types ─────────────────────────────────────── */
 interface ActivityRow {
+  id: string
   name: string
   activityId: string
   duration: number
@@ -200,6 +205,11 @@ interface ActivityRow {
   earlyFinish?: string
   isCritical: boolean
   status: string
+}
+
+/* ─── Edited tag ─────────────────────────────────── */
+function EditedTag() {
+  return <span title="Changed by an edit made in Planora (see Edits made in Planora below)" className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
 }
 
 /* ─── Near-term list ─────────────────────────────── */

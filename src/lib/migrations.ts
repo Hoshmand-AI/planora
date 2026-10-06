@@ -325,6 +325,43 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
     `,
   },
+  {
+    id: 7, name: 'uploaded_schedule_edits_and_risk_inputs',
+    sql: `
+    -- Edits a scheduler makes to an uploaded schedule in Planora (remaining duration, relationship,
+    -- constraint), each with a reason. An override layer: the imported activities and relationships
+    -- are never changed; edits are applied in order on read. Reverting sets reverted_at (kept for the
+    -- record). Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS schedule_edits (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      change JSONB NOT NULL,
+      reason TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      option_id TEXT,
+      user_id TEXT,
+      user_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reverted_at TIMESTAMPTZ,
+      reverted_by TEXT,
+      revert_reason TEXT
+    );
+    CREATE INDEX IF NOT EXISTS schedule_edits_schedule_idx ON schedule_edits(org_id, schedule_id, created_at);
+    -- Schedule risk analysis inputs for an uploaded schedule: the scheduler's per-activity three-point
+    -- ranges (work days) and discrete risk events (probability, impact days, affected activity).
+    CREATE TABLE IF NOT EXISTS schedule_risk_inputs (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      ranges JSONB NOT NULL DEFAULT '[]',
+      events JSONB NOT NULL DEFAULT '[]',
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS schedule_risk_inputs_org_idx ON schedule_risk_inputs(org_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

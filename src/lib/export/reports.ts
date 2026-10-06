@@ -213,6 +213,25 @@ function qaqc(r: ReportInput): string[] {
   ]
 }
 
+/**
+ * "Edits made in Planora": every change made to the uploaded schedule inside Planora, with who, when,
+ * before/after and the reason, so a report never presents an edited network as the contractor's file.
+ * Empty string when there are none.
+ */
+export function editsSection(edits: { label: string; before: string; after: string; reason: string; by: string; byName?: string | null; at: string; status: 'applied' | 'skipped'; note?: string; source?: string }[],
+  reverted: { reason: string; at: string; revertedAt: string | null; revertReason: string | null; change: { kind: string } }[] = []): string {
+  if (!edits.length && !reverted.length) return ''
+  const applied = edits.filter(e => e.status === 'applied')
+  const skipped = edits.filter(e => e.status === 'skipped')
+  return fmtDates([
+    '## Edits made in Planora',
+    `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora to the uploaded file (an override layer; the original file is unchanged and kept with its SHA-256).`, '',
+    table(['Date', 'By', 'Change', 'Before', 'After', 'Reason', 'Source'], applied.map(e => [d(e.at), e.byName || e.by, e.label, e.before, e.after, e.reason, e.source === 'recovery' ? 'Recovery option' : 'Manual'])),
+    ...(skipped.length ? ['', `${skipped.length} edit${skipped.length === 1 ? ' no longer applies' : 's no longer apply'}: ${skipped.map(e => `${e.label} (${e.note ?? 'not applicable'})`).join('; ')}.`] : []),
+    ...(reverted.length ? ['', `${reverted.length} earlier edit${reverted.length === 1 ? ' was' : 's were'} reverted: ${reverted.map(e => `${e.change.kind.replace('_', ' ')} edit of ${d(e.at)} reverted ${d(e.revertedAt)}${e.revertReason ? ` (${e.revertReason})` : ''}`).join('; ')}.`] : []),
+  ].join('\n'))
+}
+
 export function buildReport(type: string, r: ReportInput): string {
   const t = (type in REPORT_TITLES ? type : 'executive_summary') as ReportType
   const body = t === 'critical_path' ? criticalPath(r) : t === 'variance' ? variance(r) : t === 'qa_qc' ? qaqc(r) : executiveSummary(r)

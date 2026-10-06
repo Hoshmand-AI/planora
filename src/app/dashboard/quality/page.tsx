@@ -6,6 +6,7 @@ import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, Chevr
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
+import Link from 'next/link'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
 interface Quality {
@@ -96,7 +97,7 @@ export default function QualityPage() {
 
       {data.guidance.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What to fix — {data.guidance.filter(g => !g.decision).length} of {data.guidance.length} open. Fix in P6 / MS Project, then re-upload.</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What to fix — {data.guidance.filter(g => !g.decision).length} of {data.guidance.length} open. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in Planora (with a reason) from the schedule dashboard.</div>
           <div className="space-y-3">
             {data.guidance.map(g => <QualityGuide key={g.id} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} />)}
           </div>
@@ -191,6 +192,11 @@ function QualityGuide({ g, check, onDecide }: { g: Quality['guidance'][number]; 
           <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">What it means: </span>{g.meaning}</p>
           {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
+          {g.actions.some(a => a.kind === 'link') && (
+            <div className="flex flex-wrap gap-2">
+              {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">{a.label}</Link> : null)}
+            </div>
+          )}
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
           {g.decision ? (
             <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
