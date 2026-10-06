@@ -84,9 +84,12 @@ export function scheduleRow(s: Schedule, today: string): PortfolioRow {
   const v = an ? an.varianceDays : s.varianceDays
   if (an) {
     // Planora's own analysis: negative float, overruled constraints, variance on the finish milestone.
-    if (an.negativeFloatCount > 0) alerts.push({ code: 'negative_float', severity: 'error', text: `${an.negativeFloatCount} open ${an.negativeFloatCount === 1 ? 'activity has' : 'activities have'} negative float (lowest ${an.minFloat} work days).` })
+    if (an.negativeFloatCount > 0) alerts.push({ code: 'negative_float', severity: 'error', text: `${an.negativeFloatCount} open ${an.negativeFloatCount === 1 ? 'activity has' : 'activities have'} negative float (lowest ${an.minFloat} work days${an.minFloatAt ? ` on ${an.minFloatAt.code}, counted on ${an.minFloatAt.calendar === 'own' ? 'its own' : `its "${an.minFloatAt.calendar}"`} calendar` : ''}).` })
     if (an.violations.length) alerts.push({ code: 'constraint_overrules_logic', severity: 'error', text: `${an.violations.length} mandatory constraint${an.violations.length === 1 ? ' hides' : 's hide'} a logic-driven slip of up to ${Math.max(...an.violations.map(x => x.days))} work days.` })
-    if (an.mustFinishBy && an.forecastFinish && an.forecastFinish > an.mustFinishBy) alerts.push({ code: 'late', severity: 'error', text: `Forecast finish ${us(an.forecastFinish)} is after the required ${us(an.mustFinishBy)}.` })
+    // Required completion vs the contract (finish) milestone: equal dates are met, and a punch list /
+    // Final Completion after Substantial Completion is not a conflict.
+    const completion = an.finishMilestone?.forecastFinish ?? an.forecastFinish
+    if (an.mustFinishBy && completion && completion.slice(0, 10) > an.mustFinishBy.slice(0, 10)) alerts.push({ code: 'late', severity: 'error', text: `${an.finishMilestone?.forecastFinish ? `${an.finishMilestone.code} ${an.finishMilestone.name} forecast` : 'Forecast finish'} ${us(completion)} is after the required ${us(an.mustFinishBy)}.` })
   }
   const basis = an?.finishMilestone?.varianceDays != null ? ` (${an.finishMilestone.code} ${an.finishMilestone.name})` : ''
   if (v != null && v > 14) alerts.push({ code: 'behind', severity: 'error', text: `Finish has slipped ${v} calendar days against the baseline${basis}.` })

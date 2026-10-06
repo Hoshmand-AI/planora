@@ -1,4 +1,5 @@
 import { getOrgHistory, type Activity, type Relationship, type Schedule } from '@/lib/db'
+import type { SeriesBaseline } from '@/lib/analysis/schedule-analysis'
 import { computeFirmHistory, type FirmHistory } from './history'
 import { CONSTRAINT_TYPES, type AnalyzableSchedule, type ConstraintType, type ProjectType } from './types'
 
@@ -17,6 +18,8 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
     dataDate: s.dataDate,
     projectStart: s.projectStart,
     projectFinish: s.projectFinish,
+    mustFinishBy: s.analysis?.mustFinishBy ?? null,
+    finishMilestoneId: s.finishMilestoneId ?? null,
     calendars: s.calendars || [],
     defaultCalendarId: s.defaultCalendarId,
     links: rels.map(r => ({ from: r.predecessorId, to: r.successorId, type: r.type, lag: r.lag })),
@@ -25,10 +28,54 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
       percentComplete: a.percentComplete, status: a.status, calendarId: a.calendarId ?? null,
       earlyStart: a.earlyStart, earlyFinish: a.earlyFinish, lateStart: a.lateStart, lateFinish: a.lateFinish,
       actualStart: a.actualStart, actualFinish: a.actualFinish, baselineStart: a.baselineStart, baselineFinish: a.baselineFinish,
-      totalFloat: a.totalFloat,
+      totalFloat: a.totalFloat, milestoneKind: a.milestoneKind ?? null,
       constraint: a.constraintType && CONSTRAINTS.includes(a.constraintType) ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : null,
     })),
   }
+}
+
+/** An upload is "the Baseline" of its series when its version label says so (the first upload is labelled Baseline). */
+export const isBaselineVersion = (version: string | null | undefined) => /^\s*baseline\s*$/i.test(version || '')
+
+/** The series' upload marked Baseline (not `current` itself, and not dated after it). */
+export function pickSeriesBaseline(current: { id: string; version: string; dataDate: string | null }, series: Schedule[]): Schedule | null {
+  if (isBaselineVersion(current.version)) return null
+  return series.find(s => s.id !== current.id && isBaselineVersion(s.version) && (!s.dataDate || !current.dataDate || s.dataDate <= current.dataDate)) ?? null
+}
+
+/**
+ * Pure: pick the series' Baseline upload for `current` (another upload of the same project, marked
+ * Baseline, with a data date no later than the current one) and its forecast finish per activity code.
+ */
+export function seriesBaselineFrom(
+  current: { id: string; version: string; dataDate: string | null },
+  series: Schedule[],
+  activitiesOf: (scheduleId: string) => Activity[],
+): SeriesBaseline | null {
+  const base = pickSeriesBaseline(current, series)
+  if (!base) return null
+  const finishes: Record<string, string> = {}
+  for (const a of activitiesOf(base.id)) {
+    if (a.activityType === 'summary' || a.activityType === 'loe') continue
+    const f = a.actualFinish || a.earlyFinish
+    if (a.activityId && f) finishes[a.activityId] = f
+  }
+  // The Baseline's own analysis holds its logic-driven finish milestone forecast (a mandatory
+  // constraint can pin the stored early finish).
+  const bfm = base.analysis?.finishMilestone
+  if (bfm?.code && bfm.forecastFinish) finishes[bfm.code] = bfm.forecastFinish
+  return Object.keys(finishes).length ? { scheduleId: base.id, label: base.version, dataDate: base.dataDate, finishes } : null
+}
+
+/** Loads the series' Baseline upload (firm-scoped) for an update; null when there is none. */
+export async function loadSeriesBaseline(orgId: string, current: { id: string; version: string; dataDate: string | null; projectKey?: string | null }): Promise<SeriesBaseline | null> {
+  if (!current.projectKey || isBaselineVersion(current.version)) return null
+  const { getScheduleSeries, getActivities } = await import('@/lib/db')
+  const series = await getScheduleSeries(orgId, current.projectKey)
+  const base = pickSeriesBaseline(current, series)
+  if (!base) return null
+  const acts = await getActivities(base.id)
+  return seriesBaselineFrom(current, series, id => (id === base.id ? acts : []))
 }
 
 /**
@@ -40,7 +87,9 @@ export async function loadScheduleData(id: string, orgId: string) {
   const { completeSchedule } = await import('./complete-schedule')
   const schedule = await getScheduleById(id, orgId)
   if (!schedule) return null
-  const [rawActivities, relationships] = await Promise.all([getActivities(id), getRelationships(id)])
+  const [rawActivities, relationships, seriesBaseline] = await Promise.all([
+    getActivities(id), getRelationships(id), loadSeriesBaseline(orgId, schedule).catch(() => null),
+  ])
   const prior = schedule.analysis ?? null
   // Older uploads stored the file's header finish as projectFinish; keep it as the reported finish.
   const reportedFinish = prior ? prior.reportedFinish : schedule.projectFinish
@@ -53,10 +102,13 @@ export async function loadScheduleData(id: string, orgId: string) {
   const analysis = analyzeSchedule({
     activities: done.activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm,
     reportedFinish, mustFinishBy: prior?.mustFinishBy ?? null, fileValues: done.fileValues ?? null, today: new Date().toISOString().slice(0, 10),
+    dataDate: schedule.dataDate, finishMilestoneId: schedule.finishMilestoneId ?? null, seriesBaseline,
+    calendars: schedule.calendars, defaultCalendarId: schedule.defaultCalendarId,
   })
   if (prior?.recalc && !analysis.recalc) analysis.recalc = prior.recalc
   const criticalCount = done.activities.filter(a => a.isCritical).length
-  if (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status) {
+  if (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status
+    || prior.finishMilestone?.code !== analysis.finishMilestone?.code || prior.varianceBasis !== analysis.varianceBasis || (prior.statusReasons ?? []).join('\n') !== analysis.statusReasons.join('\n')) {
     const { updateScheduleAnalysis } = await import('@/lib/db')
     await updateScheduleAnalysis(schedule.id, orgId, { analysis, projectFinish: analysis.forecastFinish, varianceDays: analysis.varianceDays, criticalCount }).catch(() => {})
   }

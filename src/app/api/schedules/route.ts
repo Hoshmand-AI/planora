@@ -4,14 +4,15 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, setScheduleInHistory, updateScheduleAnalysis } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
-import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
+import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES } from '@/lib/planning/types'
+import { fmtDate } from '@/lib/format'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -123,22 +124,28 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     parsed.activities = completed.activities
     parsed.projectStart = completed.projectStart
     if (completed.note) warnings.unshift(completed.note)
-    const analysis = analyzeSchedule({
-      activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
-      reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
-    })
-    if (analysis.recalc && analysis.recalc.differing > 0) {
-      warnings.unshift(`${analysis.recalc.differing} of ${analysis.recalc.compared} open activities have a finish or total float in the file that differs from Planora's recalculation by more than 1 day (e.g. ${analysis.recalc.samples.slice(0, 3).map(d => `${d.code}: file ${d.fileFloat ?? '?'}d / Planora ${d.planoraFloat}d float`).join('; ')}).`)
-    }
-    if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
-      warnings.unshift(`The file's header finish is ${reportedFinish}; Planora's recalculated forecast finish is ${analysis.forecastFinish}. Planora reports its own forecast.`)
-    }
-    const varianceDays = analysis.varianceDays
 
     // Uploads of the same project form an update series; label versions automatically when not given.
     const projectKey = (parsed.projectKey || parsed.projectName || '').trim().toLowerCase().slice(0, 120) || null
     const series = projectKey ? await getScheduleSeries(ctx.orgId, projectKey) : []
     const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
+    // An update is measured against the series' upload marked Baseline (same activity codes).
+    const baseUpload = pickSeriesBaseline({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series)
+    const baseActivities = baseUpload ? await getActivities(baseUpload.id) : []
+    const seriesBaseline = seriesBaselineFrom({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series, () => baseActivities)
+
+    const analysis = analyzeSchedule({
+      activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
+      reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
+      dataDate: parsed.dataDate, seriesBaseline, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
+    })
+    if (analysis.recalc && analysis.recalc.differing > 0) {
+      warnings.unshift(`${analysis.recalc.differing} of ${analysis.recalc.compared} open activities have a finish or total float in the file that differs from Planora's recalculation by more than 1 day (e.g. ${analysis.recalc.samples.slice(0, 3).map(d => `${d.code}: file ${d.fileFloat ?? '?'}d / Planora ${d.planoraFloat}d float`).join('; ')}).`)
+    }
+    if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
+      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
+    }
+    const varianceDays = analysis.varianceDays
     const percentComplete = parsed.activities.length > 0
       ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
       : 0
@@ -206,7 +213,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   }
 })
 
-/** Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft } */
+/**
+ * Tag a schedule so it can ground future plans: { id, projectType, region, grossSqft }; include it in
+ * firm history { inHistory }; choose progress handling { progressMode }; or designate the contract /
+ * finish milestone { finishMilestoneId: activity id or activity code, or null for automatic }.
+ */
 export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const body = await req.json().catch(() => ({}))
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
@@ -220,11 +231,35 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     await updateScheduleAnalysis(s.id, ctx.orgId, { analysis: { ...s.analysis, progressMode: body.progressMode, forecastFinish: null }, projectFinish: s.projectFinish, varianceDays: s.varianceDays, criticalCount: s.criticalCount })
     await audit({ action: 'schedule.progress_mode', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.analysis.progressMode, after: body.progressMode } })
   }
+  if ('finishMilestoneId' in body) {
+    const raw = body.finishMilestoneId
+    if (raw !== null && typeof raw !== 'string') return NextResponse.json({ error: 'finishMilestoneId must be an activity id, an activity code or null' }, { status: 400 })
+    let next: string | null = null
+    let label: string | null = null
+    if (typeof raw === 'string' && raw.trim()) {
+      const want = raw.trim().slice(0, 200)
+      const acts = await getActivities(s.id)
+      const hit = acts.find(a => a.id === want) ?? acts.find(a => a.activityId === want) ?? acts.find(a => a.activityId.toLowerCase() === want.toLowerCase())
+      if (!hit || hit.activityType === 'summary' || hit.activityType === 'loe') return NextResponse.json({ error: `No activity "${want}" in this schedule can be the finish milestone.` }, { status: 400 })
+      next = hit.activityId || hit.id
+      label = `${hit.activityId} ${hit.name}`
+    }
+    const before = s.finishMilestoneId ?? null
+    if (before !== next) {
+      await setScheduleFinishMilestone(s.id, ctx.orgId, next)
+      await audit({ action: 'schedule.finish_milestone', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before, after: next, milestone: label, previousAutomatic: before ? null : s.analysis?.finishMilestone?.code ?? null } })
+    }
+  }
   if ('projectType' in body || 'region' in body || 'grossSqft' in body) {
     const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
     const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
     await updateScheduleProfile(s.id, ctx.orgId, profile)
     await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
+  }
+  if ('finishMilestoneId' in body) {
+    // Recalculate now so the stored headline (lists, portfolio) reflects the designated milestone.
+    const data = await loadScheduleData(s.id, ctx.orgId)
+    return NextResponse.json({ schedule: data?.schedule ?? await getScheduleById(s.id, ctx.orgId), analysis: data?.analysis ?? null })
   }
   return NextResponse.json({ schedule: await getScheduleById(s.id, ctx.orgId) })
 })

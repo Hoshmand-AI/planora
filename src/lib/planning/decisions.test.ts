@@ -52,6 +52,14 @@ describe('date logic', () => {
     expect(elicit({ answers: a }).conflicts.join(' ')).toMatch(/dried-in/)
   })
 
+  it('does not flag a required completion on the same day as Substantial Completion', () => {
+    const a = { ...base(), 'milestone.substantial_completion.target': k('2027-12-15'), 'project.required_finish': k('2027-12-15') }
+    const { permits, longLead } = questionBank({ answers: a })
+    expect(checkAnswerDates(a, permits, longLead).filter(i => /Required completion/.test(i.text))).toEqual([])
+    const early = { ...a, 'project.required_finish': k('2027-12-14') }
+    expect(checkAnswerDates(early, permits, longLead).some(i => /Required completion” \(12\/14\/2027\) is on or before “Substantial completion/.test(i.text))).toBe(true)
+  })
+
   it('flags a delivery that arrives after the milestone it gates', () => {
     const a = base()
     const { longLead } = questionBank({ answers: a })

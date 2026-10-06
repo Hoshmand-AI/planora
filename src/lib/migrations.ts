@@ -314,6 +314,17 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS schedule_files_org_idx ON schedule_files(org_id);
     `,
   },
+  {
+    id: 6, name: 'finish_milestone_designation',
+    sql: `
+    -- The contract/finish milestone a scheduler designated for an uploaded schedule (activity id or
+    -- activity code); NULL = Planora picks it. Additive: older code ignores the column.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS finish_milestone_id TEXT;
+    -- P6 milestone type (TT_FinMile = 'finish', TT_Mile = 'start') so the finish milestone can be
+    -- told apart from start milestones; NULL for sources without the distinction.
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {
