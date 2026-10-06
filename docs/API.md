@@ -30,7 +30,7 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 | GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes) |
 | GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics |
 | GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions |
-| PATCH | `/api/plans/{id}` | scheduler | Record interview answers: `{ "answers": { "<questionId>": { "status": "known", "value": … } } }` |
+| PATCH | `/api/plans/{id}` | scheduler | Record interview answers: `{ "answers": { "<questionId>": { "status": "known", "value": … } } }`. An invalid value (e.g. an option that is not listed) returns `400` with code `invalid_answer` and `errors` per question naming the valid options; nothing is saved. Yes/no questions accept `true`/`false` (or `"yes"`/`"no"`). |
 | POST | `/api/plans/{id}/generate` | scheduler | Generate or regenerate the schedule |
 
 ### Errors

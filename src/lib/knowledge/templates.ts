@@ -113,7 +113,12 @@ const CATALOG: TemplateActivity[] = [
   t('exterior_skin', 'Exterior skin / cladding & air barrier', NEW_WORK, { base: 30, perKsf: 0.3, perStory: 5, min: 25, max: 200 }, [ss('structure_steel', 20)]),
   t('windows_curtainwall', 'Office storefront, windows & clerestory glazing', { ...NEW_WORK, projectTypes: ['warehouse_industrial'] },
     { base: 10, perKsf: 0.01, min: 10, max: 30 }, [ss('exterior_skin', 15)]),
+  // Data centers are precast / insulated-panel boxes: entrance and admin storefront only, unless the
+  // interview says there is curtain wall (envelope.curtain_wall), and the envelope itself drives dry-in.
+  t('windows_curtainwall', 'Entrance & admin-area storefront glazing', { ...NEW_WORK, projectTypes: ['data_center'] },
+    { base: 8, perKsf: 0.01, min: 5, max: 20 }, [ss('exterior_skin', 15)]),
   t('windows_curtainwall', 'Windows, storefront & curtain wall', NEW_WORK, { base: 20, perKsf: 0.2, perStory: 3, min: 15, max: 150 }, [ss('exterior_skin', 15)]),
+  t('dry_in', 'Building dried-in / watertight', { ...NEW_WORK, projectTypes: ['data_center'] }, MS, [fs('roofing'), fs('exterior_skin'), fs('windows_curtainwall')], { milestone: true }),
   t('dry_in', 'Building dried-in / watertight', NEW_WORK, MS, [fs('roofing'), fs('windows_curtainwall')], { milestone: true }),
 
   // MEP
@@ -121,8 +126,19 @@ const CATALOG: TemplateActivity[] = [
     [ss('structure_steel', 25), fs('slab_on_grade'), fs('demolition')]),
   t('mep_rough', 'MEP rough-in (overhead & in-wall)', {}, { base: 40, perKsf: 0.35, perStory: 5, min: 30, max: 250 },
     [ss('structure_steel', 25), fs('slab_on_grade'), fs('demolition')]),
+  // Data center power train: generators/paralleling gear and UPS/PDUs are set in parallel, then the
+  // service is energized and backfeeds them. Their only predecessor (MEP rough-in) matches permanent
+  // power's own, so other building types that skip them inherit no extra logic.
+  t('power_equipment', 'Power train — set generators, paralleling switchgear & ATS; fuel system & connect', { projectTypes: ['data_center'] },
+    { base: 30, perKsf: 0.2, min: 30, max: 120 }, [ss('mep_rough', 30)],
+    { note: 'Generator and paralleling-gear deliveries usually drive this; see long-lead catalog.' }),
+  t('conductors', 'Power train — UPS modules & batteries, PDUs / RPPs & overhead busway; terminate', { projectTypes: ['data_center'] },
+    { base: 30, perKsf: 0.25, min: 30, max: 150 }, [ss('mep_rough', 30)],
+    { note: 'UPS and battery deliveries usually drive this; lithium-ion systems may need fire-code review.' }),
+  t('electrical_service', 'Permanent power — MV switchgear & utility service set, energize & backfeed the power train', { projectTypes: ['data_center'] },
+    { base: 20, perKsf: 0.05, min: 10, max: 60 }, [fs('utilities_site'), ss('mep_rough', 30), fs('power_equipment'), fs('conductors')]),
   t('electrical_service', 'Permanent power — service equipment set & energize', {}, { base: 20, perKsf: 0.05, min: 10, max: 60 },
-    [fs('utilities_site'), ss('mep_rough', 30)], { note: 'Utility and switchgear long-lead items usually drive this; see long-lead catalog.' }),
+    [fs('utilities_site'), ss('mep_rough', 30), fs('power_equipment'), fs('conductors')], { note: 'Utility and switchgear long-lead items usually drive this; see long-lead catalog.' }),
   t('mechanical_equipment', 'Set mechanical equipment (AHUs/RTUs/chillers/CRAHs) & connect', { projectTypes: ['data_center'] },
     { base: 30, perKsf: 0.25, min: 25, max: 150 }, [ss('roofing', 10), ss('mep_rough', 20)]),
   t('mechanical_equipment', 'Set RTUs, unit heaters & exhaust fans', { projectTypes: ['warehouse_industrial'] },
@@ -443,6 +459,11 @@ export function validateTemplates(extraProfiles: ProjectProfile[] = []): Templat
     if (!topoOrder(acts)) errors.push(`${tag}: cycle detected`)
   }
   return { ok: errors.length === 0, errors, checked: profiles.length }
+}
+
+/** The generic (definition) variant of a category in the building catalog. */
+export function genericVariant(category: CanonicalCategory): TemplateActivity | undefined {
+  return DEFINITION.get(category)
 }
 
 /** Raw catalog (all variants), for inspection/UI. */

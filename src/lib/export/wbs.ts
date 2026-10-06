@@ -1,8 +1,8 @@
 // WBS used by the P6-style exports: Project → Phase → (work package when split into segments) → activity.
 // Activities keep CPM order (early start) inside each node, like a P6 layout grouped by WBS.
 
-import type { GeneratedSchedule, PlanActivity, CpmTimes } from '@/lib/planning/types'
-import { PHASES } from '@/lib/planning/types'
+import type { CanonicalCategory, GeneratedSchedule, PlanActivity, CpmTimes, ProjectType } from '@/lib/planning/types'
+import { PHASES, isCivilType } from '@/lib/planning/types'
 
 export interface WbsNode {
   code: string          // e.g. "PLN.03.02"
@@ -32,6 +32,39 @@ export const PHASE_LABELS: Record<string, string> = {
   interiors: 'Interiors', commissioning: 'Commissioning', closeout: 'Closeout',
 }
 
+/**
+ * Civil / infrastructure work has no envelope, MEP or interiors: bridges, rail lines and plants are
+ * described in their own terms (pilot finding: a bridge's overview read "MEP Systems, Interiors").
+ */
+const CIVIL_PHASE_LABELS: Record<string, string> = {
+  ...PHASE_LABELS, sitework: 'Civil & Sitework', structure: 'Structures', envelope: 'Enclosures', mep: 'Systems & Equipment',
+  interiors: 'Finishes', commissioning: 'Testing, Startup & Acceptance',
+}
+const CIVIL_TYPE_PHASE_LABELS: Partial<Record<ProjectType, Record<string, string>>> = {
+  highway_bridge: { sitework: 'Right-of-Way, Roadway & Drainage', structure: 'Bridge Structure', commissioning: 'Traffic Switch & Acceptance' },
+  transit_rail: { sitework: 'Right-of-Way & Civil', structure: 'Structures, Platforms & Guideway', mep: 'Track, Traction Power & Train Control', commissioning: 'Systems Testing & Safety Certification' },
+  water_wastewater: { sitework: 'Civil, Yard Piping & Restoration', structure: 'Process Structures', mep: 'Process, Electrical & Controls' },
+  utility_power: { structure: 'Foundations & Steel Structures', mep: 'Electrical Equipment, Bus & Protection', commissioning: 'Testing, Outage & Energization' },
+  industrial_process: { structure: 'Foundations & Steel', mep: 'Process Equipment, Electrical & Controls' },
+}
+/** Categories that only occur in civil networks: an uploaded schedule with these is described as civil work. */
+const CIVIL_ONLY = new Set<CanonicalCategory>([
+  'row_utilities', 'traffic_control', 'in_water_work', 'substructure', 'superstructure', 'deck', 'roadway', 'drainage',
+  'pipeline', 'process_structures', 'process_equipment', 'track_systems', 'controls_scada', 'startup_testing', 'cutover',
+])
+
+/**
+ * Phase names for this project: building names for buildings, civil names for civil types (or, when the
+ * type is not known, for a network whose activities are clearly civil).
+ */
+export function phaseLabelsFor(projectType?: string | null, categories: Iterable<string> = []): Record<string, string> {
+  if (projectType && isCivilType(projectType)) return { ...CIVIL_PHASE_LABELS, ...CIVIL_TYPE_PHASE_LABELS[projectType as ProjectType] }
+  if (projectType) return PHASE_LABELS
+  let civil = 0, total = 0
+  for (const c of categories) { total++; if (CIVIL_ONLY.has(c as CanonicalCategory)) civil++ }
+  return total && civil / total >= 0.15 ? CIVIL_PHASE_LABELS : PHASE_LABELS
+}
+
 export function projectCode(name: string): string {
   const letters = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').toUpperCase()
   return (letters || 'PLN').slice(0, 6)
@@ -48,11 +81,14 @@ export function buildWbs(s: GeneratedSchedule, projectName: string): { root: str
   // Uploaded schedules keep their own WBS (P6 PROJWBS path / MSP outline), not Planora's phases.
   if (s.activities.some(a => a.wbs)) return buildSourceWbs(s, root, order, t)
   let pi = 0
+  // Generated plans: judge by the template work packages (permits and procurement are shared by every type).
+  const work = s.activities.filter(a => a.id.startsWith('t-'))
+  const labels = phaseLabelsFor(null, (work.length ? work : s.activities).map(a => a.category))
   for (const phase of PHASES) {
     const acts = s.activities.filter(a => a.phase === phase).sort(order)
     if (!acts.length) continue
     pi++
-    const node: WbsNode = { code: `${root}.${String(pi).padStart(2, '0')}`, name: PHASE_LABELS[phase] || phase, level: 1, start: null, finish: null, critical: false, children: [], activities: [] }
+    const node: WbsNode = { code: `${root}.${String(pi).padStart(2, '0')}`, name: labels[phase] || phase, level: 1, start: null, finish: null, critical: false, children: [], activities: [] }
     // Segmented activities ("t-finishes#1..n") become a level-2 work package.
     const packages = new Map<string, PlanActivity[]>()
     for (const a of acts) {

@@ -7,7 +7,7 @@ import type { GeneratedSchedule } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
 import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import type { ExpertReview } from '@/lib/db'
-import { PROJECT_TYPE_LABELS } from '@/lib/planning/types'
+import { PROJECT_TYPE_LABELS, isCivilType } from '@/lib/planning/types'
 import type { ProjectProfile } from '@/lib/planning/types'
 
 const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ')
@@ -36,11 +36,16 @@ export function basisOfSchedule(opts: {
 
   L.push('## 1. Project description', '')
   L.push(`| Item | Value |`, `|---|---|`)
-  L.push(`| Facility type | ${profile.projectType ? PROJECT_TYPE_LABELS[profile.projectType] : 'Not stated'} |`)
+  const civil = isCivilType(profile.projectType)
+  L.push(`| ${civil ? 'Project type' : 'Facility type'} | ${profile.projectType ? PROJECT_TYPE_LABELS[profile.projectType] : 'Not stated'} |`)
   L.push(`| Location | ${[profile.city, profile.state].filter(Boolean).join(', ') || 'Not stated'} |`)
   L.push(`| Scope | ${profile.scope?.replace(/_/g, ' ') || 'Not stated'} |`)
-  L.push(`| Gross area | ${profile.grossSqft ? profile.grossSqft.toLocaleString() + ' sf' : 'Not stated'} |`)
-  L.push(`| Stories | ${profile.stories ?? 'Not stated'} |`)
+  // Civil work is sized by construction value; area and stories describe buildings only.
+  if (civil) L.push(`| Construction value | ${profile.valueMusd ? `$${profile.valueMusd.toLocaleString()}M` : 'Not stated'} |`)
+  else {
+    L.push(`| Gross area | ${profile.grossSqft ? profile.grossSqft.toLocaleString() + ' sf' : 'Not stated'} |`)
+    L.push(`| Stories | ${profile.stories ?? 'Not stated'} |`)
+  }
   L.push(`| Delivery method | ${profile.deliveryMethod?.toUpperCase() || 'Not stated'} |`)
   L.push(`| Federal | ${profile.isFederal ? 'Yes' : 'No'}${profile.classification ? ` (${profile.classification})` : ''} |`)
   L.push('')

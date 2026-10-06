@@ -62,12 +62,12 @@ export async function loadScheduleData(id: string, orgId: string) {
   }
   const warnings = done.note && !schedule.warnings.includes(done.note) ? [done.note, ...schedule.warnings] : schedule.warnings
   // Location and size for the overview: from the plan interview when this schedule was built in Planora.
-  let extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null } = {}
+  let extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null; valueMusd?: number | null } = {}
   if (schedule.planId) {
     const { getPlan } = await import('@/lib/db')
     const plan = await getPlan(schedule.planId, orgId)
     const v = (k: string) => (plan?.answers[k]?.status === 'known' ? plan.answers[k].value : undefined)
-    extra = { city: (v('project.city') as string) ?? null, state: (v('project.state') as string) ?? null, sqft: (v('project.gross_sqft') as number) ?? null, type: (v('project.type') as string) ?? null }
+    extra = { city: (v('project.city') as string) ?? null, state: (v('project.state') as string) ?? null, sqft: (v('project.gross_sqft') as number) ?? null, type: (v('project.type') as string) ?? null, valueMusd: Number(v('project.value_musd')) || null }
   }
   const { projectBrief } = await import('@/lib/analysis/brief')
   const completedSchedule = { ...schedule, projectStart: done.projectStart, projectFinish: analysis.forecastFinish, varianceDays: analysis.varianceDays, criticalCount, warnings, analysis }
