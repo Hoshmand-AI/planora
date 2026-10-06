@@ -13,3 +13,4 @@ backups/
 *.dump
 *.dump.manifest.json
 sbom.cdx.json
+.claude/worktrees/

@@ -27,7 +27,7 @@ interface Plan {
 }
 interface View {
   plan: Plan; elicitation: ElicitationResult; adaptive: AdaptiveInterview; evaluation: Evaluation | null
-  llm: { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; error?: string }
+  llm: { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; error?: string; cuiWarning?: string }
   history: { projectCount: number; similarCount: number } | null
   answered: { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }[]
   recovery: RecoveryPlan | null
@@ -224,10 +224,13 @@ export default function PlanPage() {
         </div>
       )}
 
-      {tab === 'interview' && (
+      {tab === 'interview' && (<>
+        {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
+          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} Planora will not send this plan to a cloud AI model.</p>
+        )}
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
-      )}
+      </>)}
       {tab === 'schedule' && g && <ScheduleTab plan={plan} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
