@@ -11,6 +11,8 @@ import { exportXer } from '@/lib/export/xer'
 import { encodeXer } from '@/lib/parsers/xer-codec'
 import { exportPdf } from '@/lib/export/pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
+import { calculationSettings, planoraRelease, type Provenance } from '@/lib/export/provenance'
+import { scheduleFingerprint } from '@/lib/server/approval'
 import { profileFrom } from '@/lib/planning/elicitation'
 import { runSra } from '@/lib/planning/sra'
 import { loadFirmHistory } from '@/lib/planning/service'
@@ -48,6 +50,13 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 
   // Same rule as the plan page header: Monte Carlo only where the plan has it, else the rule-based estimate.
   const sraFor = async () => g.cpm && entitlementsFor(ctx.plan).sra ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
+  // A generated plan has no uploaded file: the hash is the SHA-256 of the generated schedule content
+  // (the same fingerprint approvals are bound to).
+  const prov = (): Provenance => ({
+    sources: [{ scheduleName: plan.name, version: `plan version ${plan.version}`, fileName: `Generated in Planora (plan "${plan.name}")`, sha256: scheduleFingerprint(g), dataDate: g.dataDate ?? g.projectStart, progressMode: g.cpm?.progressMode ?? 'retained' }],
+    release: planoraRelease(), generatedAt: new Date().toISOString(),
+    settings: calculationSettings({ calendars: g.calendars, defaultCalendarId: g.defaultCalendarId }, { progressMode: g.cpm?.progressMode ?? 'retained', mustFinishBy: g.mustFinishBy ?? null, finishMilestone: null }, ctx.settings?.quality),
+  })
   let body: string | Buffer | Uint8Array, type: string, file: string
   switch (format) {
     case 'xer':
@@ -58,9 +67,9 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     case 'csv':
       body = exportScheduleCsv(g); type = 'text/csv; charset=utf-8'; file = `${slug}.csv`; break
     case 'xlsx-import':
-      body = await exportImportXlsx(g, plan.name, { marking }); type = XLSX; file = `${slug}-import-to-p6-or-ms-project.xlsx`; break
+      body = await exportImportXlsx(g, plan.name, { marking, prov: prov() }); type = XLSX; file = `${slug}-import-to-p6-or-ms-project.xlsx`; break
     case 'xlsx-p6':
-      body = await exportP6LayoutXlsx(g, plan.name, { marking }); type = XLSX; file = `${slug}-p6-layout.xlsx`; break
+      body = await exportP6LayoutXlsx(g, plan.name, { marking, prov: prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`; break
     case 'pdf': {
       const view = await planView(plan, ctx.orgId)
       body = await exportPdf(g, plan.name, view.evaluation, { preparedBy: ctx.name, sra: await sraFor(), marking }); type = 'application/pdf'; file = `${slug}-schedule.pdf`; break

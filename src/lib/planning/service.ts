@@ -162,3 +162,25 @@ export function networkOf(data: NonNullable<Awaited<ReturnType<typeof loadSchedu
     projectStart: data.schedule.projectStart, dataDate: data.schedule.dataDate, mustFinishBy: data.analysis.mustFinishBy ?? null, progressMode: data.analysis.progressMode ?? 'retained',
   }
 }
+
+/** Most updates a windows analysis loads (each is recalculated several times). */
+export const MAX_WINDOW_UPDATES = 36
+
+/**
+ * The update series of `schedule` (same project key, org-scoped), ordered by data date, each loaded
+ * and recalculated; capped at the latest MAX_WINDOW_UPDATES uploads. A schedule outside a series
+ * returns just itself.
+ */
+export async function loadSeriesUpdates(orgId: string, schedule: { id: string; projectKey?: string | null }) {
+  const { getScheduleSeries, getScheduleById } = await import('@/lib/db')
+  const { orderSeries } = await import('@/lib/analysis/compare')
+  const series = orderSeries(schedule.projectKey ? await getScheduleSeries(orgId, schedule.projectKey) : [await getScheduleById(schedule.id, orgId)].filter((s): s is Schedule => !!s))
+  const truncated = series.length > MAX_WINDOW_UPDATES
+  const picked = series.slice(-MAX_WINDOW_UPDATES)
+  const loaded = []
+  for (const s of picked) {
+    const d = await loadScheduleData(s.id, orgId)
+    if (d) loaded.push(d)
+  }
+  return { updates: loaded, truncated, total: series.length }
+}

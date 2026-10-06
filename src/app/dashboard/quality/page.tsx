@@ -5,7 +5,8 @@ import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
 import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
-import { fmtDates } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
+import { FINDING_DISPOSITIONS, FINDING_LABELS, SUBMISSION_DISPOSITIONS, SUBMISSION_LABELS, type FindingDisposition, type ItemDisposition, type ReviewState, type SubmissionDisposition } from '@/lib/analysis/review'
 import Link from 'next/link'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
@@ -16,14 +17,17 @@ interface Quality {
   classification: { counts: Record<string, number>; classifiedPct: number }
   guidance: (CheckGuidance & { decision: { response: string; note: string | null } | null })[]
   brief: { summary: string } | null
+  review: ReviewState
 }
+
+type Dispose = (itemId: string, disposition: FindingDisposition, justification: string) => Promise<string | null>
 
 const SEV_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
 const SEV_STYLE = { error: 'border-status-at-risk', warning: 'border-status-attention', info: 'border-status-info' }
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function QualityPage() {
-  const { selectedSchedule } = useApp()
+  const { selectedSchedule, can } = useApp()
   const [data, setData] = useState<Quality | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -50,6 +54,15 @@ export default function QualityPage() {
     const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: `dcma:${id}`, response, note }) })
     if (res.ok) setData(d => d && ({ ...d, guidance: d.guidance.map(g => g.id === id ? { ...g, decision: { response, note } } : g) }))
   }
+  // Reviewer dispositions (reviewer / admin / owner): per finding or question, and for the submission.
+  const postReview = async (body: Record<string, unknown>): Promise<string | null> => {
+    const res = await fetch(`/api/schedules/${data!.schedule.id}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) return d.error || 'Could not save the disposition.'
+    setData(x => x && ({ ...x, review: d.review }))
+    return null
+  }
+  const dispose: Dispose = (itemId, disposition, justification) => postReview({ itemId, disposition, justification })
   const [stickyTop, setStickyTop] = useState(0)
   useEffect(() => {
     const measure = () => setStickyTop(document.querySelector('header')?.getBoundingClientRect().height ?? 0)
@@ -70,6 +83,9 @@ export default function QualityPage() {
   const resultStyle = (r: string) => r === 'pass' ? 'text-status-on-track' : r === 'fail' ? 'text-status-at-risk' : r === 'warn' ? 'text-status-attention' : 'text-warm-400'
 
   const failing = data.dcma.checks.filter(c => c.result === 'fail').length
+  const reviewer = can('plan.review') && data.schedule.sourceType !== 'generated'
+  const review = data.review ?? { items: [], submission: null }
+  const dispositionOf = (id: string) => review.items.find(x => x.itemId === id) ?? null
   return (
     <div className="px-4 md:px-6 pb-8 space-y-5">
       {/* Frozen summary: the schedule and its key quality numbers stay visible while scrolling */}
@@ -95,11 +111,13 @@ export default function QualityPage() {
         </div>
       )}
 
+      <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
+
       {data.guidance.length > 0 && (
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What to fix — {data.guidance.filter(g => !g.decision).length} of {data.guidance.length} open. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in Planora (with a reason) from the schedule dashboard.</div>
           <div className="space-y-3">
-            {data.guidance.map(g => <QualityGuide key={g.id} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} />)}
+            {data.guidance.map(g => <QualityGuide key={g.id} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
           </div>
         </div>
       )}
@@ -129,6 +147,7 @@ export default function QualityPage() {
                         <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">Not an issue</button>
                       </div>
                     )}
+                    <ReviewControl itemId={q.id} label={q.question} disposition={dispositionOf(q.id)} reviewer={reviewer} onDispose={dispose} />
                   </div>
                 </div>
               </div>
@@ -176,7 +195,7 @@ export default function QualityPage() {
   )
 }
 
-function QualityGuide({ g, check, onDecide }: { g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void }) {
+function QualityGuide({ g, check, onDecide, disposition, reviewer, onDispose }: { g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
   const [open, setOpen] = useState(!g.decision)
   const [note, setNote] = useState('')
   return (
@@ -185,6 +204,7 @@ function QualityGuide({ g, check, onDecide }: { g: Quality['guidance'][number]; 
         <span className={`text-[10.5px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
         {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
+        {disposition && <span className="text-[11px] font-semibold uppercase text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition]}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
@@ -207,9 +227,94 @@ function QualityGuide({ g, check, onDecide }: { g: Quality['guidance'][number]; 
               <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
             </div>
           )}
+          <ReviewControl itemId={`dcma:${g.id}`} label={`DCMA #${g.id} ${check.name}`} disposition={disposition} reviewer={reviewer} onDispose={onDispose} />
         </div>
       )}
     </div>
+  )
+}
+
+/** A reviewer's disposition of one finding or data question: shown to everyone, editable by reviewers. */
+function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { itemId: string; label: string; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
+  const [choice, setChoice] = useState<FindingDisposition>(disposition?.disposition ?? 'accepted')
+  const [text, setText] = useState(disposition?.justification ?? '')
+  const [editing, setEditing] = useState(false)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!reviewer && !disposition) return null
+  const save = async () => {
+    setBusy(true); setErr('')
+    const e = await onDispose(itemId, choice, text)
+    setBusy(false)
+    if (e) setErr(e); else setEditing(false)
+  }
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-warm-200">
+      {disposition && !editing ? (
+        <p className="text-[12.5px] text-warm-700">
+          <span className="font-semibold text-navy-950">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
+          {disposition.justification ? ` — “${disposition.justification}”` : ''}
+          <span className="text-warm-500"> · {disposition.reviewer ?? 'reviewer'}, {fmtDate(disposition.createdAt)}</span>
+          {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950">Change</button>}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
+          <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-md px-2 py-1 text-[12.5px] text-navy-950">
+            {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
+          </select>
+          <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1 text-[12.5px]" />
+          <button type="button" disabled={busy} onClick={save} className="px-3 py-1 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
+          {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The overall disposition of the submission (approved / approved as noted / revise and resubmit). */
+function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; reviewer: boolean; onSave: (d: SubmissionDisposition, comments: string) => Promise<string | null> }) {
+  const s = review.submission
+  const [choice, setChoice] = useState<SubmissionDisposition>(s?.disposition ?? 'approved')
+  const [comments, setComments] = useState(s?.comments ?? '')
+  const [editing, setEditing] = useState(false)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!reviewer && !s) return null
+  const counts = FINDING_DISPOSITIONS.map(d => `${review.items.filter(x => x.disposition === d).length} ${FINDING_LABELS[d].toLowerCase()}`).join(' · ')
+  const save = async () => {
+    setBusy(true); setErr('')
+    const e = await onSave(choice, comments)
+    setBusy(false)
+    if (e) setErr(e); else setEditing(false)
+  }
+  return (
+    <section aria-labelledby="submission-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+      <h2 id="submission-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
+      {s && !editing ? (
+        <div className="text-[13.5px] text-warm-700 space-y-1">
+          <p><span className="font-semibold text-navy-950">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDate(s.createdAt)}</span>
+            {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950 text-[12.5px]">Change</button>}</p>
+          {s.comments && <p className="whitespace-pre-wrap">{s.comments}</p>}
+          <p className="text-[12px] text-warm-500">Findings and questions dispositioned: {counts}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[13px] text-navy-950">
+              {SUBMISSION_DISPOSITIONS.map(d => <option key={d} value={d}>{SUBMISSION_LABELS[d]}</option>)}
+            </select>
+            <span className="text-[12px] text-warm-500">{counts}</span>
+          </div>
+          <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={busy} onClick={save} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Record disposition</button>
+            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-md border border-warm-300 text-[12.5px] text-navy-950">Cancel</button>}
+            {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

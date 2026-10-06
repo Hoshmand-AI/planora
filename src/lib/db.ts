@@ -5,6 +5,7 @@ import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
 import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
+import type { FindingDisposition, ReviewState, SubmissionDisposition } from '@/lib/analysis/review'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
@@ -352,6 +353,14 @@ export async function getScheduleFile(scheduleId: string, orgId: string): Promis
   return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
 }
 
+/** File name and SHA-256 of the stored original (no content), for provenance headers. */
+export async function getScheduleFileMeta(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string } | undefined> {
+  await initSchema()
+  const res = await query('SELECT file_name, sha256 FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { fileName: String(r.file_name), sha256: String(r.sha256) } : undefined
+}
+
 export async function updateScheduleProfile(id: string, orgId: string, p: { projectType?: string | null; region?: string | null; grossSqft?: number | null }): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET project_type=COALESCE($3,project_type), region=COALESCE($4,region), gross_sqft=COALESCE($5,gross_sqft) WHERE id=$1 AND org_id=$2', [id, orgId, p.projectType ?? null, p.region ?? null, p.grossSqft ?? null])
@@ -696,6 +705,40 @@ export async function saveDataQuestionResponse(scheduleId: string, r: Omit<DataQ
     [scheduleId, r.questionId, r.response, r.note, r.userId])
 }
 
+/* ─── Reviewer dispositions on uploaded submissions ─── */
+
+
+/** Dispositions recorded on one upload (org-scoped), with the reviewer's name. */
+export async function getReviewState(scheduleId: string, orgId: string): Promise<ReviewState> {
+  await initSchema()
+  const [items, sub] = await Promise.all([
+    query(`SELECT d.item_id, d.disposition, d.justification, d.user_id, d.created_at, u.name AS reviewer FROM review_dispositions d
+      LEFT JOIN users u ON u.id = d.user_id WHERE d.schedule_id=$1 AND d.org_id=$2 ORDER BY d.item_id`, [scheduleId, orgId]),
+    query(`SELECT s.disposition, s.comments, s.user_id, s.created_at, u.name AS reviewer FROM submission_reviews s
+      LEFT JOIN users u ON u.id = s.user_id WHERE s.schedule_id=$1 AND s.org_id=$2`, [scheduleId, orgId]),
+  ])
+  const ts = (v: unknown) => new Date(v as string).toISOString()
+  const r = sub.rows[0]
+  return {
+    items: items.rows.map(x => ({ itemId: String(x.item_id), disposition: x.disposition, justification: x.justification ?? null, userId: x.user_id ?? null, reviewer: x.reviewer ?? null, createdAt: ts(x.created_at) })),
+    submission: r ? { disposition: r.disposition, comments: r.comments ?? null, userId: r.user_id ?? null, reviewer: r.reviewer ?? null, createdAt: ts(r.created_at) } : null,
+  }
+}
+
+export async function saveReviewDisposition(scheduleId: string, orgId: string, d: { itemId: string; disposition: FindingDisposition; justification: string | null; userId: string }): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO review_dispositions (schedule_id, org_id, item_id, disposition, justification, user_id) VALUES ($1,$2,$3,$4,$5,$6)
+    ON CONFLICT (schedule_id, item_id) DO UPDATE SET disposition=EXCLUDED.disposition, justification=EXCLUDED.justification, user_id=EXCLUDED.user_id, created_at=NOW()`,
+  [scheduleId, orgId, d.itemId, d.disposition, d.justification, d.userId])
+}
+
+export async function saveSubmissionReview(scheduleId: string, orgId: string, d: { disposition: SubmissionDisposition; comments: string | null; userId: string }): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO submission_reviews (schedule_id, org_id, disposition, comments, user_id) VALUES ($1,$2,$3,$4,$5)
+    ON CONFLICT (schedule_id) DO UPDATE SET disposition=EXCLUDED.disposition, comments=EXCLUDED.comments, user_id=EXCLUDED.user_id, created_at=NOW()`,
+  [scheduleId, orgId, d.disposition, d.comments, d.userId])
+}
+
 /* ─── Privacy: export and deletion ──────────────────── */
 
 export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {
@@ -713,12 +756,12 @@ export async function exportOrganization(orgId: string) {
   const schedules = await getSchedules(orgId)
   const scheduleData = []
   for (const s of schedules) {
-    const [activities, relationships, responses, chats, edits, riskInputs] = await Promise.all([
+    const [activities, relationships, responses, chats, edits, riskInputs, review] = await Promise.all([
       getActivities(s.id), getRelationships(s.id), getDataQuestionResponses(s.id),
       query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
-      getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId),
+      getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId), getReviewState(s.id, orgId),
     ])
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs })
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
   return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }

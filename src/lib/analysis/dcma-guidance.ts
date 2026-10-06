@@ -120,7 +120,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
       steps: ['Assign crews or cost to work activities if the contract requires a resource-loaded schedule.'], actions: [...filter],
     }
     case 11: return {
-      id: 11, meaning: 'Activities that should have finished by the data date (per the baseline) but didn\'t.',
+      id: 11, meaning: 'Activities that should have finished before the data date (per the baseline) but didn\'t.',
       whyItMatters: 'Missed tasks are the earliest sign of slippage.', steps: ['Review each missed task and its impact on the critical path; re-plan the remaining work.'], actions: [...filter],
     }
     case 12: return {

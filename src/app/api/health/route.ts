@@ -1,6 +1,7 @@
 import { publicApi, json } from '@/lib/server/api'
 import { query, schemaStatus } from '@/lib/db'
 import { resolveLlmConfig } from '@/lib/llm/provider'
+import { planoraRelease } from '@/lib/export/provenance'
 
 /**
  * Liveness/readiness for uptime monitoring: database reachable, schema current, AI routing mode.
@@ -24,7 +25,7 @@ export const GET = publicApi(async () => {
   return json({
     status: ok ? 'ok' : 'degraded',
     time: new Date().toISOString(),
-    release: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || process.env.PLANORA_RELEASE || 'local',
+    release: planoraRelease(),
     checks: { database: db, schema, ai: { mode: llm.mode, airgapped: llm.airgapped, configured: !llm.error } },
   }, { status: ok ? 200 : 503 })
 }, { optionalAuth: false })

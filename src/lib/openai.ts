@@ -6,7 +6,8 @@ import { analyzableFromDb } from '@/lib/planning/service'
 import type { ProjectBrief } from '@/lib/analysis/brief'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleComparison } from '@/lib/analysis/compare'
-import { buildReport } from '@/lib/export/reports'
+import { buildReport, reportSupplement, type ReportInput } from '@/lib/export/reports'
+import { withProvenance } from '@/lib/export/provenance'
 import { checkInputs } from '@/lib/analysis/input-checks'
 
 // Model calls go through the provider (cloud, on-prem, or offline). When no model is available,
@@ -24,6 +25,8 @@ interface ScheduleContext {
   analysis?: ScheduleAnalysis
   /** Change since the previous upload of the same project */
   comparison?: ScheduleComparison | null
+  /** Evidence every report carries whether or not a model wrote it: provenance, windows, reviewer dispositions, relationship float */
+  evidence?: Pick<ReportInput, 'provenance' | 'windows' | 'review' | 'linkFloat'>
 }
 
 export async function askScheduleQuestion(
@@ -253,7 +256,15 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
       },
       { role: 'user', content: prompt },
     ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}` })
-    if (report) return report
+    if (report) {
+      // The model writes the narrative; the evidence sections are Planora's own calculation.
+      if (!context.analysis) return withProvenance(report, context.evidence?.provenance)
+      const sup = reportSupplement(reportType, {
+        schedule, activities, relationships, analysis: context.analysis, dcma, ...context.evidence,
+        dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)),
+      })
+      return sup ? `${report.trimEnd()}\n\n${sup}` : report
+    }
   } catch (error: unknown) {
     log('warn', 'model call failed', { purpose: 'report', error: (error as Error).message })
   }
@@ -261,10 +272,10 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
   if (context.analysis) {
     return buildReport(reportType, {
       schedule, activities, relationships, analysis: context.analysis, dcma, brief: context.brief, comparison: context.comparison ?? null,
-      dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)),
+      dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)), ...context.evidence,
     })
   }
-  return [
+  return withProvenance([
     `# ${reportType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${schedule.name}`,
     '',
     '_Generated from schedule data without an AI model._',
@@ -281,5 +292,5 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
     '',
     '## 3. Critical activities',
     ...activities.filter(a => a.isCritical).slice(0, 25).map(a => `- ${a.activityId} ${a.name} (${a.duration}d, float ${a.totalFloat}d, ${a.earlyStart} → ${a.earlyFinish})`),
-  ].join('\n')
+  ].join('\n'), context.evidence?.provenance)
 }
