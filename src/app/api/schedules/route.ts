@@ -4,7 +4,7 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis } from '@/lib/db'
+import { createSchedule, countUploadedSchedules, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis } from '@/lib/db'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifyActivity, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -15,6 +15,8 @@ import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineF
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
 import { fmtDate, fmtDay } from '@/lib/format'
+import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
+import { workspaceForNewItem } from '@/lib/server/workspaces'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -70,7 +72,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
   const ent = entitlementsFor(ctx.plan)
   if (ent.maxUploadedSchedules != null) {
-    const uploaded = (await getSchedules(ctx.orgId)).filter(s => s.sourceType !== 'generated').length
+    // Plan limits count the whole organization, not just the workspaces this member can see.
+    const uploaded = await countUploadedSchedules(ctx.orgId)
     requireFeature(ctx.plan, uploaded < ent.maxUploadedSchedules, `More than ${ent.maxUploadedSchedules} uploaded schedules`)
   }
   const quota = await hit(`upload:org:${ctx.orgId}`, LIMITS.uploadsPerOrg.limit, LIMITS.uploadsPerOrg.windowSec)
@@ -86,6 +89,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const region = formData.get('region') as string | null
     const grossSqft = Number(formData.get('grossSqft')) || null
     const allowDuplicate = formData.get('allowDuplicate') === 'true'
+    const workspaceInput = formData.get('workspaceId')
     // An unknown facility type is refused, not silently dropped (the upload would lose its grounding tag).
     const typeErr = projectTypeError(projectType)
     if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
@@ -124,6 +128,13 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
         },
       })
     }
+
+    // Workspace (matter): the one asked for, else the update series' workspace, else the default for
+    // this member (restricted members' uploads go into their workspace).
+    const latestInSeries = series[series.length - 1]
+    const workspaceId = workspaceInput || !latestInSeries
+      ? await workspaceForNewItem(ctx.orgId, await currentWorkspaceAccess(), workspaceInput)
+      : latestInSeries.workspaceId ?? null
 
     // Semantic normalization: firms label activities and calendars differently; map them to shared meaning.
     let classified = 0
@@ -202,6 +213,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       projectType: projectType && (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : null,
       region: region ? region.toUpperCase().slice(0, 12) : null,
       grossSqft,
+      workspaceId,
     })
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
@@ -210,7 +222,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, workspaceId } })
 
     return NextResponse.json({
       success: true, schedule,
