@@ -118,8 +118,24 @@ export interface CpmResult {
   longestPathConstraint?: { id: string; type: 'MSO' | 'MFO'; date: string }
   /** The path to logicFinish that logic alone would give (through mandatory constraints) */
   logicLongestPath?: string[]
-  /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
-  violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
+  /**
+   * Mandatory constraints (MSO/MFO) that overrule logic. logicDate (start for MSO, finish for MFO)
+   * and logicStart/logicFinish are the dates the predecessors drive the activity to (never floored at
+   * the data date); days = work days (own calendar) from the constraint date to that date.
+   */
+  violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number; logicStart?: string; logicFinish?: string }[]
+  /**
+   * Logic-driven early dates (mandatory constraints relaxed network-wide) of open activities whose
+   * logic dates differ from the scheduled ones (successors of an overruled constraint included).
+   */
+  logicTimes?: Record<string, { earlyStart: string; earlyFinish: string }>
+  /**
+   * The driving path to present: basis 'logic' when a mandatory constraint hides a later
+   * logic-driven finish (the path to that finish), else the scheduled longest path. Traced back
+   * through activities a constraint holds (where the P6 longest path stops), which are listed in
+   * `constraints` (effect: the constraint holds the date later or earlier than logic).
+   */
+  drivingTrace?: { basis: 'scheduled' | 'logic'; path: string[]; constraints: { id: string; type: string; date: string; effect: 'later' | 'earlier' }[] }
   /** Relationship free float between open activities (only when CpmInput.linkFloat is set) */
   linkFloat?: CpmLinkFloat[]
   progressMode: ProgressMode

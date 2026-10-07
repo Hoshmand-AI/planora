@@ -281,7 +281,7 @@ describe('runCpm: P6 constraint semantics (pilot findings)', () => {
     const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-11' } })], [fs('A', 'M')]))
     expect(r.times.M).toMatchObject({ earlyFinish: '2026-03-11', lateFinish: '2026-03-11', totalFloat: 0 })
     expect(r.times.A.totalFloat).toBe(-2)
-    expect(r.violations).toEqual([{ id: 'M', type: 'MFO', constraintDate: '2026-03-11', logicDate: '2026-03-13', days: 2 }])
+    expect(r.violations).toEqual([{ id: 'M', type: 'MFO', constraintDate: '2026-03-11', logicDate: '2026-03-13', days: 2, logicStart: '2026-03-13', logicFinish: '2026-03-13' }])
     expect(r.logicFinish).toBe('2026-03-13')
     expect(r.logicLongestPath).toEqual(['A', 'M'])
     // A (finishing 03/13) is the scheduled finish; M's date comes from its constraint, not from A
@@ -437,5 +437,47 @@ describe('runCpm: P6 parity (scheduler pilot, round 2)', () => {
         }
       }
     }
+  })
+})
+
+describe('runCpm: round-3 mandatory-constraint handling', () => {
+  it('a violation is measured from the predecessor-driven date to the constraint date, not from the data date', () => {
+    // A in progress (5d left from the data date Mon 03/09) -> M (MFO Wed 03/04, before the data date)
+    const r = runCpm(input(
+      [act('A', 10, { actualStart: '2026-03-02', remaining: 5 }), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } })],
+      [fs('A', 'M')], { dataDate: '2026-03-09' },
+    ))
+    // logic date = A's finish Fri 03/13; hidden = Thu 03/05 .. Fri 03/13 = 7 work days (not 5 from the data date)
+    expect(r.violations).toEqual([expect.objectContaining({ id: 'M', logicDate: '2026-03-13', days: 7 })])
+  })
+  it('a mandatory constraint before the data date with no predecessors is not a logic violation', () => {
+    const r = runCpm(input([act('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } }), act('B', 3)], [fs('M', 'B')], { dataDate: '2026-03-09' }))
+    expect(r.violations).toEqual([])
+  })
+  it('exposes logic-driven dates for the overruled activity and every successor', () => {
+    // A (10d, to Fri 03/13) -> M (MFO Wed 03/11) -> B (2d) -> FC
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-11' } }), act('B', 2), act('FC', 0)], [fs('A', 'M'), fs('M', 'B'), fs('B', 'FC')]))
+    expect(r.times.B.earlyFinish).toBe('2026-03-13')
+    expect(r.times.FC.earlyFinish).toBe('2026-03-13')
+    expect(r.logicTimes).toEqual({
+      M: { earlyStart: '2026-03-13', earlyFinish: '2026-03-13' },
+      B: { earlyStart: '2026-03-16', earlyFinish: '2026-03-17' },
+      FC: { earlyStart: '2026-03-17', earlyFinish: '2026-03-17' },
+    })
+    // the driving path to present is the logic path, through the flagged MFO
+    expect(r.drivingTrace).toEqual({ basis: 'logic', path: ['A', 'M', 'B', 'FC'], constraints: [{ id: 'M', type: 'MFO', date: '2026-03-11', effect: 'earlier' }] })
+  })
+  it('a Finish On that holds the finish milestone later than logic: the trace runs back through it', () => {
+    const r = runCpm(input([act('A', 5), act('B', 5), act('F', 0, { constraint: { type: 'FO', date: '2026-04-30' } })], [fs('A', 'B'), fs('B', 'F')]))
+    expect(r.longestPath).toEqual(['F']) // P6: the constraint, not logic, sets F
+    expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'F'], constraints: [{ id: 'F', type: 'FO', date: '2026-04-30', effect: 'later' }] })
+  })
+  it('a Mandatory Start that drives the finish: the trace continues through it to its logic predecessors', () => {
+    const r = runCpm(input(
+      [act('A', 3), act('B', 2, { constraint: { type: 'MSO', date: '2026-03-16' } }), act('C', 2), act('D', 8)],
+      [fs('A', 'B'), fs('B', 'C')],
+    ))
+    expect(r.longestPath).toEqual(['B', 'C'])
+    expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'C'], constraints: [{ id: 'B', type: 'MSO', date: '2026-03-16', effect: 'later' }] })
   })
 })

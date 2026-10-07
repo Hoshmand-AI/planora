@@ -332,7 +332,7 @@ describe('runDcma: pilot findings (contract milestone, CPLI units, pinned paths,
     const c = check(runDcma(s), 13)
     expect(c.result).toBe('fail')
     expect(c.offenders).toEqual(['SC'])
-    expect(c.explanation).toMatch(/^SC Substantial Completion is forecast .* with -\d+ work days on the 7-Day calendar of float to its FNLT constraint date 03\/24\/2026, against \d+ remaining work days on the 7-Day calendar/)
+    expect(c.explanation).toMatch(/^SC Substantial Completion is forecast .* with total float of -\d+ work days on the 7-Day calendar \(its own float, as shown on the activity; target its FNLT constraint date 03\/24\/2026\), against \d+ remaining work days on the 7-Day calendar/)
     expect(c.explanation).not.toMatch(/realistically achievable/)
   })
   it('CPLI is n/a (not 1.00) when the finish milestone has no constraint, required finish or baseline', () => {
