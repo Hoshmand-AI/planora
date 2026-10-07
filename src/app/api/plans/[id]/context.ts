@@ -9,7 +9,8 @@ import { adaptiveInterview } from '@/lib/planning/adaptive'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
 import { loadFirmHistory } from '@/lib/planning/service'
 import { historyForPlan } from '@/lib/planning/history'
-import { llmStatus } from '@/lib/llm/provider'
+import { deploymentKind, llmStatus } from '@/lib/llm/provider'
+import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, planMarkedClassified } from '@/lib/server/classification'
 import type { ProjectType } from '@/lib/planning/types'
 
 /**
@@ -22,6 +23,11 @@ export async function loadPlanContext(req: Request, id: string, ctx: AuthContext
   if (!plan) throw new ApiError(404, 'Plan not found')
   const expected = req.headers.get('x-plan-version')
   if (req.method !== 'GET' && expected && Number(expected) !== plan.version) throw new ConflictError()
+  // The commercial cloud does not process a plan marked classified (it can still be deleted).
+  if (req.method !== 'DELETE' && planMarkedClassified(plan.answers)) {
+    const refusal = classifiedCloudRefusal('classified', deploymentKind())
+    if (refusal) throw new ApiError(409, refusal, CLASSIFIED_CLOUD_CODE)
+  }
   return { ctx, plan }
 }
 

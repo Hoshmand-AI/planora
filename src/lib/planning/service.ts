@@ -1,5 +1,5 @@
 import { getOrgHistory, type Activity, type Relationship, type Schedule } from '@/lib/db'
-import type { SeriesBaseline } from '@/lib/analysis/schedule-analysis'
+import type { ScheduleAnalysis, SeriesBaseline } from '@/lib/analysis/schedule-analysis'
 import { computeFirmHistory, type FirmHistory } from './history'
 import { importNotes } from '@/lib/analysis/recalc-warning'
 import { CONSTRAINT_TYPES, type AnalyzableSchedule, type ConstraintType, type ProjectType } from './types'
@@ -13,6 +13,38 @@ export async function loadFirmHistory(orgId: string, projectType?: ProjectType):
 }
 
 const CONSTRAINTS: readonly string[] = CONSTRAINT_TYPES
+export { contractTarget, FINISH_DATE_CONSTRAINTS, trackedMilestones, type ContractTarget } from './contract-target'
+import { contractTarget } from './contract-target'
+
+/**
+ * Which network an output is built on. 'submitted' (the default everywhere) is the schedule exactly as
+ * the contractor submitted it, recalculated by Planora; 'scenario' applies the edits made in Planora
+ * (schedule_edits, an override layer) as a named what-if scenario. Status, variance, the portfolio
+ * and the stored headline are always as submitted.
+ */
+export type ScheduleBasis = 'submitted' | 'scenario'
+
+/** The basis a request asks for: ?basis=scenario (or scenario=1); anything else is as submitted. */
+export function basisFrom(params: URLSearchParams | Record<string, unknown> | null | undefined): ScheduleBasis {
+  if (!params) return 'submitted'
+  const get = (k: string) => (params instanceof URLSearchParams ? params.get(k) : params[k])
+  const b = get('basis'), sc = get('scenario')
+  return b === 'scenario' || sc === '1' || sc === 'true' || sc === true ? 'scenario' : 'submitted'
+}
+
+/** The basis in words, for report headers and XLSX provenance: "as submitted" | "with N Planora edits". */
+export function basisLabel(basis: ScheduleBasis, editsApplied: number): string {
+  return basis === 'scenario' && editsApplied > 0 ? `with ${editsApplied} Planora edit${editsApplied === 1 ? '' : 's'}` : 'as submitted'
+}
+
+/** What a reader must know about the basis (edits exist), else null. */
+export function basisWarning(basis: ScheduleBasis, editsApplied: number, who = 'this schedule'): string | null {
+  if (!editsApplied) return null
+  const n = `${editsApplied} Planora edit${editsApplied === 1 ? '' : 's'}`
+  return basis === 'scenario'
+    ? `Basis: ${who} with ${n} applied (a what-if scenario). These figures are not the schedule as submitted.`
+    : `Basis: ${who} as submitted. ${n} ${editsApplied === 1 ? 'is' : 'are'} not applied; choose "With Planora edits" (basis=scenario) to see the scenario.`
+}
 
 /**
  * @param resourceCounts resource assignments per source id (P6 task_id) when the source file carries
@@ -86,24 +118,36 @@ export async function loadSeriesBaseline(orgId: string, current: { id: string; v
 
 /**
  * Load a firm's schedule with activities and logic, filling in dates/float Planora had to calculate
- * for files that arrived without them (older uploads are corrected on read). Edits made in Planora
- * (schedule_edits, an override layer) are applied to the imported network before the recalculation,
- * so every view, export and analysis works on the edited schedule; `edits` lists them.
+ * for files that arrived without them (older uploads are corrected on read).
+ * By default the network is the schedule AS SUBMITTED. With { basis: 'scenario' } the edits made in
+ * Planora (schedule_edits, an override layer) are applied before the recalculation, as a named what-if
+ * scenario. Either way `edits` lists the active edits (as they apply to the imported network) so the
+ * UI can offer the scenario; only the as-submitted analysis is stored as the schedule's headline.
  */
-export async function loadScheduleData(id: string, orgId: string) {
+export async function loadScheduleData(id: string, orgId: string, opts: { basis?: ScheduleBasis } = {}) {
+  const basis: ScheduleBasis = opts.basis === 'scenario' ? 'scenario' : 'submitted'
   const { getScheduleById, getActivities, getRelationships, getScheduleEdits } = await import('@/lib/db')
   const { completeSchedule } = await import('./complete-schedule')
   const { applyScheduleEdits } = await import('./uploaded-edits')
   const schedule = await getScheduleById(id, orgId)
   if (!schedule) return null
+  // The commercial cloud does not process a schedule marked classified (marked before this rule, or
+  // through a path that skipped it): every view, analysis and export is refused with 409.
+  if (schedule.classification === 'classified') {
+    const [{ classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE }, { deploymentKind }, { ApiError }] = await Promise.all([import('@/lib/server/classification'), import('@/lib/llm/provider'), import('@/lib/server/api')])
+    const refusal = classifiedCloudRefusal('classified', deploymentKind())
+    if (refusal) throw new ApiError(409, refusal, CLASSIFIED_CLOUD_CODE)
+  }
   const [importedActivities, importedRelationships, seriesBaseline, storedEdits] = await Promise.all([
     getActivities(id), getRelationships(id), loadSeriesBaseline(orgId, schedule).catch(() => null),
     schedule.sourceType === 'generated' ? Promise.resolve([]) : getScheduleEdits(id, orgId).catch(() => []),
   ])
   const activeEdits = storedEdits.filter(e => !e.revertedAt)
   const edited = applyScheduleEdits(importedActivities, importedRelationships, activeEdits)
-  const rawActivities = activeEdits.length ? edited.activities : importedActivities
-  const relationships = activeEdits.length ? edited.relationships : importedRelationships
+  const editsApplied = edited.applied.filter(e => e.status === 'applied').length
+  const useEdits = basis === 'scenario' && activeEdits.length > 0
+  const rawActivities = useEdits ? edited.activities : importedActivities
+  const relationships = useEdits ? edited.relationships : importedRelationships
   const prior = schedule.analysis ?? null
   // Older uploads stored the file's header finish as projectFinish; keep it as the reported finish.
   const reportedFinish = prior ? prior.reportedFinish : schedule.projectFinish
@@ -123,12 +167,15 @@ export async function loadScheduleData(id: string, orgId: string) {
   // would compare Planora with itself; the upload-time comparison with the file stays authoritative.
   if (prior) analysis.recalc = prior.recalc ?? analysis.recalc
   const criticalCount = done.activities.filter(a => a.isCritical).length
-  if (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status
-    || prior.finishMilestone?.code !== analysis.finishMilestone?.code || prior.varianceBasis !== analysis.varianceBasis || (prior.statusReasons ?? []).join('\n') !== analysis.statusReasons.join('\n')) {
+  // Only the as-submitted analysis is the schedule's stored headline (lists, portfolio, dashboard status).
+  if (basis === 'submitted' && (!prior || prior.forecastFinish !== analysis.forecastFinish || prior.varianceDays !== analysis.varianceDays || prior.status !== analysis.status
+    || prior.finishMilestone?.code !== analysis.finishMilestone?.code || prior.varianceBasis !== analysis.varianceBasis || (prior.statusReasons ?? []).join('\n') !== analysis.statusReasons.join('\n'))) {
     const { updateScheduleAnalysis } = await import('@/lib/db')
     await updateScheduleAnalysis(schedule.id, orgId, { analysis, projectFinish: analysis.forecastFinish, varianceDays: analysis.varianceDays, criticalCount }).catch(() => {})
   }
   const warnings = importNotes(schedule.warnings, done.note, !!prior, analysis.recalc)
+  const bw = basisWarning(basis, editsApplied)
+  if (bw) warnings.unshift(bw)
   // Location and size for the overview: from the plan interview when this schedule was built in Planora.
   let extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null; valueMusd?: number | null } = {}
   if (schedule.planId) {
@@ -147,19 +194,29 @@ export async function loadScheduleData(id: string, orgId: string) {
     hasLogic: done.hasLogic,
     analysis,
     cpm: done.cpm,
-    /** Active edits made in Planora, in order, as applied (with before/after) */
+    /** 'submitted' (the file as submitted) or 'scenario' (with the Planora edits applied) */
+    basis,
+    /** Forecast finish of the schedule as submitted (the stored headline when the scenario was loaded) */
+    submittedForecastFinish: basis === 'submitted' ? analysis.forecastFinish : prior?.forecastFinish ?? null,
+    /** Edits that apply to the imported network: the scenario's size, whichever basis was loaded */
+    editsApplied,
+    /** Active edits made in Planora, in order, as they apply to the imported network (with before/after) */
     edits: edited.applied,
     /** Reverted edits, kept for the record */
     revertedEdits: storedEdits.filter(e => e.revertedAt),
-    editedActivityIds: edited.editedActivityIds,
+    /** Activities the loaded network has edited (empty as submitted) */
+    editedActivityIds: useEdits ? edited.editedActivityIds : [],
+    /** Activities the scenario edits, whichever basis was loaded */
+    scenarioActivityIds: edited.editedActivityIds,
   }
 }
 
-/** The (edited) network of loaded schedule data, for what-if recalculation. */
+/** The network of loaded schedule data (as loaded: submitted or scenario) and its contract target, for what-if recalculation. */
 export function networkOf(data: NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>) {
   return {
     activities: data.activities, relationships: data.relationships, calendars: data.schedule.calendars, defaultCalendarId: data.schedule.defaultCalendarId,
     projectStart: data.schedule.projectStart, dataDate: data.schedule.dataDate, mustFinishBy: data.analysis.mustFinishBy ?? null, progressMode: data.analysis.progressMode ?? 'retained',
+    contract: contractTarget(data.analysis),
   }
 }
 
@@ -171,7 +228,7 @@ export const MAX_WINDOW_UPDATES = 36
  * and recalculated; capped at the latest MAX_WINDOW_UPDATES uploads. A schedule outside a series
  * returns just itself.
  */
-export async function loadSeriesUpdates(orgId: string, schedule: { id: string; projectKey?: string | null }) {
+export async function loadSeriesUpdates(orgId: string, schedule: { id: string; projectKey?: string | null }, opts: { basis?: ScheduleBasis } = {}) {
   const { getScheduleSeries, getScheduleById } = await import('@/lib/db')
   const { orderSeries } = await import('@/lib/analysis/compare')
   const series = orderSeries(schedule.projectKey ? await getScheduleSeries(orgId, schedule.projectKey) : [await getScheduleById(schedule.id, orgId)].filter((s): s is Schedule => !!s))
@@ -179,7 +236,7 @@ export async function loadSeriesUpdates(orgId: string, schedule: { id: string; p
   const picked = series.slice(-MAX_WINDOW_UPDATES)
   const loaded = []
   for (const s of picked) {
-    const d = await loadScheduleData(s.id, orgId)
+    const d = await loadScheduleData(s.id, orgId, opts)
     if (d) loaded.push(d)
   }
   return { updates: loaded, truncated, total: series.length }

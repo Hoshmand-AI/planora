@@ -18,6 +18,24 @@ export function classificationFromAnswer(a: unknown): DataClassification | null 
 /** CUI and classified information must not leave an accredited (on-prem / air-gapped) environment. */
 export const isRestrictedClassification = (c: string | null | undefined) => c === 'cui' || c === 'classified'
 
+/** Returned with 409 when the commercial cloud service is asked to hold a classified schedule or plan. */
+export const CLASSIFIED_CLOUD_REFUSAL = 'This is the commercial cloud service, which is not accredited for classified information, so it does not accept or process schedules or plans marked classified. Use the on-premises / air-gapped Planora package (container image and Docker Compose bundle; see docs/operations/ON-PREM-INSTALL.md) inside your accredited enclave. If this item was marked classified by mistake, mark it unclassified or CUI instead; if it is classified, delete it here and report it to your security officer.'
+export const CLASSIFIED_CLOUD_CODE = 'classified_on_commercial_cloud'
+
+/**
+ * The refusal message when `classification` is 'classified' on the commercial cloud deployment, else
+ * null. On-prem and air-gapped deployments accept classified data. Pure: the deployment is passed in.
+ */
+export function classifiedCloudRefusal(classification: string | null | undefined, deployment: 'commercial_cloud' | 'on_prem' | 'airgapped'): string | null {
+  return classification === 'classified' && deployment === 'commercial_cloud' ? CLASSIFIED_CLOUD_REFUSAL : null
+}
+
+/** The interview answer that marks a plan classified (an explicit answer; a withheld one is not a marking). */
+export const planMarkedClassified = (answers: Record<string, unknown> | null | undefined) => {
+  const a = answers?.['security.classification'] as { status?: string; value?: unknown } | null | undefined
+  return !!a && a.status === 'known' && a.value === 'classified'
+}
+
 async function ofPlan(planId: string, orgId: string): Promise<DataClassification | null> {
   const res = await query(`SELECT answers->'security.classification' AS c FROM plans WHERE id=$1 AND org_id=$2`, [planId, orgId])
   return classificationFromAnswer(res.rows[0]?.c)

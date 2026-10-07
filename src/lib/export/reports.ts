@@ -333,13 +333,17 @@ function qaqc(r: ReportInput): string[] {
  * Empty string when there are none.
  */
 export function editsSection(edits: { label: string; before: string; after: string; reason: string; by: string; byName?: string | null; at: string; status: 'applied' | 'skipped'; note?: string; source?: string }[],
-  reverted: { reason: string; at: string; revertedAt: string | null; revertReason: string | null; change: { kind: string } }[] = []): string {
+  reverted: { reason: string; at: string; revertedAt: string | null; revertReason: string | null; change: { kind: string } }[] = [],
+  /** false when the report is on the schedule as submitted: the edits are listed but not in its figures */
+  inFigures = true): string {
   if (!edits.length && !reverted.length) return ''
   const applied = edits.filter(e => e.status === 'applied')
   const skipped = edits.filter(e => e.status === 'skipped')
   return fmtDates([
     '## Edits made in Planora',
-    `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora to the uploaded file (an override layer; the original file is unchanged and kept with its SHA-256).`, '',
+    inFigures
+      ? `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora to the uploaded file (a what-if scenario; the original file is unchanged and kept with its SHA-256).`
+      : `This report is on the schedule as submitted: its forecast, float and driving path do NOT include the ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora listed below (a what-if scenario; request the report on the scenario to include them).`, '',
     table(['Date', 'By', 'Change', 'Before', 'After', 'Reason', 'Source'], applied.map(e => [d(e.at), e.byName || e.by, e.label, e.before, e.after, e.reason, e.source === 'recovery' ? 'Recovery option' : 'Manual'])),
     ...(skipped.length ? ['', `${skipped.length} edit${skipped.length === 1 ? ' no longer applies' : 's no longer apply'}: ${skipped.map(e => `${e.label} (${e.note ?? 'not applicable'})`).join('; ')}.`] : []),
     ...(reverted.length ? ['', `${reverted.length} earlier edit${reverted.length === 1 ? ' was' : 's were'} reverted: ${reverted.map(e => `${e.change.kind.replace('_', ' ')} edit of ${d(e.at)} reverted ${d(e.revertedAt)}${e.revertReason ? ` (${e.revertReason})` : ''}`).join('; ')}.`] : []),

@@ -3,7 +3,7 @@ import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
-import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
+import type { SraCommitment, SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
 import type { FindingDisposition, ReviewState, SubmissionDisposition } from '@/lib/analysis/review'
 import { currentWorkspaceAccess, workspaceClause } from '@/lib/server/workspace-scope'
@@ -530,21 +530,21 @@ export async function revertScheduleEdit(scheduleId: string, orgId: string, edit
   return (res.rowCount ?? 0) > 0
 }
 
-export interface ScheduleRiskInputs { ranges: SraRange[]; events: SraRiskEvent[]; updatedBy: string | null; updatedAt: string | null }
+export interface ScheduleRiskInputs { ranges: SraRange[]; events: SraRiskEvent[]; commitments: SraCommitment[]; updatedBy: string | null; updatedAt: string | null }
 
 export async function getScheduleRiskInputs(scheduleId: string, orgId: string): Promise<ScheduleRiskInputs> {
   await initSchema()
   const res = await query('SELECT * FROM schedule_risk_inputs WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
   const r = res.rows[0]
-  return r ? { ranges: (r.ranges as SraRange[]) || [], events: (r.events as SraRiskEvent[]) || [], updatedBy: r.updated_by ?? null, updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : null }
-    : { ranges: [], events: [], updatedBy: null, updatedAt: null }
+  return r ? { ranges: (r.ranges as SraRange[]) || [], events: (r.events as SraRiskEvent[]) || [], commitments: (r.commitments as SraCommitment[] | undefined) || [], updatedBy: r.updated_by ?? null, updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : null }
+    : { ranges: [], events: [], commitments: [], updatedBy: null, updatedAt: null }
 }
 
-export async function saveScheduleRiskInputs(scheduleId: string, orgId: string, inputs: { ranges: SraRange[]; events: SraRiskEvent[] }, by: string): Promise<void> {
+export async function saveScheduleRiskInputs(scheduleId: string, orgId: string, inputs: { ranges: SraRange[]; events: SraRiskEvent[]; commitments?: SraCommitment[] }, by: string): Promise<void> {
   await initSchema()
-  await query(`INSERT INTO schedule_risk_inputs (schedule_id, org_id, ranges, events, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,NOW())
-    ON CONFLICT (schedule_id) DO UPDATE SET ranges=EXCLUDED.ranges, events=EXCLUDED.events, updated_by=EXCLUDED.updated_by, updated_at=NOW()
-    WHERE schedule_risk_inputs.org_id=EXCLUDED.org_id`, [scheduleId, orgId, JSON.stringify(inputs.ranges), JSON.stringify(inputs.events), by])
+  await query(`INSERT INTO schedule_risk_inputs (schedule_id, org_id, ranges, events, commitments, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    ON CONFLICT (schedule_id) DO UPDATE SET ranges=EXCLUDED.ranges, events=EXCLUDED.events, commitments=EXCLUDED.commitments, updated_by=EXCLUDED.updated_by, updated_at=NOW()
+    WHERE schedule_risk_inputs.org_id=EXCLUDED.org_id`, [scheduleId, orgId, JSON.stringify(inputs.ranges), JSON.stringify(inputs.events), JSON.stringify(inputs.commitments ?? []), by])
 }
 
 /* ─── Firm history (private to one org) ─────────────── */

@@ -5,7 +5,7 @@ import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleFile } from '@/lib/db'
-import { loadScheduleData } from '@/lib/planning/service'
+import { basisFrom, loadScheduleData } from '@/lib/planning/service'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import { exportXer, exportXerFromOriginal, xerEditsFrom, xerUpdatesFrom } from '@/lib/export/xer'
 import { decodeXer, encodeXer } from '@/lib/parsers/xer-codec'
@@ -30,15 +30,22 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * An uploaded P6 file exports as its original XER with Planora's recalculated dates and float written
  * in, so everything Planora does not model (activity codes, UDFs, resources, notebooks...) is kept;
  * &rebuild=1 builds a fresh XER from Planora's model instead.
- * Edits made in Planora are in every export: written into the original XER (durations, constraints,
- * TASKPRED rows), and in the other formats through the edited network, with their reasons as notes.
+ * Basis: every export is the schedule AS SUBMITTED unless the request asks for the what-if scenario
+ * (&basis=scenario or &scenario=1). Only the scenario carries the edits made in Planora: written into
+ * the original XER (durations, constraints, TASKPRED rows), and in the other formats through the edited
+ * network, with their reasons as notes; its file name says "with-N-edits" and its provenance says
+ * "derived from <sha> with N edits" rather than printing the original file's SHA-256 as the content's.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const format = req.nextUrl.searchParams.get('format') || 'xer'
-  const data = await loadScheduleData(params.id, auth.orgId)
+  const basis = basisFrom(req.nextUrl.searchParams)
+  const data = await loadScheduleData(params.id, auth.orgId, { basis })
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule } = data
-  const slug = `${schedule.name}-${schedule.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule'
+  // Edits in this export: only the scenario carries them.
+  const scenarioEdits = basis === 'scenario' ? data.edits : []
+  const editsApplied = basis === 'scenario' ? data.editsApplied : 0
+  const slug = (`${schedule.name}-${schedule.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule') + (editsApplied ? `-with-${editsApplied}-planora-edit${editsApplied === 1 ? '' : 's'}` : '')
   const rl = await hit(`export:user:${auth.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
 
@@ -54,17 +61,17 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const classification = await scheduleClassification(schedule.id, auth.orgId).catch(() => 'classified' as const)
   const marking = exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name })
   if (marking && format === 'csv') return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
-  const prov = () => loadProvenance(auth.orgId, [{ schedule, analysis: data.analysis }], auth.settings.quality)
+  const prov = () => loadProvenance(auth.orgId, [{ schedule, analysis: data.analysis, editsApplied }], auth.settings.quality)
   if (format === 'lookahead-xlsx') {
     if (!schedule.dataDate) return NextResponse.json({ error: 'This schedule has no data date, so a look-ahead cannot be built.' }, { status: 400 })
     const rows = lookaheadRows(data.activities, data.relationships, schedule.dataDate, 21)
     const file = `${slug}-3-week-look-ahead.xlsx`
     const body = await exportLookaheadXlsx(rows, await prov(), { project: `${schedule.name} (${schedule.version})`, dataDate: schedule.dataDate, days: 21 }, marking)
-    await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: rows.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
+    await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, basis, editsInPlanora: editsApplied, activities: rows.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
     return new NextResponse(body as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${file}"` } })
   }
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
-  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits)
+  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits)
   // P6's progress option: written into the export when the scheduler changed it from the file's own.
   const mode = data.analysis.progressMode
   const fileMode = data.analysis.fileProgressMode ?? null
@@ -76,7 +83,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
       const original = schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId) : undefined
       if (original) {
         const { text, encoding, bom } = decodeXer(original.content)
-        body = encodeXer(markXer(exportXerFromOriginal(text, xerUpdatesFrom(data.activities, data.cpm), { forecastFinish: data.analysis.forecastFinish, edits: xerEditsFrom(data.activities, data.edits), progressMode: changedMode }), marking), encoding, bom)
+        body = encodeXer(markXer(exportXerFromOriginal(text, xerUpdatesFrom(data.activities, data.cpm), { forecastFinish: data.analysis.forecastFinish, edits: xerEditsFrom(data.activities, scenarioEdits), progressMode: changedMode }), marking), encoding, bom)
       } else {
         body = encodeXer(markXer(exportXer(g, schedule.name, { exportedBy: auth.name, projectShortName: schedule.name, progressMode: mode }), marking))
       }
@@ -87,6 +94,6 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     case 'xlsx-import': body = await exportImportXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-import.xlsx`; break
     default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`
   }
-  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, editsInPlanora: data.edits.filter(e => e.status === 'applied').length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"` } })
+  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInPlanora: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted' } })
 })

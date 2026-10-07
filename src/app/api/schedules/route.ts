@@ -11,7 +11,7 @@ import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
-import { analyzableFromDb, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
+import { analyzableFromDb, basisFrom, basisLabel, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
 import { fmtDate, fmtDay } from '@/lib/format'
@@ -28,6 +28,8 @@ const workCounts = (acts: { activityType: string; actualFinish: string | null }[
   return { workCount: work.length, openCount: work.filter(a => !a.actualFinish).length }
 }
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
+import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE } from '@/lib/server/classification'
+import { deploymentKind } from '@/lib/llm/provider'
 import { workspaceForNewItem } from '@/lib/server/workspaces'
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -37,9 +39,10 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 
   if (scheduleId) {
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
-    const data = await loadScheduleData(scheduleId, ctx.orgId)
+    // As submitted by default; ?basis=scenario shows the what-if scenario with the Planora edits.
+    const data = await loadScheduleData(scheduleId, ctx.orgId, { basis: basisFrom(req.nextUrl.searchParams) })
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds } = data
+    const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds, basis, editsApplied } = data
 
     const criticalActivities = activities.filter(a => a.isCritical)
     // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
@@ -54,6 +57,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 
     return NextResponse.json({
       schedule, activities, relationships, brief, analysis, edits, editedActivityIds,
+      basis, basisLabel: basisLabel(basis, editsApplied), scenarioActivityIds: data.scenarioActivityIds,
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
@@ -72,7 +76,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
         // Edits made in Planora (override layer on the uploaded file)
         editedActivityIds,
-        editsCount: edits.filter(e => e.status === 'applied').length,
+        editsCount: editsApplied,
+        basis,
       },
     })
   }
@@ -103,6 +108,12 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const historyOverrideInput = formData.get('historyOverride') === 'true'
     const classificationInput = formData.get('classification') || null
     if (classificationInput !== null && !isClassification(classificationInput)) return NextResponse.json({ error: `classification must be one of ${CLASSIFICATIONS.join(', ')}.` }, { status: 400 })
+    // The commercial cloud does not take classified schedules (nothing is parsed or stored).
+    const classifiedRefusal = classifiedCloudRefusal(classificationInput, deploymentKind())
+    if (classifiedRefusal) {
+      await audit({ action: 'schedule.upload_refused', detail: { reason: CLASSIFIED_CLOUD_CODE, fileName: file?.name ?? null, deployment: deploymentKind() } })
+      return NextResponse.json({ error: classifiedRefusal, code: CLASSIFIED_CLOUD_CODE }, { status: 409 })
+    }
     const originInput = formData.get('origin') || null
     if (originInput !== null && !isOrigin(originInput)) return NextResponse.json({ error: 'origin must be own or third_party.' }, { status: 400 })
     const projectIdInput = (formData.get('projectId') as string) || null
@@ -307,6 +318,11 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   const typeErr = projectTypeError(body.projectType)
   if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
   if ('classification' in body && !isClassification(body.classification)) return NextResponse.json({ error: `classification must be one of ${CLASSIFICATIONS.join(', ')}.` }, { status: 400 })
+  const classifiedRefusal = 'classification' in body ? classifiedCloudRefusal(body.classification, deploymentKind()) : null
+  if (classifiedRefusal) {
+    await audit({ action: 'schedule.classification_refused', targetType: 'schedule', targetId: s.id, detail: { name: s.name, requested: 'classified', reason: CLASSIFIED_CLOUD_CODE, deployment: deploymentKind() } })
+    return NextResponse.json({ error: classifiedRefusal, code: CLASSIFIED_CLOUD_CODE }, { status: 409 })
+  }
   if ('origin' in body && body.origin !== null && !isOrigin(body.origin)) return NextResponse.json({ error: 'origin must be own, third_party or null.' }, { status: 400 })
   let version: string | null = null
   if ('version' in body) {

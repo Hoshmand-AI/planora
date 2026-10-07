@@ -23,7 +23,10 @@ interface RecoveryOption {
   id: string; title: string; description: string; tradeoff: string; changes: Change[]; reason: string
   newFinish: string; daysSaved: number; minFloatBefore: number | null; minFloatAfter: number | null; meetsDate: boolean | null
 }
-interface RecoveryData { finish: string; required: string | null; gapDays: number; minFloat: number | null; explanation: string[]; options: RecoveryOption[]; editable: boolean }
+interface RecoveryData {
+  finish: string; required: string | null; requiredSource?: string | null; gapDays: number; minFloat: number | null; explanation: string[]; options: RecoveryOption[]; editable: boolean
+  milestone?: { code: string; name: string; designated: boolean } | null; basisNote?: string | null
+}
 
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
@@ -143,7 +146,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
   )
 }
 
-export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey }: { scheduleId: string; canEdit: boolean; onApplied: () => void; refreshKey: number }) {
+export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basis = 'submitted' }: { scheduleId: string; canEdit: boolean; onApplied: () => void; refreshKey: number; basis?: 'submitted' | 'scenario' }) {
   const [data, setData] = useState<RecoveryData | null>(null)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState('')
@@ -152,32 +155,34 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey }: { 
   useEffect(() => {
     let live = true
     setData(null); setMsg('')
-    fetch(`/api/schedules/${scheduleId}/recovery`).then(async r => {
+    fetch(`/api/schedules/${scheduleId}/recovery${basis === 'scenario' ? '?basis=scenario' : ''}`).then(async r => {
       const d = await r.json().catch(() => ({}))
       if (!live) return
       if (r.ok) setData(d); else setMsg(d.error || 'No options for this schedule.')
     }).catch(() => live && setMsg('Could not load the options.'))
     return () => { live = false }
-  }, [scheduleId, refreshKey])
+  }, [scheduleId, refreshKey, basis])
 
   const apply = async (o: RecoveryOption) => {
     setBusy(o.id); setMsg('')
     const r = await postJson(`/api/schedules/${scheduleId}/edits`, { changes: o.changes, reason: reasons[o.id] ?? o.reason, source: 'recovery', optionId: o.id })
     setBusy('')
     if (!r.ok) { setMsg(r.data.error || 'The option was not applied.'); return }
-    setMsg(`Applied: ${o.title}. Forecast finish now ${fmtDate(String(r.data.forecastFinish ?? ''))}.`)
+    setMsg(`Applied to the "With Planora edits" scenario: ${o.title}. Scenario forecast finish ${fmtDate(String(r.data.forecastFinish ?? ''))}; the schedule as submitted is unchanged.`)
     onApplied()
   }
 
   if (!data) return <p className="text-[13px] text-warm-600">{msg || 'Modeling options on this network…'}</p>
   return (
     <div className="space-y-3 text-[13px] text-warm-700">
+      {data.basisNote && <p className="border-l-2 border-status-info pl-2">{data.basisNote}</p>}
+      <p className="text-warm-600">Target: {data.milestone ? `${data.milestone.code} ${data.milestone.name}` : 'project finish'}{data.required ? `, required ${fmtDate(data.required)}${data.requiredSource ? ` (${data.requiredSource})` : ''}` : ', no required date'}.</p>
       <ul className="list-disc pl-5 space-y-1">{data.explanation.map((x, i) => <li key={i}>{x}</li>)}</ul>
       {data.options.length > 0 && (
         <ul className="space-y-3">{data.options.map(o => (
           <li key={o.id} className="border border-warm-200 rounded-lg p-3 bg-warm-50">
             <p className="font-semibold text-navy-950">{o.title}</p>
-            <p className="mt-0.5">Finish {fmtDate(o.newFinish)} ({o.daysSaved > 0 ? `${o.daysSaved} calendar days earlier` : o.daysSaved < 0 ? `${-o.daysSaved} days later` : 'no change'}){o.minFloatBefore != null && o.minFloatAfter != null ? ` · lowest float ${o.minFloatBefore} → ${o.minFloatAfter} work days` : ''}{o.meetsDate != null ? (o.meetsDate ? ' · meets the required date' : ' · still after the required date') : ''}.</p>
+            <p className="mt-0.5">{data.milestone ? data.milestone.code : 'Finish'} {fmtDate(o.newFinish)} ({o.daysSaved > 0 ? `${o.daysSaved} calendar days earlier` : o.daysSaved < 0 ? `${-o.daysSaved} days later` : 'no change'}){o.minFloatBefore != null && o.minFloatAfter != null ? ` · lowest float ${o.minFloatBefore} → ${o.minFloatAfter} work days` : ''}{o.meetsDate != null ? (o.meetsDate ? ' · meets the required date' : ' · still after the required date') : ''}.</p>
             <p className="text-warm-600 mt-1">{o.description} <span className="text-warm-700">Trade-off:</span> {o.tradeoff}</p>
             {canEdit && data.editable && (
               <div className="flex flex-wrap gap-2 items-end mt-2">
@@ -196,12 +201,14 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey }: { 
 
 interface RangeRow { activityId: string; code?: string; name?: string; optimistic: number | string; mostLikely: number | string; pessimistic: number | string }
 interface EventRow { id?: string; activityId: string; code?: string; name: string; probability: number | string; impactDays: number | string }
-export interface RiskInputsView { ranges: RangeRow[]; events: (EventRow & { name: string })[]; updatedAt: string | null; defaults: { procurement: number; cure: number } }
+interface CommitmentRow { activityId: string; code?: string; name?: string; date: string; note?: string }
+export interface RiskInputsView { ranges: RangeRow[]; events: (EventRow & { name: string })[]; commitments?: CommitmentRow[]; updatedAt: string | null; defaults: { procurement: number; cure: number } }
 
 /** The scheduler's ranges and risk events; saving re-runs the analysis. Probability is entered in %. */
 export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { scheduleId: string; inputs: RiskInputsView; canEdit: boolean; onSaved: () => void }) {
   const [ranges, setRanges] = useState<RangeRow[]>(inputs.ranges.map(r => ({ ...r, activityId: r.code || r.activityId })))
   const [events, setEvents] = useState<EventRow[]>(inputs.events.map(e => ({ ...e, activityId: e.code || e.activityId, probability: Math.round(Number(e.probability) * 100) })))
+  const [commitments, setCommitments] = useState<CommitmentRow[]>((inputs.commitments ?? []).map(c => ({ ...c, activityId: c.code || c.activityId })))
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const save = async () => {
@@ -209,6 +216,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
     const r = await postJson(`/api/schedules/${scheduleId}/risk`, {
       ranges: ranges.map(x => ({ activityId: x.activityId, optimistic: Number(x.optimistic), mostLikely: Number(x.mostLikely), pessimistic: Number(x.pessimistic) })),
       events: events.map(x => ({ id: x.id, name: x.name, activityId: x.activityId, probability: Number(x.probability) / 100, impactDays: Number(x.impactDays) })),
+      commitments: commitments.map(x => ({ activityId: x.activityId, date: x.date, note: x.note })),
     }, 'PUT')
     setBusy(false)
     if (!r.ok) { setErr(r.data.error || 'Not saved.'); return }
@@ -229,18 +237,28 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
           </tr>))}</tbody></table></div>
       {canEdit && <button type="button" onClick={() => setRanges(rs => [...rs, { activityId: '', optimistic: '', mostLikely: '', pessimistic: '' }])} className={secondary}>Add range</button>}
       <div className="overflow-x-auto"><table className="text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Risk events</caption>
-        <thead><tr><th className={th}>Event</th><th className={th}>Probability %</th><th className={th}>Impact (work days)</th><th className={th}>Affects activity</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
+        <thead><tr><th className={th}>Event</th><th className={th}>Probability %</th><th className={th}>Impact (work days)</th><th className={th}>Affects activity or milestone</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{events.map((r, i) => (
           <tr key={i}>
             <td className={td}><input aria-label="Event name" disabled={!canEdit} value={r.name} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} className={`${input} w-48`} /></td>
             <td className={td}><input aria-label="Probability percent" type="number" min={1} max={100} disabled={!canEdit} value={r.probability} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, probability: e.target.value } : x))} className={cell} /></td>
             <td className={td}><input aria-label="Impact work days" type="number" min={1} disabled={!canEdit} value={r.impactDays} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, impactDays: e.target.value } : x))} className={cell} /></td>
-            <td className={td}><input aria-label="Affected activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} /></td>
+            <td className={td}><input aria-label="Affected activity or milestone ID" disabled={!canEdit} value={r.activityId} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} /></td>
             {canEdit && <td className={td}><button type="button" onClick={() => setEvents(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
+          </tr>))}</tbody></table></div>
+      {canEdit && <button type="button" onClick={() => setEvents(rs => [...rs, { activityId: '', name: '', probability: '', impactDays: '' }])} className={secondary}>Add risk event</button>}
+      <div className="overflow-x-auto"><table className="text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Committed delivery dates</caption>
+        <thead><tr><th className={th}>Activity ID</th><th className={th}>Committed date</th><th className={th}>Note (e.g. supplier letter)</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
+        <tbody>{commitments.map((r, i) => (
+          <tr key={i}>
+            <td className={td}><input aria-label="Committed activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[11.5px]">{r.name}</span>}</td>
+            <td className={td}><input aria-label="Committed delivery date" type="date" disabled={!canEdit} value={r.date} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={input} /></td>
+            <td className={td}><input aria-label="Commitment note" disabled={!canEdit} value={r.note ?? ''} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} className={`${input} w-48`} /></td>
+            {canEdit && <td className={td}><button type="button" onClick={() => setCommitments(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
       {canEdit && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setEvents(rs => [...rs, { activityId: '', name: '', probability: '', impactDays: '' }])} className={secondary}>Add risk event</button>
+          <button type="button" onClick={() => setCommitments(rs => [...rs, { activityId: '', date: '' }])} className={secondary}>Add committed date</button>
           <button type="button" disabled={busy} onClick={save} className={primary}>{busy ? 'Saving…' : 'Save and re-run'}</button>
         </div>
       )}

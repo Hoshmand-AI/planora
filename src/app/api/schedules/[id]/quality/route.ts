@@ -6,12 +6,13 @@ import { xerResourceCounts } from '@/lib/parsers/xer-parser'
 import { decodeXer } from '@/lib/parsers/xer-codec'
 import { runDcma } from '@/lib/analysis/dcma'
 import { checkInputs } from '@/lib/analysis/input-checks'
-import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
+import { analyzableFromDb, basisFrom, basisLabel, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
 
 /** DCMA 14-point assessment + the tool's own questions about the imported data. */
-export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth: ctx }) => {
-  const data = await loadScheduleData(params.id, ctx.orgId)
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth: ctx }) => {
+  // DCMA of the schedule as submitted; ?basis=scenario assesses the what-if scenario with the Planora edits.
+  const data = await loadScheduleData(params.id, ctx.orgId, { basis: basisFrom(req.nextUrl.searchParams) })
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
   const [responses, review] = await Promise.all([getDataQuestionResponses(schedule.id), getReviewState(schedule.id, ctx.orgId)])
@@ -31,6 +32,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     decision: byId.get(`dcma:${c.id}`) ?? null,
   }))
   return NextResponse.json({
+    basis: data.basis, basisLabel: basisLabel(data.basis, data.editsApplied), editsApplied: data.editsApplied,
+    basisNote: basisWarning(data.basis, data.editsApplied),
     guidance,
     brief: data.brief,
     schedule: { id: schedule.id, name: schedule.name, version: schedule.version, sourceType: schedule.sourceType, calendars: schedule.calendars, warnings: schedule.warnings },
