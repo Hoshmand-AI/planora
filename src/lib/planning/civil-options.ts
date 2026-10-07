@@ -27,7 +27,10 @@ export const NORTHERN_STATES = new Set(['AK', 'CO', 'CT', 'IA', 'ID', 'IL', 'IN'
 /** Seasonal shutdown: no seasonal work from December 1 through March 31 (month-day, inclusive). */
 export const WINTER_SHUTDOWN = { from: '12-01', to: '03-31', label: 'December 1 – March 31' }
 
-const SEASONAL_TYPES: ProjectType[] = ['highway_bridge', 'aviation']
+/** Water / wastewater: most process structures planned individually (pour, cure, leak test, backfill). */
+export const WW_MAX_STRUCTURES = 12
+
+const SEASONAL_TYPES: ProjectType[] =['highway_bridge', 'aviation']
 const IN_WATER_TYPES: ProjectType[] = ['highway_bridge', 'marine_civil_works']
 
 function permitStatus(answers: Record<string, Answer>, id: string): string | undefined {
@@ -53,11 +56,14 @@ export function civilOptionsFrom(type: ProjectType, answers: Record<string, Answ
   if (type === 'transit_rail') {
     o.guideway = known(answers, 'transit.guideway') === 'elevated_segmental' ? 'elevated_segmental' : 'at_grade'
     o.stations = clampInt(num(known(answers, 'transit.stations')), 0, 20, 1)
+    o.trackwork = known(answers, 'procure.civ-special-trackwork.status') !== 'not_in_scope'
   }
   if (type === 'water_wastewater') {
     const f = known(answers, 'ww.facility')
     o.wwFacility = f === 'water_treatment' || f === 'pump_station' ? f : 'wastewater_treatment'
-    o.wwStructures = clampInt(num(known(answers, 'ww.structures')), 1, 4, o.wwFacility === 'pump_station' ? 1 : 2)
+    // Up to WW_MAX_STRUCTURES structures are planned one by one; a larger count is capped and the
+    // generator says so in the assumptions.
+    o.wwStructures = clampInt(num(known(answers, 'ww.structures')), 1, WW_MAX_STRUCTURES, o.wwFacility === 'pump_station' ? 1 : 2)
   }
   if (type === 'aviation') {
     const a = known(answers, 'aviation.area')
@@ -176,7 +182,7 @@ export function civilQuestions(p: ProjectProfile, answers: Record<string, Answer
       {
         id: 'ww.structures', section: 'design', kind: 'number', unit: 'structures', impact: 50, allowWithheld: true,
         prompt: 'How many major concrete process structures (basins, clarifiers, tanks, wet wells) are built?',
-        why: 'Each structure is poured, cured, leak tested (ACI 350.1) and backfilled in sequence; equipment cannot be set until its structure passes the leak test.',
+        why: `Each structure is poured, cured, leak tested (ACI 350.1) and backfilled (one concrete crew per four structures); equipment cannot be set until its structure passes the leak test. Up to ${WW_MAX_STRUCTURES} structures are planned individually.`,
         fallback: { value: o.wwFacility === 'pump_station' ? 1 : 2, explanation: 'Assumed two major process structures built by one concrete crew in sequence.' },
       },
     )

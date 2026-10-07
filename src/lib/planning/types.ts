@@ -282,6 +282,10 @@ export interface CivilOptions {
   epcDelivery?: 'epc' | 'epcm'
   heavyLifts?: boolean
   hydrotestSystems?: number
+  /** EPC: construction areas worked in parallel (default 2 when there are 2+ test systems) */
+  epcAreas?: number
+  /** Transit: trackwork in scope (false when special trackwork & rail is answered "Not in scope") */
+  trackwork?: boolean
 }
 
 /* ─── Knowledge catalogs (grounding) ─────────────────── */

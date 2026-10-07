@@ -3,12 +3,18 @@ import { api } from '@/lib/server/api'
 import { randomUUID as uuid } from 'crypto'
 import { createActivities, createRelationships, createSchedule, getSchedules, savePlan, type Activity } from '@/lib/db'
 import { profileFrom } from '@/lib/planning/elicitation'
+import { publishBlockers } from '@/lib/planning/evaluation'
 import { approvalOfCurrentVersion } from '@/lib/server/approval'
 import { loadPlanContext, planView } from '../context'
 
 /**
  * Publish the generated schedule as a project schedule so the analyze/monitor stages
  * (dashboard, timeline, Ask AI, quality checks, updates) work on it. Each publish is a new version.
+ *
+ * Body: { confirm?: boolean }. A plan whose forecast misses its required / contractual date by more
+ * than the threshold, or whose project type has no Planora template, is refused with 409
+ * `publish_confirmation_required` and the warnings until the caller resends with confirm: true. The
+ * confirmation and the warnings it overrode are recorded in the audit trail.
  */
 export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
@@ -30,6 +36,15 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
         ...(stale ? { reason: 'approval_stale' } : {}),
       }, { status: 403 })
     }
+  }
+  const body = await req.json().catch(() => ({})) as { confirm?: unknown }
+  const blockers = publishBlockers(g, plan.answers)
+  if (blockers.length && body?.confirm !== true) {
+    return NextResponse.json({
+      error: `Publishing needs confirmation: ${blockers.map(b => b.text).join(' ')}`,
+      code: 'publish_confirmation_required',
+      warnings: blockers,
+    }, { status: 409 })
   }
   const existing = (await getSchedules(ctx.orgId)).filter(s => s.planId === plan.id)
   const scheduleId = uuid()
@@ -65,7 +80,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.publish' }, async (r
   await createActivities(activities)
   await createRelationships(g.links.map(l => ({ id: `${scheduleId}:${l.id}`, scheduleId, predecessorId: idMap.get(l.from)!, successorId: idMap.get(l.to)!, type: l.type, lag: l.lag })))
   plan.scheduleId = scheduleId
-  plan.audit.push({ at: new Date().toISOString(), by: ctx.name, action: 'publish', detail: `${schedule.version} (${activities.length} activities)` })
+  plan.audit.push({ at: new Date().toISOString(), by: ctx.name, action: 'publish', detail: `${schedule.version} (${activities.length} activities)${blockers.length ? `. Published with confirmation despite: ${blockers.map(b => b.code === 'late' ? `forecast ${b.days} days late` : 'no matching template').join('; ')}` : ''}` })
   const saved = await savePlan(plan)
   return NextResponse.json({ ...(await planView(saved, ctx.orgId)), schedule })
 })
