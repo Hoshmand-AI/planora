@@ -4,6 +4,8 @@ import { audit } from '@/lib/server/audit'
 import { deletePlan, savePlan } from '@/lib/db'
 import { applyAnswers, elicit } from '@/lib/planning/elicitation'
 import type { Answer } from '@/lib/planning/types'
+import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, planMarkedClassified } from '@/lib/server/classification'
+import { deploymentKind } from '@/lib/llm/provider'
 import { elicitationContext, loadPlanContext, planView } from './context'
 
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
@@ -23,6 +25,13 @@ export const PATCH = api<{ id: string }>({ permission: 'plan.write', apiKey: tru
   const body = await req.json().catch(() => ({}))
   const incoming = (body.answers || {}) as Record<string, Partial<Answer> | null>
   const now = new Date().toISOString()
+  // The commercial cloud does not take a plan marked classified: refused before anything is saved.
+  const refusal = planMarkedClassified({ 'security.classification': { status: incoming['security.classification']?.status ?? 'known', value: incoming['security.classification']?.value } })
+    ? classifiedCloudRefusal('classified', deploymentKind()) : null
+  if (refusal) {
+    await audit({ action: 'plan.classification_refused', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, requested: 'classified', reason: CLASSIFIED_CLOUD_CODE, deployment: deploymentKind() } })
+    return NextResponse.json({ error: refusal, code: CLASSIFIED_CLOUD_CODE }, { status: 409 })
+  }
 
   const originalAnswers = plan.answers
   const { ectx } = await elicitationContext(plan, ctx.orgId)

@@ -22,8 +22,10 @@ interface Comparison {
   actualsRewritten: Change[]
   floatErosion: { code: string; name: string; before: number; after: number; delta: number }[]
 }
+interface SraMilestone { id: string; code: string; name: string; contract: boolean; required: string | null; requiredSource: string | null; deterministic: string; p50: string; p80: string; probability: number | null }
 interface Sra {
   method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }
+  contract?: SraMilestone | null; milestones?: SraMilestone[]; warnings?: string[]
   sensitivity: { code: string; name: string; correlation: number; basis: string }[]; assumptions: string[]
   events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
   inputs?: RiskInputsView
@@ -46,6 +48,11 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
   const [sra, setSra] = useState<Sra | null>(null)
   const [sraErr, setSraErr] = useState('')
   const [busy, setBusy] = useState(false)
+  // Which network the tools below use: the schedule as submitted (default) or the what-if scenario.
+  const [basis, setBasis] = useState<'submitted' | 'scenario'>('submitted')
+  useEffect(() => { setBasis('submitted') }, [scheduleId])
+  useEffect(() => { if (!editsCount) setBasis('submitted') }, [editsCount])
+  const bq: Record<string, string> = basis === 'scenario' ? { basis: 'scenario' } : {}
   // Bumped after an edit so the edits list, the options and the risk analysis reload.
   const [rev, setRev] = useState(0)
   // Deep link from the Quality page (…#recovery) opens the what-if and recovery options.
@@ -57,18 +64,19 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
   useEffect(() => {
     let live = true
-    fetch(`/api/schedules/compare?id=${scheduleId}${base ? `&base=${base}` : ''}`).then(r => r.json()).then(d => {
+    fetch(`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), ...(basis === 'scenario' ? { basis } : {}) }).toString()}`).then(r => r.json()).then(d => {
       if (!live) return
       setSeries(d.series || [])
       setCmp(d.comparison || null)
       setCmpMsg(d.message || d.error || '')
     }).catch(() => {})
     return () => { live = false }
-  }, [scheduleId, base])
+  }, [scheduleId, base, basis])
+  useEffect(() => { setSra(null) }, [basis])
 
   const runRisk = async () => {
     setBusy(true); setSraErr('')
-    const r = await fetch(`/api/schedules/${scheduleId}/risk`)
+    const r = await fetch(`/api/schedules/${scheduleId}/risk${basis === 'scenario' ? '?basis=scenario' : ''}`)
     const d = await r.json().catch(() => ({}))
     setBusy(false)
     if (r.ok) setSra(d); else setSraErr(d.error || 'Risk analysis failed.')
@@ -80,19 +88,27 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
     onChanged()
   }
   const restricted = classification === 'cui' || classification === 'classified'
-  const exp = (format: string) => `/api/schedules/${scheduleId}/export?format=${format}`
+  const exp = (format: string) => `/api/schedules/${scheduleId}/export?${new URLSearchParams({ format, ...(format !== 'original' ? bq : {}) }).toString()}`
   const others = series.filter(s => s.id !== scheduleId)
 
   return (
     <section aria-labelledby="tools-h" className="space-y-1">
       <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, edits, risk and exports</h2>
+      {editsCount > 0 && (
+        <fieldset className="text-[13px] text-warm-700 mb-2">
+          <legend className="font-semibold text-navy-950 mb-1">Basis for recovery, comparison, risk and exports</legend>
+          <label className="mr-4"><input type="radio" name="basis" checked={basis === 'submitted'} onChange={() => setBasis('submitted')} /> As submitted</label>
+          <label><input type="radio" name="basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With Planora edits ({editsCount})</label>
+          <p className="text-[12px] text-warm-600 mt-1">{basis === 'scenario' ? `A what-if scenario: the ${editsCount} edit${editsCount === 1 ? '' : 's'} made in Planora are applied. Outputs say so, and exports say they are derived from the original file.` : 'The schedule exactly as submitted. Status, variance, quality and the portfolio always use it.'}</p>
+        </fieldset>
+      )}
 
       <Disclosure title="Edits made in Planora" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
         <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
       </Disclosure>
 
-      <Disclosure id="recovery" title="What-if and recovery options" meta="modeled on this network" defaultOpen={openRecovery}>
-        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} />
+      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with Planora edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
+        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
       </Disclosure>
 
       <Disclosure title="Compare with another update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
@@ -107,9 +123,9 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
           <div className="space-y-4 text-[13px] text-warm-700">
             <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
-              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'csv' }).toString()}`}>Download differences (CSV)</a>{' · '}
-              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), format: 'xlsx' }).toString()}`}>Excel, sheet per change type</a>{' · '}
-              <a className="underline text-navy-950" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), ...bq, format: 'csv' }).toString()}`}>Download differences (CSV)</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), ...bq, format: 'xlsx' }).toString()}`}>Excel, sheet per change type</a>{' · '}
+              <a className="underline text-navy-950" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, ...bq, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Largest float erosion (work days)</caption>
@@ -141,6 +157,13 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
           <div className="text-[13px] text-warm-700 space-y-2">
             <p><span className="font-semibold text-navy-950">Monte Carlo P50 {fmtDate(sra.percentiles.p50)} · P80 {fmtDate(sra.percentiles.p80)}</span> (deterministic forecast {fmtDate(sra.deterministic)}){sra.required ? `; ${Math.round(sra.required.probability * 100)}% chance of meeting ${fmtDate(sra.required.date)}` : ''}.</p>
             <p className="text-warm-600">{sra.method}</p>
+            {sra.warnings && sra.warnings.length > 0 && <ul className="list-disc pl-5 border-l-2 border-status-info">{sra.warnings.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+            {sra.contract && <p><span className="font-semibold text-navy-950">Contract milestone {sra.contract.code} {sra.contract.name}: P50 {fmtDate(sra.contract.p50)} · P80 {fmtDate(sra.contract.p80)}</span>{sra.contract.required && sra.contract.probability != null ? `; ${Math.round(sra.contract.probability * 100)}% chance of meeting ${fmtDate(sra.contract.required)}${sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}` : '; no date to meet'}.</p>}
+            {sra.milestones && sra.milestones.filter(m => !m.contract).length > 0 && (
+              <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Milestones with a finish constraint</caption>
+                <thead><tr><th className={th}>Milestone</th><th className={th}>Date to meet</th><th className={th}>P50</th><th className={th}>P80</th><th className={th}>Chance of meeting</th></tr></thead>
+                <tbody>{sra.milestones.filter(m => !m.contract).map(m => <tr key={m.id}><td className={td}>{m.code} {m.name}</td><td className={td}>{m.required ? fmtDate(m.required) : '—'}</td><td className={td}>{fmtDate(m.p50)}</td><td className={td}>{fmtDate(m.p80)}</td><td className={td}>{m.probability != null ? `${Math.round(m.probability * 100)}%` : '—'}</td></tr>)}</tbody></table></div>
+            )}
             {sra.sensitivity.length > 0 && <p>Biggest drivers: {sra.sensitivity.slice(0, 5).map(s => `${s.code} ${s.name}`).join('; ')}.</p>}
             {sra.events && sra.events.length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Risk events in the simulation</caption>
@@ -159,7 +182,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>
-        <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. The original file is stored with its SHA-256, recorded in the audit log.</p>
+        <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} Planora edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no Planora edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
         {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 

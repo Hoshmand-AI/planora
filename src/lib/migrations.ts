@@ -452,6 +452,15 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS baseline_meta JSONB;
     `,
   },
+  {
+    id: 12, name: 'risk_inputs_committed_delivery_dates',
+    sql: `
+    -- Committed delivery dates on an uploaded schedule's risk inputs: a supplier's committed delivery
+    -- (finish) date per activity, held near-deterministic in the Monte Carlo and flagged when the
+    -- forecast is later. Additive: older code ignores the column.
+    ALTER TABLE schedule_risk_inputs ADD COLUMN IF NOT EXISTS commitments JSONB NOT NULL DEFAULT '[]';
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

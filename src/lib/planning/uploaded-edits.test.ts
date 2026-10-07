@@ -239,7 +239,9 @@ describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name ru
     expect(parseRiskInputs({ ranges: [{ activityId: 'A1050', optimistic: 20, mostLikely: 15, pessimistic: 25 }] }, p.activities)).toHaveProperty('error')
     expect(parseRiskInputs({ events: [{ name: 'x', probability: 30, impactDays: 5, activityId: 'A1050' }] }, p.activities)).toHaveProperty('error')
     expect(parseRiskInputs({ events: [{ name: 'x', probability: 0.3, impactDays: 5, activityId: 'A1010' }] }, p.activities)).toMatchObject({ error: expect.stringMatching(/complete/) })
-    expect(parseRiskInputs({ events: [{ name: 'x', probability: 0.3, impactDays: 5, activityId: 'A1070' }] }, p.activities)).toMatchObject({ error: expect.stringMatching(/not a task/) })
+    // A risk event may attach to a milestone (it delays the milestone); ranges may not.
+    expect(parseRiskInputs({ events: [{ name: 'x', probability: 0.3, impactDays: 5, activityId: 'A1070' }] }, p.activities)).toMatchObject({ events: [{ activityId: code(p.activities, 'A1070').id }] })
+    expect(parseRiskInputs({ ranges: [{ activityId: 'A1070', optimistic: 1, mostLikely: 2, pessimistic: 3 }] }, p.activities)).toMatchObject({ error: expect.stringMatching(/not a task/) })
   })
 })
 
