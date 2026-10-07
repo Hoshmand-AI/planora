@@ -7,12 +7,14 @@
 //   6. Backtest — leave-one-out: re-predict each completed firm project and compare to its actual duration
 
 import type { Answer, AnalyzableSchedule, DcmaReport, GeneratedSchedule, ProjectType, WorkCalendar } from './types'
+import { PROJECT_TYPES } from './types'
 import { runCpm } from './cpm'
 import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { computeFirmHistory, historyForPlan, historyOptedOut, scaleForSize, type FirmHistory } from './history'
 import { committedActivities, hasDurationOverride, type SraResult } from './sra'
 import { questionBank, elicit, profileFrom } from './elicitation'
 import { generateSchedule } from './generator'
+import { checkPlanLogic } from './logic-check'
 import type { ExpertReview, HistoryRow } from '@/lib/db'
 
 export function toAnalyzable(s: GeneratedSchedule): AnalyzableSchedule {
@@ -112,6 +114,65 @@ export interface Evaluation {
   review: { status: 'none' | 'approved' | 'changes_requested' | 'stale'; latest?: ExpertReview; reviewedVersion?: string }
   findings: string[]
   dateChecks: ScheduleDateCheck[]
+  /** Problems that cap the grade and that publishing must confirm explicitly (see publishBlockers) */
+  blockers: PublishBlocker[]
+}
+
+/* ─── Publish blockers: a plan that misses its date or has no real template is not a baseline ── */
+
+/** Calendar days the forecast may miss the contract / required date before publishing needs confirmation. */
+export const LATE_THRESHOLD_DAYS = 30
+/** Days late at which the grade drops to D (between the threshold and this it is capped at C). */
+export const LATE_GRADE_D_DAYS = 90
+
+export interface PublishBlocker {
+  code: 'late' | 'no_template'
+  text: string
+  /** Calendar days late (code 'late') */
+  days?: number
+  /** Highest grade the plan can get while this stands */
+  maxGrade: 'C' | 'D'
+}
+
+/**
+ * What must be confirmed before this plan is published as a baseline: the deterministic forecast
+ * missing the required finish (or a contractual milestone target) by more than LATE_THRESHOLD_DAYS,
+ * and a project type typed in by the user that matches no Planora template (planned with the
+ * generic building network).
+ */
+export function publishBlockers(s: GeneratedSchedule, answers: Record<string, Answer>): PublishBlocker[] {
+  const out: PublishBlocker[] = []
+  const t = s.cpm?.times || {}
+  const misses: { label: string; target: string; forecast: string; days: number }[] = []
+  const required = answers['project.required_finish']?.status === 'known' && typeof answers['project.required_finish'].value === 'string' ? String(answers['project.required_finish'].value) : s.mustFinishBy
+  if (required && /^\d{4}-\d{2}-\d{2}$/.test(required) && s.cpm?.projectFinish) {
+    misses.push({ label: 'the required finish', target: required, forecast: s.cpm.projectFinish, days: days(required, s.cpm.projectFinish) })
+  }
+  for (const m of s.milestoneTargets || []) {
+    const ef = t[m.activityId]?.earlyFinish
+    if (ef) misses.push({ label: `the “${m.label}” target`, target: m.target, forecast: ef, days: days(m.target, ef) })
+  }
+  const worst = misses.filter(m => m.days > LATE_THRESHOLD_DAYS).sort((a, b) => b.days - a.days)[0]
+  if (worst) {
+    out.push({
+      code: 'late', days: worst.days, maxGrade: worst.days > LATE_GRADE_D_DAYS ? 'D' : 'C',
+      text: `The forecast (${us(worst.forecast)}) misses ${worst.label} (${us(worst.target)}) by ${worst.days} calendar days — more than the ${LATE_THRESHOLD_DAYS}-day threshold. Recover the schedule (Evaluation tab) or confirm that you are publishing a baseline that does not meet the date.`,
+    })
+  }
+  const type = answers['project.type']
+  if (type?.status === 'known' && typeof type.value === 'string' && (type.custom || !(PROJECT_TYPES as readonly string[]).includes(type.value))) {
+    out.push({
+      code: 'no_template', maxGrade: 'C',
+      text: `“${type.value}” is not a Planora project type, so the plan uses the generic building network. Choose the closest listed type, or review every activity and its logic before publishing.`,
+    })
+  }
+  return out
+}
+
+const GRADE_ORDER = ['A', 'B', 'C', 'D'] as const
+/** The grade, no better than any blocker allows. */
+export function cappedGrade(grade: Evaluation['grade'], blockers: PublishBlocker[]): Evaluation['grade'] {
+  return blockers.reduce<Evaluation['grade']>((g, b) => (GRADE_ORDER.indexOf(b.maxGrade) > GRADE_ORDER.indexOf(g) ? b.maxGrade : g), grade)
 }
 
 export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, reviews: ExpertReview[], rules?: Partial<DcmaRules>): Evaluation {
@@ -198,6 +259,8 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
   }
   const qualified = (s.qualifications || []).filter(q => q.activityIds.length)
   if (qualified.length) findings.push(`${qualified.length} answer(s) were qualified in the team's own words (e.g. “${qualified[0].note.slice(0, 80)}”). The related activities are marked low-confidence — open them on the Schedule tab and adjust durations or logic if needed.`)
+  const logic = checkPlanLogic(s)
+  if (logic.length) findings.push(`Logic integrity: ${logic.length} issue${logic.length > 1 ? 's' : ''} — ${logic.slice(0, 3).map(i => i.text).join(' ')}${logic.length > 3 ? ' …' : ''}`)
   const placeholders = s.activities.filter(a => a.placeholder)
   if (placeholders.length) findings.push(`${placeholders.length} placeholder(s) reserve time for withheld constraints; a cleared scheduler should position them on-site.`)
 
@@ -206,11 +269,14 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
   const cov = coverage.length ? 100 * (coverage.length - missing.length) / coverage.length : 100
   const rev = reviewStatus === 'approved' ? 100 : reviewStatus === 'none' ? 50 : 30
   const score = Math.round(dcma.score * 0.35 + elic.readiness * 0.2 + realism * 0.2 + cov * 0.15 + rev * 0.1)
-  const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D'
+  const blockers = publishBlockers(s, answers)
+  const grade = cappedGrade(score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D', blockers)
 
   const dateChecks = scheduleDateChecks(s)
   for (const c of dateChecks.filter(c => c.severity !== 'info')) findings.unshift(c.text)
+  for (const b of [...blockers].reverse()) findings.unshift(`Grade capped at ${b.maxGrade}: ${b.text}`)
   return {
+    blockers,
     dateChecks,
     score, grade, dcma, readiness: elic.readiness,
     openAssumptions: s.assumptions.filter(a => a.kind !== 'inferred').length,
