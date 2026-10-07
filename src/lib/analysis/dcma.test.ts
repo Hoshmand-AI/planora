@@ -163,7 +163,8 @@ describe('runDcma: failing checks', () => {
     // A4 is baselined to finish ON the data date (03/09): not yet due (strictly before only).
     expect(check(r, 11).offenders).toEqual(['A2', 'A3'])
     expect(check(r, 14).result).toBe('fail')
-    expect(check(r, 14).metric).toBe('0.50') // 2 complete / 4 due (S, A1, A2, A3)
+    // Tasks only (DCMA): the start milestone S is in neither numerator nor denominator.
+    expect(check(r, 14).metric).toBe('0.33') // 1 complete (A1) / 3 due (A1, A2, A3)
   })
   it('11/14 count baseline finishes strictly before the data date', () => {
     const s = goodSchedule()
@@ -172,10 +173,10 @@ describe('runDcma: failing checks', () => {
     const r = runDcma(s)
     expect(check(r, 11).offenders).not.toContain('A2')
     expect(check(r, 11).result).toBe('pass')
-    expect(check(r, 14).metric).toBe('1.00') // 2 complete / 2 due (S, A1)
-    expect(baselineExecution(s.activities, '2026-03-09')).toMatchObject({ due: 2, missed: 0 })
+    expect(check(r, 14).metric).toBe('1.00') // 1 complete / 1 due (A1; the start milestone S is excluded)
+    expect(baselineExecution(s.activities, '2026-03-09')).toMatchObject({ due: 1, missed: 0 })
     // One day later it is due and missed.
-    expect(baselineExecution(s.activities, '2026-03-10')).toMatchObject({ due: 3, missed: 1, missedCodes: ['A2'] })
+    expect(baselineExecution(s.activities, '2026-03-10')).toMatchObject({ due: 2, missed: 1, missedCodes: ['A2'] })
   })
   it('12 Critical path test fails when a mandatory constraint pins the finish', () => {
     const s: AnalyzableSchedule = {

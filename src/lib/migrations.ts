@@ -441,6 +441,17 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS plans_workspace_idx ON plans(org_id, workspace_id);
     `,
   },
+  {
+    id: 11, name: 'baseline_resolver',
+    sql: `
+    -- One baseline for every surface (src/lib/analysis/baseline.ts). Additive: older code ignores both
+    -- columns. baseline_schedule_id = the earlier upload of the series the scheduler designated as this
+    -- upload's baseline (NULL = the upload labelled Baseline); baseline_meta = the P6 project baseline
+    -- embedded in the uploaded XER and whether the file's own target dates may serve as a baseline.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS baseline_schedule_id TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS baseline_meta JSONB;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

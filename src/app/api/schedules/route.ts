@@ -4,7 +4,8 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta } from '@/lib/db'
+import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -63,6 +64,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         percentComplete,
         varianceDays: analysis.varianceDays,
         varianceBasis: analysis.varianceBasis,
+        baseline: analysis.baseline?.header ?? null,
         forecastFinish: analysis.forecastFinish,
         reportedFinish: analysis.reportedFinish,
         status: analysis.status,
@@ -177,6 +179,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const { mode: progressMode, warning: modeWarning } = resolveProgressMode(chosenMode, parsed.progressMode ?? null)
     if (modeWarning) warnings.push(modeWarning)
 
+    // Baseline facts judged on the file's own dates, before Planora recalculates them: the P6 project
+    // baseline exported with the file, and whether its target dates are a baseline or just the planned
+    // dates of not-started work (src/lib/analysis/baseline.ts).
+    const baselineMeta: BaselineMeta = { embedded: parsed.embeddedBaseline ?? null, fileTargets: assessFileTargets(parsed.activities) }
+
     // Recalculate the network (never trust header dates or stored float) and analyze it.
     const reportedFinish = parsed.projectFinish
     const completed = completeSchedule({
@@ -194,11 +201,12 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const baseUpload = pickSeriesBaseline({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series)
     const baseActivities = baseUpload ? await getActivities(baseUpload.id) : []
     const seriesBaseline = seriesBaselineFrom({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series, () => baseActivities)
+    const baseline = resolveBaseline({ activities: parsed.activities, seriesBaseline, meta: baselineMeta })
 
     const analysis = analyzeSchedule({
-      activities: parsed.activities, links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
+      activities: applyBaseline(parsed.activities, baseline), links: parsed.relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: completed.cpm,
       reportedFinish, mustFinishBy: parsed.mustFinishBy ?? null, fileValues: completed.fileValues, today: new Date().toISOString().slice(0, 10),
-      dataDate: parsed.dataDate, seriesBaseline, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
+      dataDate: parsed.dataDate, baseline, calendars: parsed.calendars, defaultCalendarId: parsed.defaultCalendarId,
       fileProgressMode: parsed.progressMode ?? null,
     })
     const recalcNote = recalcWarning(analysis.recalc)
@@ -258,7 +266,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     })
     const meta = { classification: classificationInput, uploadOrigin: originInput, planoraExport, historyOverride: history.historyOverride }
     await updateScheduleMeta(schedule.id, ctx.orgId, meta)
-    Object.assign(schedule, meta)
+    await setScheduleBaselineMeta(schedule.id, ctx.orgId, baselineMeta)
+    Object.assign(schedule, meta, { baselineMeta })
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
@@ -281,6 +290,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
         reportedFinish,
         varianceDays,
         varianceBasis: analysis.varianceBasis,
+        baseline: analysis.baseline?.header ?? null,
         status: analysis.status,
         sha256,
         series: series.length + 1,
@@ -297,7 +307,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
  * firm history { inHistory, historyOverride (include although not as-built), origin: own | third_party };
  * choose progress handling { progressMode }; designate the contract / finish milestone
  * { finishMilestoneId: activity id or activity code, or null for automatic }; relabel the upload
- * { version }; or set its security classification { classification: unclassified | cui | classified }.
+ * { version }; choose the earlier upload it is measured against { baselineScheduleId, or null for the upload
+ * labelled Baseline }; or set its security classification { classification: unclassified | cui | classified }.
  * Every change is audited; `warnings` explains settings that will not behave as the caller may expect.
  */
 export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
@@ -372,13 +383,34 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
       await audit({ action: 'schedule.finish_milestone', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before, after: next, milestone: label, previousAutomatic: before ? null : s.analysis?.finishMilestone?.code ?? null } })
     }
   }
+  if ('baselineScheduleId' in body) {
+    // The earlier upload of this series that variance, BEI, missed tasks, reports and the trend
+    // measure against; null returns to the upload labelled Baseline.
+    const raw = body.baselineScheduleId
+    if (raw !== null && typeof raw !== 'string') return NextResponse.json({ error: 'baselineScheduleId must be the id of an earlier upload of this project, or null.' }, { status: 400 })
+    let next: string | null = null
+    let chosen: { id: string; version: string; dataDate: string | null } | null = null
+    if (typeof raw === 'string' && raw.trim()) {
+      const series = s.projectKey ? await getScheduleSeries(ctx.orgId, s.projectKey) : []
+      const hit = series.find(x => x.id === raw.trim())
+      if (!hit || hit.id === s.id) return NextResponse.json({ error: 'The baseline must be another upload of the same project.', code: 'invalid_baseline' }, { status: 400 })
+      if (hit.dataDate && s.dataDate && hit.dataDate > s.dataDate) return NextResponse.json({ error: `${hit.version} has a later data date (${fmtDate(hit.dataDate)}) than this upload, so it cannot be its baseline.`, code: 'invalid_baseline' }, { status: 400 })
+      next = hit.id
+      chosen = { id: hit.id, version: hit.version, dataDate: hit.dataDate }
+    }
+    const before = s.baselineScheduleId ?? null
+    if (before !== next) {
+      await setScheduleBaseline(s.id, ctx.orgId, next)
+      await audit({ action: 'schedule.baseline', targetType: 'schedule', targetId: s.id, detail: { name: s.name, version: s.version, before, after: next, baseline: chosen, previous: s.analysis?.baseline?.header ?? null } })
+    }
+  }
   if ('projectType' in body || 'region' in body || 'grossSqft' in body) {
     const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
     const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
     await updateScheduleProfile(s.id, ctx.orgId, profile)
     await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
   }
-  if ('finishMilestoneId' in body) {
+  if ('finishMilestoneId' in body || 'baselineScheduleId' in body) {
     // Recalculate now so the stored headline (lists, portfolio) reflects the designated milestone.
     const data = await loadScheduleData(s.id, ctx.orgId)
     return NextResponse.json({ schedule: data?.schedule ?? await getScheduleById(s.id, ctx.orgId), analysis: data?.analysis ?? null, warnings })

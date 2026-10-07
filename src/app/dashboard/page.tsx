@@ -36,6 +36,8 @@ export default function DashboardPage() {
   // Status and variance come from Planora's recalculation (src/lib/analysis/schedule-analysis.ts).
   const varianceDays: number | null = mx.varianceDays == null ? null : Number(mx.varianceDays)
   const varianceBasis = (mx.varianceBasis as string) || ''
+  // The one baseline variance, BEI, missed tasks and reports measure against (src/lib/analysis/baseline.ts)
+  const baselineHeader = (mx.baseline as string) || ''
   const status = (mx.status as 'on_track' | 'attention' | 'at_risk' | 'complete' | undefined) ?? (varianceDays != null && varianceDays > 14 ? 'at_risk' : varianceDays != null && varianceDays > 0 ? 'attention' : 'on_track')
   const statusReasons = (mx.statusReasons as string[]) ?? []
   const forecastFinish = (mx.forecastFinish as string) || null
@@ -114,8 +116,8 @@ export default function DashboardPage() {
         <MetricCard
           label="Schedule Variance"
           value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
-          context={varianceDays == null ? 'no usable baseline' : 'calendar days vs baseline'}
-          title={varianceBasis}
+          context={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'}
+          title={[baselineHeader && `${baselineHeader}.`, varianceBasis].filter(Boolean).join(' ')}
           color={varianceDays == null ? undefined : STATUS_TONE[varianceDays > 14 ? 'at_risk' : varianceDays > 0 ? 'attention' : 'on_track']}
         />
         <MetricCard

@@ -35,8 +35,10 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const format = req.nextUrl.searchParams.get('format') || 'xer'
-  const data = await loadScheduleData(params.id, auth.orgId)
-  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const loaded = await loadScheduleData(params.id, auth.orgId)
+  if (!loaded) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // Exports carry the file's own baseline (P6 target) dates, not the baseline the analysis resolved.
+  const data = { ...loaded, activities: loaded.fileActivities }
   const { schedule } = data
   const slug = `${schedule.name}-${schedule.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule'
   const rl = await hit(`export:user:${auth.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)

@@ -11,7 +11,8 @@ import type { Activity } from '@/lib/db'
 import type { CpmResult, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { fmtDate } from '@/lib/format'
 import { pickFinishCandidate } from '@/lib/analysis/finish-milestone'
-import { baselineExecution, DEFAULT_DCMA_RULES } from '@/lib/analysis/dcma'
+import { baselineExecution, DEFAULT_DCMA_RULES, fmtIndex, roundIndex } from '@/lib/analysis/dcma'
+import { applyBaseline, summarizeBaseline, type BaselineSummary, type ResolvedBaseline } from '@/lib/analysis/baseline'
 
 export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete'
 
@@ -21,8 +22,8 @@ export interface FinishMilestone {
   name: string
   /** The date variance is measured against (see baselineSource) */
   baselineFinish: string | null
-  /** Where baselineFinish comes from: the series' Baseline upload, or the file's own baseline (P6 target) dates */
-  baselineSource?: 'baseline_upload' | 'file' | null
+  /** Where baselineFinish comes from: the series' Baseline upload, the P6 baseline embedded in the XER, or the file's own (P6 target) dates */
+  baselineSource?: 'baseline_upload' | 'p6_embedded' | 'file' | null
   forecastFinish: string | null
   constraint: { type: string; date: string } | null
   /** Calendar days forecast minus baseline (positive = late); null without a baseline */
@@ -40,6 +41,8 @@ export interface SeriesBaseline {
   dataDate: string | null
   /** activity code -> forecast (or actual) finish in that upload */
   finishes: Record<string, string>
+  /** activity code -> forecast (or actual) start in that upload */
+  starts?: Record<string, string>
 }
 
 export interface ScheduleAnalysis {
@@ -58,6 +61,8 @@ export interface ScheduleAnalysis {
   varianceDays: number | null
   /** Plain-language statement of what the variance was measured against */
   varianceBasis: string
+  /** The baseline every surface measures against (src/lib/analysis/baseline.ts); header goes on every report */
+  baseline?: BaselineSummary | null
   /**
    * Lowest total float among open activities, in work days of THAT activity's own calendar (float is
    * never converted between calendars); minFloatAt names the activity and calendar.
@@ -110,15 +115,28 @@ export function analyzeSchedule(input: {
   dataDate?: string | null
   /** Contract milestone the scheduler designated (activity id or activity code) */
   finishMilestoneId?: string | null
-  /** The series' Baseline upload, when this upload is a later update of the same project */
+  /** The series' Baseline upload, when this upload is a later update of the same project (legacy; prefer `baseline`) */
   seriesBaseline?: SeriesBaseline | null
+  /**
+   * The resolved baseline (resolveBaseline in baseline.ts). The activities' baseline dates are
+   * replaced with it, so the variance, BEI and missed tasks all use the same baseline.
+   */
+  baseline?: ResolvedBaseline | null
   /** Used to name the calendar float is counted on */
   calendars?: WorkCalendar[]
   defaultCalendarId?: string | null
   /** The file's own progress option (kept in the analysis so a later change can be compared with it) */
   fileProgressMode?: ProgressMode | null
 }): ScheduleAnalysis {
-  const { activities, cpm } = input
+  const { cpm } = input
+  const rb: ResolvedBaseline | null = input.baseline ?? (input.seriesBaseline ? {
+    source: 'baseline_upload', scheduleId: input.seriesBaseline.scheduleId, label: input.seriesBaseline.label, dataDate: input.seriesBaseline.dataDate, uploadedAt: null,
+    seriesIndex: null, designated: false, starts: input.seriesBaseline.starts ?? {}, finishes: input.seriesBaseline.finishes,
+    header: `Baseline: '${input.seriesBaseline.label}'`, note: null,
+  } : null)
+  // A series Baseline given as finishes only (legacy callers) leaves the activities' own dates.
+  const activities = rb && (input.baseline || input.seriesBaseline?.starts) ? applyBaseline(input.activities, rb) : input.activities
+  const fromBaseline = rb?.source === 'baseline_upload' || rb?.source === 'p6_embedded'
   const work = activities.filter(isWork)
   const open = work.filter(isOpen)
   const hasSucc = new Set(input.links.map(l => l.from))
@@ -139,7 +157,7 @@ export function analyzeSchedule(input: {
     const f = forecastOf(fm)
     const want = input.finishMilestoneId?.trim().toLowerCase()
     finishMilestone = {
-      id: fm.id, code: fm.activityId, name: fm.name, baselineFinish: fm.baselineFinish, baselineSource: fm.baselineFinish ? 'file' : null, forecastFinish: f,
+      id: fm.id, code: fm.activityId, name: fm.name, baselineFinish: fm.baselineFinish, baselineSource: fm.baselineFinish ? (fromBaseline && input.baseline ? rb!.source as 'baseline_upload' | 'p6_embedded' : 'file') : null, forecastFinish: f,
       constraint: fm.constraintType && fm.constraintDate ? { type: fm.constraintType, date: fm.constraintDate } : null,
       varianceDays: f && fm.baselineFinish ? calDays(fm.baselineFinish, f) : null,
       designated: !!want && (want === fm.id.toLowerCase() || want === fm.activityId.toLowerCase()),
@@ -152,16 +170,17 @@ export function analyzeSchedule(input: {
   // project forecast against the latest baseline finish, but only when most activities carry a
   // baseline (a few baselined activities do not describe the project's baseline finish).
   let varianceDays: number | null = null
-  let varianceBasis = 'The file has no baseline dates, so variance cannot be measured.'
+  let varianceBasis = rb?.source === 'none' && rb.note ? `${rb.note} Variance cannot be measured.` : 'The file has no baseline dates, so variance cannot be measured.'
   const baselined = work.filter(a => a.baselineFinish)
-  const sb = input.seriesBaseline
-  const sbFinish = sb && finishMilestone ? sb.finishes[finishMilestone.code] ?? null : null
-  if (finishMilestone?.forecastFinish && sb && sbFinish) {
+  const sbFinish = fromBaseline && finishMilestone ? rb!.finishes[finishMilestone.code] ?? null : null
+  if (finishMilestone?.forecastFinish && fromBaseline && sbFinish) {
     finishMilestone.baselineFinish = sbFinish
-    finishMilestone.baselineSource = 'baseline_upload'
+    finishMilestone.baselineSource = rb!.source as 'baseline_upload' | 'p6_embedded'
     finishMilestone.varianceDays = calDays(sbFinish, finishMilestone.forecastFinish)
     varianceDays = finishMilestone.varianceDays
-    varianceBasis = `${finishMilestone.code} ${finishMilestone.name}: forecast ${fmtDate(finishMilestone.forecastFinish)} vs ${fmtDate(sbFinish)} in the Baseline upload "${sb.label}"${sb.dataDate ? ` (data date ${fmtDate(sb.dataDate)})` : ''} (calendar days).`
+    varianceBasis = rb!.source === 'baseline_upload'
+      ? `${finishMilestone.code} ${finishMilestone.name}: forecast ${fmtDate(finishMilestone.forecastFinish)} vs ${fmtDate(sbFinish)} in the Baseline upload "${rb!.label}"${rb!.dataDate ? ` (data date ${fmtDate(rb!.dataDate)})` : ''} (calendar days).`
+      : `${finishMilestone.code} ${finishMilestone.name}: forecast ${fmtDate(finishMilestone.forecastFinish)} vs ${fmtDate(sbFinish)} in the P6 project baseline "${rb!.label}" embedded in the file (calendar days).`
   } else if (finishMilestone?.varianceDays != null) {
     varianceDays = finishMilestone.varianceDays
     varianceBasis = `${finishMilestone.code} ${finishMilestone.name}: forecast ${fmtDate(finishMilestone.forecastFinish)} vs baseline ${fmtDate(finishMilestone.baselineFinish)} (calendar days).`
@@ -179,7 +198,7 @@ export function analyzeSchedule(input: {
   // just planned dates (often copied from another version), so a difference from the recalculated
   // forecast is a planning difference, not a slip. Report it in the basis, never as variance.
   const started = work.some(a => a.actualStart || a.actualFinish || a.status !== 'not_started' || a.percentComplete > 0)
-  if (!started && varianceDays != null && varianceDays !== 0 && finishMilestone?.baselineSource !== 'baseline_upload') {
+  if (!started && varianceDays != null && varianceDays !== 0 && !fromBaseline) {
     const diff = varianceDays
     varianceDays = null
     if (finishMilestone) finishMilestone.varianceDays = null
@@ -230,8 +249,8 @@ export function analyzeSchedule(input: {
     )
     if (ex) {
       const R = DEFAULT_DCMA_RULES
-      if (ex.bei < R.indexTarget) bump('attention', `Baseline execution index is ${(Math.floor(ex.bei * 100) / 100).toFixed(2)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} activities complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.`)
-      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} activities baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
+      if (roundIndex(ex.bei) < R.indexTarget) bump('attention', `Baseline execution index is ${fmtIndex(ex.bei)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} tasks complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.`)
+      if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} tasks baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
 
@@ -255,7 +274,7 @@ export function analyzeSchedule(input: {
 
   return {
     version: 1, progressMode: cpm?.progressMode ?? 'retained', fileProgressMode: input.fileProgressMode ?? null, forecastFinish, reportedFinish: input.reportedFinish, mustFinishBy: input.mustFinishBy,
-    finishMilestone, varianceDays, varianceBasis, minFloat, minFloatAt, negativeFloatCount, violations, longestPath: cpm?.longestPath ?? [],
+    finishMilestone, varianceDays, varianceBasis, baseline: rb ? summarizeBaseline(rb) : null, minFloat, minFloatAt, negativeFloatCount, violations, longestPath: cpm?.longestPath ?? [],
     status, statusReasons: reasons, recalc,
   }
 }

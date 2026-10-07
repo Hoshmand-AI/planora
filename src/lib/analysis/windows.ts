@@ -20,7 +20,7 @@ import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { completeSchedule, type CompletionResult } from '@/lib/planning/complete-schedule'
-import { baselineExecution } from '@/lib/analysis/dcma'
+import { baselineExecution, roundIndex } from '@/lib/analysis/dcma'
 
 export interface WindowUpdate {
   schedule: Pick<Schedule, 'id' | 'name' | 'version' | 'dataDate' | 'projectStart' | 'calendars' | 'defaultCalendarId'>
@@ -279,7 +279,7 @@ export function seriesTrend(updates: WindowUpdate[], finishCode: string | null):
       id: u.schedule.id, version: u.schedule.version, dataDate: u.schedule.dataDate, finishCode: fm ? fm.activityId : null,
       forecastFinish: forecast ?? null, finishFloat: fm && !fm.actualFinish ? fm.totalFloat : null,
       minFloat: u.analysis.minFloat ?? null, negativeFloatCount: u.analysis.negativeFloatCount ?? 0,
-      bei: ex ? Math.round(ex.bei * 100) / 100 : null, missed: ex ? ex.missed : null, due: ex ? ex.due : null,
+      bei: ex ? roundIndex(ex.bei) : null, missed: ex ? ex.missed : null, due: ex ? ex.due : null,
     }
   })
 }

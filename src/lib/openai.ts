@@ -236,7 +236,7 @@ Use formal, professional language suitable for presentation to project executive
 Data Date: ${schedule.dataDate} | Start: ${schedule.projectStart} | Finish: ${schedule.projectFinish}
 Activities: ${stats.total} | Critical: ${stats.critical} | Complete: ${stats.complete}
 In Progress: ${stats.inProgress} | Not Started: ${stats.notStarted}
-Variance: ${context.analysis ? `${context.analysis.varianceDays ?? 'not measurable'} calendar days (${context.analysis.varianceBasis})` : `${schedule.varianceDays ?? 'not measurable'} calendar days`}
+${context.analysis?.baseline ? `${context.analysis.baseline.header}\n` : ''}Variance: ${context.analysis ? `${context.analysis.varianceDays ?? 'not measurable'} calendar days (${context.analysis.varianceBasis})` : `${schedule.varianceDays ?? 'not measurable'} calendar days`}
 ${context.analysis ? `Status: ${context.analysis.status} — ${context.analysis.statusReasons.join(' ') || 'no issues'}\nForecast finish (recalculated): ${context.analysis.forecastFinish} | Header finish in file: ${context.analysis.reportedFinish ?? 'none'} | Required: ${context.analysis.mustFinishBy ?? 'none'}` : ''}
 ${context.comparison ? `Since the previous update (${context.comparison.before.version}): ${context.comparison.summary.join(' ')}` : ''}
 Missing Predecessors: ${stats.missingPred} | Missing Successors: ${stats.missingSucc}

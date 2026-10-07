@@ -2,6 +2,7 @@ import { Pool } from 'pg'
 import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import type { BaselineMeta } from '@/lib/analysis/baseline'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
 import type { SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
@@ -248,6 +249,10 @@ export interface Schedule {
   planoraExport?: boolean
   /** Matter / engagement workspace; null = organization-wide */
   workspaceId?: string | null
+  /** Earlier upload of the series designated as this upload's baseline; null = the upload labelled Baseline */
+  baselineScheduleId?: string | null
+  /** Embedded P6 baseline and the assessment of the file's own target dates (src/lib/analysis/baseline.ts) */
+  baselineMeta?: BaselineMeta | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -268,6 +273,8 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     historyOverride: row.history_override === true,
     planoraExport: row.planora_export === true,
     workspaceId: (row.workspace_id as string) ?? null,
+    baselineScheduleId: (row.baseline_schedule_id as string) ?? null,
+    baselineMeta: (row.baseline_meta as BaselineMeta) ?? null,
   }
 }
 
@@ -309,6 +316,18 @@ export async function updateScheduleAnalysis(id: string, orgId: string, a: { ana
   await initSchema()
   await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
     [id, orgId, JSON.stringify(a.analysis), a.projectFinish, a.varianceDays, a.criticalCount])
+}
+
+/** Designate (or clear, with null) the earlier upload this schedule's variance, BEI and reports measure against. */
+export async function setScheduleBaseline(id: string, orgId: string, baselineScheduleId: string | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET baseline_schedule_id=$3 WHERE id=$1 AND org_id=$2', [id, orgId, baselineScheduleId])
+}
+
+/** Baseline facts captured at import (embedded P6 baseline, file target assessment). */
+export async function setScheduleBaselineMeta(id: string, orgId: string, meta: BaselineMeta | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET baseline_meta=$3 WHERE id=$1 AND org_id=$2', [id, orgId, meta ? JSON.stringify(meta) : null])
 }
 
 /** Designate (or clear, with null) the schedule's contract/finish milestone. */

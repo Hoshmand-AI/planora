@@ -9,7 +9,9 @@
 //                       in an update series the windows analysis and the float / BEI trend
 //   qa_qc             — DCMA 14-point table with every offender, recalculation differences,
 //                       overruled constraints, the data questions and the reviewer's dispositions
-// Every report starts with a provenance block (source file, SHA-256, release, settings, data date).
+// Every report starts with a provenance block (source file, SHA-256, release, settings, data date)
+// and states the one baseline all of its tables, the variance and BEI / missed tasks measure against
+// (src/lib/analysis/baseline.ts): the activities' baseline dates are the resolved baseline's.
 // Dates are MM/DD/YYYY; variances are calendar days, float is work days. Pure, so it is unit tested.
 
 import type { Activity, Relationship, Schedule } from '@/lib/db'
@@ -66,6 +68,12 @@ const open = (a: Activity) => a.status !== 'complete' && !a.actualFinish
 const isWork = (a: Activity) => a.activityType !== 'summary' && a.activityType !== 'loe'
 const STATUS = { on_track: 'On track', attention: 'Needs attention', at_risk: 'At risk', complete: 'Complete' } as const
 
+/** "Baseline: Update 0 'Baseline' uploaded MM/DD/YYYY" — the source every table here measures against. */
+export function baselineLine(r: Pick<ReportInput, 'analysis' | 'activities'>): string {
+  if (r.analysis.baseline?.header) return r.analysis.baseline.header
+  return r.activities.some(a => a.baselineFinish) ? "Baseline: the file's own P6 target dates" : 'Baseline: none. The file has no baseline dates.'
+}
+
 function statusSection(r: ReportInput): string[] {
   const { analysis: an, schedule: s } = r
   const fm = an.finishMilestone
@@ -73,6 +81,7 @@ function statusSection(r: ReportInput): string[] {
     `**Status: ${STATUS[an.status]}.** ${an.statusReasons.join(' ') || 'No negative float, no overruled constraints and no slip against the baseline.'}`,
     '',
     table(['Item', 'Value'], [
+      ['Baseline', baselineLine(r).replace(/^Baseline:\s*/, '')],
       ['Data date', d(s.dataDate)],
       ['Forecast finish (Planora recalculation)', d(an.forecastFinish)],
       ['Finish written in the file header', d(an.reportedFinish)],
@@ -280,7 +289,8 @@ function variance(r: ReportInput): string[] {
   const w = r.windows
   return [
     '## 1. Overall variance', ...statusSection(r), '',
-    withBl.length ? `${withBl.length} of ${work.length} activities carry baseline dates: ${late.length} forecast or finished late, ${early.length} early, ${withBl.length - late.length - early.length} on time.` : 'The file carries no baseline dates, so activity variance cannot be measured. Export the baseline into the update (P6: assign the project baseline before export) to enable this report.',
+    withBl.length ? `${withBl.length} of ${work.length} activities have a baseline (${baselineLine(r).replace(/^Baseline:\s*/, '')}): ${late.length} forecast or finished late, ${early.length} early, ${withBl.length - late.length - early.length} on time.`
+      : `${r.analysis.baseline?.note ?? 'The file carries no baseline dates.'} Activity variance cannot be measured. Mark an upload of this project as Baseline, or export the project baseline into the update (P6: assign the project baseline before export), to enable this report.`,
     '',
     '## 2. Milestones: baseline, contract and forecast', table(MILESTONE_HEAD, milestoneRows(r)),
     '', '_Days late vs contract: forecast (or actual) minus the milestone\'s constraint date, or the required finish for the finish milestone; + = late._', '',
@@ -352,7 +362,7 @@ export function editsSection(edits: { label: string; before: string; after: stri
  * reviewer's dispositions (QA/QC).
  */
 export function reportSupplement(type: string, r: ReportInput): string {
-  const out: string[] = []
+  const out: string[] = [`**${baselineLine(r)}.** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
   if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (Planora calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
   if (type === 'qa_qc') out.push('## Reviewer disposition', ...reviewMarkdown(r.review, { dcma: r.dcma.checks.map(c => ({ id: c.id, name: c.name, result: c.result })), questions: (r.dataQuestions ?? []).filter(q => q.id).map(q => ({ id: q.id!, question: q.question })) }), '')
   if (r.provenance) out.push(...provenanceMarkdown(r.provenance))
@@ -366,6 +376,7 @@ export function buildReport(type: string, r: ReportInput): string {
   return fmtDates([
     `# ${REPORT_TITLES[t]} — ${r.schedule.name} (${r.schedule.version})`, '',
     `_Prepared by Planora from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
+    `**${baselineLine(r)}.** Every variance, milestone and activity table, BEI and missed tasks in this report measure against this baseline.`, '',
     ...(r.provenance ? provenanceMarkdown(r.provenance) : []),
     ...body,
   ].join('\n'))

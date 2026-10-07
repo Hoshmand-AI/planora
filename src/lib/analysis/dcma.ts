@@ -61,8 +61,35 @@ const CONSTRAINT_LABEL: Record<string, string> = {
   SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish',
 }
 
+/**
+ * Complete = an actual finish, status complete, or 100% where the file states no status. The status
+ * the file gives wins over percent complete: an out-of-range percent clamped to 100 on import must not
+ * turn a not-started (or in-progress) activity into a completed one.
+ */
 export function isCompleteActivity(a: AnalyzableActivity): boolean {
-  return !!a.actualFinish || a.status === 'complete' || (a.percentComplete ?? 0) >= 100
+  if (a.actualFinish || a.status === 'complete') return true
+  if (a.status === 'not_started' || a.status === 'in_progress') return false
+  return (a.percentComplete ?? 0) >= 100
+}
+
+/**
+ * The one rounding of an index (BEI) used everywhere — status text, the DCMA table, reports and the
+ * trend: 2 decimals, half up (0.945 -> 0.95, 0.9449 -> 0.94). Pass/fail is judged on the rounded value,
+ * so the number shown and the result always agree.
+ */
+export function roundIndex(v: number): number {
+  return Math.floor(v * 100 + 0.5 + 1e-9) / 100
+}
+export function fmtIndex(v: number): string {
+  return roundIndex(v).toFixed(2)
+}
+
+/**
+ * DCMA #11 / #14 population: tasks only. Milestones (start milestones such as NTP included), level of
+ * effort and WBS summaries are excluded from both the numerator and the denominator.
+ */
+function isExecutionTask(a: AnalyzableActivity): boolean {
+  return a.type === 'task'
 }
 
 function isScheduled(a: AnalyzableActivity): boolean {
@@ -138,14 +165,15 @@ function indexText(v: number, ok: boolean, target: number): string {
 }
 
 /**
- * Execution against the baseline as of the data date (DCMA #11 Missed Tasks and #14 BEI): work
- * baselined to finish strictly BEFORE the data date vs work actually finished. The data date is the
+ * Execution against the baseline as of the data date (DCMA #11 Missed Tasks and #14 BEI): tasks
+ * baselined to finish strictly BEFORE the data date vs tasks actually finished (DCMA convention:
+ * milestones, LOE and summaries are excluded from numerator and denominator alike). The data date is the
  * first day of the remaining work, so work baselined to finish on it is not yet due (DCMA guidance). Null when it cannot be measured
  * (no data date, no baselines, a fresh baseline, or nothing due yet).
  */
 export function baselineExecution(activities: AnalyzableActivity[], dataDate: string | null | undefined): { due: number; missed: number; completed: number; bei: number; dueCodes: string[]; missedCodes: string[]; openDueCodes: string[] } | null {
   if (!isValidDate(dataDate)) return null
-  const all = activities.filter(isScheduled)
+  const all = activities.filter(isExecutionTask)
   const withBaseline = all.filter((a) => isValidDate(a.baselineFinish))
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
   if (!firstBaseline || toDayNumber(dataDate) <= toDayNumber(firstBaseline)) return null
@@ -368,8 +396,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     }
   }
 
-  /* 11. Missed tasks & 14. BEI */
-  const withBaseline = all.filter((a) => isValidDate(a.baselineFinish))
+  /* 11. Missed tasks & 14. BEI (tasks only, as in baselineExecution) */
+  const withBaseline = all.filter(isExecutionTask).filter((a) => isValidDate(a.baselineFinish))
   // A fresh baseline (data date on or before the first baselined start) has nothing due yet; a
   // start milestone baselined on the data date is not "missed".
   const firstBaseline = withBaseline.map((a) => (isValidDate(a.baselineStart) ? a.baselineStart! : a.baselineFinish!)).sort()[0]
@@ -387,7 +415,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       offenders: cap(ex.missedCodes),
       explanation: ok
         ? 'Work baselined to finish before the data date has essentially all finished on time.'
-        : `${ex.missed} of ${due.length} activities baselined to finish before ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
+        : `${ex.missed} of ${due.length} tasks baselined to finish before ${fmtDate(dataDate)} finished late or not at all, which shows the plan is not being met.`,
     })
   }
 
@@ -567,14 +595,14 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
     const { completed, bei } = ex
-    const ok = bei >= R.indexTarget
-    const shown = indexText(bei, ok, R.indexTarget)
+    const ok = roundIndex(bei) >= R.indexTarget
+    const shown = fmtIndex(bei)
     add({
       id: 14, name: 'BEI', metric: shown, threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
       offenders: ok ? [] : cap(ex.openDueCodes),
       explanation: ok
-        ? `${completed} activities are complete against ${due.length} baselined to finish before the data date, so the team is keeping pace with the plan.`
-        : `Only ${completed} activities are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.`,
+        ? `${completed} tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so the team is keeping pace with the plan.`
+        : `Only ${completed} tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.`,
     })
   }
 

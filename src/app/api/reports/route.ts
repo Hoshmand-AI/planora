@@ -37,7 +37,8 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
     if (prev) {
       const side = (d: NonNullable<typeof data>): CompareSide => ({
         schedule: { id: d.schedule.id, name: d.schedule.name, version: d.schedule.version, dataDate: d.schedule.dataDate, forecastFinish: d.analysis.forecastFinish },
-        activities: d.activities, relationships: d.relationships, longestPath: d.analysis.longestPath,
+        // File to file: a change of the file's own target dates (re-baselined in P6) still shows.
+        activities: d.fileActivities, relationships: d.relationships, longestPath: d.analysis.longestPath,
         finishMilestone: d.analysis.finishMilestone ? { code: d.analysis.finishMilestone.code, forecastFinish: d.analysis.finishMilestone.forecastFinish } : null,
         calendars: d.schedule.calendars, defaultCalendarId: d.schedule.defaultCalendarId, violations: d.analysis.violations ?? [],
         logicLongestPath: d.cpm?.logicLongestPath ?? [], logicFinish: d.cpm?.logicFinish ?? null,
