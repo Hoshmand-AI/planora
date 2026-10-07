@@ -6,6 +6,7 @@ import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleById, getScheduleFileMeta, getScheduleSeries } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
 import { compareSchedules, orderSeries, pickDefaultBase, type CompareSide } from '@/lib/analysis/compare'
+import { analyzeWindow, type WindowRow, type WindowUpdate } from '@/lib/analysis/windows'
 import { exportComparisonCsv } from '@/lib/export/csv'
 import { CSV_CUI_REFUSAL, exportMarking } from '@/lib/export/markings'
 import { isRestrictedClassification, mostRestrictive, scheduleClassification } from '@/lib/server/classification'
@@ -64,7 +65,11 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     calendars: d.schedule.calendars, defaultCalendarId: d.schedule.defaultCalendarId, violations: d.analysis.violations ?? [],
     logicLongestPath: d.cpm?.logicLongestPath ?? [], logicFinish: d.cpm?.logicFinish ?? null,
   })
-  const comparison = compareSchedules(side(b), side(a))
+  // The windows attribution of this pair, so compare's finish causes agree with the windows analysis.
+  const wu = (d: NonNullable<typeof a>): WindowUpdate => ({ schedule: d.schedule, activities: d.activities, relationships: d.relationships, analysis: d.analysis })
+  let window: WindowRow | null = null
+  try { window = analyzeWindow(wu(b), wu(a)) } catch { window = null }
+  const comparison = compareSchedules(side(b), side(a), { window })
   await audit({ action: 'schedule.compare', targetType: 'schedule', targetId: after.id, detail: { name: after.name, after: after.version, before: before.version, baseId: before.id, format } })
   const slug = `${after.name}-${before.version}-vs-${after.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'comparison'
   // CUI markings apply when either upload is CUI or classified (most restrictive wins).

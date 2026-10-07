@@ -8,7 +8,7 @@ import type { Activity, Relationship } from '@/lib/db'
 import type { ActivityChange, ScheduleComparison } from '@/lib/analysis/compare'
 import { describeCalendarChange } from '@/lib/analysis/compare'
 import type { WindowsAnalysis } from '@/lib/analysis/windows'
-import { windowsTableRows, WINDOWS_COLUMNS } from '@/lib/analysis/windows'
+import { windowDriverRows, windowsTableRows, WINDOWS_COLUMNS } from '@/lib/analysis/windows'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { neutralizeFormula } from './csv'
 import { addProvenance, type Provenance } from './provenance'
@@ -81,22 +81,23 @@ export async function exportComparisonXlsx(c: ScheduleComparison, prov: Provenan
     { k: 'Later update', v: `${c.after.version} — data date ${fmtDate(c.after.dataDate)}, forecast finish ${fmtDate(c.after.forecastFinish)}` },
     { k: `Finish movement (calendar days)${c.finishActivity ? `, on ${c.finishActivity}` : ''}`, v: c.finishMovement ?? '—' },
     ...(c.finishBasis.after ? [{ k: 'Constrained vs logic-driven finish (later)', v: `${c.finishBasis.after.type} ${fmtDate(c.finishBasis.after.constrainedFinish)} vs logic ${fmtDate(c.finishBasis.after.logicFinish)} (${c.finishBasis.after.days} wd)` }] : []),
-    ...c.finishCauses.map((x, i) => ({ k: i === 0 ? 'Finish movement causes' : '', v: `${x.code}: ${x.detail}` })),
+    ...(c.windowAttribution ? [{ k: 'Logic-driven finish movement, windows attribution (cd)', v: c.windowAttribution.movement ?? '—' }, { k: 'Finish movement as scheduled, windows attribution (cd)', v: c.windowAttribution.asScheduledMovement ?? '—' }] : []),
+    ...c.finishCauses.map((x, i) => ({ k: i === 0 ? 'Finish movement causes' : '', v: `${x.code ? `${x.code}: ` : ''}${x.days != null ? `${x.days > 0 ? '+' : ''}${x.days} cd${x.workDays != null ? ` (${x.workDays > 0 ? '+' : ''}${x.workDays} wd)` : ''} — ` : ''}${x.detail}` })),
     ...c.summary.map((x, i) => ({ k: i === 0 ? 'Summary' : '', v: x })),
   ])
   const actCols: Col[] = [{ header: 'Activity ID', key: 'code', width: 14 }, { header: 'Activity Name', key: 'name', width: 44 }, ...ddCols]
   addSheet(wb, 'Added', actCols, c.added.map(x => ({ ...x, ...dd })))
   addSheet(wb, 'Deleted', actCols, c.deleted.map(x => ({ ...x, ...dd })))
-  const chCols: Col[] = [{ header: 'Activity ID', key: 'code', width: 14 }, { header: 'Activity Name', key: 'name', width: 44 }, { header: 'Field', key: 'field', width: 16 },
-    { header: bLabel, key: 'before', width: 26 }, { header: aLabel, key: 'after', width: 26 }, { header: 'Change (days)', key: 'delta', width: 12 }, ...ddCols]
-  const ch = (xs: ActivityChange[]) => xs.map(x => ({ code: x.code, name: x.name, field: x.field.replace(/_/g, ' '), before: x.before, after: x.after, delta: x.delta, ...dd }))
+  const chCols: Col[] = [{ header: 'Activity ID', key: 'code', width: 14 }, { header: 'Activity Name', key: 'name', width: 44 }, { header: 'Calendar', key: 'calendar', width: 18 }, { header: 'Field', key: 'field', width: 16 },
+    { header: bLabel, key: 'before', width: 26 }, { header: aLabel, key: 'after', width: 26 }, { header: 'Change', key: 'delta', width: 10 }, { header: 'Unit (wd = work days, cd = calendar days)', key: 'unit', width: 12 }, ...ddCols]
+  const ch = (xs: ActivityChange[]) => xs.map(x => ({ code: x.code, name: x.name, calendar: x.calendar ?? '', field: x.field.replace(/_/g, ' '), before: x.before, after: x.after, delta: x.delta, unit: x.unit ?? '', ...dd }))
   const by = (...f: ActivityChange['field'][]) => c.changes.filter(x => f.includes(x.field))
   addSheet(wb, 'Durations', chCols, ch(by('duration', 'remaining')))
   addSheet(wb, 'Dates', chCols, ch(by('start', 'finish')))
   addSheet(wb, 'Constraints', chCols, ch(by('constraint')))
   addSheet(wb, 'Calendars', chCols, [
     ...ch(by('calendar')),
-    ...c.calendarChanges.map(k => ({ code: '', name: describeCalendarChange(k), field: `calendar ${k.field.replace(/_/g, ' ')}`, before: k.before, after: k.after, delta: null, ...dd })),
+    ...c.calendarChanges.map(k => ({ code: '', name: describeCalendarChange(k), calendar: k.calendar, field: `calendar ${k.field.replace(/_/g, ' ')}`, before: k.before, after: k.after, delta: null, ...dd })),
   ])
   addSheet(wb, 'Logic', [{ header: 'Change', key: 'kind', width: 14 }, { header: 'Predecessor', key: 'pred', width: 14 }, { header: 'Successor', key: 'succ', width: 14 }, { header: 'Type', key: 'type', width: 8 },
     { header: `Lag ${bLabel}`, key: 'before', width: 22 }, { header: `Lag ${aLabel}`, key: 'after', width: 22 }, ...ddCols], [
@@ -122,7 +123,13 @@ export async function exportComparisonXlsx(c: ScheduleComparison, prov: Provenan
 export async function exportWindowsXlsx(w: WindowsAnalysis, prov: Provenance, title: string, marking?: ExportMarking | null): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   addProvenance(wb, prov, `Windows analysis — ${title}`)
-  addSheet(wb, 'Windows', WINDOWS_COLUMNS.map(c => ({ header: c.label, key: c.key, date: c.date, width: c.key === 'notes' ? 60 : c.key.startsWith('driving') ? 26 : undefined })), windowsTableRows(w))
+  addSheet(wb, 'Windows', WINDOWS_COLUMNS.map(c => ({ header: c.label, key: c.key, date: c.date, width: c.key === 'notes' || c.key === 'drivers' ? 60 : c.key.startsWith('driving') || c.key.startsWith('logicPath') || c.key === 'hidden' ? 30 : undefined })), windowsTableRows(w))
+  addSheet(wb, 'Drivers', [
+    { header: 'Window', key: 'window', width: 8 }, { header: 'Later update', key: 'after', width: 18 }, { header: 'Activity ID', key: 'code', width: 14 }, { header: 'Activity Name', key: 'name', width: 40 },
+    { header: 'Finish movement (cd)', key: 'days', width: 12 }, { header: 'Finish movement (wd, activity calendar)', key: 'workDays', width: 14 },
+    { header: 'Finish, earlier (logic)', key: 'before', date: true }, { header: 'Finish, later (logic)', key: 'afterFinish', date: true },
+    { header: 'Changes', key: 'changes', width: 60 }, { header: 'Hidden as scheduled by', key: 'hiddenBy', width: 14 },
+  ], windowDriverRows(w))
   addSheet(wb, 'Trend', [
     { header: 'Update', key: 'version', width: 18 }, { header: 'Data date', key: 'dataDate', date: true }, { header: 'Finish milestone', key: 'finishCode', width: 14 },
     { header: 'Finish forecast', key: 'forecastFinish', date: true }, { header: 'Finish float (wd)', key: 'finishFloat', width: 12 }, { header: 'Lowest float (wd)', key: 'minFloat', width: 12 },

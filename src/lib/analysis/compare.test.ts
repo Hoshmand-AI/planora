@@ -4,6 +4,9 @@ import { makeActivity } from '@/lib/parsers/types'
 import type { WorkCalendar } from '@/lib/planning/types'
 import { compareSchedules, orderSeries, pickDefaultBase, type CompareSide } from '@/lib/analysis/compare'
 import { exportComparisonCsv } from '@/lib/export/csv'
+import { completeSchedule } from '@/lib/planning/complete-schedule'
+import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
+import { analyzeWindow, type WindowUpdate } from '@/lib/analysis/windows'
 
 const a = (sched: string, code: string, f: Partial<Activity> = {}) => makeActivity(sched, { activityId: code, name: code, duration: 5, ...f })
 const rel = (sched: string, p: Activity, s: Activity, lag = 0): Relationship => ({ id: `${p.id}${s.id}`, scheduleId: sched, predecessorId: p.id, successorId: s.id, type: 'FS', lag })
@@ -156,5 +159,61 @@ describe('comparison CSV', () => {
     expect(lines[0]).toBe('Category,Activity ID,Activity Name,Field,Before (Update 5),After (Update 6),Change (days)')
     expect(csv).toContain(`Changed,"'=HYPERLINK(""x"")","'=HYPERLINK(""x"")",finish,03/20/2026,03/25/2026,5`)
     expect(csv).not.toMatch(/(^|,)=HYPERLINK/m)
+  })
+})
+
+describe('compare and windows agree on a pair', () => {
+  const cal: WorkCalendar = { id: 'c1', name: 'Standard 5-Day', workDays: [1, 2, 3, 4, 5], hoursPerDay: 8, holidays: [] }
+  // An update as the routes load it: Planora's recalculated dates and analysis.
+  function load(id: string, version: string, dataDate: string, acts: Partial<Activity>[], links: [string, string][]) {
+    const activities = acts.map(f => makeActivity(id, { calendarId: cal.id, name: f.activityId, ...f }))
+    const byCode = new Map(activities.map(x => [x.activityId, x]))
+    const relationships: Relationship[] = links.map(([p, s], i) => ({ id: `${id}r${i}`, scheduleId: id, predecessorId: byCode.get(p)!.id, successorId: byCode.get(s)!.id, type: 'FS', lag: 0 }))
+    const done = completeSchedule({ activities, relationships, calendars: [cal], defaultCalendarId: cal.id, projectStart: '2026-03-02', projectFinish: null, dataDate })
+    const analysis = analyzeSchedule({ activities: done.activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm, reportedFinish: null, mustFinishBy: null, dataDate })
+    const wu: WindowUpdate = { schedule: { id, name: 'Riverside', version, dataDate, projectStart: '2026-03-02', calendars: [cal], defaultCalendarId: cal.id }, activities: done.activities, relationships, analysis }
+    const cs: CompareSide = {
+      schedule: { id, name: 'Riverside', version, dataDate, forecastFinish: analysis.forecastFinish }, activities: done.activities, relationships, longestPath: analysis.longestPath,
+      finishMilestone: analysis.finishMilestone ? { code: analysis.finishMilestone.code, forecastFinish: analysis.finishMilestone.forecastFinish } : null,
+      calendars: [cal], defaultCalendarId: cal.id, violations: analysis.violations ?? [], logicLongestPath: done.cpm?.logicLongestPath ?? [], logicFinish: done.cpm?.logicFinish ?? null,
+    }
+    return { wu, cs }
+  }
+  // F900 is driven by A100 -> B200. P500 -> M600 (Mandatory Finish, overruled) -> Z700 is a separate
+  // chain that finishes later but does not feed F900.
+  const FIN = { activityId: 'F900', name: 'Substantial Completion', activityType: 'milestone' as const, duration: 0 }
+  const M = { activityId: 'M600', duration: 5, constraintType: 'MFO' as const, constraintDate: '2026-04-03' }
+  const links: [string, string][] = [['A100', 'B200'], ['B200', 'F900'], ['P500', 'M600'], ['M600', 'Z700']]
+  const e = load('E', 'Update 1', '2026-03-02', [{ activityId: 'A100', duration: 5 }, { activityId: 'B200', duration: 10 }, FIN, { activityId: 'P500', duration: 40 }, M, { activityId: 'Z700', duration: 5 }], links)
+  const l = load('L', 'Update 2', '2026-03-09', [
+    { activityId: 'A100', duration: 5, actualStart: '2026-03-02', actualFinish: '2026-03-06', status: 'complete', remainingDuration: 0, percentComplete: 100 },
+    { activityId: 'B200', duration: 12 }, FIN, { activityId: 'P500', duration: 60 }, M, { activityId: 'Z700', duration: 5 },
+  ], links)
+  const w = analyzeWindow(e.wu, l.wu)
+  const withW = compareSchedules(e.cs, l.cs, { window: w })
+  const without = compareSchedules(e.cs, l.cs)
+
+  it('lists only causes on the driving path to the finish, adding up to the windows movement', () => {
+    expect(w.finishCode).toBe('F900')
+    expect(w.movement).toBe(4)
+    expect(withW.finishMovement).toBe(w.movement)
+    expect(withW.finishCauses).toEqual([expect.objectContaining({ kind: 'driving_duration', code: 'B200', days: 4, workDays: 2, delta: 2 })])
+    const total = withW.finishCauses.reduce((t, c) => t + (c.days ?? 0), 0)
+    expect(total).toBe(w.movement)
+    expect(withW.windowAttribution).toMatchObject({ finishCode: 'F900', movement: 4, unattributed: 0 })
+    expect(withW.summary.join(' ')).toMatch(/Windows attribution for this pair \(calendar days; they add up to the \+4 movement of the F900 logic-driven finish\): B200 \+4 \(original duration 10 → 12 wd\)/)
+  })
+  it('without the windows attribution, still leaves out work behind an overruled mandatory constraint', () => {
+    expect(without.finishCauses.map(c => c.code)).not.toContain('P500')
+    expect(without.finishCauses.filter(c => c.kind === 'driving_duration').map(c => c.code)).toEqual(['B200'])
+  })
+  it('measures the latest-finishing activity on the activity dates and labels units and calendars', () => {
+    // P500 (the predecessor the MFO on M600 overrules) finishes last on the activity dates.
+    const p = l.cs.activities.find(x => x.activityId === 'P500')!
+    expect(withW.latestFinish).toEqual({ before: { code: 'P500', date: '2026-04-24' }, after: { code: 'P500', date: p.earlyFinish } })
+    expect(withW.projectFinishMovement).toBe(Math.round((Date.parse(p.earlyFinish!) - Date.parse('2026-04-24')) / 86_400_000))
+    expect(withW.summary.join(' ')).toMatch(/The latest-finishing activity \(P500\) moved \d+ calendar days later \(04\/24\/2026 → \d\d\/\d\d\/2026, Planora's recalculated activity dates\)/)
+    expect(withW.changes.find(c => c.code === 'B200' && c.field === 'duration')).toMatchObject({ unit: 'wd', calendar: 'Standard 5-Day', delta: 2 })
+    expect(withW.changes.find(c => c.code === 'B200' && c.field === 'finish')).toMatchObject({ unit: 'cd', delta: 4 })
   })
 })

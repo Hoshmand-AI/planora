@@ -16,7 +16,8 @@ import { fmtDate } from '@/lib/format'
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 /**
- * Windows analysis of an update series. GET ?id=<any upload in the series>[&format=json|csv|xlsx].
+ * Windows analysis of an update series. GET ?id=<any upload in the series>[&format=json|csv|xlsx][&reissues=include].
+ * A reissue (same data date) supersedes the earlier upload of that period unless reissues=include.
  * Per consecutive pair of updates (by data date): data dates, finish-milestone movement (calendar
  * days), driving-path start/end, and the movement split into progress, added/deleted activities and
  * revisions (logic, durations, constraints, calendars) by half-step recalculation; plus the
@@ -40,7 +41,9 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     const message = 'A windows analysis needs at least two uploads of this project. Upload the next update with the same P6 project ID (or MS Project title).'
     return format === 'json' ? NextResponse.json({ windows: null, message }) : NextResponse.json({ error: message }, { status: 404 })
   }
-  const w = analyzeWindows(updates.map((d): WindowUpdate => ({ schedule: d.schedule, activities: d.activities, relationships: d.relationships, analysis: d.analysis })))
+  // A reissue with the same data date supersedes the earlier upload unless ?reissues=include.
+  const includeReissues = req.nextUrl.searchParams.get('reissues') === 'include'
+  const w = analyzeWindows(updates.map((d): WindowUpdate => ({ schedule: d.schedule, activities: d.activities, relationships: d.relationships, analysis: d.analysis })), { includeReissues })
   if (truncated) w.notes.unshift(`The series has ${total} uploads; the latest ${MAX_WINDOW_UPDATES} are analyzed.`)
   await audit({ action: 'schedule.windows', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, updates: updates.length, format } })
 
@@ -59,5 +62,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     const buf = await exportWindowsXlsx(w, prov, schedule.name, exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name }))
     return new NextResponse(buf as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${slug}.xlsx"` } })
   }
-  return NextResponse.json({ windows: w, series: updates.map(d => ({ id: d.schedule.id, version: d.schedule.version, dataDate: d.schedule.dataDate })) })
+  const superseded = new Set(w.series.flatMap(p => p.superseded.map(x => x.id)))
+  const perDate = new Map(w.series.map(p => [p.dataDate, p.uploads]))
+  return NextResponse.json({ windows: w, series: updates.map(d => ({ id: d.schedule.id, version: d.schedule.version, dataDate: d.schedule.dataDate, superseded: superseded.has(d.schedule.id), uploadsWithDataDate: perDate.get(d.schedule.dataDate) ?? 1 })) })
 })
