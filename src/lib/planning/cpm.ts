@@ -86,6 +86,12 @@ interface Node {
   /** mandatory constraint: pinned early start/finish instants before data-date clamping (= late dates) */
   pinEs: number
   pinEf: number
+  /**
+   * mandatory activity: early dates its predecessors alone would give it (no data-date floor, no
+   * constraint); NaN when it has no predecessors (nothing but the constraint and the data date drives it)
+   */
+  predEs: number
+  predEf: number
   tf: number
   ff: number
 }
@@ -171,12 +177,16 @@ export function runCpm(input: CpmInput): CpmResult {
     }
     idx.set(a.id, nodes.length)
     const isMs = a.type === 'milestone'
-    const dur = isMs ? 0 : Math.max(0, Math.ceil(Number(a.duration) || 0))
     const af = dateNum(a.actualFinish), as = dateNum(a.actualStart)
     if (a.actualFinish && Number.isNaN(af)) warnings.push(`Activity ${a.code}: invalid actual finish '${a.actualFinish}' ignored.`)
     if (a.actualStart && Number.isNaN(as)) warnings.push(`Activity ${a.code}: invalid actual start '${a.actualStart}' ignored.`)
     const state: Node['state'] = !Number.isNaN(af) || (isMs && !Number.isNaN(as)) ? 'complete' : !Number.isNaN(as) ? 'progress' : 'open'
-    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, logicResume: 0, drvEs: 0, drvEf: 0, mand: false, pinEs: 0, pinEf: 0, tf: 0, ff: 0 })
+    // A not-started activity is scheduled on its remaining duration when one is given (P6 schedules
+    // remaining, which can differ from the original before work starts); 0 / absent = original.
+    const rem0 = Number(a.remaining)
+    const openRem = state === 'open' && a.remaining != null && Number.isFinite(rem0) && rem0 > 0
+    const dur = isMs ? 0 : Math.max(0, Math.ceil(openRem ? rem0 : Number(a.duration) || 0))
+    nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, logicResume: 0, drvEs: 0, drvEf: 0, mand: false, pinEs: 0, pinEf: 0, predEs: NaN, predEf: NaN, tf: 0, ff: 0 })
   }
   const n = nodes.length
 
@@ -292,28 +302,34 @@ export function runCpm(input: CpmInput): CpmResult {
     }
     let startLB = lower, finishLB = -INF
     let startLBL = lower, finishLBL = -INF
+    // What the (scheduled) predecessors alone require, without the data-date floor: a mandatory
+    // constraint's logic date and overrun are measured from this, never from the data date.
+    let startP = -INF, finishP = -INF
     for (const e of ins[i]) {
       const ed = edges[e]
       const p = nodes[ed.from]
       switch (ed.type) {
         case 'FS':
-          startLB = Math.max(startLB, shift(p.ef, ed.lag, p.c))
+          startP = Math.max(startP, shift(p.ef, ed.lag, p.c))
           startLBL = Math.max(startLBL, shift(p.logicEf, ed.lag, p.c))
           break
         case 'SS':
-          startLB = Math.max(startLB, shift(p.es, ed.lag, p.c))
+          startP = Math.max(startP, shift(p.es, ed.lag, p.c))
           startLBL = Math.max(startLBL, shift(p.logicEs, ed.lag, p.c))
           break
         case 'FF':
-          finishLB = Math.max(finishLB, shift(p.ef, ed.lag, p.c))
+          finishP = Math.max(finishP, shift(p.ef, ed.lag, p.c))
           finishLBL = Math.max(finishLBL, shift(p.logicEf, ed.lag, p.c))
           break
         case 'SF':
-          finishLB = Math.max(finishLB, shift(p.es, ed.lag, p.c))
+          finishP = Math.max(finishP, shift(p.es, ed.lag, p.c))
           finishLBL = Math.max(finishLBL, shift(p.logicEs, ed.lag, p.c))
           break
       }
     }
+    startLB = Math.max(startLB, startP)
+    finishLB = finishP
+    const hasPredBound = startP > -INF || finishP > -INF
     const k = a.constraint
     const kd = constraintDay(node)
     const hasK = !!k && !Number.isNaN(kd)
@@ -360,6 +376,7 @@ export function runCpm(input: CpmInput): CpmResult {
       let t: number
       if (node.mand) {
         node.drvEs = node.drvEf = place(startLB, finishLB)
+        if (hasPredBound) node.predEs = node.predEf = msSnap(node, Math.max(startP, finishP))
         node.pinEs = node.pinEf = msSnap(node, ki)
         t = ki
         if (t < lower) {
@@ -391,6 +408,12 @@ export function runCpm(input: CpmInput): CpmResult {
     if (node.mand) {
       node.drvEs = placeTask(startLB, finishLB)
       node.drvEf = taskFinish(node.drvEs, node.dur, c) + 1
+      if (hasPredBound) {
+        let ps = startP > -INF ? c.next(startP) : -INF
+        if (finishP > -INF) ps = Math.max(ps, taskStart(c.next(finishP - 1), node.dur, c))
+        node.predEs = ps
+        node.predEf = taskFinish(ps, node.dur, c) + 1
+      }
       s = k!.type === 'MSO' ? c.next(kd) : taskStart(c.prev(kd), node.dur, c)
       node.pinEs = s
       node.pinEf = taskFinish(s, node.dur, c) + 1
@@ -494,13 +517,20 @@ export function runCpm(input: CpmInput): CpmResult {
   for (let i = 0; i < n; i++) {
     const node = nodes[i]
     const k = node.a.constraint
-    if (!node.mand || !k) continue
-    const over = node.isMs ? wdInstants(node.es, node.drvEs, node.c) : wdInstants(node.ef, node.drvEf, node.c)
+    if (!node.mand || !k || Number.isNaN(node.predEs)) continue
+    // Measured from the date the predecessors drive it to (not from the data date, which only
+    // floors the displayed date) back to the constraint date itself (where its late dates sit).
+    const over = node.isMs || k.type === 'MSO' ? wdInstants(node.pinEs, node.predEs, node.c) : wdInstants(node.pinEf, node.predEf, node.c)
     if (over <= 0) continue
     // As P6, the constrained activity keeps the float of its pinned dates; the overrun shows as
     // negative float on its predecessors (their late dates follow the pinned dates).
-    const logicDay = node.isMs ? msDisplay(node, node.drvEs) : k.type === 'MSO' ? node.drvEs : node.drvEf - 1
-    violations.push({ id: node.a.id, type: k.type as 'MSO' | 'MFO', constraintDate: k.date, logicDate: fromDayNumber(logicDay), days: over })
+    const logicStart = node.isMs ? msDisplay(node, node.predEs) : node.predEs
+    const logicFinishDay = node.isMs ? logicStart : node.predEf - 1
+    violations.push({
+      id: node.a.id, type: k.type as 'MSO' | 'MFO', constraintDate: k.date,
+      logicDate: fromDayNumber(k.type === 'MSO' ? logicStart : logicFinishDay), days: over,
+      logicStart: fromDayNumber(logicStart), logicFinish: fromDayNumber(logicFinishDay),
+    })
     warnings.push(`Activity ${node.a.code}: mandatory ${k.type === 'MSO' ? 'start' : 'finish'} ${k.date} overrules logic by ${over} work day${over === 1 ? '' : 's'}.`)
   }
   const linkFloat: CpmLinkFloat[] | null = input.linkFloat ? [] : null
@@ -573,8 +603,22 @@ export function runCpm(input: CpmInput): CpmResult {
   // constraints are judged on the logic dates they overrule, so the walk follows the sequence
   // logic alone would produce.
   const isPinned = (q: Node) => q.mand && q.state === 'open' && (q.isMs ? q.es !== q.drvEs : q.ef !== q.drvEf)
-  const walk = (endIdx: number, eligible: (i: number) => boolean, mode: 'scheduled' | 'logic'): { path: string[]; stop: number } => {
+  // A constraint that can set an early date (P6 ignores start constraints once work has started).
+  const softHold = (q: Node) => {
+    const k = q.a.constraint
+    if (!k || q.state === 'complete') return false
+    if (q.state === 'progress') return k.type === 'FNET' || k.type === 'FO'
+    return k.type === 'SNET' || k.type === 'SO' || k.type === 'FNET' || k.type === 'FO'
+  }
+  /**
+   * through = false: P6 longest path (stops where a constraint, not logic, sets the date).
+   * through = true: the logic driving path behind it: where a constraint holds an activity (no
+   * predecessor drives it), the walk continues to the predecessor that comes closest to driving it,
+   * and records the constraint in `held`.
+   */
+  const walk = (endIdx: number, eligible: (i: number) => boolean, mode: 'scheduled' | 'logic', through = false): { path: string[]; stop: number; held: number[] } => {
     const path: string[] = []
+    const held: number[] = []
     const visited = new Uint8Array(n)
     let cur = endIdx
     let stop = -1
@@ -582,11 +626,17 @@ export function runCpm(input: CpmInput): CpmResult {
       visited[cur] = 1
       path.push(nodes[cur].a.id)
       const q = nodes[cur]
-      if (mode === 'scheduled' && isPinned(q)) { stop = cur; break }
+      const pinned = isPinned(q)
+      if (mode === 'scheduled' && pinned && !through) { stop = cur; break }
+      // In logic mode the pinned activity sits at its logic dates; flag the constraint it overrules.
+      if (mode === 'logic' && pinned) held.push(cur)
       const qEs = mode === 'logic' ? q.logicEs : q.es
       const qEf = mode === 'logic' ? q.logicEf : q.ef
       let best = -1
       let bestScore = INF
+      // the closest non-driving predecessor (for through = true)
+      let near = -1
+      let nearGap = INF
       for (const e of ins[cur]) {
         const ed = edges[e]
         const p = nodes[ed.from]
@@ -596,17 +646,24 @@ export function runCpm(input: CpmInput): CpmResult {
         const src = ed.type === 'FS' || ed.type === 'FF' ? (mode === 'logic' ? p.logicEf : p.ef) : (mode === 'logic' ? p.logicEs : p.es)
         const bound = shift(src, ed.lag, p.c)
         let driving: boolean
-        if (q.isMs) driving = msSnap(q, bound) >= qEs
-        else if (startLink) driving = q.c.next(bound) >= (q.state === 'progress' ? (mode === 'logic' ? q.logicResume : q.resume) : qEs)
-        else driving = q.c.next(bound - 1) + 1 >= qEf
+        let gap: number
+        if (q.isMs) { const t = msSnap(q, bound); driving = t >= qEs; gap = qEs - t }
+        else if (startLink) { const t = q.c.next(bound); const at = q.state === 'progress' ? (mode === 'logic' ? q.logicResume : q.resume) : qEs; driving = t >= at; gap = at - t }
+        else { const t = q.c.next(bound - 1) + 1; driving = t >= qEf; gap = qEf - t }
+        const score = p.tf * 1e6 - p.ef
+        if (gap < nearGap || (gap === nearGap && near >= 0 && score < nodes[near].tf * 1e6 - nodes[near].ef)) { nearGap = gap; near = ed.from }
+        if (mode === 'scheduled' && pinned) continue
         if (!driving) continue
         // prefer the most critical driver; on ties, the one that finishes latest
-        const score = p.tf * 1e6 - p.ef
         if (score < bestScore) { bestScore = score; best = ed.from }
+      }
+      if (through && best < 0 && near >= 0 && (pinned || softHold(q))) {
+        if (mode === 'scheduled' || !pinned) held.push(cur)
+        best = near
       }
       cur = best
     }
-    return { path: path.reverse(), stop }
+    return { path: path.reverse(), stop, held: held.reverse() }
   }
 
   let critEnd = -1
@@ -641,9 +698,36 @@ export function runCpm(input: CpmInput): CpmResult {
   const logicFinish = logicEnd >= 0
     ? fromDayNumber(nodes[logicEnd].isMs ? msDisplay(nodes[logicEnd], nodes[logicEnd].logicEs) : nodes[logicEnd].logicEf - 1)
     : projectFinish
+  // The driving path to present: when a mandatory constraint hides a later logic-driven finish, the
+  // path to that finish; otherwise the scheduled longest path. Either way traced back through any
+  // constraint that holds an activity (instead of stopping there), with those constraints flagged.
+  const logicBasis = violations.length > 0 && logicEnd >= 0 && nodes[logicEnd].logicEf > longEf
+  const trace = logicBasis ? walk(logicEnd, () => true, 'logic', true) : longEnd >= 0 ? walk(longEnd, () => true, 'scheduled', true) : { path: [], stop: -1, held: [] }
+  const drivingTrace: NonNullable<CpmResult['drivingTrace']> = {
+    basis: logicBasis ? 'logic' : 'scheduled',
+    path: trace.path,
+    constraints: trace.held.map((i) => {
+      const q = nodes[i]
+      const k = q.a.constraint!
+      const later = q.mand ? (q.isMs ? q.es > q.drvEs : q.ef > q.drvEf) : true
+      return { id: q.a.id, type: k.type, date: k.date, effect: later ? 'later' as const : 'earlier' as const }
+    }),
+  }
+  // Per-activity logic-driven dates (mandatory constraints relaxed network-wide), where they differ
+  // from the scheduled ones.
+  const logicTimes: NonNullable<CpmResult['logicTimes']> = {}
+  for (let i = 0; i < n; i++) {
+    const node = nodes[i]
+    if (node.state === 'complete') continue
+    const es = node.isMs ? msDisplay(node, node.logicEs) : node.state === 'progress' ? node.es : node.logicEs
+    const ef = node.isMs ? es : node.logicEf - 1
+    const t = times[node.a.id]
+    const esS = fromDayNumber(es), efS = fromDayNumber(ef)
+    if (esS !== t.earlyStart || efS !== t.earlyFinish) logicTimes[node.a.id] = { earlyStart: esS, earlyFinish: efS }
+  }
 
   return {
-    times, projectFinish, logicFinish, criticalPath, longestPath, logicLongestPath,
+    times, projectFinish, logicFinish, criticalPath, longestPath, logicLongestPath, logicTimes, drivingTrace,
     ...(longestPathConstraint ? { longestPathConstraint } : {}),
     violations, ...(linkFloat ? { linkFloat } : {}), progressMode: retained ? 'retained' : 'override', cycles, warnings: Array.from(new Set(warnings)),
   }

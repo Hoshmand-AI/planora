@@ -57,6 +57,9 @@ function c(category: CanonicalCategory, name: string, duration: Dur, preds: P[],
 
 interface FrontOpts {
   design?: [string, string, string, string]
+  /** Durations of the four design steps and the primary-materials fabrication, when the type differs */
+  designDur?: [Dur, Dur, Dur, Dur]
+  procurementDur?: Dur
   mobilization?: string
   /** Extra predecessors of mobilization (work-plan approval, EPCm contract award) */
   mobilizationAfter?: string[]
@@ -64,16 +67,17 @@ interface FrontOpts {
 
 function front(o: FrontOpts = {}): Node[] {
   const [sd, dd, cd, rev] = o.design ?? ['Preliminary engineering / 30% design', '60% design', '90% / final design (plans, specifications & estimate)', 'Owner / agency design review & comment resolution']
+  const [dsd, ddd, dcd, drev] = o.designDur ?? [d(30, 0.6, 20, 120), d(35, 0.6, 25, 150), d(40, 0.8, 30, 180), d(25, 0.2, 20, 60)]
   return [
     c('ntp', 'Notice to Proceed', MS, [], { milestone: true }),
-    c('design_sd', sd, d(30, 0.6, 20, 120), [fs('ntp')]),
-    c('design_dd', dd, d(35, 0.6, 25, 150), [fs('design_sd')]),
-    c('design_cd', cd, d(40, 0.8, 30, 180), [fs('design_dd')]),
-    c('design_review', rev, d(25, 0.2, 20, 60), [fs('design_cd')]),
+    c('design_sd', sd, dsd, [fs('ntp')]),
+    c('design_dd', dd, ddd, [fs('design_sd')]),
+    c('design_cd', cd, dcd, [fs('design_dd')]),
+    c('design_review', rev, drev, [fs('design_cd')]),
     c('permit_site', 'Environmental & site permits (placeholder)', d(40, 0.2, 20, 120), [fs('design_dd')],
       { note: 'Replaced by the regional and federal permit activities (NEPA, Section 404/401, NPDES, agency agreements).' }),
     c('submittals', 'Submittals & shop drawings — primary materials', d(25, 0.2, 20, 60), [fs('design_review')]),
-    c('procurement', 'Fabrication & delivery — primary materials', d(50, 0.6, 40, 200), [fs('submittals')],
+    c('procurement', 'Fabrication & delivery — primary materials', o.procurementDur ?? d(50, 0.6, 40, 200), [fs('submittals')],
       { note: 'Specific long-lead items (girders, special trackwork, pumps, transformers) get their own activities.' }),
     c('mobilization', o.mobilization ?? 'Mobilization, field office & erosion and sediment controls', d(10, 0.05, 5, 25),
       [fs('permit_site'), fs('design_review'), ...(o.mobilizationAfter ?? []).map(k => fs(k))]),
@@ -127,8 +131,12 @@ function highway(o: CivilOptions): Node[] {
       o.inWater !== false ? [fs(inWater)] : s === 1 ? [ss('earthwork', 10), fs(demo)] : [fs(sw), fs(demo)]))
     out.push(
       n(`abutments_s${s}`, 'substructure', `Abutments & wingwalls${stage(s)} (crew A)`, share(S, 15, 0.5, 8, 110), [fs(deep)]),
+      n(`abutments_cure_s${s}`, 'concrete_cure', `Abutment & bridge-seat cure to bearing-setting strength — 7 calendar days${stage(s)}`, fixed(7), [fs(`abutments_s${s}`)],
+        { calendar: '7d', note: 'Bearings and girders are set once the bridge seats reach the specified strength (cylinder breaks); cure runs on calendar days.' }),
       n(`piers_s${s}`, 'substructure', `Piers & pier caps${stage(s)} (crew B, in parallel with crew A)`, share(S, 20, 0.7, 10, 120), [fs(deep)]),
-      n(`superstructure_s${s}`, 'superstructure', `Set girders, bearings & diaphragms${stage(s)}`, share(S, 15, 0.5, 8, 90), [fs(`abutments_s${s}`), fs(`piers_s${s}`), fs('procurement')]),
+      n(`piers_cure_s${s}`, 'concrete_cure', `Pier cap cure to bearing-setting strength — 7 calendar days${stage(s)}`, fixed(7), [fs(`piers_s${s}`)],
+        { calendar: '7d', note: 'Pier caps carry the girders: no erection until the caps reach the specified strength; cure runs on calendar days.' }),
+      n(`superstructure_s${s}`, 'superstructure', `Set girders, bearings & diaphragms${stage(s)}`, share(S, 15, 0.5, 8, 90), [fs(`abutments_cure_s${s}`), fs(`piers_cure_s${s}`), fs('procurement')]),
       n(`deck_forms_s${s}`, 'deck', `Deck forming, overhang brackets & screed rails${stage(s)}`, share(S, 10, 0.25, 5, 60), [fs(`superstructure_s${s}`)]),
       n(`deck_rebar_s${s}`, 'deck', `Deck rebar & embedments; pre-pour inspection${stage(s)}`, share(S, 8, 0.2, 4, 45), [fs(`deck_forms_s${s}`)]),
       n(`deck_pour_s${s}`, 'deck', `Deck pour & finish (bridge finishing machine)${stage(s)}`, d(2, 0.02, 1, 5), [fs(`deck_rebar_s${s}`)]),
@@ -157,23 +165,30 @@ function transit(o: CivilOptions): Node[] {
   const elevated = o.guideway === 'elevated_segmental'
   const N = Math.max(0, o.stations ?? 1)
   const st = `${N} station${N === 1 ? '' : 's'}`
+  // Trackwork answered "Not in scope" on an at-grade contract (e.g. a station rehabilitation): no
+  // subgrade / embankment, track foundations, track drainage or track installation.
+  const trackless = o.trackwork === false && !elevated
   const out: Node[] = [
     ...front(),
     c('row_utilities', 'Right-of-way, utility relocations & railroad agreements', d(45, 1.0, 30, 260), [fs('design_dd')]),
     c('traffic_control', 'Track access, outage plan & roadway worker protection (flagging)', d(10, 0.05, 5, 30), [fs('mobilization')]),
-    c('earthwork', 'Civil: subgrade, embankment & excavation', d(25, 0.6, 15, 180), [fs('mobilization'), fs('row_utilities'), fs('traffic_control')]),
-    c('drainage', 'Track drainage & underdrains', d(15, 0.3, 10, 90), [fs('earthwork')]),
   ]
+  if (!trackless) {
+    out.push(
+      c('earthwork', 'Civil: subgrade, embankment & excavation', d(25, 0.6, 15, 180), [fs('mobilization'), fs('row_utilities'), fs('traffic_control')]),
+      c('drainage', 'Track drainage & underdrains', d(15, 0.3, 10, 90), [fs('earthwork')]),
+    )
+  }
   if (N > 0) {
     out.push(n('general_orders', 'permit_other', 'General orders & track outage approvals for station and tie-in work (operating railroad)', d(30, 0, 20, 60), [fs('design_review')],
       { calendar: '7d', note: 'Outages are requested weeks ahead under the railroad\'s general-order process and granted for nights / weekends; confirm the outage calendar.' }))
   }
-  if (!elevated) {
+  if (!elevated && !trackless) {
     out.push(
       c('substructure', 'Structures: retaining walls, culverts & track foundations', d(40, 1.0, 30, 300), [ss('earthwork', 20)]),
       c('track_systems', 'Track: ballast, ties, rail & special trackwork', d(30, 0.8, 20, 220), [fs('substructure'), fs('procurement')]),
     )
-  } else {
+  } else if (elevated) {
     out.push(
       n('casting_yard', 'mobilization', 'Casting yard setup, segment molds & trial casting', d(30, 0.1, 20, 60), [fs('mobilization')]),
       c('deep_foundations', 'Guideway foundations: drilled shafts & pile caps', d(30, 0.6, 20, 250), [ss('earthwork', 10)]),
@@ -190,17 +205,17 @@ function transit(o: CivilOptions): Node[] {
   if (N > 0) {
     out.push(
       n('station_structure', 'substructure', elevated ? `Elevated station structures: platforms, canopies & mezzanines (${st})` : `Station platforms, canopies & site work (${st})`,
-        d(30 + 10 * N, 0.2, 20, 200), [elevated ? fs('substructure') : fs('drainage')]),
+        d(30 + 10 * N, 0.2, 20, 200), elevated ? [fs('substructure')] : trackless ? [fs('traffic_control'), fs('row_utilities')] : [fs('drainage')]),
       n('platform_edge', 'finishes', `Platform edges: tactile warning strips, gap fillers & ADA boarding areas — under track outages (${st})`, d(8 + 4 * N, 0.05, 8, 80), [fs('station_structure'), fs('general_orders')]),
       c('elevators', `Station ADA elevators & escalators (vertical circulation): install, test & state acceptance (${st})`, d(35 + 10 * N, 0.1, 35, 200), [fs('station_structure'), fs('procurement')],
         { note: 'Elevator and escalator acceptance by the state inspector precedes revenue service; ADA access must be in service at opening.' }),
     )
   }
   out.push(
-    c('power_equipment', 'Traction power substations & overhead contact system', d(40, 0.8, 30, 250), [ss('track_systems', 20), fs('procurement')]),
-    c('controls_scada', 'Signals, train control & communications', d(45, 0.8, 30, 250), [ss('track_systems', 30)]),
-    c('cutover', 'Weekend outages: cutovers & tie-ins to the operating line', d(10, 0.1, 5, 40), [ff('track_systems'), ff('controls_scada'), fs('general_orders')]),
-    c('startup_testing', 'Systems integration testing & pre-revenue operations', d(40, 0.3, 30, 180), [fs('power_equipment'), fs('controls_scada'), fs('cutover'), fs('drainage'), fs('platform_edge'), fs('elevators')]),
+    c('power_equipment', 'Traction power substations & overhead contact system', d(40, 0.8, 30, 250), trackless ? [fs('traffic_control'), fs('procurement')] : [ss('track_systems', 20), fs('procurement')]),
+    c('controls_scada', 'Signals, train control & communications', d(45, 0.8, 30, 250), trackless ? [fs('traffic_control')] : [ss('track_systems', 30)]),
+    c('cutover', 'Weekend outages: cutovers & tie-ins to the operating line', d(10, 0.1, 5, 40), [...(trackless ? [] : [ff('track_systems')]), ff('controls_scada'), fs('general_orders')]),
+    c('startup_testing', 'Systems integration testing & pre-revenue operations', d(40, 0.3, 30, 180), [fs('power_equipment'), fs('controls_scada'), fs('cutover'), ...(trackless ? [] : [fs('drainage')]), fs('platform_edge'), fs('elevators')]),
     c('inspections', 'Safety certification & regulator acceptance', d(15, 0.1, 10, 60), [fs('startup_testing')]),
     c('punchlist', 'Punch list', d(15, 0.1, 10, 45), [fs('startup_testing')]),
     ...completion('Substantial Completion — ready for revenue service'),
@@ -214,6 +229,8 @@ function water(o: CivilOptions): Node[] {
   const N = Math.max(1, o.wwStructures ?? 2)
   const facility = o.wwFacility ?? 'wastewater_treatment'
   const pour = (i: number) => (i === 1 ? 'process_structures' : `structure_${i}`)
+  // One concrete crew per four structures (at most three crews), each working its structures in sequence.
+  const crews = Math.min(3, Math.ceil(N / 4))
   const out: Node[] = [
     ...front(),
     c('demolition', 'Demolition of existing process units', d(15, 0.2, 10, 60), [fs('mobilization')], { scopes: REHAB }),
@@ -224,7 +241,7 @@ function water(o: CivilOptions): Node[] {
   for (let i = 1; i <= N; i++) {
     const of = N > 1 ? `Structure ${i} of ${N}` : 'Process structure'
     out.push(
-      n(pour(i), 'process_structures', `${of}: base slab, walls & elevated slabs — form, rebar & pour`, share(N, 60, 1.5, 20, 330), i === 1 ? [ss('earthwork', 10)] : [fs(pour(i - 1))]),
+      n(pour(i), 'process_structures', `${of}: base slab, walls & elevated slabs — form, rebar & pour`, share(N, 60, 1.5, 20, 330), i <= crews ? [ss('earthwork', 10)] : [fs(pour(i - crews))]),
       n(`structure_${i}_cure`, 'concrete_cure', `${of}: cure to design strength before leak testing — 14 calendar days`, fixed(14), [fs(pour(i))], { calendar: '7d' }),
       n(`structure_${i}_leak`, 'process_structures', `${of}: hydrostatic leak test (ACI 350.1) & repairs`, d(7, 0.02, 5, 15), [fs(`structure_${i}_cure`)]),
       n(`structure_${i}_backfill`, 'earthwork', `${of}: backfill & grading around the structure`, d(5, 0.05, 3, 20), [fs(`structure_${i}_leak`)]),
@@ -473,44 +490,91 @@ function epc(o: CivilOptions): Node[] {
   const epcm = o.epcDelivery === 'epcm'
   const heavy = o.heavyLifts !== false
   const H = Math.max(1, o.hydrotestSystems ?? 3)
-  const eq = heavy ? 'set_equipment' : 'process_equipment'
+  // Construction runs by area with parallel crews (e.g. process unit and utilities / offsites); test
+  // systems are spread over the areas and tested, completed and commissioned system by system.
+  const A = Math.min(H, Math.max(1, o.epcAreas ?? (H >= 2 ? 2 : 1)))
+  const areaOf = (i: number) => ((i - 1) % A) + 1
+  const ar = (a: number) => (A > 1 ? ` — Area ${a} of ${A}` : '')
+  const sy = (i: number) => (H > 1 ? ` — system ${i} of ${H}` : '')
+  /** Area 1 keeps the plain key (the category's first activity); other areas / systems are suffixed. */
+  const ak = (base: string, a: number) => (a === 1 ? base : `${base}_a${a}`)
+  const eqBase = heavy ? 'set_equipment' : 'process_equipment'
+  const pipeKey = (i: number) => (i === 1 ? 'pipeline' : `pipeline_s${i}`)
   const out: Node[] = [
     ...front({
       design: ['Process design basis, PFDs & heat and material balances (FEED)', 'P&IDs, plot plan & equipment specifications (issued for design)', 'IFC civil, structural & foundation drawings', 'Owner review & IFC release'],
+      // Engineering overlaps by discipline: civil / structural is issued first so the site can start
+      // while piping and E&I design continue (below) off the vendor data.
+      designDur: [d(25, 0.15, 20, 70), d(25, 0.15, 20, 70), d(20, 0.1, 15, 50), d(10, 0, 10, 15)],
+      procurementDur: d(40, 0.3, 30, 150),
       mobilizationAfter: epcm ? ['construction_contracts'] : [],
     }),
-    n('hazop', 'design_dd', 'HAZOP / LOPA review & P&ID revisions (P&IDs issued for construction)', d(15, 0.05, 10, 40), [fs('design_dd')]),
-    n('ll_po_award', 'procurement', 'Long-lead equipment RFQs, bid evaluation & PO award (off the process design basis)', d(30, 0.05, 20, 60), [fs('design_sd')],
+    n('hazop', 'design_dd', 'HAZOP / LOPA review & P&ID revisions (P&IDs issued for construction)', d(10, 0.03, 10, 25), [fs('design_dd')]),
+    n('ll_po_award', 'procurement', 'Long-lead equipment RFQs, bid evaluation & PO award (off the process design basis)', d(25, 0.03, 20, 45), [fs('design_sd')],
       { note: 'Vessels, compressors and electrical gear are bought off the process design basis, ahead of IFC drawings.' }),
     n('vendor_data', 'submittals', 'Vendor data: certified GA drawings, loads & nozzle orientations — calendar days', d(56, 0, 42, 90), [fs('ll_po_award')], { calendar: '7d' }),
-    n('ifc_piping', 'design_cd', 'IFC piping isometrics & 3D model review (90%)', d(30, 0.3, 20, 120), [fs('hazop'), fs('vendor_data'), fs('design_cd')]),
-    n('ifc_ei', 'design_cd', 'IFC electrical & instrument drawings (single lines, loop diagrams, cable schedules)', d(25, 0.2, 15, 90), [fs('hazop'), fs('vendor_data'), fs('design_cd')]),
+    n('ifc_piping', 'design_cd', 'IFC piping isometrics & 3D model review (90%) — issued area by area', d(25, 0.15, 20, 90), [fs('hazop'), fs('vendor_data')]),
+    n('ifc_ei', 'design_cd', 'IFC electrical & instrument drawings (single lines, loop diagrams, cable schedules)', d(20, 0.1, 15, 70), [fs('hazop'), fs('vendor_data')]),
   ]
   if (epcm) out.push(n('construction_contracts', 'procurement', 'Construction packages (civil, mechanical, E&I): bid, evaluate & award — EPCm, owner contracts', d(40, 0.05, 30, 70), [fs('design_cd')]))
   out.push(
-    c('earthwork', 'Site preparation, excavation & grading', d(20, 0.3, 15, 150), [fs('mobilization')]),
-    c('utilities_site', 'Underground: process drains, sewers, fire water, grounding & duct banks', d(20, 0.3, 15, 150), [ss('earthwork', 10)]),
-    c('deep_foundations', 'Piling', d(15, 0.2, 10, 120), [ss('earthwork', 10)]),
-    c('foundations', 'Equipment & structure foundations', d(30, 0.4, 20, 200), [fs('deep_foundations'), fs('utilities_site')]),
-    c('structure_steel', 'Pipe racks & structural steel', d(30, 0.4, 20, 220), [ss('foundations', 20), fs('procurement')]),
+    c('earthwork', 'Site preparation, excavation & grading', d(15, 0.1, 10, 60), [fs('mobilization')]),
+    c('utilities_site', 'Underground: process drains, sewers, fire water, grounding & duct banks', d(15, 0.1, 10, 80), [ss('earthwork', 10)]),
+    c('deep_foundations', 'Piling', d(15, 0.1, 10, 80), [ss('earthwork', 10)]),
   )
-  if (heavy) out.push(c('process_equipment', 'Heavy lifts: crane mobilization, lift plans & set columns / reactors', d(15, 0.1, 10, 40), [fs('foundations'), fs('procurement')],
+  for (let a = 1; a <= A; a++) {
+    out.push(
+      n(ak('foundations', a), 'foundations', `Equipment & structure foundations${ar(a)}`, share(A, 30, 0.4, 15, 200), [fs('deep_foundations'), fs('utilities_site'), fs('vendor_data')]),
+      n(ak('structure_steel', a), 'structure_steel', `Pipe racks & structural steel${ar(a)}`, share(A, 30, 0.4, 15, 220), [ss(ak('foundations', a), 15), fs('procurement')]),
+    )
+  }
+  if (heavy) out.push(c('process_equipment', 'Heavy lifts: crane mobilization, lift plans & set columns / reactors', d(15, 0.05, 10, 40), [fs('foundations'), fs('procurement')],
     { note: 'Heavy-lift cranes are booked months ahead; ground bearing preparation and lift plans precede the lift window.' }))
-  out.push(
-    n(eq, 'process_equipment', heavy ? 'Set remaining equipment, pumps, compressors & packages' : 'Set process equipment, vessels, pumps & packages', d(25, 0.3, 15, 150),
-      [ss('structure_steel', 20), fs('procurement'), ...(heavy ? [fs('process_equipment')] : [])]),
-    c('pipeline', 'Process piping: spool fabrication & field erection', d(60, 1.0, 40, 400), [fs('ifc_piping'), ss(eq, 15)]),
-    c('power_equipment', 'Electrical: substation, MCCs, cable tray & cable pulling', d(50, 0.8, 30, 300), [ss('structure_steel', 30), fs('ifc_ei')]),
-    c('controls_scada', 'Instrumentation installation, DCS & loop checks', d(50, 0.6, 30, 300), [ss('pipeline', 30), ss('power_equipment', 30), fs('ifc_ei')]),
-  )
+  for (let a = 1; a <= A; a++) {
+    out.push(
+      n(ak(eqBase, a), 'process_equipment', `${heavy ? 'Set remaining equipment, pumps, compressors & packages' : 'Set process equipment, vessels, pumps & packages'}${ar(a)}`, share(A, 25, 0.3, 15, 150),
+        [ss(ak('structure_steel', a), 20), fs('procurement'), ...(heavy && a === 1 ? [fs('process_equipment')] : [])]),
+      n(ak('power_equipment', a), 'power_equipment', `Electrical: substation, MCCs, cable tray & cable pulling${ar(a)}`, share(A, 40, 0.5, 20, 250), [ss(ak('structure_steel', a), 30), fs('ifc_ei')]),
+    )
+  }
+  // Piping by test system: each area's crew works its systems in turn, areas in parallel.
   for (let i = 1; i <= H; i++) {
-    out.push(n(`hydrotest_${i}`, 'startup_testing', `Hydrotest, flush & reinstate — test system ${i} of ${H}`, d(8, 0.05, 5, 20),
-      i === 1 ? [ss('pipeline', 30)] : [fs(`hydrotest_${i - 1}`), ...(i === H ? [fs('pipeline')] : [])]))
+    const a = areaOf(i)
+    const prev = i - A >= 1 ? [ss(pipeKey(i - A), 20)] : []
+    out.push(n(pipeKey(i), 'pipeline', `Process piping: spool fabrication & field erection${sy(i)}${A > 1 ? ` (Area ${a})` : ''}`, share(H, 75, 1.2, 20, 480),
+      [fs('ifc_piping'), ss(ak('structure_steel', a), 20), ...prev]))
+  }
+  for (let a = 1; a <= A; a++) {
+    out.push(n(ak('controls_scada', a), 'controls_scada', `Instrumentation installation, DCS & loop checks${ar(a)}`, share(A, 40, 0.4, 20, 250),
+      [ss(pipeKey(a), 30), ss(ak('power_equipment', a), 20), fs('ifc_ei')]))
+  }
+  // Hydrotest, mechanical completion and commissioning system by system (in parallel across systems).
+  for (let i = 1; i <= H; i++) {
+    const a = areaOf(i)
+    out.push(n(`hydrotest_${i}`, 'startup_testing', `Hydrotest, flush & reinstate — test system ${i} of ${H}`, d(8, 0.03, 5, 20), [fs(pipeKey(i)), fs(ak(eqBase, a))]))
+  }
+  if (H > 1) {
+    for (let i = 1; i <= H; i++) {
+      const a = areaOf(i)
+      out.push(
+        n(`mc_${i}`, 'inspections', `Mechanical completion${sy(i)}: walkdowns, punch A cleared & turnover package`, d(5, 0.02, 3, 15),
+          [fs(`hydrotest_${i}`), fs(ak('power_equipment', a)), fs(ak('controls_scada', a))]),
+        n(`commissioning_${i}`, 'commissioning', `Commissioning${sy(i)}: energize, run-in rotating equipment, loop & functional tests`, share(H, 30, 0.2, 10, 120), [fs(`mc_${i}`)]),
+      )
+    }
+    out.push(
+      n('mc', 'inspections', 'Mechanical completion — all systems turned over (plant MC)', MS, Array.from({ length: H }, (_, j) => fs(`mc_${j + 1}`)), { milestone: true }),
+      c('commissioning', 'Plant commissioning: utilities in service, integrated functional tests & ready for start-up', d(10, 0.05, 5, 30),
+        [fs('mc'), ...Array.from({ length: H }, (_, j) => fs(`commissioning_${j + 1}`))]),
+    )
+  } else {
+    out.push(
+      n('mc', 'inspections', 'Mechanical completion — system walkdowns, punch A cleared & turnover packages', d(10, 0.05, 5, 25),
+        [fs('hydrotest_1'), fs('controls_scada'), fs('power_equipment'), fs('pipeline')]),
+      c('commissioning', 'Commissioning: energize, run-in rotating equipment, loop & functional tests, utilities in service', d(30, 0.2, 20, 120), [fs('mc')]),
+    )
   }
   out.push(
-    n('mc', 'inspections', 'Mechanical completion — system walkdowns, punch A cleared & turnover packages', d(10, 0.05, 5, 25),
-      [fs(`hydrotest_${H}`), fs('controls_scada'), fs('power_equipment'), fs('pipeline')]),
-    c('commissioning', 'Commissioning: energize, run-in rotating equipment, loop & functional tests, utilities in service', d(30, 0.2, 20, 120), [fs('mc')]),
     c('inspections', 'Pre-startup safety review (PSSR, OSHA 1910.119) & permits to operate', d(10, 0, 5, 20), [fs('commissioning')]),
     c('startup_testing', 'Introduce feedstock, startup & performance test run', d(20, 0.1, 15, 60), [fs('inspections')]),
     c('punchlist', 'Punch list (punch B)', d(15, 0.1, 10, 45), [fs('startup_testing')]),

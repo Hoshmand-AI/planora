@@ -57,15 +57,18 @@ describe('adaptive interview', () => {
     expect(Object.values(r.insights).some(i => i.role === 'unprobed')).toBe(true)
     expect(r.ask.length).toBeGreaterThan(0)
   })
-  it('asks parallel long-lead items as one checklist when only together they move the finish', () => {
-    // Generators feed their own power-train activity and drive on their own; once ordered, the remaining
-    // electrical and mechanical items run in parallel and mask each other.
+  it('asks a long-lead item that drives on its own as a driver; parallel items are grouped only when only together they move the finish', () => {
+    // Generators ordered: the MV switchgear now drives the data center on its own (substation
+    // energization → permanent power → L2–L5 commissioning), so it is a driver, not hidden in a checklist.
     const a = { 'project.type': k('data_center'), 'project.state': k('VA'), 'project.scope': k('new_construction'), 'project.gross_sqft': k(200000), 'project.target_start': k('2026-11-02'), 'procure.emergency-generator.status': k('released') }
     const r = run(a)
-    const g = r.groups.find(x => x.id === 'procurement')!
-    expect(g.questionIds.length).toBeGreaterThan(5)
-    expect(g.swingDays).toBeGreaterThanOrEqual(r.thresholdDays)
-    const idx = r.ask.map((q, i) => g.questionIds.includes(q.id) ? i : -1).filter(i => i >= 0)
-    expect(idx[idx.length - 1] - idx[0]).toBe(idx.length - 1) // members are adjacent
+    expect(r.insights['procure.mv-switchgear.status'].role).toBe('driver')
+    expect(r.insights['procure.mv-switchgear.status'].swingDays).toBeGreaterThanOrEqual(r.thresholdDays)
+    for (const g of r.groups) {
+      expect(g.swingDays).toBeGreaterThanOrEqual(r.thresholdDays)
+      for (const id of g.questionIds) expect(r.insights[id].role).toBe('group')
+      const idx = r.ask.map((q, i) => g.questionIds.includes(q.id) ? i : -1).filter(i => i >= 0)
+      expect(idx[idx.length - 1] - idx[0]).toBe(idx.length - 1) // members are adjacent
+    }
   })
 })

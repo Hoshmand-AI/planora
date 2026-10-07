@@ -110,7 +110,7 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
   return {
     kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
     gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status, alerts,
-    updates, dataDate: s.dataDate, varianceBasis: an?.varianceBasis ?? null,
+    updates, dataDate: s.dataDate, varianceBasis: an ? fmtDates([an.baseline?.header ? `${an.baseline.header}.` : '', an.varianceBasis].filter(Boolean).join(' ')) || null : null,
   }
 }
 

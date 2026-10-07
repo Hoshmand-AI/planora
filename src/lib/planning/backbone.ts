@@ -50,8 +50,16 @@ export function addDataCenterBackbone(g: PlanGraph, ctx: BackboneContext): void 
   const has = (id: string) => g.acts.has(id)
 
   /* Utility substation, then the MV switchgear it feeds. */
-  const sub = task('dc-substation', 'Utility / owner substation & MV service — construct, test & energize (utility-coordinated)', 'electrical_service',
-    days(30, 0.1, 30, 90), why('Data center service is taken at medium voltage from a dedicated substation; the utility builds or energizes it before the MV switchgear can be energized.', 'Substation duration scales with load (area); confirm with the utility’s interconnection schedule.'))
+  const energizeDays = Math.max(1, Math.round(5 * ctx.hoursFactor))
+  const sub = task('dc-substation', 'Utility / owner substation & MV service — construct, set equipment & test (utility-coordinated)', 'electrical_service',
+    Math.max(1, days(30, 0.1, 30, 90) - energizeDays), why('Data center service is taken at medium voltage from a dedicated substation; the utility builds it before the MV switchgear can be energized.', 'Substation duration scales with load (area); confirm with the utility’s interconnection schedule.'))
+  const energize = task('dc-substation-energize', 'Substation energization — relay settings, utility witness testing & energize the MV service', 'electrical_service', energizeDays,
+    why('The substation is energized only once its transformers and the MV switchgear it feeds are delivered, set and tested; the utility witnesses the protection settings.'))
+  g.link(sub.id, energize.id, 'FS', 0, why('Energization follows construction and testing of the substation.'))
+  // Transformers and MV switchgear must be on site (and set) before anything is energized.
+  for (const item of ['padmount-transformer', 'mv-switchgear']) {
+    for (const id of [`ll-${item}-fab`, `ll-${item}-delivered`]) if (has(id)) g.link(id, energize.id, 'FS', 0, why('Energization needs the transformers and MV switchgear delivered.'))
+  }
   // The utility's service application drives the substation, not the switchgear set.
   for (const l of [...g.links.values()]) {
     if (l.to !== elec.id) continue
@@ -62,7 +70,7 @@ export function addDataCenterBackbone(g: PlanGraph, ctx: BackboneContext): void 
   }
   const siteStart = has('t-utilities_site') ? 't-utilities_site' : has('t-mobilization') ? 't-mobilization' : 'ntp'
   g.link(siteStart, sub.id, 'FS', 0, why('The substation and duct banks follow site utilities.'))
-  g.link(sub.id, elec.id, 'FS', 0, why('MV switchgear is energized from the substation.'))
+  g.link(energize.id, elec.id, 'FS', 0, why('MV switchgear is energized from the substation.'))
 
   /* Generators: set (template), then load bank testing. */
   const gens = g.acts.get('t-power_equipment')
@@ -114,4 +122,12 @@ export function addDataCenterBackbone(g: PlanGraph, ctx: BackboneContext): void 
   g.link(busway.id, l2.id, 'FS', 0, why('Busway is inspected and verified with the rest of the power train.'))
   if (loadBank) g.link(loadBank.id, l3.id, 'FS', 0, why('Generators are load-bank tested before system startup relies on them.'))
   g.link(containment.id, l4.id, 'FS', 0, why('Functional thermal testing needs the containment in place.'))
+  // Integrated systems testing is the last gate before turnover: the white space is finished and its
+  // punch list worked off before IST, so substantial completion is driven by IST, not by finishes.
+  const punch = [...g.acts.values()].find(a => a.category === 'punchlist' && a.id.startsWith('t-'))
+  if (punch) {
+    const sc = [...g.acts.values()].find(a => a.category === 'substantial_completion')
+    for (const l of [...g.links.values()]) if (l.from === punch.id && sc && l.to === sc.id) g.links.delete(l.id)
+    g.link(punch.id, comm.id, 'FS', 0, why('Punch list in the data halls is closed before integrated systems testing (L5 IST).'))
+  }
 }

@@ -8,6 +8,7 @@ import { CONSTRAINT_TYPES, type CanonicalCategory, type ConstraintType, type Cpm
 import type { AppliedEdit } from './uploaded-edits'
 import { phaseOf } from '@/lib/semantic/taxonomy'
 import { defaultCalendar } from './calendar'
+import { scheduledRemaining } from './complete-schedule'
 
 const CSTR = new Set<string>(CONSTRAINT_TYPES)
 const isoOf = (v: unknown): string => {
@@ -32,18 +33,23 @@ export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
   return out
 }
 
-export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = []): GeneratedSchedule {
+/**
+ * @param opts.includeLoe keep level-of-effort activities and their relationships (flagged with
+ *   `levelOfEffort`, which carries the file's dates). Only for exports that write them out (MS Project
+ *   XML); the CPM, risk analysis and the other exports leave LOE out, as P6 does when scheduling.
+ */
+export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = [], opts: { includeLoe?: boolean } = {}): GeneratedSchedule {
   const overrides = editOverrides(edits)
   const calendars = s.calendars?.length ? s.calendars : [defaultCalendar()]
   const defaultCalendarId = s.defaultCalendarId && calendars.some(c => c.id === s.defaultCalendarId) ? s.defaultCalendarId : calendars[0].id
-  const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
+  const work = activities.filter(a => a.activityType !== 'summary' && (a.activityType !== 'loe' || opts.includeLoe))
   const ids = new Set(work.map(a => a.id))
   const acts: PlanActivity[] = work.map(a => {
     const category = (a.category || 'other') as CanonicalCategory
     return {
       id: a.id, code: a.activityId, name: a.name,
       duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
-      remaining: a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : undefined,
+      remaining: scheduledRemaining(a),
       type: a.activityType === 'milestone' ? 'milestone' : 'task',
       milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
       calendarId: a.calendarId && calendars.some(c => c.id === a.calendarId) ? a.calendarId : defaultCalendarId,
@@ -53,6 +59,7 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
       rationale: { summary: `From the uploaded file ${s.fileName}`, sources: [{ kind: 'file', label: s.fileName }], confidence: 'medium' },
       wbs: a.wbs || undefined, status: a.status, percentComplete: a.percentComplete,
       baselineStart: a.baselineStart, baselineFinish: a.baselineFinish,
+      ...(a.activityType === 'loe' ? { levelOfEffort: { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish } } : {}),
       ...(overrides.has(a.id) ? { overrides: overrides.get(a.id) } : {}),
     }
   })

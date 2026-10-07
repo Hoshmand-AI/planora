@@ -4,8 +4,9 @@ import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleById, getScheduleFileMeta, getScheduleSeries } from '@/lib/db'
-import { loadScheduleData } from '@/lib/planning/service'
+import { basisFrom, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { compareSchedules, orderSeries, pickDefaultBase, type CompareSide } from '@/lib/analysis/compare'
+import { analyzeWindow, type WindowRow, type WindowUpdate } from '@/lib/analysis/windows'
 import { exportComparisonCsv } from '@/lib/export/csv'
 import { CSV_CUI_REFUSAL, exportMarking } from '@/lib/export/markings'
 import { isRestrictedClassification, mostRestrictive, scheduleClassification } from '@/lib/server/classification'
@@ -22,6 +23,8 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * &format=csv downloads the activity-level differences as CSV; &format=xlsx a workbook with one sheet
  * per change category (before/after with both data dates) and a Provenance sheet.
  * A schedule is never compared with itself (same id, or an upload of byte-identical file): 400.
+ * Both uploads are compared AS SUBMITTED; &basis=scenario compares their what-if scenarios (each with
+ * its own Planora edits) and says so in the warnings and the provenance.
  */
 export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth }) => {
   const id = req.nextUrl.searchParams.get('id')
@@ -55,17 +58,26 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     const rl = await hit(`export:user:${auth.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)
     if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
   }
-  const [a, b] = await Promise.all([loadScheduleData(after.id, auth.orgId), loadScheduleData(before.id, auth.orgId)])
+  const basis = basisFrom(req.nextUrl.searchParams)
+  const [a, b] = await Promise.all([loadScheduleData(after.id, auth.orgId, { basis }), loadScheduleData(before.id, auth.orgId, { basis })])
   if (!a || !b) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const side = (d: NonNullable<typeof a>): CompareSide => ({
     schedule: { id: d.schedule.id, name: d.schedule.name, version: d.schedule.version, dataDate: d.schedule.dataDate, forecastFinish: d.analysis.forecastFinish, projectKey: d.schedule.projectKey ?? null },
-    activities: d.activities, relationships: d.relationships, longestPath: d.analysis.longestPath,
+    // File to file: a change of the file's own target dates (re-baselined in P6) still shows.
+    activities: d.fileActivities, relationships: d.relationships, longestPath: d.analysis.longestPath,
     finishMilestone: d.analysis.finishMilestone ? { code: d.analysis.finishMilestone.code, forecastFinish: d.analysis.finishMilestone.forecastFinish } : null,
     calendars: d.schedule.calendars, defaultCalendarId: d.schedule.defaultCalendarId, violations: d.analysis.violations ?? [],
     logicLongestPath: d.cpm?.logicLongestPath ?? [], logicFinish: d.cpm?.logicFinish ?? null,
   })
-  const comparison = compareSchedules(side(b), side(a))
-  await audit({ action: 'schedule.compare', targetType: 'schedule', targetId: after.id, detail: { name: after.name, after: after.version, before: before.version, baseId: before.id, format } })
+  // The windows attribution of this pair, so compare's finish causes agree with the windows analysis.
+  const wu = (d: NonNullable<typeof a>): WindowUpdate => ({ schedule: d.schedule, activities: d.activities, relationships: d.relationships, analysis: d.analysis })
+  let window: WindowRow | null = null
+  try { window = analyzeWindow(wu(b), wu(a)) } catch { window = null }
+  const comparison = compareSchedules(side(b), side(a), { window })
+  // Say which network each side is: as submitted, or the scenario with its Planora edits.
+  const basisNotes = [basisWarning(basis, b.editsApplied, b.schedule.version), basisWarning(basis, a.editsApplied, a.schedule.version)].filter((x): x is string => !!x)
+  if (basisNotes.length) { comparison.warnings.unshift(...basisNotes); comparison.summary.unshift(...basisNotes) }
+  await audit({ action: 'schedule.compare', targetType: 'schedule', targetId: after.id, detail: { name: after.name, after: after.version, before: before.version, baseId: before.id, format, basis } })
   const slug = `${after.name}-${before.version}-vs-${after.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'comparison'
   // CUI markings apply when either upload is CUI or classified (most restrictive wins).
   const classification = format === 'xlsx' || format === 'csv'
@@ -73,7 +85,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     : null
   if (format === 'xlsx') {
     const marking = exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name })
-    const prov = await loadProvenance(auth.orgId, [{ role: 'Earlier update', schedule: b.schedule, analysis: b.analysis }, { role: 'Later update', schedule: a.schedule, analysis: a.analysis }], auth.settings.quality)
+    const prov = await loadProvenance(auth.orgId, [{ role: 'Earlier update', schedule: b.schedule, analysis: b.analysis, editsApplied: basis === 'scenario' ? b.editsApplied : 0 }, { role: 'Later update', schedule: a.schedule, analysis: a.analysis, editsApplied: basis === 'scenario' ? a.editsApplied : 0 }], auth.settings.quality)
     const buf = await exportComparisonXlsx(comparison, prov, marking)
     return new NextResponse(buf as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${slug}.xlsx"` } })
   }
@@ -82,5 +94,5 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     if (isRestrictedClassification(classification)) return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
     return new NextResponse(exportComparisonCsv(comparison), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.csv"` } })
   }
-  return NextResponse.json({ series: seriesOut, comparison })
+  return NextResponse.json({ series: seriesOut, comparison, basis })
 })

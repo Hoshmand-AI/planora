@@ -3,6 +3,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, ProgressMode, Weekday, WorkCalendar } from '@/lib/planning/types'
+import type { EmbeddedBaseline } from '@/lib/analysis/baseline'
 import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoDatePrefix, serialToIso, round2, constraintFromLabel,
@@ -29,6 +30,8 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     warnings.push(`XER contains ${projects.length} projects; imported "${project['proj_short_name'] || projId}" only. Not imported: ${others.join(', ')}.`)
   }
   const inProject = (r: Row) => !projId || !r['proj_id'] || r['proj_id'] === projId
+  const embeddedBaseline = projId ? embeddedBaselineOf(projects, project, tables['TASK'] || []) : null
+  if (embeddedBaseline) warnings.push(`The file carries the P6 project baseline "${embeddedBaseline.name}" (${Object.keys(embeddedBaseline.finishes).length} activities); variance, BEI and missed tasks are measured against it unless an upload of this project is designated as Baseline.`)
   if (projId) {
     tables['TASK'] = (tables['TASK'] || []).filter(inProject)
     tables['PROJWBS'] = (tables['PROJWBS'] || []).filter(inProject)
@@ -211,9 +214,37 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,
     planoraExport: isPlanoraXer(content),
     activities, relationships, calendars, defaultCalendarId, warnings,
-    sourceType: 'p6_xer',
+    sourceType: 'p6_xer', embeddedBaseline,
     resourceCounts: tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tasks) : undefined,
     sourceTables: Object.keys(tables),
+  }
+}
+
+/**
+ * The P6 project baseline exported in the same XER as the imported project: the project its
+ * sum_base_proj_id names, else a project whose orig_proj_id points at the imported one. Its TASK
+ * dates by task_code are the per-activity baseline: P6 "BL Project Start/Finish" = the actual date
+ * once the activity started/finished in the baseline, else its planned (target) date.
+ */
+export function embeddedBaselineOf(projects: Row[], project: Row, tasks: Row[]): EmbeddedBaseline | null {
+  const pid = project['proj_id']
+  if (!pid) return null
+  const base = (project['sum_base_proj_id'] && project['sum_base_proj_id'] !== pid && projects.find(p => p['proj_id'] === project['sum_base_proj_id']))
+    || projects.find(p => p['proj_id'] && p['proj_id'] !== pid && p['orig_proj_id'] === pid)
+  if (!base) return null
+  const starts: Record<string, string> = {}
+  const finishes: Record<string, string> = {}
+  for (const t of tasks) {
+    if (t['proj_id'] !== base['proj_id'] || !t['task_code'] || t['task_type'] === 'TT_LOE' || t['task_type'] === 'TT_WBS') continue
+    const st = isoDatePrefix(t['act_start_date']) || isoDatePrefix(t['target_start_date']) || isoDatePrefix(t['early_start_date'])
+    const fi = isoDatePrefix(t['act_end_date']) || isoDatePrefix(t['target_end_date']) || isoDatePrefix(t['early_end_date'])
+    if (st) starts[t['task_code']] = st
+    if (fi) finishes[t['task_code']] = fi
+  }
+  if (!Object.keys(finishes).length) return null
+  return {
+    projectId: base['proj_id'], name: base['proj_short_name'] || base['proj_long_name'] || base['proj_id'],
+    dataDate: isoDatePrefix(base['last_recalc_date']) || isoDatePrefix(base['next_data_date']) || null, starts, finishes,
   }
 }
 
@@ -388,6 +419,8 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
   const tree = c['clndr_data'] ? parseClndrData(c['clndr_data']) : null
   const workDays: Weekday[] = []
   const dayHours: number[] = []
+  let workTimes: WorkCalendar['workTimes']
+  let workTimesHours = 0
   const dow = findChild(tree, 'DaysOfWeek')
   if (dow) {
     for (const d of dow.children) {
@@ -395,7 +428,10 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
       if (!(n >= 1 && n <= 7)) continue
       if (d.children.length > 0) {
         workDays.push((n - 1) as Weekday)
-        dayHours.push(intervalHours(d.children))
+        const h = intervalHours(d.children)
+        dayHours.push(h)
+        // The working periods of the longest work day (the one hours per day comes from).
+        if (h > workTimesHours) { workTimesHours = h; workTimes = workPeriods(d.children) }
       }
     }
   } else {
@@ -433,6 +469,22 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
     hoursPerDay,
     holidays,
     ...(extraWorkDays.length ? { extraWorkDays } : {}),
+    ...(workTimes?.length ? { workTimes } : {}),
     sourceName: name,
   }
+}
+
+/** A work day's periods as HH:MM pairs in time order ("f|00:00" = midnight, written 24:00). */
+function workPeriods(intervals: CNode[]): { from: string; to: string }[] {
+  const out: [number, number][] = []
+  for (const iv of intervals) {
+    const a = attrMap(iv.attrs)
+    const s = toMinutes(a['s'])
+    let f = toMinutes(a['f'])
+    if (s === null || f === null) continue
+    if (f <= s) f += 24 * 60
+    out.push([s, Math.min(f, 24 * 60)])
+  }
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  return out.sort((x, y) => x[0] - y[0]).map(([s, f]) => ({ from: hm(s), to: hm(f) }))
 }

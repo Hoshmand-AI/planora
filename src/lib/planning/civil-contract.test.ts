@@ -88,7 +88,10 @@ describe('1. Highway & bridge: staged construction, deck sequence, windows, seas
       expect(predsOf(g, `t-abutments_s${s}`)).toEqual([`t-deep_foundations_s${s}`])
       expect(predsOf(g, `t-piers_s${s}`)).toEqual([`t-deep_foundations_s${s}`])
       expect(es(g, all(g, `t-abutments_s${s}`)[0])).toBe(es(g, all(g, `t-piers_s${s}`)[0]))
-      expect(predsOf(g, `t-superstructure_s${s}`)).toEqual(expect.arrayContaining([`t-abutments_s${s}`, `t-piers_s${s}`]))
+      // Girders go on cured bridge seats and pier caps (separate cure activities on calendar days).
+      expect(predsOf(g, `t-superstructure_s${s}`)).toEqual(expect.arrayContaining([`t-abutments_cure_s${s}`, `t-piers_cure_s${s}`]))
+      expect(predsOf(g, `t-abutments_cure_s${s}`)).toEqual([`t-abutments_s${s}`])
+      expect(byId(g, `t-piers_cure_s${s}`)!.calendarId).toBe('cal-7d')
     }
     expect(gen({ ...staged, 'civil.mot_phases': k(3) }).activities.some(a => a.id === 't-traffic_switch_s3')).toBe(true)
     expect(gen({ ...staged, 'civil.mot_phases': k(1), 'project.scope': k('new_construction') }).activities.some(a => /Stage/.test(a.name))).toBe(false)
@@ -318,8 +321,14 @@ describe('5. New project types', () => {
     expect(preds(g, 'll-civ-process-vessels-sub')).toEqual(['t-ll_po_award'])
     expect(preds(g, all(g, 't-process_equipment')[0].id)).toContain('ll-civ-process-vessels-fab')
     expect(byId(g, 't-process_equipment')!.name).toMatch(/Heavy lifts/)
-    expect(predsOf(g, 't-hydrotest_2')).toContain('t-hydrotest_1')
-    const chain = ['t-hydrotest_3', 't-mc', 't-commissioning', 't-inspections', 't-startup_testing']
+    // Hydrotest, MC and commissioning run system by system in parallel (not one serial chain).
+    expect(predsOf(g, 't-hydrotest_2')).not.toContain('t-hydrotest_1')
+    for (const i of [1, 2, 3]) {
+      expect(predsOf(g, `t-mc_${i}`)).toContain(`t-hydrotest_${i}`)
+      expect(predsOf(g, `t-commissioning_${i}`)).toContain(`t-mc_${i}`)
+      expect(predsOf(g, 't-mc')).toContain(`t-mc_${i}`)
+    }
+    const chain = ['t-mc', 't-commissioning', 't-inspections', 't-startup_testing']
     for (let i = 1; i < chain.length; i++) expect(predsOf(g, chain[i])).toContain(chain[i - 1])
     expect(byId(g, 't-inspections')!.name).toMatch(/PSSR/)
     const epcm = gen(civil('epc_industrial', { 'epc.delivery': k('epcm') }))

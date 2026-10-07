@@ -173,12 +173,18 @@ const CATALOG: TemplateActivity[] = [
   // Interiors
   t('framing_drywall', 'Office pod framing & drywall', { projectTypes: ['warehouse_industrial'] }, { base: 20, perKsf: 0.02, min: 15, max: 60 },
     [ss('mep_rough', 30), fs('dry_in')]),
+  // Data centers: the white space gets sealed floors, paint and containment (backbone), not office
+  // build-out; framing and finishes cover the electrical / mechanical rooms and the admin & support areas.
+  t('framing_drywall', 'Interior framing & drywall — electrical rooms, MMRs, admin & support areas', { projectTypes: ['data_center'] },
+    { base: 20, perKsf: 0.08, perStory: 3, min: 15, max: 90 }, [ss('mep_rough', 30), fs('dry_in')]),
   t('framing_drywall', 'Interior framing, in-wall inspections, drywall hang/tape/finish', TI, { base: 15, perKsf: 0.3, perStory: 3, min: 15, max: 200 },
     [ss('mep_rough', 10)]),
   t('framing_drywall', 'Interior framing, drywall hang/tape/finish', {}, { base: 30, perKsf: 0.35, perStory: 5, min: 25, max: 250 },
     [ss('mep_rough', 30), fs('dry_in')]),
   t('finishes', 'Office pod finishes, warehouse floor sealer & striping', { projectTypes: ['warehouse_industrial'] }, { base: 25, perKsf: 0.03, min: 20, max: 70 },
     [ss('framing_drywall', 15), ff('framing_drywall', 10)]),
+  t('finishes', 'Finishes — sealed / epoxy floors & paint in the data halls; admin & support-area finishes', { projectTypes: ['data_center'] },
+    { base: 20, perKsf: 0.1, perStory: 3, min: 15, max: 100 }, [ss('framing_drywall', 15), ff('framing_drywall', 10)]),
   t('finishes', 'Interior finishes (paint, ceilings, flooring, doors, millwork)', {}, { base: 40, perKsf: 0.35, perStory: 5, min: 30, max: 250 },
     [ss('framing_drywall', 30), ff('framing_drywall', 15)]),
   t('specialties', 'Laboratory casework, fume hoods & lab equipment — set, anchor & connect services', { projectTypes: ['lab_research'] },
@@ -479,7 +485,7 @@ export function validateTemplates(extraProfiles: ProjectProfile[] = []): Templat
     const keys = acts.map(keyOf)
     const set = new Set(keys)
     if (set.size !== keys.length) errors.push(`${tag}: duplicate activities`)
-    if (cats.filter(isStructure).length > 1) errors.push(`${tag}: more than one structural system`)
+    if (new Set(cats.filter(isStructure)).size > 1) errors.push(`${tag}: more than one structural system`)
     for (const req of ['ntp', 'substantial_completion', 'final_completion'] as CanonicalCategory[]) {
       if (!set.has(req)) errors.push(`${tag}: missing ${req}`)
     }

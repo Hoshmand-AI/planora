@@ -16,6 +16,11 @@ export interface WorkCalendar {
   holidays: string[]
   /** ISO dates that are work days even if they fall outside workDays (P6 exceptions) */
   extraWorkDays?: string[]
+  /**
+   * Working periods of a typical work day as the source file gives them, e.g. 07:00–11:00 and
+   * 11:30–15:30 (HH:MM, "24:00" = midnight). Exports write these times of day instead of 08:00–17:00.
+   */
+  workTimes?: { from: string; to: string }[]
   /** Canonical label after semantic normalization, e.g. "5-day x 8h" */
   canonical?: string
   /** Original label as written in the source file */
@@ -49,7 +54,10 @@ export interface CpmActivity {
   name: string
   /** Original duration in work days on the activity's calendar. 0 for milestones. */
   duration: number
-  /** Remaining work days (defaults to duration). Used when the activity is in progress. */
+  /**
+   * Remaining work days (defaults to duration). Used when the activity is in progress, and for a
+   * not-started activity when positive (P6 schedules not-started work on its remaining duration).
+   */
   remaining?: number
   calendarId?: string
   type: 'task' | 'milestone'
@@ -118,8 +126,24 @@ export interface CpmResult {
   longestPathConstraint?: { id: string; type: 'MSO' | 'MFO'; date: string }
   /** The path to logicFinish that logic alone would give (through mandatory constraints) */
   logicLongestPath?: string[]
-  /** Mandatory constraints (MSO/MFO) that overrule logic: how many work days logic would push them */
-  violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number }[]
+  /**
+   * Mandatory constraints (MSO/MFO) that overrule logic. logicDate (start for MSO, finish for MFO)
+   * and logicStart/logicFinish are the dates the predecessors drive the activity to (never floored at
+   * the data date); days = work days (own calendar) from the constraint date to that date.
+   */
+  violations: { id: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number; logicStart?: string; logicFinish?: string }[]
+  /**
+   * Logic-driven early dates (mandatory constraints relaxed network-wide) of open activities whose
+   * logic dates differ from the scheduled ones (successors of an overruled constraint included).
+   */
+  logicTimes?: Record<string, { earlyStart: string; earlyFinish: string }>
+  /**
+   * The driving path to present: basis 'logic' when a mandatory constraint hides a later
+   * logic-driven finish (the path to that finish), else the scheduled longest path. Traced back
+   * through activities a constraint holds (where the P6 longest path stops), which are listed in
+   * `constraints` (effect: the constraint holds the date later or earlier than logic).
+   */
+  drivingTrace?: { basis: 'scheduled' | 'logic'; path: string[]; constraints: { id: string; type: string; date: string; effect: 'later' | 'earlier' }[] }
   /** Relationship free float between open activities (only when CpmInput.linkFloat is set) */
   linkFloat?: CpmLinkFloat[]
   progressMode: ProgressMode
@@ -282,6 +306,10 @@ export interface CivilOptions {
   epcDelivery?: 'epc' | 'epcm'
   heavyLifts?: boolean
   hydrotestSystems?: number
+  /** EPC: construction areas worked in parallel (default 2 when there are 2+ test systems) */
+  epcAreas?: number
+  /** Transit: trackwork in scope (false when special trackwork & rail is answered "Not in scope") */
+  trackwork?: boolean
 }
 
 /* ─── Knowledge catalogs (grounding) ─────────────────── */
@@ -534,6 +562,11 @@ export interface PlanActivity extends CpmActivity {
   baselineFinish?: string | null
   /** Placeholder for a withheld/classified constraint */
   placeholder?: boolean
+  /**
+   * Uploaded level-of-effort activity (P6 TT_LOE), present only in exports that write LOE out: it is
+   * not in the CPM; its dates span the work it is linked to (the file's dates when it has no links).
+   */
+  levelOfEffort?: { start: string | null; finish: string | null }
   overrides?: Override[]
 }
 
@@ -606,6 +639,12 @@ export interface AnalyzableSchedule {
   mustFinishBy?: string | null
   /** Contract/finish milestone the scheduler designated (activity id or code) */
   finishMilestoneId?: string | null
+  /**
+   * The contractor file's own early dates, by activity id, where they differ from the stored
+   * (recalculated) ones: DCMA #9 judges forecasts on them. Present (possibly empty) when the file's
+   * dates were captured at upload; absent when the stored dates are the file's own.
+   */
+  fileDates?: Record<string, { earlyStart?: string | null; earlyFinish?: string | null }> | null
 }
 
 export type CheckResult = 'pass' | 'fail' | 'warn' | 'n/a'

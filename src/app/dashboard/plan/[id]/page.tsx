@@ -109,6 +109,8 @@ export default function PlanPage() {
       const res = await fetch(url, { headers, ...init })
       const data = await res.json()
       if (res.status === 409 && data.code === 'conflict') { setConflict(true); return null }
+      // Publishing a late plan (or one without a matching template) needs an explicit confirmation.
+      if (res.status === 409 && data.code === 'publish_confirmation_required') return { confirmRequired: true, warnings: data.warnings || [] }
       if (!res.ok) { setError(data.error || 'Request failed.'); return null }
       if (data.plan) setView(data as View)
       return data
@@ -149,7 +151,12 @@ export default function PlanPage() {
     if (data) { setTab('schedule'); setNotice(fresh ? 'Rebuilt from scratch (overrides discarded).' : hadSchedule ? 'Schedule regenerated from the latest answers. Your overrides were kept.' : 'Schedule generated. Open any activity to see why it is there, or override it.') }
   }
   const publish = async () => {
-    const data = await call('publish', `/api/plans/${id}/publish`, { method: 'POST', body: '{}' })
+    let data = await call('publish', `/api/plans/${id}/publish`, { method: 'POST', body: '{}' })
+    if (data?.confirmRequired) {
+      const warnings = (data.warnings as { text: string }[]).map(w => `• ${w.text}`).join('\n\n')
+      if (!confirm(`Publish this plan as a baseline anyway?\n\n${warnings}`)) return
+      data = await call('publish', `/api/plans/${id}/publish`, { method: 'POST', body: JSON.stringify({ confirm: true }) })
+    }
     if (data) setNotice('Published. Overview, Quality, Timeline and Ask AI now work on this schedule; it is also the baseline for progress updates.')
   }
   const suggest = async () => {

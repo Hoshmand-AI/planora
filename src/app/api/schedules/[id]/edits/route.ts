@@ -6,9 +6,14 @@ import { addScheduleEdits, revertScheduleEdit } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
 import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit } from '@/lib/planning/uploaded-edits'
 
+// Edits build the what-if scenario, so this route always works on it (validation against the edited
+// network, forecasts with the edits). The schedule as submitted is unchanged and stays the default
+// basis of every other view, analysis and export.
+const SCENARIO = { basis: 'scenario' as const }
+
 /**
  * Edits made in Planora to an uploaded schedule (override layer; the imported file is not changed).
- *   GET                       → { edits (active, as applied), reverted, editedActivityIds, forecastFinish, minFloat }
+ *   GET                       → { edits (active, as applied), reverted, editedActivityIds, forecastFinish (scenario), submittedForecastFinish, minFloat }
  *   POST { change | changes[], reason, source?: 'manual'|'recovery', optionId? }
  *        change: { kind: 'duration', activityId, remaining }
  *              | { kind: 'link_set', predecessorId, successorId, type: FS|SS|FF|SF, lag }
@@ -19,13 +24,13 @@ import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit 
  * Writing needs schedule.write (owner, admin, scheduler); reviewers and viewers can read only.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth }) => {
-  const data = await loadScheduleData(params.id, auth.orgId)
+  const data = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(summary(data))
 })
 
 export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async (req, { params, auth }) => {
-  const data = await loadScheduleData(params.id, auth.orgId)
+  const data = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (data.schedule.sourceType === 'generated') return NextResponse.json({ error: 'This schedule was published from a Planora plan; edit the plan instead (Plan → Schedule).', code: 'edit_plan_instead' }, { status: 400 })
   const b = await readBody<Record<string, unknown>>(req)
@@ -51,7 +56,7 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
     edits.push(e)
   }
   await addScheduleEdits(data.schedule.id, auth.orgId, edits)
-  const after = await loadScheduleData(params.id, auth.orgId)
+  const after = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   const byId = new Map((after?.edits ?? []).map(e => [e.id, e]))
   for (const e of edits) {
     const a = byId.get(e.id)
@@ -68,11 +73,11 @@ export const DELETE = api<{ id: string }>({ permission: 'schedule.write' }, asyn
   const reason = (req.nextUrl.searchParams.get('reason') || '').trim()
   const reasonErr = reasonError(reason)
   if (reasonErr) return NextResponse.json({ error: reasonErr.replace('for the edit', 'for reverting the edit'), code: 'reason_required' }, { status: 400 })
-  const data = await loadScheduleData(params.id, auth.orgId)
+  const data = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const edit = data.edits.find(e => e.id === editId)
   if (!edit || !(await revertScheduleEdit(data.schedule.id, auth.orgId, editId, auth.userId, reason.slice(0, 1000)))) return NextResponse.json({ error: 'No active edit with that id.' }, { status: 404 })
-  const after = await loadScheduleData(params.id, auth.orgId)
+  const after = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   await audit({ action: 'schedule.edit_revert', targetType: 'schedule', targetId: data.schedule.id, detail: {
     schedule: data.schedule.name, version: data.schedule.version, editId, kind: edit.change.kind, what: edit.label, before: edit.before, after: edit.after,
     originalReason: edit.reason, reason: reason.slice(0, 1000), forecastBefore: data.analysis.forecastFinish, forecastAfter: after?.analysis.forecastFinish ?? null,
@@ -83,7 +88,10 @@ export const DELETE = api<{ id: string }>({ permission: 'schedule.write' }, asyn
 function summary(data: NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>) {
   return {
     edits: data.edits, reverted: data.revertedEdits, editedActivityIds: data.editedActivityIds,
+    basis: 'scenario' as const, scenarioName: data.editsApplied ? `With Planora edits (${data.editsApplied})` : null,
     forecastFinish: data.analysis.forecastFinish, minFloat: data.analysis.minFloat,
+    // The stored headline is the schedule as submitted.
+    submittedForecastFinish: data.submittedForecastFinish,
     editable: data.schedule.sourceType !== 'generated',
     // Pick list for the edit form: open work activities with what an edit would change.
     activities: data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({

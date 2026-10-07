@@ -24,6 +24,24 @@ export interface ProvenanceSource {
   sha256: string | null
   dataDate: string | null
   progressMode: ProgressMode
+  /**
+   * Planora edits applied to this source (a what-if scenario); 0 / omitted = the schedule as submitted.
+   * A scenario's content is derived from the file, so its SHA-256 is not printed as the content's.
+   */
+  editsApplied?: number
+}
+
+/** "as submitted" | "with N Planora edits" */
+export function sourceBasis(s: Pick<ProvenanceSource, 'editsApplied'>): string {
+  const n = s.editsApplied ?? 0
+  return n > 0 ? `with ${n} Planora edit${n === 1 ? '' : 's'}` : 'as submitted'
+}
+
+/** The SHA-256 line: the file's hash as submitted; for a scenario, what it was derived from. */
+export function sourceSha(s: Pick<ProvenanceSource, 'sha256' | 'editsApplied'>): string {
+  const n = s.editsApplied ?? 0
+  if (n > 0) return s.sha256 ? `derived from ${s.sha256} with ${n} edit${n === 1 ? '' : 's'} (the content is not the original file)` : `not recorded (original file not retained); ${n} edit${n === 1 ? '' : 's'} applied`
+  return s.sha256 || 'not recorded (original file not retained)'
 }
 
 export interface Provenance {
@@ -65,7 +83,8 @@ export function provenanceRows(p: Provenance): [string, string][] {
     const pre = s.role ? `${s.role}: ` : ''
     rows.push([`${pre}Schedule`, `${s.scheduleName} (${s.version})`])
     rows.push([`${pre}Source file`, s.fileName || '—'])
-    rows.push([`${pre}SHA-256`, s.sha256 || 'not recorded (original file not retained)'])
+    rows.push([`${pre}Basis`, sourceBasis(s)])
+    rows.push([`${pre}SHA-256`, sourceSha(s)])
     rows.push([`${pre}Data date`, s.dataDate ? fmtDate(s.dataDate) : '—'])
     rows.push([`${pre}Progress mode`, MODE_TEXT[s.progressMode]])
   }
@@ -97,7 +116,7 @@ export function addProvenance(wb: ExcelJS.Workbook, p: Provenance, title: string
   wb.creator = 'Planora'
   wb.title = title
   wb.subject = p.sources.map(s => `${s.scheduleName} (${s.version})`).join(' vs ')
-  wb.keywords = p.sources.map(s => s.sha256 ? `sha256:${s.sha256}` : '').filter(Boolean).join(' ')
+  wb.keywords = p.sources.map(s => s.sha256 ? (s.editsApplied ? `derived-from-sha256:${s.sha256}` : `sha256:${s.sha256}`) : '').filter(Boolean).join(' ')
   wb.description = provenanceRows(p).map(([k, v]) => (k ? `${k}: ${v}` : v)).join('\n')
   wb.company = `Planora ${p.release}`
   const ws = wb.addWorksheet('Provenance')
@@ -111,7 +130,7 @@ export function addProvenance(wb: ExcelJS.Workbook, p: Provenance, title: string
 /** Builds the provenance of one or more loaded schedules (reads only the file name and hash, org-scoped). */
 export async function loadProvenance(
   orgId: string,
-  items: { role?: string; schedule: Pick<Schedule, 'id' | 'name' | 'version' | 'fileName' | 'dataDate' | 'calendars' | 'defaultCalendarId'>; analysis: ScheduleAnalysis | null }[],
+  items: { role?: string; schedule: Pick<Schedule, 'id' | 'name' | 'version' | 'fileName' | 'dataDate' | 'calendars' | 'defaultCalendarId'>; analysis: ScheduleAnalysis | null; editsApplied?: number }[],
   rules?: Partial<DcmaRules> | null,
 ): Promise<Provenance> {
   const { getScheduleFileMeta } = await import('@/lib/db')
@@ -121,6 +140,7 @@ export async function loadProvenance(
     sources.push({
       role: it.role, scheduleName: it.schedule.name, version: it.schedule.version, fileName: meta?.fileName || it.schedule.fileName,
       sha256: meta?.sha256 ?? null, dataDate: it.schedule.dataDate, progressMode: it.analysis?.progressMode ?? 'retained',
+      ...(it.editsApplied ? { editsApplied: it.editsApplied } : {}),
     })
   }
   const first = items[0]

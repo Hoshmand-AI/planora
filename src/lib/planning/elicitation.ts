@@ -527,7 +527,10 @@ const CIVIL_MILESTONES: Partial<Record<ProjectType, MilestoneTarget[]>> = {
 export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
   // Interiors / TI: no foundations, structure or dry-in to target.
   if (p.projectType === 'interiors_ti') return MILESTONE_TARGETS.filter(m => m.key === 'commissioning' || m.key === 'substantial_completion')
-  return (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
+  const list = (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
+  // Transit with trackwork out of scope (e.g. a station rehabilitation): there is no track to complete.
+  if (p.projectType === 'transit_rail' && p.civil?.trackwork === false && p.civil.guideway !== 'elevated_segmental') return list.filter(m => m.key !== 'track')
+  return list
 }
 /** Every milestone target key across project types (for date checks on stored answers). */
 const ALL_MILESTONE_TARGETS: MilestoneTarget[] = [...MILESTONE_TARGETS, ...Object.values(CIVIL_MILESTONES).flat()].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)

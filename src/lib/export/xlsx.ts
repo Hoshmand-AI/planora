@@ -25,7 +25,7 @@ function markSheet(ws: ExcelJS.Worksheet, m: ExportMarking | null | undefined): 
   ws.headerFooter = { oddHeader: `&C&B${m.banner}`, oddFooter: `&C&B${m.banner}&R&P / &N` }
   return rows.length
 }
-import { addProvenance, type Provenance } from './provenance'
+import { addProvenance, sourceBasis, sourceSha, type Provenance } from './provenance'
 
 const DATE_FMT = 'mm/dd/yyyy'
 const toDate = (iso?: string | null) => (iso ? new Date(iso.slice(0, 10) + 'T00:00:00Z') : null)
@@ -296,7 +296,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   ws.getCell(r + 4, 2).font = { italic: true, size: 9, color: { argb: 'FF6B6359' } }
   if (prov) {
     const src = prov.sources[0]
-    ws.getCell(off + 3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src?.sha256 ?? 'not recorded'} · Planora ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} — see the Provenance sheet`
+    ws.getCell(off + 3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src ? sourceSha(src) : 'not recorded'} · Planora ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} · Basis: ${src ? sourceBasis(src) : 'as submitted'} — see the Provenance sheet`
     ws.getCell(off + 3, 1).font = { size: 9, color: { argb: 'FF6B6359' } }
     addProvenance(wb, prov, `${projectName} — P6 layout`)
   }

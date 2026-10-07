@@ -235,7 +235,8 @@ describe('6. Data center mission-critical backbone', () => {
     expect(preds(g, 'dc-l2')).toEqual(expect.arrayContaining(['dc-l1', 't-electrical_service']))
     expect(preds(g, 'dc-l3')).toEqual(expect.arrayContaining(['dc-l2', 'dc-loadbank']))
     expect(preds(g, 'dc-l4')).toEqual(expect.arrayContaining(['dc-l3', 'dc-containment']))
-    expect(preds(g, 't-commissioning')).toEqual(['dc-l4'])
+    // L5 IST follows L4 and the closed-out punch list; it, not the finishes, drives substantial completion.
+    expect(preds(g, 't-commissioning').sort()).toEqual(['dc-l4', 't-punchlist'])
     expect(reaches(g, 'dc-substation#1', 't-electrical_service') || reaches(g, 'dc-substation', 't-electrical_service')).toBe(true)
     expect(preds(g, 'dc-loadbank').some(p => p.startsWith('t-power_equipment'))).toBe(true)
     expect(preds(g, 'dc-containment').some(p => p.startsWith('dc-busway'))).toBe(true)

@@ -34,7 +34,13 @@
 // are sampled each iteration on top of the ranges. With inputs.nameRules, activities are classified
 // by their names (work-kind.ts): fabrication / delivery / procurement / submittals get a procurement
 // range and no field-productivity correlation, and cure activities are fixed duration unless the
-// scheduler gives them a range.
+// scheduler gives them a range. A risk event may also attach to a milestone: when it occurs the
+// milestone is delayed by its impact (work days). A committed delivery date (inputs.commitments) holds
+// that activity near-deterministic (0 / +5%), and a forecast past the commitment is flagged.
+// Milestones (inputs.milestones): the contract milestone and every milestone with a finish constraint
+// get their own P50 / P80 and probability of meeting their date, measured on logic (their own
+// Finish On / Mandatory Finish / Finish On or After constraint is lifted in the simulation so the
+// date it would really be reached shows, not the constraint date).
 
 import type { GeneratedSchedule, PlanActivity, Answer } from './types'
 import { historyForPlan, type FirmHistory } from './history'
@@ -61,7 +67,9 @@ export interface SraResult {
   /** Discrete risk events: how often each occurred and what it did to the finish */
   events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
   /** How many activities used the scheduler's own ranges / were held fixed (cure) */
-  inputsUsed?: { ranges: number; events: number; fixed: number; procurementByName: number }
+  inputsUsed?: { ranges: number; events: number; fixed: number; procurementByName: number; commitments?: number }
+  /** P50 / P80 and probability of meeting the date, per tracked milestone (the contract milestone first) */
+  milestones?: SraMilestoneResult[]
   ms: number
 }
 
@@ -69,14 +77,35 @@ export interface SraResult {
 export interface SraRange { activityId: string; optimistic: number; mostLikely: number; pessimistic: number }
 /** A discrete risk event: with `probability` (0–1), `impactDays` work days are added to one activity. */
 export interface SraRiskEvent { id: string; name: string; probability: number; impactDays: number; activityId: string }
+/** A supplier's committed delivery (finish) date for one activity. */
+export interface SraCommitment { activityId: string; date: string; note?: string }
+/** A milestone whose finish the simulation tracks; `required` is the date it must meet. */
+export interface SraMilestone { id: string; required: string | null; requiredSource?: string | null; contract?: boolean }
+export interface SraMilestoneResult {
+  id: string; code: string; name: string
+  /** The contract milestone recovery and reports measure against */
+  contract: boolean
+  required: string | null
+  requiredSource: string | null
+  deterministic: string
+  p50: string
+  p80: string
+  /** Share of iterations finishing on or before `required`; null without a date */
+  probability: number | null
+}
 export interface SraInputs {
   ranges?: SraRange[]
   events?: SraRiskEvent[]
+  /** Committed delivery dates (held near-deterministic; a forecast past the date is flagged) */
+  commitments?: SraCommitment[]
+  /** Milestones to report separately (contract milestone and milestones with finish constraints) */
+  milestones?: SraMilestone[]
   /** Classify activities by name (uploaded schedules): procurement ranges, fixed cure durations */
   nameRules?: boolean
 }
 
 const FIELD_RHO = 0.4
+const us = (x: string) => `${x.slice(5, 7)}/${x.slice(8, 10)}/${x.slice(0, 4)}`
 
 function mulberry32(seed: number) {
   let a = seed >>> 0
@@ -229,11 +258,13 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
   const idx = new Map(acts.map((a, i) => [a.id, i]))
   const userRanges = new Map((inputs.ranges || []).filter(r => idx.has(r.activityId)).map(r => [r.activityId, r]))
   const nameRules = !!inputs.nameRules
+  const commitments = (inputs.commitments || []).filter(c => idx.has(c.activityId) && !acts[idx.get(c.activityId)!].actualFinish)
+  for (const c of commitments) if (!userRanges.has(c.activityId)) committed.set(c.activityId, `Committed delivery date ${us(c.date)}${c.note ? ` (${c.note})` : ''}`)
   const dists = acts.map(a => distributionFor(a, { history, catalog, committed, userRanges, nameRules }))
   const kinds = acts.map(a => (nameRules ? workKind(a.name, a.category, a.phase) : null))
   // Supplier-driven and fixed-duration work does not share the field productivity/weather factor.
   const field = acts.map((a, i) => isField(a) && kinds[i] !== 'procurement' && kinds[i] !== 'cure' && !userRanges.has(a.id))
-  const events = (inputs.events || []).map(e => ({ e, i: idx.get(e.activityId) })).filter((x): x is { e: SraRiskEvent; i: number } => x.i != null && !acts[x.i].actualFinish && acts[x.i].type === 'task')
+  const events = (inputs.events || []).map(e => ({ e, i: idx.get(e.activityId) })).filter((x): x is { e: SraRiskEvent; i: number } => x.i != null && !acts[x.i].actualFinish && (acts[x.i].type === 'task' || acts[x.i].type === 'milestone'))
   const eventHits = events.map(() => [] as boolean[])
   const budget = opts.iterations ?? Math.max(200, Math.min(1000, Math.floor(400_000 / Math.max(1, acts.length))))
   const seed = opts.seed ?? hashSeed(`${s.generatedAt}|${acts.length}|${s.links.length}`)
@@ -246,10 +277,18 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
   const warnings: string[] = []
   // Relax mandatory constraints to their logic-driven form so the finish distribution reflects the
   // network, not a pinned date.
-  const mandatory = acts.filter(a => !a.actualFinish && (a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'))
-  const relaxed = acts.map(a => a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'
+  // Tracked milestones are measured on logic: their own finish-date constraint is lifted.
+  const tracked = (inputs.milestones || []).filter(m => idx.has(m.id) && !acts[idx.get(m.id)!].actualFinish)
+  const trackedIds = new Set(tracked.map(m => m.id))
+  const mandatory = acts.filter(a => !a.actualFinish && !trackedIds.has(a.id) && (a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'))
+  const relaxed = acts.map(a => trackedIds.has(a.id) && a.constraint && ['FO', 'MFO', 'FNET', 'MSO', 'SO', 'SNET'].includes(a.constraint.type)
+    ? { ...a, constraint: undefined }
+    : a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO'
     ? { ...a, constraint: { type: a.constraint.type === 'MSO' ? 'SNET' as const : 'FNET' as const, date: a.constraint.date } }
     : a)
+  const lifted = acts.filter(a => trackedIds.has(a.id) && a.constraint && ['FO', 'MFO', 'FNET', 'MSO', 'SO', 'SNET'].includes(a.constraint.type))
+  if (lifted.length) warnings.push(`${lifted.map(a => `${a.code} (${a.constraint!.type} ${us(a.constraint!.date)})`).join(', ')}: the milestone's own date constraint is lifted in the simulation, so its P50 / P80 show when logic reaches it; the probability is of reaching it by that date.`)
+  const msFinishes: number[][] = tracked.map(() => [])
   if (mandatory.length) {
     const names = mandatory.slice(0, 5).map(a => `${a.code} (${a.constraint!.type === 'MSO' ? 'Mandatory Start' : 'Mandatory Finish'} ${a.constraint!.date})`).join(', ')
     warnings.push(`${mandatory.length} mandatory constraint${mandatory.length === 1 ? '' : 's'} (${names}${mandatory.length > 5 ? ', …' : ''}) ${mandatory.length === 1 ? 'was' : 'were'} relaxed for the simulation: Mandatory Start is treated as Start On or After and Mandatory Finish as Finish On or After, so logic drives the simulated finish. The deterministic finish still honours the mandatory dates.`)
@@ -274,10 +313,14 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       eventHits[k].push(hit)
       if (!hit || e.impactDays <= 0) return
       const a = simActs[i]
-      simActs[i] = { ...a, duration: a.duration + Math.round(e.impactDays), remaining: a.remaining != null ? a.remaining + Math.round(e.impactDays) : undefined }
+      // On a milestone the event delays it: it becomes a step of `impact` work days for this iteration.
+      simActs[i] = a.type === 'milestone'
+        ? { ...a, type: 'task' as const, duration: Math.round(e.impactDays), remaining: undefined }
+        : { ...a, duration: a.duration + Math.round(e.impactDays), remaining: a.remaining != null ? a.remaining + Math.round(e.impactDays) : undefined }
     })
     const r = runCpm({ ...base, activities: simActs })
     finishes.push(toDayNumber(r.projectFinish))
+    tracked.forEach((m, k) => { const t = r.times[m.id]; msFinishes[k].push(toDayNumber(t ? t.earlyFinish : r.projectFinish)) })
     // Critical in this iteration = on its driving path to the project finish.
     const onPath = new Set(r.longestPath)
     acts.forEach((a, i) => { if (onPath.has(a.id)) critical[i]++ })
@@ -316,6 +359,27 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
   const procurementByName = nameRules ? acts.filter((a, i) => kinds[i] === 'procurement' && dists[i] && !userRanges.has(a.id)).length : 0
   const requiredDate = s.mustFinishBy
   const contingency = acts.find(a => a.category === 'contingency')
+  // Tracked milestones: deterministic logic date (no sampling, no events) and the simulated spread.
+  let milestones: SraMilestoneResult[] | undefined
+  if (tracked.length) {
+    const det = runCpm({ ...base, activities: relaxed })
+    milestones = tracked.map((m, k) => {
+      const a = acts[idx.get(m.id)!]
+      const xs = [...msFinishes[k]].sort((x, y) => x - y)
+      const qq = (p: number) => fromDayNumber(xs[Math.min(xs.length - 1, Math.max(0, Math.ceil(p * xs.length) - 1))])
+      return {
+        id: a.id, code: a.code, name: a.name, contract: !!m.contract, required: m.required, requiredSource: m.requiredSource ?? null,
+        deterministic: det.times[a.id]?.earlyFinish ?? det.projectFinish, p50: qq(0.5), p80: qq(0.8),
+        probability: m.required ? xs.filter(f => f <= toDayNumber(m.required!)).length / xs.length : null,
+      }
+    }).sort((x, y) => Number(y.contract) - Number(x.contract))
+  }
+  // A forecast past a supplier's committed delivery date is a problem in the schedule, not a risk.
+  for (const c of commitments) {
+    const t = s.cpm?.times[c.activityId]
+    const a = acts[idx.get(c.activityId)!]
+    if (t && t.earlyFinish > c.date) warnings.push(`${a.code} ${a.name} is forecast to finish ${us(t.earlyFinish)}, after its committed delivery date ${us(c.date)}: update the logic or the commitment.`)
+  }
   return {
     method: `Monte Carlo schedule risk analysis: ${budget.toLocaleString()} iterations of the full CPM network with three-point (triangular) duration distributions, correlated field work (rho ${FIELD_RHO}), seeded for reproducibility.`,
     iterations: budget,
@@ -334,6 +398,7 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       'Field activities share a common productivity/weather factor (correlation 0.4).',
       contingency ? `The ${contingency.duration}-day contingency activity is excluded; the simulated uncertainty replaces it.` : 'No contingency activity in the schedule.',
       ...(userRanges.size ? [`${userRanges.size} activit${userRanges.size === 1 ? 'y uses' : 'ies use'} the scheduler's own optimistic / most likely / pessimistic range (work days of remaining work) instead of the rule-based range.`] : []),
+      ...(commitments.length ? [`${commitments.length} activit${commitments.length === 1 ? 'y has' : 'ies have'} a committed delivery date and ${commitments.length === 1 ? 'is' : 'are'} held near-deterministic (0 / +5%).`] : []),
       ...(nameRules ? [`Activities are classified by name: ${procurementByName} fabrication / delivery / procurement / submittal activit${procurementByName === 1 ? 'y uses' : 'ies use'} a supplier range (−10% / +40%) outside the field productivity factor; ${fixed} cure activit${fixed === 1 ? 'y is' : 'ies are'} held at fixed duration unless given a range.`] : []),
       events.length
         ? `${events.length} discrete risk event${events.length === 1 ? ' is' : 's are'} sampled each iteration (probability × impact on the named activity), on top of the duration ranges.`
@@ -341,7 +406,8 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       'Criticality index: the share of iterations in which the activity was on the driving (longest) path to the simulated project finish.',
     ],
     warnings,
-    ...(opts.inputs ? { events: eventStats, inputsUsed: { ranges: userRanges.size, events: events.length, fixed, procurementByName } } : {}),
+    ...(opts.inputs ? { events: eventStats, inputsUsed: { ranges: userRanges.size, events: events.length, fixed, procurementByName, commitments: commitments.length } } : {}),
+    ...(milestones ? { milestones } : {}),
     ms: Date.now() - started,
   }
 }

@@ -3,7 +3,7 @@
 // held as real date constraints, and federal-installation wording. Kept apart from generator.ts so
 // the shared generator stays small; each function only touches civil or federal plans.
 
-import type { Answer, Assumption, CpmResult, PlanActivity, ProjectProfile, WorkCalendar } from './types'
+import type { Answer, Assumption, CpmResult, PlanActivity, PlanLink, ProjectProfile, WorkCalendar } from './types'
 import { WINTER_SHUTDOWN, inWaterWindow } from './civil-options'
 import { federalInstallationTri } from '@/lib/knowledge/applicability'
 
@@ -66,11 +66,13 @@ export function applySeasonalCalendar(acts: Map<string, PlanActivity>, calendars
 }
 
 /**
- * The in-water work window as real constraints: the first in-water activity starts no earlier than the
- * window opens and the last must finish before it closes (finish-no-later-than), in the first season
- * whose window is still open when the work is ready. Work that cannot fit shows negative float.
+ * The in-water work window as real constraints: the in-water work starts no earlier than the window
+ * opens (a "window opens" start milestone held start-no-earlier-than) and its last piece must finish
+ * before the window closes (finish-no-later-than), in the first season whose window is still open when
+ * the work is ready. Both ends are always held, also when the work is one activity. Work that cannot
+ * fit shows negative float.
  */
-export function applyInWaterWindow(acts: Map<string, PlanActivity>, first: CpmResult, recompute: () => CpmResult, answers: Record<string, Answer>, notes: string[], assumptions: Assumption[]): CpmResult {
+export function applyInWaterWindow(acts: Map<string, PlanActivity>, links: Map<string, PlanLink>, first: CpmResult, recompute: () => CpmResult, answers: Record<string, Answer>, notes: string[], assumptions: Assumption[]): CpmResult {
   const win = inWaterWindow(answers)
   // Window-limited in-water work (cofferdams, pile driving in water, cofferdam removal) says so in its
   // name; dewatering inside a cofferdam is not limited.
@@ -103,22 +105,48 @@ export function applyInWaterWindow(acts: Map<string, PlanActivity>, first: CpmRe
     let y = Number(ready.slice(0, 4)) - (wraps ? 1 : 0)
     while (closeOf(y) < ready) y++
     const open = `${y}-${win.open}`, close = closeOf(y)
-    // One activity holds one constraint: a single activity waits for the window if it is not open yet,
-    // otherwise it is held to the closing date.
+    // One activity holds one constraint: the window opening is a start milestone ahead of the work, and
+    // the last piece of the work holds the closing date.
     if (open > ready) {
-      head.constraint = { type: 'SNET', date: open }
-      head.rationale = { ...head.rationale, assumptions: [...(head.rationale.assumptions || []), `In-water work window opens ${f(open)} (start no earlier than the window).`] }
+      const key = head.id.replace(/#\d+$/, '')
+      const msId = `${key}-window-opens`
+      acts.set(msId, {
+        id: msId, code: '', name: `In-water work window opens — ${head.name.replace(/ — Area \d+ of \d+$/, '')}`, category: head.category, phase: head.phase,
+        type: 'milestone', milestoneKind: 'start', duration: 0, calendarId: head.calendarId, constraint: { type: 'SNET', date: open },
+        rationale: { summary: `The permit window opens ${f(open)}; in-water work cannot start before it (start no earlier than).`, sources: [{ kind: 'user', label: 'In-water work window from interview' }], confidence: 'high' },
+      })
+      const lk = (from: string, to: string, summary: string) => {
+        const id = `${from}>${to}`
+        if (from !== to && !links.has(id)) links.set(id, { id, from, to, type: 'FS', lag: 0, rationale: { summary, sources: [{ kind: 'user', label: 'In-water work window' }], confidence: 'high' } })
+      }
+      lk(acts.has('ntp') ? 'ntp' : [...links.values()].find(l => l.to === head.id)?.from ?? head.id, msId, 'The window date is tracked from NTP.')
+      lk(msId, head.id, 'In-water work starts once the permit window is open.')
     }
-    if (tail.id !== head.id || open <= ready) {
-      tail.constraint = { type: 'FNLT', date: close }
-      tail.rationale = { ...tail.rationale, assumptions: [...(tail.rationale.assumptions || []), `In-water work must finish before the window closes ${f(close)} (finish no later than).`] }
-    }
+    tail.constraint = { type: 'FNLT', date: close }
+    tail.rationale = { ...tail.rationale, assumptions: [...(tail.rationale.assumptions || []), `In-water work must finish before the window closes ${f(close)} (finish no later than).`] }
     placed.push(`${head.name.replace(/ — Area \d+ of \d+$/, '')}: ${f(open)} – ${f(close)}`)
     cpm = recompute()
   }
   notes.push(`In-water work windows (${win.open.replace('-', '/')} – ${win.close.replace('-', '/')} each season): ${placed.join('; ')}. Negative float on these activities means the work does not fit its season; resequence it or plan for the next window.`)
   assumptions.push({ questionId: 'civil.inwater_open', text: `In-water work held to the permit window, each piece in the first season open when it is ready (${placed.length} window${placed.length > 1 ? 's' : ''}).`, bufferDays: 0, kind: 'inferred' })
   return cpm
+}
+
+/**
+ * California public K-12 under the Division of the State Architect: DSA, not the local building
+ * department, is the authority. There is no local certificate of occupancy; the Project Inspector's
+ * verified report and DSA certification close the project (one certification, not one per area).
+ */
+export function applyStateAgencyCertification(acts: Map<string, PlanActivity>, permitIds: string[], answers: Record<string, Answer>, assumptions: Assumption[]): void {
+  if (!permitIds.includes('ca-dsa') || known(answers, 'permit.ca-dsa.status') === 'not_required') return
+  let renamed = false
+  for (const a of acts.values()) {
+    if (a.category !== 'inspections' || !a.id.startsWith('t-') || !/certificate of occupancy/i.test(a.name)) continue
+    a.name = 'Final inspections (DSA Project Inspector verified report, State Fire Marshal, elevator, health) — DSA-approved occupancy'
+    a.rationale = { ...a.rationale, assumptions: [...(a.rationale.assumptions || []), 'DSA jurisdiction (Field Act): no local building inspection or certificate of occupancy; the Project Inspector and DSA close the project.'] }
+    renamed = true
+  }
+  if (renamed) assumptions.push({ questionId: 'permit.ca-dsa.status', text: 'California public K-12 under DSA: no local certificate of occupancy is planned; DSA certification of construction is one closeout activity for the whole project.', bufferDays: 0, kind: 'inferred' })
 }
 
 /**

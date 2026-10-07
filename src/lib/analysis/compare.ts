@@ -5,10 +5,18 @@
 // This is the evidence a monthly update review and a windows / time-impact analysis start from:
 // what moved, what was added or deleted, which logic, durations, constraints and calendars changed,
 // which actual dates were rewritten after the fact, and where float eroded.
+//
+// Finish causes: given the windows attribution of the same pair (analyzeWindow), the causes are its
+// activity-level drivers on the logic-driven path to the finish, in calendar days that add up to the
+// windows movement, so compare and windows agree. Without it, a heuristic lists changes on the
+// driving path to the finish milestone (never work behind an overruled mandatory constraint).
+// Dates in rows are calendar days (unit 'cd'), durations and float work days ('wd'), with each
+// row's calendar by name; the latest-finishing activity is read from the same activity dates.
 
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { CpmResult, WorkCalendar } from '@/lib/planning/types'
 import { fmtDate } from '@/lib/format'
+import type { DriverChange, WindowRow } from '@/lib/analysis/windows'
 
 export interface CompareSide {
   schedule: Pick<Schedule, 'id' | 'name' | 'version' | 'dataDate'> & { forecastFinish: string | null; projectKey?: string | null }
@@ -30,11 +38,21 @@ export interface CompareSide {
 
 /** A change that can explain finish movement (attribution by cause, not a recalculation). */
 export interface FinishCause {
-  kind: 'mandatory_constraint' | 'driving_duration' | 'driving_logic'
+  kind: 'mandatory_constraint' | 'driving_duration' | 'driving_logic' | 'driving_constraint' | 'driving_calendar' | 'progress' | 'added_activity' | 'driving_other' | 'unattributed'
   code: string
   detail: string
   /** Work days, for duration changes */
   delta?: number | null
+  /**
+   * Calendar days of the finish movement this cause accounts for, from the windows attribution of
+   * the same pair (present only when compare was given it). The causes with days add up to
+   * windowAttribution.movement.
+   */
+  days?: number | null
+  /** The same in work days on the activity's calendar */
+  workDays?: number | null
+  /** Overruled mandatory constraint downstream on the driving path that hides this slip as scheduled */
+  hiddenBy?: string | null
 }
 
 /** Where a mandatory constraint holds the finish milestone: the constrained date next to logic's. */
@@ -48,6 +66,10 @@ export interface ActivityChange {
   after: string | number | null
   /** For dates: calendar days after - before; for numbers: after - before */
   delta: number | null
+  /** Unit of before/after/delta: work days (durations, float) or calendar days (dates); null for text */
+  unit: 'wd' | 'cd' | null
+  /** The activity's calendar (by name) in the later update */
+  calendar: string | null
 }
 
 /** A change to a calendar's definition, matched by calendar name across the two updates. */
@@ -66,8 +88,18 @@ export interface ScheduleComparison {
    * updates when there is one (finishActivity); otherwise on the project forecast finish.
    */
   finishMovement: number | null
-  /** Calendar days the project forecast finish moved, whichever activity finishes last */
+  /**
+   * Calendar days the latest-finishing activity moved, whichever activity finishes last, on the same
+   * basis as the activity dates (Planora's recalculated dates; latestFinish names the activities)
+   */
   projectFinishMovement: number | null
+  /** The latest-finishing activity in each update, from the activity dates */
+  latestFinish: { before: { code: string; date: string } | null; after: { code: string; date: string } | null }
+  /**
+   * The windows attribution of this pair, when compare was given it: finishCauses then come from it
+   * (activity-level drivers on the logic-driven driving path) and their days add up to movement.
+   */
+  windowAttribution: { finishCode: string | null; movement: number | null; asScheduledMovement: number | null; unattributed: number; hidden: string[] } | null
   /** Activity whose finish finishMovement measures (null: project forecast finish) */
   finishActivity: string | null
   milestoneMovement: { code: string; before: string | null; after: string | null; delta: number | null } | null
@@ -140,7 +172,11 @@ const CAL_CHANGE_TEXT: Record<CalendarChange['field'], (c: CalendarChange) => st
 }
 export const describeCalendarChange = (c: CalendarChange) => CAL_CHANGE_TEXT[c.field](c)
 
-export function compareSchedules(before: CompareSide, after: CompareSide): ScheduleComparison {
+/**
+ * Compare two updates. Pass `window` (analyzeWindow of the same pair, earlier → later) so the finish
+ * causes are the windows attribution's activity-level drivers and agree with the windows analysis.
+ */
+export function compareSchedules(before: CompareSide, after: CompareSide, opts: { window?: WindowRow | null } = {}): ScheduleComparison {
   const bActs = before.activities.filter(work)
   const aActs = after.activities.filter(work)
   const bByCode = new Map(bActs.map(a => [a.activityId, a]))
@@ -164,13 +200,15 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   const actualsRewritten: ActivityChange[] = []
   const floatErosion: ScheduleComparison['floatErosion'] = []
   const started: string[] = [], finished: string[] = []
+  const UNIT: Partial<Record<ActivityChange['field'], 'wd' | 'cd'>> = { duration: 'wd', remaining: 'wd', float: 'wd', start: 'cd', finish: 'cd', actual_start: 'cd', actual_finish: 'cd', baseline_finish: 'cd' }
+  const unitOf = (c: Omit<ActivityChange, 'unit'>): ActivityChange => ({ ...c, unit: UNIT[c.field] ?? null })
+  const push = (c: Omit<ActivityChange, 'unit'>) => changes.push(unitOf(c))
   let matched = 0
-  const push = (c: ActivityChange) => changes.push(c)
   for (const a of aActs) {
     const b = bByCode.get(a.activityId)
     if (!b) continue
     matched++
-    const base = { code: a.activityId, name: a.name }
+    const base = { code: a.activityId, name: a.name, calendar: calName(after, a.calendarId) }
     if (Math.round(b.duration) !== Math.round(a.duration)) push({ ...base, field: 'duration', before: b.duration, after: a.duration, delta: Math.round(a.duration - b.duration) })
     if (a.status !== 'complete' && b.status !== 'complete' && Math.round(b.remainingDuration) !== Math.round(a.remainingDuration) && a.status === 'in_progress' && b.status === 'in_progress') {
       push({ ...base, field: 'remaining', before: b.remainingDuration, after: a.remainingDuration, delta: Math.round(a.remainingDuration - b.remainingDuration) })
@@ -189,8 +227,8 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
     if ((bc === null ? null : calKey(bc)) !== (ac === null ? null : calKey(ac))) push({ ...base, field: 'calendar', before: bc, after: ac, delta: null })
     if (b.baselineFinish && a.baselineFinish && b.baselineFinish !== a.baselineFinish) push({ ...base, field: 'baseline_finish', before: b.baselineFinish, after: a.baselineFinish, delta: calDays(b.baselineFinish, a.baselineFinish) })
     // Actuals already reported should not change in a later update.
-    if (b.actualStart && b.actualStart !== a.actualStart) actualsRewritten.push({ ...base, field: 'actual_start', before: b.actualStart, after: a.actualStart, delta: calDays(b.actualStart, a.actualStart) })
-    if (b.actualFinish && b.actualFinish !== a.actualFinish) actualsRewritten.push({ ...base, field: 'actual_finish', before: b.actualFinish, after: a.actualFinish, delta: calDays(b.actualFinish, a.actualFinish) })
+    if (b.actualStart && b.actualStart !== a.actualStart) actualsRewritten.push(unitOf({ ...base, field: 'actual_start', before: b.actualStart, after: a.actualStart, delta: calDays(b.actualStart, a.actualStart) }))
+    if (b.actualFinish && b.actualFinish !== a.actualFinish) actualsRewritten.push(unitOf({ ...base, field: 'actual_finish', before: b.actualFinish, after: a.actualFinish, delta: calDays(b.actualFinish, a.actualFinish) }))
     if (!b.actualStart && a.actualStart) started.push(a.activityId)
     if (!b.actualFinish && a.actualFinish) finished.push(a.activityId)
     if (a.status !== 'complete' && b.status !== 'complete' && a.totalFloat < b.totalFloat) {
@@ -224,13 +262,26 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
 
   // Finish movement is measured on the same finish activity in both updates, so a different activity
   // becoming the last one does not read as a slip or a gain.
-  const projectFinishMovement = calDays(before.schedule.forecastFinish, after.schedule.forecastFinish)
+  // The latest-finishing activity on the activity dates themselves (the dates every row shows).
+  const latestOf = (acts: Activity[]) => {
+    let best: { code: string; date: string } | null = null
+    for (const x of acts) {
+      if (x.activityType === 'loe') continue
+      const d = x.actualFinish || x.earlyFinish
+      if (d && (!best || d.slice(0, 10) > best.date.slice(0, 10))) best = { code: x.activityId, date: d }
+    }
+    return best
+  }
+  const latestFinish = { before: latestOf(bActs), after: latestOf(aActs) }
+  const projectFinishMovement = latestFinish.before && latestFinish.after
+    ? calDays(latestFinish.before.date, latestFinish.after.date)
+    : calDays(before.schedule.forecastFinish, after.schedule.forecastFinish)
   const finishOn = (side: CompareSide, byCode: Map<string, Activity>, code: string) =>
     side.finishMilestone?.code === code ? side.finishMilestone.forecastFinish : (byCode.get(code)?.actualFinish || byCode.get(code)?.earlyFinish || null)
   const fmCode = after.finishMilestone?.code ?? before.finishMilestone?.code ?? null
   let milestoneMovement: ScheduleComparison['milestoneMovement'] = null
   let finishActivity: string | null = null
-  let finishMovement = projectFinishMovement
+  let finishMovement = calDays(before.schedule.forecastFinish, after.schedule.forecastFinish)
   if (fmCode) {
     const bd = finishOn(before, bByCode, fmCode), ad = finishOn(after, aByCode, fmCode)
     milestoneMovement = { code: fmCode, before: bd, after: ad, delta: calDays(bd, ad) }
@@ -256,25 +307,74 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   }
   const finishBasis = { before: basisOf(before, bCodeOf), after: basisOf(after, aCodeOf) }
 
-  // What can explain the movement: mandatory constraints added/changed/removed anywhere, and duration
-  // and logic changes on the driving path (scheduled or logic-driven) of either update.
-  const drivingCodes = new Set<string>([...bPath, ...aPath])
-  for (const [side, codeOf] of [[before, bCodeOf], [after, aCodeOf]] as const) for (const id of side.logicLongestPath ?? []) { const c = codeOf.get(id); if (c) drivingCodes.add(c) }
   const isMand = (k: string | number | null) => typeof k === 'string' && /^(MSO|MFO)\b/.test(k)
   const finishCauses: FinishCause[] = []
-  for (const c of changes) {
+  const w = opts.window ?? null
+  let windowAttribution: ScheduleComparison['windowAttribution'] = null
+  if (w) {
+    // The windows attribution of the same pair: activity-level drivers on the logic-driven driving path
+    // to the finish (activities off that path, e.g. behind a mandatory constraint that cuts them off,
+    // are not listed), in calendar days that add up to the windows movement.
+    windowAttribution = { finishCode: w.finishCode, movement: w.movement, asScheduledMovement: w.asScheduled.movement, unattributed: w.unattributed, hidden: w.hidden.map(h => h.text) }
+    const KIND: Record<DriverChange['kind'], FinishCause['kind']> = {
+      added: 'added_activity', duration: 'driving_duration', remaining: 'driving_duration', logic: 'driving_logic', constraint: 'driving_constraint', calendar: 'driving_calendar', progress: 'progress',
+    }
+    for (const d of w.drivers) {
+      const first = d.changes[0]
+      let kind: FinishCause['kind'] = first ? KIND[first.kind] : 'driving_other'
+      if (first?.kind === 'constraint' && /\b(MSO|MFO)\b/.test(first.detail)) kind = 'mandatory_constraint'
+      const dur = d.changes.find(c => c.kind === 'duration' || c.kind === 'remaining')
+      finishCauses.push({
+        kind, code: d.code, days: d.days, workDays: d.workDays, hiddenBy: d.hiddenBy, ...(dur ? { delta: dur.delta ?? null } : {}),
+        detail: `${d.changes.length ? d.changes.map(c => c.detail).join('; ') : 'driving-path timing (no change recorded on the activity itself)'}${d.hiddenBy ? `; hidden as scheduled by the mandatory constraint on ${d.hiddenBy}` : ''}`,
+      })
+    }
+    if (w.unattributed) finishCauses.push({ kind: 'unattributed', code: w.finishCode ?? '', days: w.unattributed, detail: 'not explained along the driving path to the finish' })
+    for (const h of w.hidden) finishCauses.push({ kind: 'mandatory_constraint', code: h.code, workDays: h.days, detail: h.text })
+  }
+  // Without the windows attribution: mandatory constraints added/changed/removed anywhere, and
+  // duration and logic changes on the driving path of either update — the scheduled longest path, and
+  // the logic-driven path only from the last overruled mandatory constraint on it onward (work behind
+  // such a constraint does not drive the finish as scheduled).
+  const drivingCodes = new Set<string>([...bPath, ...aPath])
+  for (const [side, codeOf] of [[before, bCodeOf], [after, aCodeOf]] as const) {
+    const codes = (side.logicLongestPath ?? []).map(id => codeOf.get(id)).filter((c): c is string => !!c)
+    const fin = side.finishMilestone?.code ?? fmCode
+    const cut = new Set((side.violations || []).filter(v => v.days > 0).map(v => codeOf.get(v.id)).filter(c => c && c !== fin))
+    let from = 0
+    codes.forEach((c, i) => { if (cut.has(c)) from = i })
+    for (const c of codes.slice(from)) drivingCodes.add(c)
+  }
+  // With a finish milestone, only work that can drive it (its predecessors, transitively) counts, and
+  // its predecessors with no more float than it has are its driving path.
+  if (fmCode) {
+    const feeds = new Set<string>([fmCode])
+    for (const [side, codeOf, byCode] of [[before, bCodeOf, bByCode], [after, aCodeOf, aByCode]] as const) {
+      const preds = new Map<string, string[]>()
+      for (const r of side.relationships) {
+        const p = codeOf.get(r.predecessorId), s = codeOf.get(r.successorId)
+        if (p && s) { if (!preds.has(s)) preds.set(s, []); preds.get(s)!.push(p) }
+      }
+      const stack = [fmCode], seen = new Set([fmCode])
+      while (stack.length) for (const p of preds.get(stack.pop()!) ?? []) if (!seen.has(p)) { seen.add(p); feeds.add(p); stack.push(p) }
+      const fm = byCode.get(fmCode)
+      if (fm) for (const c of seen) { const x = byCode.get(c); if (x && x.status !== 'complete' && !x.actualFinish && x.totalFloat <= fm.totalFloat) drivingCodes.add(c) }
+    }
+    for (const c of [...drivingCodes]) if (!feeds.has(c)) drivingCodes.delete(c)
+  }
+  for (const c of w ? [] : changes) {
     if (c.field === 'constraint' && (isMand(c.before) || isMand(c.after))) {
       const holds = (after.violations || []).some(v => aCodeOf.get(v.id) === c.code && v.days > 0)
       const what = c.before == null ? 'added' : c.after == null ? 'removed' : 'changed'
       finishCauses.push({ kind: 'mandatory_constraint', code: c.code, detail: `mandatory constraint ${what}: ${c.before ?? 'none'} → ${c.after ?? 'none'}${holds ? ' (overrules logic)' : ''}` })
     }
   }
-  for (const c of changes) {
+  for (const c of w ? [] : changes) {
     if ((c.field === 'duration' || c.field === 'remaining') && drivingCodes.has(c.code)) {
       finishCauses.push({ kind: 'driving_duration', code: c.code, delta: c.delta, detail: `${c.field === 'duration' ? 'original' : 'remaining'} duration ${c.before} → ${c.after} work days on the driving path` })
     }
   }
-  const touches = (l: { pred: string; succ: string }) => drivingCodes.has(l.pred) || drivingCodes.has(l.succ)
+  const touches = (l: { pred: string; succ: string }) => !w && (drivingCodes.has(l.pred) || drivingCodes.has(l.succ))
   for (const l of logicAdded.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `relationship added ${l.pred} → ${l.succ} ${l.type}${l.lag ? ` lag ${l.lag}` : ''}` })
   for (const l of logicDeleted.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `relationship deleted ${l.pred} → ${l.succ} ${l.type}${l.lag ? ` lag ${l.lag}` : ''}` })
   for (const l of lagChanged.filter(touches)) finishCauses.push({ kind: 'driving_logic', code: l.succ, detail: `lag ${l.pred} → ${l.succ} ${l.type} ${l.before} → ${l.after}` })
@@ -299,10 +399,23 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
     const ad = finishActivity ? milestoneMovement!.after : after.schedule.forecastFinish
     summary.push(finishMovement === 0 ? `${what} did not move.` : `${what} moved ${days(finishMovement)} (${fmtDate(bd)} → ${fmtDate(ad)}).`)
   }
-  if (finishActivity && projectFinishMovement != null && projectFinishMovement !== finishMovement) summary.push(`The latest-finishing activity moved ${projectFinishMovement === 0 ? '0 days' : days(projectFinishMovement)} (${fmtDate(before.schedule.forecastFinish)} → ${fmtDate(after.schedule.forecastFinish)}).`)
+  if (finishActivity && projectFinishMovement != null && latestFinish.before && latestFinish.after
+    && (projectFinishMovement !== finishMovement || latestFinish.after.code !== finishActivity)) {
+    const who = latestFinish.before.code === latestFinish.after.code ? latestFinish.after.code : `${latestFinish.before.code} → ${latestFinish.after.code}`
+    summary.push(`The latest-finishing activity (${who}) moved ${projectFinishMovement === 0 ? '0 days' : days(projectFinishMovement)} (${fmtDate(latestFinish.before.date)} → ${fmtDate(latestFinish.after.date)}, Planora's recalculated activity dates).`)
+  }
   if (finishHeldBy) summary.push(`The finish ${finishMovement === 0 ? 'did not move' : 'moved earlier'} only because a Mandatory Finish constraint on ${finishHeldBy.code} holds it at ${fmtDate(finishHeldBy.constraintDate)}; logic alone would finish it ${fmtDate(finishHeldBy.logicDate)}, ${n(finishHeldBy.days, 'work day')} later.`)
   if (finishBasis.after && !finishHeldBy) summary.push(`${finishBasis.after.code} is held by a ${finishBasis.after.type === 'MFO' ? 'Mandatory Finish' : 'Mandatory Start'} at ${fmtDate(finishBasis.after.constrainedFinish)}; the logic-driven finish is ${fmtDate(finishBasis.after.logicFinish)} (${n(finishBasis.after.days, 'work day')} later).`)
-  if (finishMovement && finishCauses.length) {
+  if (w && w.movement != null) {
+    const sgn = (x: number) => (x > 0 ? `+${x}` : String(x))
+    const items = finishCauses.filter(c => c.days != null && c.days !== 0)
+    const shown = items.slice(0, 6).map(c => (c.kind === 'unattributed' ? `not explained along the driving path ${sgn(c.days!)}` : `${c.code} ${sgn(c.days!)} (${c.detail})`))
+    const what = `${w.finishCode ?? 'the project finish'} logic-driven finish`
+    if (w.movement === 0 && !items.length) summary.push(`Windows attribution for this pair: the ${what} did not move.`)
+    else summary.push(`Windows attribution for this pair (calendar days; they add up to the ${sgn(w.movement)} movement of the ${what}): ${shown.join('; ')}${items.length > 6 ? `; and ${items.length - 6} more` : ''}.`)
+    if (w.asScheduled.movement != null && w.asScheduled.movement !== w.movement) summary.push(`As scheduled (mandatory constraints honored) the finish moved ${sgn(w.asScheduled.movement)} calendar days${w.hidden.length ? `; ${w.hidden.map(h => h.text).join('; ')}` : ''}.`)
+    else if (w.hidden.length) summary.push(`Delay hidden by mandatory constraints: ${w.hidden.map(h => h.text).join('; ')}.`)
+  } else if (finishMovement && finishCauses.length) {
     const k = (kind: FinishCause['kind']) => finishCauses.filter(c => c.kind === kind)
     const list = (xs: FinishCause[]) => `${xs.slice(0, 4).map(x => x.code).join(', ')}${xs.length > 4 ? ` and ${xs.length - 4} more` : ''}`
     const parts: string[] = []
@@ -341,7 +454,7 @@ export function compareSchedules(before: CompareSide, after: CompareSide): Sched
   return {
     before: { id: before.schedule.id, name: before.schedule.name, version: before.schedule.version, dataDate: before.schedule.dataDate, forecastFinish: before.schedule.forecastFinish },
     after: { id: after.schedule.id, name: after.schedule.name, version: after.schedule.version, dataDate: after.schedule.dataDate, forecastFinish: after.schedule.forecastFinish },
-    finishMovement, projectFinishMovement, finishActivity, milestoneMovement, finishHeldBy, finishCauses, finishBasis, matched, added, deleted, logicAdded, logicDeleted, lagChanged, changes, calendarChanges, actualsRewritten,
+    finishMovement, projectFinishMovement, latestFinish, windowAttribution, finishActivity, milestoneMovement, finishHeldBy, finishCauses, finishBasis, matched, added, deleted, logicAdded, logicDeleted, lagChanged, changes, calendarChanges, actualsRewritten,
     floatErosion, criticalPath: { entered, left, leftDeleted }, progress: { started, finished }, warnings, summary,
   }
 }

@@ -9,12 +9,15 @@
 //                       in an update series the windows analysis and the float / BEI trend
 //   qa_qc             — DCMA 14-point table with every offender, recalculation differences,
 //                       overruled constraints, the data questions and the reviewer's dispositions
-// Every report starts with a provenance block (source file, SHA-256, release, settings, data date).
+// Every report starts with a provenance block (source file, SHA-256, release, settings, data date)
+// and states the one baseline all of its tables, the variance and BEI / missed tasks measure against
+// (src/lib/analysis/baseline.ts): the activities' baseline dates are the resolved baseline's.
 // Dates are MM/DD/YYYY; variances are calendar days, float is work days. Pure, so it is unit tested.
 
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { DcmaReport } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import { FINISH_LABELS } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleComparison } from '@/lib/analysis/compare'
 import type { ProjectBrief } from '@/lib/analysis/brief'
 import type { CpmLinkFloat } from '@/lib/planning/types'
@@ -66,6 +69,12 @@ const open = (a: Activity) => a.status !== 'complete' && !a.actualFinish
 const isWork = (a: Activity) => a.activityType !== 'summary' && a.activityType !== 'loe'
 const STATUS = { on_track: 'On track', attention: 'Needs attention', at_risk: 'At risk', complete: 'Complete' } as const
 
+/** "Baseline: Update 0 'Baseline' uploaded MM/DD/YYYY" — the source every table here measures against. */
+export function baselineLine(r: Pick<ReportInput, 'analysis' | 'activities'>): string {
+  if (r.analysis.baseline?.header) return r.analysis.baseline.header
+  return r.activities.some(a => a.baselineFinish) ? "Baseline: the file's own P6 target dates" : 'Baseline: none. The file has no baseline dates.'
+}
+
 function statusSection(r: ReportInput): string[] {
   const { analysis: an, schedule: s } = r
   const fm = an.finishMilestone
@@ -73,8 +82,12 @@ function statusSection(r: ReportInput): string[] {
     `**Status: ${STATUS[an.status]}.** ${an.statusReasons.join(' ') || 'No negative float, no overruled constraints and no slip against the baseline.'}`,
     '',
     table(['Item', 'Value'], [
+      ['Baseline', baselineLine(r).replace(/^Baseline:\s*/, '')],
       ['Data date', d(s.dataDate)],
-      ['Forecast finish (Planora recalculation)', d(an.forecastFinish)],
+      ['Forecast finish (Planora recalculation)', `${d(an.forecastFinish)}${an.forecastBasis === 'logic' ? ' (logic-driven)' : ''}`],
+      ...(an.scheduledFinish && an.logicFinish && an.scheduledFinish !== an.logicFinish
+        ? [[FINISH_LABELS.scheduled, d(an.scheduledFinish)], [FINISH_LABELS.logic, d(an.logicFinish)]]
+        : []),
       ['Finish written in the file header', d(an.reportedFinish)],
       ['Required finish (Must Finish By)', d(an.mustFinishBy)],
       ['Finish milestone', fm ? `${fm.code} ${fm.name}` : '—'],
@@ -90,16 +103,20 @@ function statusSection(r: ReportInput): string[] {
 }
 
 /**
- * The forecast an activity's logic produces. Where a mandatory constraint (MFO/MSO) pins the
- * displayed date earlier than logic allows, the logic date is the forecast — the same rule the
- * headline variance uses (src/lib/analysis/schedule-analysis.ts), so tables agree with it.
+ * The forecast an activity's logic produces. Where a mandatory constraint (MFO/MSO) on it or
+ * upstream of it pins the displayed date earlier than logic allows, the logic-driven date is the
+ * forecast (analysis.logicDates) — the same rule the headline variance uses
+ * (src/lib/analysis/schedule-analysis.ts), so tables agree with it, successors of the constraint included.
  */
-function forecastOf(r: ReportInput, a: Activity): { start: string | null; finish: string | null; pinned: ScheduleAnalysis['violations'][number] | null } {
-  if (!open(a)) return { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish, pinned: null }
+function forecastOf(r: ReportInput, a: Activity): { start: string | null; finish: string | null; pinned: ScheduleAnalysis['violations'][number] | null; logic: boolean } {
+  if (!open(a)) return { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish, pinned: null, logic: false }
   const v = r.analysis.violations.find(x => x.id === a.id) ?? null
-  if (!v) return { start: a.actualStart || a.earlyStart, finish: a.earlyFinish, pinned: null }
-  // The CPM's logicDate is the logic-driven finish (a milestone's date) for MFO and MSO alike.
-  return { start: a.actualStart || (a.activityType === 'milestone' ? v.logicDate : a.earlyStart), finish: v.logicDate, pinned: v }
+  const l = r.analysis.logicDates?.[a.id]
+  if (l) return { start: a.actualStart || l.start, finish: l.finish, pinned: v, logic: true }
+  // Analyses stored before logicDates: the violation's own logic dates.
+  if (!v) return { start: a.actualStart || a.earlyStart, finish: a.earlyFinish, pinned: null, logic: false }
+  const finish = v.logicFinish ?? (v.type === 'MFO' || a.activityType === 'milestone' ? v.logicDate : a.earlyFinish)
+  return { start: a.actualStart || v.logicStart || (a.activityType === 'milestone' ? v.logicDate : a.earlyStart), finish, pinned: v, logic: true }
 }
 
 /**
@@ -119,14 +136,16 @@ function milestoneRows(r: ReportInput) {
     .map(m => ({ m, f: forecastOf(r, m), k: contractOf(r, m) }))
     .sort((x, y) => (x.f.finish || '').localeCompare(y.f.finish || ''))
     .map(({ m, f, k }) => [m.activityId, m.name, d(m.baselineFinish), d(f.finish),
-      m.actualFinish ? 'Actual' : f.pinned ? `Forecast by logic (${f.pinned.type} ${d(f.pinned.constraintDate)} overruled)` : 'Forecast',
+      m.actualFinish ? 'Actual' : f.pinned ? `Forecast by logic (${f.pinned.type} ${d(f.pinned.constraintDate)} overruled)` : f.logic ? `Forecast by logic (${d(m.earlyFinish)} as scheduled; a mandatory constraint upstream is overruled)` : 'Forecast',
       k ? `${k.label} ${d(k.date)}` : '—', k ? signed(calDays(k.date, f.finish)) : '—',
       signed(calDays(m.baselineFinish, f.finish)), open(m) ? m.totalFloat : '—'])
 }
 
+/** The driving path to present: traced through constraints that hold it (analysis.drivingPath), else the P6 longest path. */
 function drivingPath(r: ReportInput): Activity[] {
   const byId = new Map(r.activities.map(a => [a.id, a]))
-  return r.analysis.longestPath.map(id => byId.get(id)).filter((a): a is Activity => !!a && open(a))
+  const ids = r.analysis.drivingPath?.ids.length ? r.analysis.drivingPath.ids : r.analysis.longestPath
+  return ids.map(id => byId.get(id)).filter((a): a is Activity => !!a && open(a))
 }
 
 function executiveSummary(r: ReportInput): string[] {
@@ -156,7 +175,7 @@ function issues(r: ReportInput, failing: DcmaReport['checks']): string[] {
     ...r.analysis.violations.map(v => `- ${codeOf(r, v.id)}: mandatory ${v.type === 'MSO' ? 'start' : 'finish'} ${d(v.constraintDate)} overrules logic by ${v.days} work days (logic date ${d(v.logicDate)}).`),
     ...failing.slice(0, 6).map(c => `- DCMA #${c.id} ${c.name} (${c.metric}): ${c.explanation}`),
   ]
-  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry float or finish dates in the file that differ from Planora's recalculation by more than 1 day.`)
+  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry dates or float in the file that differ from Planora's recalculation by more than 1 day.`)
   return out.length ? out : ['_None found._']
 }
 
@@ -186,16 +205,31 @@ function criticalPath(r: ReportInput): string[] {
     return fmtRel(best)
   }
   const branches = drivingBranches(r, path)
+  const an = r.analysis
+  const dp = an.drivingPath
+  const flags = new Map((dp?.constraints ?? []).map(c => [c.id, c]))
+  const flagText = (c: NonNullable<ScheduleAnalysis['drivingPath']>['constraints'][number]) =>
+    c.effect === 'start' ? `path starts at its ${c.type} ${d(c.date)}` : `${c.type} ${d(c.date)} holds it ${c.effect} than logic`
+  const p6 = an.longestPath.filter(id => { const a = r.activities.find(x => x.id === id); return a && open(a) }).length
   return [
     '## 1. Summary',
-    `- Longest (driving) path to the finish: ${path.length} open activities, from ${path[0] ? `${path[0].activityId} ${path[0].name}` : '—'} to ${path.length ? `${path[path.length - 1].activityId} ${path[path.length - 1].name}` : '—'}.`,
+    `- ${dp?.basis === 'logic' ? 'Logic-driven path (mandatory constraints relaxed) to the finish' : 'Longest (driving) path to the finish'}: ${path.length} open activities, from ${path[0] ? `${path[0].activityId} ${path[0].name}` : '—'} to ${path.length ? `${path[path.length - 1].activityId} ${path[path.length - 1].name}` : '—'}.`,
+    ...(dp?.constraints.length ? [`- Constraints on the driving path (flagged in the table): ${dp.constraints.map(c => `${c.code} (${flagText(c)})`).join('; ')}.${p6 < path.length ? ` P6's longest path stops at the constraint (${p6} open ${p6 === 1 ? 'activity' : 'activities'}); the path is traced back through it to the logic that feeds it.` : ''}`] : []),
+    ...(dp?.openEnd ? [`- ${dp.openEnd.code} has no successor but drives the project finish (an open end).`] : []),
     `- Critical (total float ≤ 0): ${critical.length} of ${opens.length} open activities (${opens.length ? Math.round((100 * critical.length) / opens.length) : 0}%).`,
     `- Near-critical (1–10 work days of float): ${near.length}.`,
-    `- Forecast finish ${d(r.analysis.forecastFinish)}${r.analysis.mustFinishBy ? `; required ${d(r.analysis.mustFinishBy)}` : ''}. Lowest float on open work: ${r.analysis.minFloat ?? '—'} work days.`,
+    `- ${FINISH_LABELS.scheduled}: ${d(an.scheduledFinish ?? an.forecastFinish)}; ${FINISH_LABELS.logic.charAt(0).toLowerCase() + FINISH_LABELS.logic.slice(1)}: ${d(an.logicFinish ?? an.forecastFinish)}${an.mustFinishBy ? `; required ${d(an.mustFinishBy)}` : ''}. Lowest float on open work: ${an.minFloat ?? '—'} work days.`,
     `- Out-of-sequence progress scheduled with ${r.analysis.progressMode === 'retained' ? 'retained logic' : 'progress override'}.`,
     '',
     '## 2. Driving path in sequence', table(['#', 'ID', 'Activity', 'Relationship in', 'Duration (wd)', 'Start', 'Finish', 'Float (wd)', 'Constraint'],
-      path.map((a, i) => [i + 1, a.activityId, a.name, linkInto(a, i), a.status === 'in_progress' ? `${a.remainingDuration} rem.` : a.duration, d(a.earlyStart), d(a.earlyFinish), a.totalFloat, a.constraintType ? `${a.constraintType} ${d(a.constraintDate)}` : ''])), '',
+      path.map((a, i) => {
+        const fc = forecastOf(r, a)
+        const k = flags.get(a.id)
+        return [i + 1, a.activityId, a.name, linkInto(a, i), a.status === 'in_progress' ? `${a.remainingDuration} rem.` : a.duration,
+          d(fc.start), fc.logic ? `${d(fc.finish)} (logic; ${d(a.earlyFinish)} as scheduled)` : d(fc.finish), a.totalFloat,
+          k ? `**${k.type} ${d(k.date)}: ${flagText(k)}**` : a.constraintType ? `${a.constraintType} ${d(a.constraintDate)}` : '']
+      })), '',
+    ...(path.some(a => forecastOf(r, a).logic) ? ['_Start/finish: the logic-driven date where an overruled mandatory constraint on or upstream of the activity holds the scheduled date (shown after it)._', ''] : []),
     '## 3. All driving branches to the finish (relationship free float 0)',
     ...(branches ? [
       branches.ties.length
@@ -207,7 +241,7 @@ function criticalPath(r: ReportInput): string[] {
     '## 4. Near-critical activities (1–10 work days of float)', table(['ID', 'Activity', 'Finish', 'Float (wd)'], near.slice(0, 30).map(a => [a.activityId, a.name, d(a.earlyFinish), a.totalFloat])), '',
     '## 5. Constraints on open work', table(['ID', 'Activity', 'Constraint', 'Date', 'Float (wd)'], constrained.map(a => [a.activityId, a.name, a.constraintType, d(a.constraintDate), a.totalFloat])), '',
     '## 6. Mandatory constraints that overrule logic',
-    r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date', 'Work days hidden'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._',
+    r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date (predecessor-driven)', 'Work days hidden (constraint to logic date)'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._',
   ]
 }
 
@@ -280,7 +314,8 @@ function variance(r: ReportInput): string[] {
   const w = r.windows
   return [
     '## 1. Overall variance', ...statusSection(r), '',
-    withBl.length ? `${withBl.length} of ${work.length} activities carry baseline dates: ${late.length} forecast or finished late, ${early.length} early, ${withBl.length - late.length - early.length} on time.` : 'The file carries no baseline dates, so activity variance cannot be measured. Export the baseline into the update (P6: assign the project baseline before export) to enable this report.',
+    withBl.length ? `${withBl.length} of ${work.length} activities have a baseline (${baselineLine(r).replace(/^Baseline:\s*/, '')}): ${late.length} forecast or finished late, ${early.length} early, ${withBl.length - late.length - early.length} on time.`
+      : `${r.analysis.baseline?.note ?? 'The file carries no baseline dates.'} Activity variance cannot be measured. Mark an upload of this project as Baseline, or export the project baseline into the update (P6: assign the project baseline before export), to enable this report.`,
     '',
     '## 2. Milestones: baseline, contract and forecast', table(MILESTONE_HEAD, milestoneRows(r)),
     '', '_Days late vs contract: forecast (or actual) minus the milestone\'s constraint date, or the required finish for the finish milestone; + = late._', '',
@@ -307,6 +342,24 @@ function variance(r: ReportInput): string[] {
   ]
 }
 
+/**
+ * QA/QC section 5: every activity whose file dates or float differ from Planora's recalculation, with
+ * file vs Planora ES/EF/LS/LF/TF; the count in the text is the number of rows. Analyses stored before
+ * every difference was kept hold at most 10, which the text says.
+ */
+export function recalcSection(rc: NonNullable<ReportInput['analysis']['recalc']>): string {
+  const rows = rc.samples.map(x => [
+    x.code, x.name, d(x.fileStart), d(x.planoraStart), d(x.fileFinish), d(x.planoraFinish), d(x.fileLateStart), d(x.planoraLateStart),
+    d(x.fileLateFinish), d(x.planoraLateFinish), x.fileFloat ?? '—', x.planoraFloat ?? '—',
+  ])
+  const head = rc.samples.length === rc.differing
+    ? `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in early/late dates or total float${rc.differing ? '; all are listed' : ''}.`
+    : `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in finish or total float. This upload was analyzed before every difference was kept, so only ${rc.samples.length} are listed; upload the file again to list all ${rc.differing}.`
+  return rows.length
+    ? `${head}\n\n${table(['ID', 'Activity', 'File ES', 'Planora ES', 'File EF', 'Planora EF', 'File LS', 'Planora LS', 'File LF', 'Planora LF', 'File TF', 'Planora TF'], rows)}`
+    : head
+}
+
 function qaqc(r: ReportInput): string[] {
   const fail = r.dcma.checks.filter(c => c.result === 'fail')
   return [
@@ -317,9 +370,7 @@ function qaqc(r: ReportInput): string[] {
     '## 4. Mandatory constraints that overrule logic',
     r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date', 'Work days hidden'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._', '',
     '## 5. File vs Planora recalculation',
-    r.analysis.recalc
-      ? `${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities differ by more than 1 day in finish or total float.\n\n${table(['ID', 'Activity', 'File finish', 'Planora finish', 'File float', 'Planora float'], r.analysis.recalc.samples.map(x => [x.code, x.name, d(x.fileFinish), d(x.planoraFinish), x.fileFloat ?? '—', x.planoraFloat ?? '—']))}`
-      : '_The file carried no calculated dates, so Planora scheduled it from logic; there is nothing to compare._', '',
+    r.analysis.recalc ? recalcSection(r.analysis.recalc) : '_The file carried no calculated dates, so Planora scheduled it from logic; there is nothing to compare._', '',
     '## 6. Data questions for the scheduler',
     ...(r.dataQuestions?.length ? r.dataQuestions.slice(0, 30).map(q => `- (${q.severity}) ${q.question}${q.activityCodes?.length ? ` [${q.activityCodes.slice(0, 8).join(', ')}]` : ''}`) : ['_None._']), '',
     '## 7. Reviewer disposition',
@@ -333,13 +384,17 @@ function qaqc(r: ReportInput): string[] {
  * Empty string when there are none.
  */
 export function editsSection(edits: { label: string; before: string; after: string; reason: string; by: string; byName?: string | null; at: string; status: 'applied' | 'skipped'; note?: string; source?: string }[],
-  reverted: { reason: string; at: string; revertedAt: string | null; revertReason: string | null; change: { kind: string } }[] = []): string {
+  reverted: { reason: string; at: string; revertedAt: string | null; revertReason: string | null; change: { kind: string } }[] = [],
+  /** false when the report is on the schedule as submitted: the edits are listed but not in its figures */
+  inFigures = true): string {
   if (!edits.length && !reverted.length) return ''
   const applied = edits.filter(e => e.status === 'applied')
   const skipped = edits.filter(e => e.status === 'skipped')
   return fmtDates([
     '## Edits made in Planora',
-    `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora to the uploaded file (an override layer; the original file is unchanged and kept with its SHA-256).`, '',
+    inFigures
+      ? `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora to the uploaded file (a what-if scenario; the original file is unchanged and kept with its SHA-256).`
+      : `This report is on the schedule as submitted: its forecast, float and driving path do NOT include the ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Planora listed below (a what-if scenario; request the report on the scenario to include them).`, '',
     table(['Date', 'By', 'Change', 'Before', 'After', 'Reason', 'Source'], applied.map(e => [d(e.at), e.byName || e.by, e.label, e.before, e.after, e.reason, e.source === 'recovery' ? 'Recovery option' : 'Manual'])),
     ...(skipped.length ? ['', `${skipped.length} edit${skipped.length === 1 ? ' no longer applies' : 's no longer apply'}: ${skipped.map(e => `${e.label} (${e.note ?? 'not applicable'})`).join('; ')}.`] : []),
     ...(reverted.length ? ['', `${reverted.length} earlier edit${reverted.length === 1 ? ' was' : 's were'} reverted: ${reverted.map(e => `${e.change.kind.replace('_', ' ')} edit of ${d(e.at)} reverted ${d(e.revertedAt)}${e.revertReason ? ` (${e.revertReason})` : ''}`).join('; ')}.`] : []),
@@ -352,7 +407,7 @@ export function editsSection(edits: { label: string; before: string; after: stri
  * reviewer's dispositions (QA/QC).
  */
 export function reportSupplement(type: string, r: ReportInput): string {
-  const out: string[] = []
+  const out: string[] = [`**${baselineLine(r)}.** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
   if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (Planora calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
   if (type === 'qa_qc') out.push('## Reviewer disposition', ...reviewMarkdown(r.review, { dcma: r.dcma.checks.map(c => ({ id: c.id, name: c.name, result: c.result })), questions: (r.dataQuestions ?? []).filter(q => q.id).map(q => ({ id: q.id!, question: q.question })) }), '')
   if (r.provenance) out.push(...provenanceMarkdown(r.provenance))
@@ -366,6 +421,7 @@ export function buildReport(type: string, r: ReportInput): string {
   return fmtDates([
     `# ${REPORT_TITLES[t]} — ${r.schedule.name} (${r.schedule.version})`, '',
     `_Prepared by Planora from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
+    `**${baselineLine(r)}.** Every variance, milestone and activity table, BEI and missed tasks in this report measure against this baseline.`, '',
     ...(r.provenance ? provenanceMarkdown(r.provenance) : []),
     ...body,
   ].join('\n'))

@@ -2,6 +2,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
+import type { EmbeddedBaseline } from '@/lib/analysis/baseline'
 import { randomUUID as uuid } from 'crypto'
 
 export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
@@ -32,6 +33,8 @@ export interface ParsedSchedule {
   progressMode?: ProgressMode | null
   /** The file was written by Planora's own exporter (a re-import of Planora output, not a project record) */
   planoraExport?: boolean
+  /** P6 only: the project baseline exported in the same XER (per-activity baseline by task_code) */
+  embeddedBaseline?: EmbeddedBaseline | null
 }
 
 /* ─── helpers shared by the parsers (not part of the public contract) ─── */

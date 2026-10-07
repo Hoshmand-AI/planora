@@ -132,8 +132,9 @@ describe('analyzeSchedule: pilot findings (finish milestone, variance basis, sta
     const { done } = run([ntp, ...ts, f], rels, { dataDate: '2026-03-16' })
     const analysis = analyzeSchedule({ activities: done.activities, links: links(rels), cpm: done.cpm, reportedFinish: null, mustFinishBy: null, dataDate: '2026-03-16' })
     expect(analysis.status).not.toBe('on_track')
-    expect(analysis.statusReasons.join(' ')).toMatch(/Baseline execution index is 0\.20, below 0\.95/)
-    expect(analysis.statusReasons.join(' ')).toMatch(/4 of 5 activities baselined to finish before 03\/16\/2026 finished late or not at all/)
+    // Tasks only (DCMA): the finished NTP milestone counts in neither numerator nor denominator.
+    expect(analysis.statusReasons.join(' ')).toMatch(/Baseline execution index is 0\.00, below 0\.95: 0 tasks complete against 4/)
+    expect(analysis.statusReasons.join(' ')).toMatch(/4 of 4 tasks baselined to finish before 03\/16\/2026 finished late or not at all/)
   })
 
   it('an unstarted schedule does not report a slip against stale target dates', () => {
