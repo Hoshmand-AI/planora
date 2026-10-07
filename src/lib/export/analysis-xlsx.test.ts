@@ -77,11 +77,14 @@ describe('compare XLSX export', () => {
     expect(head).toContain('Before: Update 5 (data date 03/02/2026)')
     expect(head).toContain('After: Update 6 (data date 04/01/2026)')
     expect(head).toContain('Data date Update 5')
-    expect((dur.getRow(2).values as unknown[]).slice(1, 7)).toEqual(['A200', 'A200', 'duration', 5, 9, 4])
-    expect((dur.getRow(2).getCell(7).value as Date).toISOString().slice(0, 10)).toBe('2026-03-02')
+    // Calendar per row, and the unit (durations in work days, dates in calendar days).
+    expect((dur.getRow(2).values as unknown[]).slice(1, 9)).toEqual(['A200', 'A200', '', 'duration', 5, 9, 4, 'wd'])
+    expect((dur.getRow(2).getCell(9).value as Date).toISOString().slice(0, 10)).toBe('2026-03-02')
+    const dts = wb.getWorksheet('Dates')!
+    expect(dts.getRow(2).getCell(8).value).toBe('cd')
 
     const cs = wb.getWorksheet('Constraints')!
-    expect((cs.getRow(2).values as unknown[]).slice(1, 6)).toEqual(['F900', 'F900', 'constraint', '', 'MFO 03/27/2026'])
+    expect((cs.getRow(2).values as unknown[]).slice(1, 7)).toEqual(['F900', 'F900', '', 'constraint', '', 'MFO 03/27/2026'])
     const logic = wb.getWorksheet('Logic')!
     expect(logic.rowCount).toBe(2)
     // A name that looks like a formula stays text (CSV-injection guard).

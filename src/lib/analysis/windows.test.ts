@@ -78,7 +78,7 @@ describe('windows analysis (half-step attribution)', () => {
     expect(all.trend).toHaveLength(3)
     expect(all.trend[2].finishFloat).not.toBeNull()
     const md = windowsMarkdown(all, fmtDate).join('\n')
-    expect(md).toMatch(/\| 1 \| Update 1 \(03\/02\/2026\) \| Update 2 \(03\/09\/2026\) \| 03\/20\/2026 → 04\/02\/2026 \| \+13 \| \+5 \| \+6 \| 0 \| \+2 \|/)
+    expect(md).toMatch(/\| 1 \| Update 1 \(03\/02\/2026\) \| Update 2 \(03\/09\/2026\) \| 03\/20\/2026 → 04\/02\/2026 \| \+13 \| \+13 \| \+5 \| \+6 \| 0 \| \+2 \|/)
     expect(trendMarkdown(all.trend, fmtDate).join('\n')).toMatch(/Update 3 \| 03\/16\/2026/)
   })
   it('credits a logic change (resequencing) to the logic revision', () => {
@@ -92,5 +92,77 @@ describe('windows analysis (half-step attribution)', () => {
     expect(w3.attribution!.revisions.logic).toBeLessThan(0)
     expect(w3.attribution!.progress).toBe(0)
     expect(w3.movement).toBe(w3.attribution!.progress + w3.attribution!.addedDeleted + w3.attribution!.revisions.total)
+  })
+})
+
+describe('windows analysis: scope, drivers, hidden delay and reissues', () => {
+  const sum = (w: ReturnType<typeof analyzeWindow>) => w.attribution!.progress + w.attribution!.addedDeleted + w.attribution!.revisions.total
+
+  it('does not offset added/deleted against logic when a deleted activity\'s link is replaced', () => {
+    // Update 1: A -> D500 (60d) -> F, and A -> B200 (70d) as an open end.
+    const e = update('R1', 'Update 1', '2026-03-02', '10', [
+      { activityId: 'A100', duration: 5 }, { activityId: 'D500', duration: 60 }, { activityId: 'B200', duration: 70 }, FIN,
+    ], [['A100', 'D500'], ['D500', 'F900'], ['A100', 'B200']])
+    // Update 2: A finished as planned; D500 deleted and replaced by the link B200 -> F900.
+    const l = update('R2', 'Update 2', '2026-03-09', '10', [
+      { activityId: 'A100', duration: 5, actualStart: '2026-03-02', actualFinish: '2026-03-06', status: 'complete', remainingDuration: 0, percentComplete: 100 },
+      { activityId: 'B200', duration: 70 }, FIN,
+    ], [['A100', 'B200'], ['B200', 'F900']])
+    const w = analyzeWindow(e, l)
+    expect(w.movement).toBe(14) // 10 more work days
+    expect(w.attribution).toMatchObject({ progress: 0, addedDeleted: 14, revisions: { logic: 0, total: 0 }, method: 'symmetric' })
+    for (const x of [w.attribution!.progress, w.attribution!.addedDeleted, w.attribution!.revisions.logic]) expect(Math.abs(x)).toBeLessThanOrEqual(Math.abs(w.movement!))
+    expect(sum(w)).toBe(w.movement)
+    expect(w.notes.join(' ')).toMatch(/1 relationship replacing added or deleted activities is counted with added\/deleted activities/)
+  })
+
+  it('names the driving activities and their changes, adding up to the movement', () => {
+    const u1 = update('D1', 'Update 1', '2026-03-02', '10', [{ activityId: 'A100', duration: 5 }, { activityId: 'B200', duration: 10 }, FIN], [['A100', 'B200'], ['B200', 'F900']])
+    const u2 = update('D2', 'Update 2', '2026-03-09', '10', [
+      { activityId: 'A100', duration: 5, actualStart: '2026-03-02', status: 'in_progress', remainingDuration: 3, percentComplete: 40 },
+      { activityId: 'B200', duration: 12 }, { activityId: 'C300', duration: 4 }, FIN,
+    ], [['A100', 'B200'], ['B200', 'C300'], ['C300', 'F900']])
+    const w = analyzeWindow(u1, u2)
+    expect(w.drivers.map(d => [d.code, d.days, d.workDays, d.changes.map(c => c.kind)])).toEqual([
+      ['A100', 5, 3, ['progress']], ['B200', 2, 2, ['duration']], ['C300', 6, 4, ['added']],
+    ])
+    expect(w.drivers.reduce((t, d) => t + d.days, 0) + w.unattributed).toBe(w.movement)
+    expect(w.logicPath.before).toEqual(['A100', 'B200', 'F900'])
+    expect(w.logicPath.after).toEqual(['A100', 'B200', 'C300', 'F900'])
+  })
+
+  it('reports delay hidden by a Mandatory Finish and never shows 0 movement for a masked slip', () => {
+    // A1190 carries an MFO on its planned finish; in update 2 A100 overruns by 8 work days.
+    const mfo = { activityId: 'A1190', duration: 10, constraintType: 'MFO' as const, constraintDate: '2026-03-20' }
+    const u1 = update('M1', 'Update 1', '2026-03-02', '10', [{ activityId: 'A100', duration: 5 }, mfo, FIN], [['A100', 'A1190'], ['A1190', 'F900']])
+    const u2 = update('M2', 'Update 2', '2026-03-09', '10', [
+      { activityId: 'A100', duration: 5, actualStart: '2026-03-02', status: 'in_progress', remainingDuration: 8, percentComplete: 10 }, mfo, FIN,
+    ], [['A100', 'A1190'], ['A1190', 'F900']])
+    const w = analyzeWindow(u1, u2)
+    expect(w.asScheduled.movement).toBe(0)
+    expect(w.movement).toBe(12) // logic: A100 to 03/18, A1190 to 04/01
+    expect(w.attribution!.progress).toBe(12)
+    expect(w.hidden).toEqual([expect.objectContaining({ code: 'A1190', type: 'MFO', days: 8, daysBefore: 0 })])
+    expect(w.hidden[0].text).toMatch(/^8 wd hidden by MFO on A1190/)
+    expect(w.drivers).toEqual([expect.objectContaining({ code: 'A100', days: 12, hiddenBy: 'A1190' })])
+    expect(w.notes.join(' ')).toMatch(/As scheduled \(mandatory constraints honored\) the finish moved 0 calendar days; the logic-driven finish moved 12/)
+  })
+
+  it('treats a same-data-date reissue as superseding the earlier upload', () => {
+    const acts = [{ activityId: 'A100', duration: 5 }, { activityId: 'B200', duration: 10 }, FIN]
+    const links: [string, string][] = [['A100', 'B200'], ['B200', 'F900']]
+    const a = update('S1', 'Update 1', '2026-03-02', '10', acts, links)
+    const b = update('S2', 'Update 2', '2026-03-09', '10', acts, links)
+    const b2 = update('S2r', 'Update 2 rev 1', '2026-03-09', '10', acts, links)
+    const c = update('S3', 'Update 3', '2026-03-16', '10', acts, links)
+    const w = analyzeWindows([a, b, b2, c])
+    expect(w.windows.map(x => `${x.before.version} → ${x.after.version}`)).toEqual(['Update 1 → Update 2 rev 1', 'Update 2 rev 1 → Update 3'])
+    expect(w.series.map(p => [p.dataDate, p.uploads])).toEqual([['2026-03-02', 1], ['2026-03-09', 2], ['2026-03-16', 1]])
+    expect(w.series[1].superseded).toEqual([{ id: 'S2', version: 'Update 2' }])
+    expect(w.notes.join(' ')).toMatch(/2 uploads have the data date 03\/09\/2026; Update 2 is superseded by the reissue Update 2 rev 1/)
+    expect(w.trend).toHaveLength(3)
+    const all = analyzeWindows([a, b, b2, c], { includeReissues: true })
+    expect(all.windows).toHaveLength(3)
+    expect(all.windows[1].notes.join(' ')).toMatch(/reissue \(a revision of the same period\)/)
   })
 })
