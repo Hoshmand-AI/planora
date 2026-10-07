@@ -458,6 +458,9 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     const seasonalBase = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId && pathCals.has(c.id)).map((c) => [c.id, c.seasonalBaseId!]))
     const shutdownCals = new Set((raw?.calendars ?? []).filter((c) => pathCals.has(c.id) && shutdownDays(c).size > 0).map((c) => c.id))
     const seasonal = seasonalBase.size > 0 || shutdownCals.size > 0
+    // A path that mixes calendars (e.g. 5-day field work and 7-day reviews) counts a shifted span
+    // differently depending on the holidays it crosses; continuity is then judged by what drives.
+    const mixedCalendars = pathCals.size > 1
     const inp = raw && seasonal
       ? {
           ...raw,
@@ -525,11 +528,11 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
           // the longest path and the finish moved. Accepted only where the path's calendars carry
           // seasonal nonwork that explains a count outside the allowance.
           const afterEnd = after.longestPath[after.longestPath.length - 1]
-          const drives = seasonal && after.longestPath.includes(targetId) && afterEnd === endId && toDayNumber(after.projectFinish) > toDayNumber(base.projectFinish)
+          const drives = (seasonal || mixedCalendars) && after.longestPath.includes(targetId) && afterEnd === endId && toDayNumber(after.projectFinish) > toDayNumber(base.projectFinish)
           const ok = !pathStartPin && (within(delta) || within(deltaAtFinish) || drives)
           const seasonalNames = [...new Set([...seasonalBase.keys(), ...shutdownCals])].map((id) => raw!.calendars.find((c) => c.id === id)?.name || id)
           const calNote = !within(delta) && ok
-            ? ` (${delta} work days on ${target.code}'s calendar${deltaAtFinish !== delta ? `, ${deltaAtFinish} on the finish activity's` : ''}: ${drives && !within(deltaAtFinish) ? `the seasonal nonwork on ${seasonalNames.join(', ')} accounts for the difference` : 'the finish activity\'s calendar accounts for the difference'}, and ${target.code} still drives the finish)`
+            ? ` (${delta} work days on ${target.code}'s calendar${deltaAtFinish !== delta ? `, ${deltaAtFinish} on the finish activity's` : ''}: ${drives && !within(deltaAtFinish) ? (seasonal ? `the seasonal nonwork on ${seasonalNames.join(', ')} accounts for the difference` : `the path mixes ${pathCals.size} calendars, whose holidays the shifted span crosses differently`) : 'the finish activity\'s calendar accounts for the difference'}, and ${target.code} still drives the finish)`
             : ''
           const moved = delta === CP_TEST_DAYS
             ? 'pushed the project finish by the same amount'
