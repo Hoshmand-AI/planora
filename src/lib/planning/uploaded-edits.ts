@@ -14,6 +14,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import { CONSTRAINT_TYPES, type ConstraintType, type LinkType } from './types'
+import { scheduledRemaining } from './complete-schedule'
 
 export type ScheduleEditChange =
   | { kind: 'duration'; activityId: string; remaining: number }
@@ -56,7 +57,7 @@ const linkText = (type: string, lag: number) => `${type}${lag ? ` ${lag > 0 ? '+
 const cstrText = (t?: string | null, d?: string | null) => (t && d ? `${t} ${d}` : 'none')
 
 /** Remaining work days the CPM uses for an activity. */
-export const remainingOf = (a: Activity) => (a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : Math.max(0, Math.round(a.duration)))
+export const remainingOf = (a: Activity) => scheduledRemaining(a) ?? Math.max(0, Math.round(a.duration))
 
 /** Apply edits in order to copies of the imported activities and relationships. */
 export function applyScheduleEdits(activities: Activity[], relationships: Relationship[], edits: ScheduleEdit[]): {

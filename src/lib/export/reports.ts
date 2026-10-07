@@ -156,7 +156,7 @@ function issues(r: ReportInput, failing: DcmaReport['checks']): string[] {
     ...r.analysis.violations.map(v => `- ${codeOf(r, v.id)}: mandatory ${v.type === 'MSO' ? 'start' : 'finish'} ${d(v.constraintDate)} overrules logic by ${v.days} work days (logic date ${d(v.logicDate)}).`),
     ...failing.slice(0, 6).map(c => `- DCMA #${c.id} ${c.name} (${c.metric}): ${c.explanation}`),
   ]
-  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry float or finish dates in the file that differ from Planora's recalculation by more than 1 day.`)
+  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry dates or float in the file that differ from Planora's recalculation by more than 1 day.`)
   return out.length ? out : ['_None found._']
 }
 
@@ -307,6 +307,24 @@ function variance(r: ReportInput): string[] {
   ]
 }
 
+/**
+ * QA/QC section 5: every activity whose file dates or float differ from Planora's recalculation, with
+ * file vs Planora ES/EF/LS/LF/TF; the count in the text is the number of rows. Analyses stored before
+ * every difference was kept hold at most 10, which the text says.
+ */
+export function recalcSection(rc: NonNullable<ReportInput['analysis']['recalc']>): string {
+  const rows = rc.samples.map(x => [
+    x.code, x.name, d(x.fileStart), d(x.planoraStart), d(x.fileFinish), d(x.planoraFinish), d(x.fileLateStart), d(x.planoraLateStart),
+    d(x.fileLateFinish), d(x.planoraLateFinish), x.fileFloat ?? '—', x.planoraFloat ?? '—',
+  ])
+  const head = rc.samples.length === rc.differing
+    ? `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in early/late dates or total float${rc.differing ? '; all are listed' : ''}.`
+    : `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in finish or total float. This upload was analyzed before every difference was kept, so only ${rc.samples.length} are listed; upload the file again to list all ${rc.differing}.`
+  return rows.length
+    ? `${head}\n\n${table(['ID', 'Activity', 'File ES', 'Planora ES', 'File EF', 'Planora EF', 'File LS', 'Planora LS', 'File LF', 'Planora LF', 'File TF', 'Planora TF'], rows)}`
+    : head
+}
+
 function qaqc(r: ReportInput): string[] {
   const fail = r.dcma.checks.filter(c => c.result === 'fail')
   return [
@@ -317,9 +335,7 @@ function qaqc(r: ReportInput): string[] {
     '## 4. Mandatory constraints that overrule logic',
     r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date', 'Work days hidden'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._', '',
     '## 5. File vs Planora recalculation',
-    r.analysis.recalc
-      ? `${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities differ by more than 1 day in finish or total float.\n\n${table(['ID', 'Activity', 'File finish', 'Planora finish', 'File float', 'Planora float'], r.analysis.recalc.samples.map(x => [x.code, x.name, d(x.fileFinish), d(x.planoraFinish), x.fileFloat ?? '—', x.planoraFloat ?? '—']))}`
-      : '_The file carried no calculated dates, so Planora scheduled it from logic; there is nothing to compare._', '',
+    r.analysis.recalc ? recalcSection(r.analysis.recalc) : '_The file carried no calculated dates, so Planora scheduled it from logic; there is nothing to compare._', '',
     '## 6. Data questions for the scheduler',
     ...(r.dataQuestions?.length ? r.dataQuestions.slice(0, 30).map(q => `- (${q.severity}) ${q.question}${q.activityCodes?.length ? ` [${q.activityCodes.slice(0, 8).join(', ')}]` : ''}`) : ['_None._']), '',
     '## 7. Reviewer disposition',

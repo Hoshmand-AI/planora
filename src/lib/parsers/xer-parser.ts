@@ -388,6 +388,8 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
   const tree = c['clndr_data'] ? parseClndrData(c['clndr_data']) : null
   const workDays: Weekday[] = []
   const dayHours: number[] = []
+  let workTimes: WorkCalendar['workTimes']
+  let workTimesHours = 0
   const dow = findChild(tree, 'DaysOfWeek')
   if (dow) {
     for (const d of dow.children) {
@@ -395,7 +397,10 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
       if (!(n >= 1 && n <= 7)) continue
       if (d.children.length > 0) {
         workDays.push((n - 1) as Weekday)
-        dayHours.push(intervalHours(d.children))
+        const h = intervalHours(d.children)
+        dayHours.push(h)
+        // The working periods of the longest work day (the one hours per day comes from).
+        if (h > workTimesHours) { workTimesHours = h; workTimes = workPeriods(d.children) }
       }
     }
   } else {
@@ -433,6 +438,22 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
     hoursPerDay,
     holidays,
     ...(extraWorkDays.length ? { extraWorkDays } : {}),
+    ...(workTimes?.length ? { workTimes } : {}),
     sourceName: name,
   }
+}
+
+/** A work day's periods as HH:MM pairs in time order ("f|00:00" = midnight, written 24:00). */
+function workPeriods(intervals: CNode[]): { from: string; to: string }[] {
+  const out: [number, number][] = []
+  for (const iv of intervals) {
+    const a = attrMap(iv.attrs)
+    const s = toMinutes(a['s'])
+    let f = toMinutes(a['f'])
+    if (s === null || f === null) continue
+    if (f <= s) f += 24 * 60
+    out.push([s, Math.min(f, 24 * 60)])
+  }
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  return out.sort((x, y) => x[0] - y[0]).map(([s, f]) => ({ from: hm(s), to: hm(f) }))
 }

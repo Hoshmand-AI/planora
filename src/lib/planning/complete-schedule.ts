@@ -18,8 +18,30 @@ export interface CompletionResult {
   note: string | null
   hasLogic: boolean
   cpm: CpmResult | null
-  /** The file's own early finish and float per activity id, when the file carried calculated values */
-  fileValues: Map<string, { earlyFinish: string | null; totalFloat: number | null }> | null
+  /** The file's own calculated dates and float per activity id, when the file carried calculated values */
+  fileValues: Map<string, FileValues> | null
+}
+
+/** The file's own calculated values for one activity, before Planora recalculated it. */
+export interface FileValues {
+  earlyStart?: string | null
+  earlyFinish: string | null
+  lateStart?: string | null
+  lateFinish?: string | null
+  totalFloat: number | null
+}
+
+/**
+ * Remaining work days the CPM schedules an open activity on (undefined = its original duration): the
+ * remaining duration when in progress, and, as P6 does, also for a not-started activity whose remaining
+ * duration differs from its original. A remaining of 0 on not-started work is how files without a
+ * remaining field arrive, so it means "not given".
+ */
+export function scheduledRemaining(a: Pick<Activity, 'status' | 'activityType' | 'duration' | 'remainingDuration' | 'actualFinish'>): number | undefined {
+  if (a.activityType === 'milestone' || a.status === 'complete' || a.actualFinish) return undefined
+  if (a.status === 'in_progress') return Math.max(0, Math.round(a.remainingDuration))
+  const r = Number(a.remainingDuration)
+  return Number.isFinite(r) && r > 0 && Math.round(r) !== Math.round(a.duration) ? Math.round(r) : undefined
 }
 
 const CSTR = new Set<string>(CONSTRAINT_TYPES)
@@ -69,12 +91,12 @@ export function completeSchedule(input: {
   const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
   const ids = new Set(work.map(a => a.id))
   const fileValues = fileHadResults
-    ? new Map(work.map(a => [a.id, { earlyFinish: a.earlyFinish, totalFloat: Number.isFinite(a.totalFloat) ? a.totalFloat : null }]))
+    ? new Map<string, FileValues>(work.map(a => [a.id, { earlyStart: a.earlyStart, earlyFinish: a.earlyFinish, lateStart: a.lateStart, lateFinish: a.lateFinish, totalFloat: Number.isFinite(a.totalFloat) ? a.totalFloat : null }]))
     : null
   const cpmActs: CpmActivity[] = work.map(a => ({
     id: a.id, code: a.activityId, name: a.name,
     duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
-    remaining: a.status === 'in_progress' ? Math.max(0, Math.round(a.remainingDuration)) : undefined,
+    remaining: scheduledRemaining(a),
     type: a.activityType === 'milestone' ? 'milestone' : 'task',
     milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
     calendarId: a.calendarId || input.defaultCalendarId || cals[0].id,

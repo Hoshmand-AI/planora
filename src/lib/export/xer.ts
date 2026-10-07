@@ -153,7 +153,8 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     const dur = a.duration * h
     const done = !!a.actualFinish || a.status === 'complete'
     const active = !done && !!a.actualStart
-    const remaining = done ? 0 : active ? (a.remaining ?? a.duration) * h : dur
+    // Not-started work keeps its own remaining duration too (P6 schedules it on remaining).
+    const remaining = done ? 0 : (a.remaining ?? a.duration) * h
     const pct = done ? 100 : active ? Math.max(0, Math.min(99, Math.round(a.percentComplete ?? (dur ? 100 * (1 - remaining / dur) : 0)))) : 0
     const constraintTime = a.constraint && (a.constraint.type === 'FNET' || a.constraint.type === 'FNLT' || a.constraint.type === 'FO' || a.constraint.type === 'MFO') ? fin : '08:00'
     taskRows.push([

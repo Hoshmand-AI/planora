@@ -171,11 +171,15 @@ export function runCpm(input: CpmInput): CpmResult {
     }
     idx.set(a.id, nodes.length)
     const isMs = a.type === 'milestone'
-    const dur = isMs ? 0 : Math.max(0, Math.ceil(Number(a.duration) || 0))
     const af = dateNum(a.actualFinish), as = dateNum(a.actualStart)
     if (a.actualFinish && Number.isNaN(af)) warnings.push(`Activity ${a.code}: invalid actual finish '${a.actualFinish}' ignored.`)
     if (a.actualStart && Number.isNaN(as)) warnings.push(`Activity ${a.code}: invalid actual start '${a.actualStart}' ignored.`)
     const state: Node['state'] = !Number.isNaN(af) || (isMs && !Number.isNaN(as)) ? 'complete' : !Number.isNaN(as) ? 'progress' : 'open'
+    // A not-started activity is scheduled on its remaining duration when one is given (P6 schedules
+    // remaining, which can differ from the original before work starts); 0 / absent = original.
+    const rem0 = Number(a.remaining)
+    const openRem = state === 'open' && a.remaining != null && Number.isFinite(rem0) && rem0 > 0
+    const dur = isMs ? 0 : Math.max(0, Math.ceil(openRem ? rem0 : Number(a.duration) || 0))
     nodes.push({ a, c: calFor(a.calendarId), isMs, startLike: true, dur, state, es: 0, ef: 0, ls: 0, lf: 0, pinnedLow: false, logicEs: 0, logicEf: 0, resume: 0, logicResume: 0, drvEs: 0, drvEf: 0, mand: false, pinEs: 0, pinEf: 0, tf: 0, ff: 0 })
   }
   const n = nodes.length

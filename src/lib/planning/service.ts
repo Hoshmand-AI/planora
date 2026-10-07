@@ -25,6 +25,10 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
     projectFinish: s.projectFinish,
     mustFinishBy: s.analysis?.mustFinishBy ?? null,
     finishMilestoneId: s.finishMilestoneId ?? null,
+    // DCMA #9: the file's own forecasts before the data date, captured at upload (stored dates are Planora's).
+    fileDates: s.analysis?.recalc?.fileForecastsBeforeDataDate
+      ? Object.fromEntries(s.analysis.recalc.fileForecastsBeforeDataDate.map(f => [f.id, { earlyStart: f.earlyStart, earlyFinish: f.earlyFinish }]))
+      : null,
     calendars: s.calendars || [],
     defaultCalendarId: s.defaultCalendarId,
     links: rels.map(r => ({ from: r.predecessorId, to: r.successorId, type: r.type, lag: r.lag })),
