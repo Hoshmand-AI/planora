@@ -365,17 +365,32 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     const dd = toDayNumber(dataDate)
     const before = (d: string | null | undefined) => isValidDate(d) && toDayNumber(d) < dd
     const after = (d: string | null | undefined) => isValidDate(d) && toDayNumber(d) > dd
-    const bad = all.filter((a) => {
-      if (after(a.actualStart) || after(a.actualFinish)) return true
-      if (isCompleteActivity(a)) return false
-      return (!a.actualStart && before(a.earlyStart)) || before(a.earlyFinish)
-    })
+    // Forecasts are judged on the contractor file's own early dates when they were captured before
+    // Planora's recalculation (which always schedules open work from the data date); actuals are never
+    // recalculated, so the stored ones are the file's.
+    const fileDates = s.fileDates ?? null
+    const es = (a: AnalyzableActivity) => (fileDates?.[a.id] ? fileDates[a.id].earlyStart ?? a.earlyStart : a.earlyStart)
+    const ef = (a: AnalyzableActivity) => (fileDates?.[a.id] ? fileDates[a.id].earlyFinish ?? a.earlyFinish : a.earlyFinish)
+    const actualsAfter = all.filter((a) => after(a.actualStart) || after(a.actualFinish))
+    const lateActual = new Set(actualsAfter.map((a) => a.id))
+    const forecastsBefore = all.filter((a) => !lateActual.has(a.id) && !isCompleteActivity(a) && ((!a.actualStart && before(es(a))) || before(ef(a))))
+    // Unstarted work forecast to start before the data date: the file was not scheduled (P6 F9 /
+    // MS Project "update project") to its own data date after it was statused.
+    const unscheduled = forecastsBefore.filter((a) => !a.actualStart && before(es(a)))
+    const badIds = new Set([...actualsAfter, ...forecastsBefore].map((a) => a.id))
+    const bad = all.filter((a) => badIds.has(a.id))
+    const parts: string[] = []
+    if (actualsAfter.length) parts.push(`${plural(actualsAfter.length, 'activity', 'activities')} ${actualsAfter.length === 1 ? 'has an actual date' : 'have actual dates'} after the ${fmtDate(dataDate)} data date`)
+    if (forecastsBefore.length) parts.push(`${plural(forecastsBefore.length, 'incomplete activity', 'incomplete activities')} ${forecastsBefore.length === 1 ? 'has a forecast (early) date' : 'have forecast (early) dates'} before it${fileDates ? ' in the contractor\'s file' : ''}`)
+    const notScheduledNote = unscheduled.length
+      ? ` Not scheduled to the data date: ${plural(unscheduled.length, 'unstarted activity', 'unstarted activities')} (${unscheduled.slice(0, 5).map((a) => a.code).join(', ')}${unscheduled.length > 5 ? ', …' : ''}) ${unscheduled.length === 1 ? 'has its' : 'have their'} early start before the data date, so the file's dates were not recalculated to its ${fmtDate(dataDate)} data date after statusing (schedule it, F9 in P6, before submitting)${fileDates ? '; Planora\'s recalculation moves this work to the data date' : ''}.`
+      : ''
     add({
       id: 9, name: 'Invalid dates', metric: String(bad.length), threshold: '0', result: bad.length === 0 ? 'pass' : 'fail',
       offenders: cap(bad.map((a) => a.code)),
       explanation: bad.length === 0
-        ? 'All actual dates are on or before the data date and all forecasts are on or after it.'
-        : `${plural(bad.length, 'activity', 'activities')} ${bad.length === 1 ? 'has' : 'have'} actuals in the future or forecasts in the past relative to the ${fmtDate(dataDate)} data date, so the update was not statused correctly.`,
+        ? `All actual dates are on or before the data date and all forecasts${fileDates ? ' in the contractor\'s file' : ''} are on or after it.`
+        : `${parts.join('; ')}, so the update was not statused correctly.${notScheduledNote}`,
     })
   }
 

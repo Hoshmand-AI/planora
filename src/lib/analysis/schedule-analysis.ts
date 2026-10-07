@@ -32,7 +32,24 @@ export interface FinishMilestone {
   designated?: boolean
 }
 
-export interface RecalcDifference { code: string; name: string; fileFinish: string | null; planoraFinish: string | null; fileFloat: number | null; planoraFloat: number | null }
+/**
+ * One open activity whose file dates/float differ from Planora's recalculation. The early start and
+ * late dates were added later: differences stored before then carry only finish and float.
+ */
+export interface RecalcDifference {
+  code: string; name: string
+  fileStart?: string | null; planoraStart?: string | null
+  fileFinish: string | null; planoraFinish: string | null
+  fileLateStart?: string | null; planoraLateStart?: string | null
+  fileLateFinish?: string | null; planoraLateFinish?: string | null
+  fileFloat: number | null; planoraFloat: number | null
+}
+
+/**
+ * The contractor file's own forecast for an open activity that sits before the data date (DCMA #9
+ * Invalid Dates is judged on the file's dates, which Planora's recalculation replaces).
+ */
+export interface FileForecastBeforeDataDate { id: string; code: string; earlyStart: string | null; earlyFinish: string | null; notStarted: boolean }
 
 /** The update series' upload marked "Baseline": its forecast finish per activity code */
 export interface SeriesBaseline {
@@ -75,8 +92,12 @@ export interface ScheduleAnalysis {
   longestPath: string[]
   status: ScheduleStatus
   statusReasons: string[]
-  /** How the file's own dates/float compare with Planora's recalculation (null when the file had none) */
-  recalc: { compared: number; differing: number; samples: RecalcDifference[] } | null
+  /**
+   * How the file's own dates/float compare with Planora's recalculation (null when the file had none).
+   * `samples` lists EVERY differing activity (the name is kept for stored analyses, which were capped
+   * at 10). `fileForecastsBeforeDataDate`: open activities whose file early dates fall before the data date.
+   */
+  recalc: { compared: number; differing: number; samples: RecalcDifference[]; fileForecastsBeforeDataDate?: FileForecastBeforeDataDate[] } | null
 }
 
 const DAY = 86_400_000
@@ -108,8 +129,8 @@ export function analyzeSchedule(input: {
   cpm: CpmResult | null
   reportedFinish: string | null
   mustFinishBy: string | null
-  /** Snapshot of the file's own finish/float before recalculation, keyed by activity id */
-  fileValues?: Map<string, { earlyFinish: string | null; totalFloat: number | null }> | null
+  /** Snapshot of the file's own dates/float before recalculation, keyed by activity id */
+  fileValues?: Map<string, { earlyStart?: string | null; earlyFinish: string | null; lateStart?: string | null; lateFinish?: string | null; totalFloat: number | null }> | null
   today?: string
   /** Data date (status date); enables the execution-against-baseline check (BEI / missed tasks) */
   dataDate?: string | null
@@ -256,20 +277,33 @@ export function analyzeSchedule(input: {
 
   let recalc: ScheduleAnalysis['recalc'] = null
   if (input.fileValues && input.fileValues.size) {
+    // Every differing activity is kept (no sample cap): the QA/QC report lists them all.
     const samples: RecalcDifference[] = []
+    const fileForecastsBeforeDataDate: FileForecastBeforeDataDate[] = []
     let compared = 0, differing = 0
+    const off = (x: string | null | undefined, y: string | null | undefined) => !!x && !!y && Math.abs(calDays(x, y)) > 1
     for (const a of open) {
       const f = input.fileValues.get(a.id)
-      if (!f || (!f.earlyFinish && f.totalFloat == null)) continue
+      if (!f) continue
+      const dd = input.dataDate
+      const notStarted = !a.actualStart
+      if (dd && ((notStarted && f.earlyStart && day(f.earlyStart) < dd) || (f.earlyFinish && day(f.earlyFinish) < dd))) {
+        fileForecastsBeforeDataDate.push({ id: a.id, code: a.activityId, earlyStart: f.earlyStart ?? null, earlyFinish: f.earlyFinish, notStarted })
+      }
+      if (!f.earlyFinish && f.totalFloat == null) continue
       compared++
-      const finishOff = f.earlyFinish && a.earlyFinish ? Math.abs(calDays(f.earlyFinish, a.earlyFinish)) > 1 : false
       const floatOff = f.totalFloat != null ? Math.abs(f.totalFloat - a.totalFloat) > 1 : false
-      if (finishOff || floatOff) {
+      if (off(f.earlyStart, a.earlyStart) || off(f.earlyFinish, a.earlyFinish) || off(f.lateStart, a.lateStart) || off(f.lateFinish, a.lateFinish) || floatOff) {
         differing++
-        if (samples.length < 10) samples.push({ code: a.activityId, name: a.name, fileFinish: f.earlyFinish, planoraFinish: a.earlyFinish, fileFloat: f.totalFloat, planoraFloat: a.totalFloat })
+        samples.push({
+          code: a.activityId, name: a.name,
+          fileStart: f.earlyStart ?? null, planoraStart: a.earlyStart, fileFinish: f.earlyFinish, planoraFinish: a.earlyFinish,
+          fileLateStart: f.lateStart ?? null, planoraLateStart: a.lateStart, fileLateFinish: f.lateFinish ?? null, planoraLateFinish: a.lateFinish,
+          fileFloat: f.totalFloat, planoraFloat: a.totalFloat,
+        })
       }
     }
-    recalc = { compared, differing, samples }
+    recalc = { compared, differing, samples, ...(input.dataDate ? { fileForecastsBeforeDataDate } : {}) }
   }
 
   return {

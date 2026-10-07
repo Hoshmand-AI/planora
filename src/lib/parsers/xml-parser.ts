@@ -86,6 +86,20 @@ function workingTimeHours(block: string): number {
   return mins / 60
 }
 
+/** A day's WorkingTime periods as HH:MM pairs in time order (ToTime 00:00 = midnight, written 24:00). */
+function workingPeriods(block: string): { from: string; to: string }[] {
+  const out: [number, number][] = []
+  for (const wt of allBlocks(block, 'WorkingTime')) {
+    const f = timeToMin(tagText(wt, 'FromTime'))
+    let t = timeToMin(tagText(wt, 'ToTime'))
+    if (f === null || t === null) continue
+    if (t <= f) t += 24 * 60
+    out.push([f, Math.min(t, 24 * 60)])
+  }
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  return out.sort((x, y) => x[0] - y[0]).map(([f, t]) => ({ from: hm(f), to: hm(t) }))
+}
+
 function expandRange(from: string | null, to: string | null, max = 366): string[] | null {
   if (!from) return []
   const end = to || from
@@ -121,6 +135,8 @@ function buildCalendars(xml: string, warnings: string[]): { calendars: Map<strin
     const base = baseRaw && depth < 10 ? resolve(baseRaw, depth + 1) : undefined
     const dayWorking = new Map<number, boolean>()
     const dayHours: number[] = []
+    let workTimes = base?.workTimes
+    let workTimesHours = 0
     const holidays = new Set<string>(base?.holidays || [])
     const extra = new Set<string>(base?.extraWorkDays || [])
 
@@ -148,6 +164,7 @@ function buildCalendars(xml: string, warnings: string[]): { calendars: Map<strin
       if (working) {
         const h = workingTimeHours(wd)
         dayHours.push(h > 0 ? h : 8)
+        if (h > workTimesHours) { workTimesHours = h; workTimes = workingPeriods(wd) }
       }
     }
     for (const ex of allBlocks(firstBlock(r.block, 'Exceptions') || '', 'Exception')) {
@@ -178,6 +195,7 @@ function buildCalendars(xml: string, warnings: string[]): { calendars: Map<strin
       hoursPerDay,
       holidays: hol,
       ...(ext.length ? { extraWorkDays: ext } : {}),
+      ...(workTimes?.length ? { workTimes } : {}),
       sourceName: r.name || undefined,
     }
     result.set(r.uid, cal)
@@ -206,10 +224,12 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   // Is Text1 used as an activity code?
   const extAttrs = allBlocks(firstBlock(xml, 'ExtendedAttributes') || '', 'ExtendedAttribute')
   const codeFieldIds = new Set<string>()
+  const typeFieldIds = new Set<string>()
   for (const ea of extAttrs) {
     const fid = tagText(ea, 'FieldID')
     const alias = tagText(ea, 'Alias')
-    if (/\b(activity\s*id|activity\s*code|task\s*code|code)\b/i.test(alias)) codeFieldIds.add(fid)
+    if (/\b(activity\s*type|task\s*type)\b/i.test(alias)) typeFieldIds.add(fid)
+    else if (/\b(activity\s*id|activity\s*code|task\s*code|code)\b/i.test(alias)) codeFieldIds.add(fid)
   }
 
   const { calendars: calMap, baseIds } = buildCalendars(xml, warnings)
@@ -224,6 +244,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   let projectSummaryName = ''
   const outlineStack: string[] = []
   const pendingLinks: { succUid: string; block: string }[] = []
+  const deadlines: { a: Activity; date: string }[] = []
 
   for (const block of taskBlocks) {
     const own = stripBlocks(block, ['PredecessorLink', 'ExtendedAttribute', 'Baseline', 'TimephasedData'])
@@ -283,8 +304,12 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     }
 
     let code = ''
+    let loe = false
     for (const ea of allBlocks(block, 'ExtendedAttribute')) {
-      if (codeFieldIds.has(tagText(ea, 'FieldID'))) { code = tagText(ea, 'Value'); break }
+      const fid = tagText(ea, 'FieldID')
+      if (!code && codeFieldIds.has(fid)) code = tagText(ea, 'Value')
+      // A P6 level-of-effort activity exported to MS Project (which has no LOE type) is named in an "Activity Type" text field.
+      if (typeFieldIds.has(fid) && /^\s*(level\s*of\s*effort|loe)\s*$/i.test(tagText(ea, 'Value'))) loe = true
     }
     const idTxt = tagText(own, 'ID') || uid
 
@@ -298,6 +323,18 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     }
 
     const isMilestone = tagText(own, 'Milestone') === '1'
+    // Start vs finish milestone (P6 TT_Mile / TT_FinMile) from its time of day: at or before the
+    // calendar's first working time = start milestone, at or after its last = finish milestone.
+    let milestoneKind: Activity['milestoneKind'] = null
+    if (isMilestone) {
+      const t = timeToMin((tagText(own, 'Start').split('T')[1] || ''))
+      const wt = (calendarId ? calMap.get(calendarId)?.workTimes : undefined) || [{ from: '08:00', to: '17:00' }]
+      const dayStart = timeToMin(wt[0].from) ?? 480, dayEnd = timeToMin(wt[wt.length - 1].to) ?? 1020
+      if (t !== null) milestoneKind = t <= dayStart ? 'start' : t >= dayEnd ? 'finish' : null
+    }
+    // MS Project Deadline: a target finish. Kept as the activity's finish constraint (or the project's
+    // required finish on an end activity) once the links are known.
+    const deadline = isoDatePrefix(tagText(own, 'Deadline'))
     const a = makeActivity(scheduleId, {
       activityId: code || `A${idTxt}`,
       name,
@@ -315,15 +352,17 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
       baselineFinish,
       totalFloat: tf ?? 0,
       freeFloat: ff ?? 0,
-      isCritical: isSummary ? false : isCritical,
+      isCritical: isSummary || loe ? false : isCritical,
       status,
-      activityType: isSummary ? 'summary' : isMilestone ? 'milestone' : 'task',
+      activityType: isSummary ? 'summary' : isMilestone ? 'milestone' : loe ? 'loe' : 'task',
+      milestoneKind,
       calendarId,
       constraintType,
       constraintDate: constraintType ? constraintDate : null,
       sourceId: uid,
     })
     activities.push(a)
+    if (deadline && !isSummary) deadlines.push({ a, date: deadline })
     byUid.set(uid, a)
     hpdByUid.set(uid, hpd)
     for (const link of allBlocks(block, 'PredecessorLink')) pendingLinks.push({ succUid: uid, block: link })
@@ -355,8 +394,19 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
 
+  // Deadlines: an end activity's (nothing follows it) is the project's required finish (Planora's own
+  // export writes the required finish there, as P6 Must Finish By); any other activity's becomes its
+  // Finish On or Before constraint unless it already has a constraint, which it keeps.
+  const hasSucc = new Set(relationships.map(r => r.predecessorId))
+  let mustFinishBy: string | null = null
+  for (const { a, date } of deadlines) {
+    if (!hasSucc.has(a.id)) { if (!mustFinishBy || date > mustFinishBy) mustFinishBy = date }
+    else if (!a.constraintType) { a.constraintType = 'FNLT'; a.constraintDate = date }
+  }
+
   return {
     projectName: title || projectSummaryName || fileName || 'Imported Schedule',
+    mustFinishBy,
     dataDate,
     projectStart,
     projectFinish,

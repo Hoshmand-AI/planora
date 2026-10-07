@@ -84,7 +84,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
       }
       type = 'application/octet-stream'; file = `${slug}.xer`; break
     }
-    case 'xml': body = exportMspXml(g, schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
+    // MS Project XML keeps level-of-effort activities and their relationships (as P6 → MSP does).
+    case 'xml': body = exportMspXml(uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true }), schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv': body = exportScheduleCsv(g); type = 'text/csv; charset=utf-8'; file = `${slug}.csv`; break
     case 'xlsx-import': body = await exportImportXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-import.xlsx`; break
     default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`
