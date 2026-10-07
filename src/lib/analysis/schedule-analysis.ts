@@ -30,7 +30,26 @@ export interface FinishMilestone {
   varianceDays: number | null
   /** True when the scheduler designated this milestone (PATCH /api/schedules finishMilestoneId) */
   designated?: boolean
+  /** Forecast as scheduled (constraints honoured): the date shown on the activity */
+  scheduledFinish?: string | null
+  /** Logic-driven forecast (mandatory constraints relaxed) */
+  logicFinish?: string | null
+  /**
+   * What forecastFinish (and so variance, the required-finish check and CPLI) is measured on:
+   * 'logic' when a mandatory constraint on or upstream of this milestone overrules logic.
+   */
+  basis?: 'scheduled' | 'logic'
+  /** The overruled mandatory constraint on (or upstream of) this milestone, when basis is 'logic' */
+  heldBy?: { code: string; name: string; type: 'MSO' | 'MFO'; constraintDate: string; logicDate: string; days: number } | null
 }
+
+/** A constraint the driving path is traced through (it, not logic, sets that activity's date) */
+export interface DrivingConstraint { id: string; code: string; type: string; date: string; effect: 'later' | 'earlier' | 'start' }
+
+export const FINISH_LABELS = {
+  scheduled: 'Forecast (as scheduled, constraints honoured)',
+  logic: 'Logic-driven (mandatory constraints relaxed)',
+} as const
 
 /**
  * One open activity whose file dates/float differ from Planora's recalculation. The early start and
@@ -67,8 +86,28 @@ export interface ScheduleAnalysis {
   progressMode: ProgressMode
   /** The file's own out-of-sequence progress option (P6 SCHEDOPTIONS), when it states one */
   fileProgressMode?: ProgressMode | null
-  /** Latest finish the recalculated logic produces */
+  /**
+   * Headline forecast finish: the later of the scheduled and the logic-driven finish (a mandatory
+   * constraint can't hide a slip); forecastBasis says which one it is.
+   */
   forecastFinish: string | null
+  forecastBasis?: 'scheduled' | 'logic'
+  /** FINISH_LABELS.scheduled: latest finish with every constraint honoured (the dates shown on activities) */
+  scheduledFinish?: string | null
+  /** FINISH_LABELS.logic: latest finish logic produces with mandatory constraints relaxed */
+  logicFinish?: string | null
+  /**
+   * Logic-driven dates of open activities where they are later than the scheduled ones (an
+   * overruled mandatory constraint on or upstream of them): milestone tables, next milestones and
+   * driving tasks show these.
+   */
+  logicDates?: Record<string, { start: string; finish: string }>
+  /**
+   * The driving path to present: the logic path when a mandatory constraint hides a later finish,
+   * else the scheduled longest path, traced back through constraints that hold activities
+   * (flagged in `constraints`; effect 'start' = the path starts at a constrained activity).
+   */
+  drivingPath?: { basis: 'scheduled' | 'logic'; ids: string[]; constraints: DrivingConstraint[]; openEnd?: { id: string; code: string } | null }
   /** Finish date written in the file header (P6 scheduled finish / MSP finish), for comparison only */
   reportedFinish: string | null
   /** Required finish the file imposes (P6 "Must Finish By"), used as the float anchor */
@@ -162,15 +201,29 @@ export function analyzeSchedule(input: {
   const open = work.filter(isOpen)
   const hasSucc = new Set(input.links.map(l => l.from))
   const violationById = new Map((cpm?.violations ?? []).map(v => [v.id, v]))
-  // Forecast per activity: what logic says, even where a mandatory constraint pins the displayed date.
+  // Forecast per activity: what logic says, even where a mandatory constraint on it or upstream of
+  // it pins the displayed date earlier (cpm.logicTimes); a constraint that holds work later stands.
+  const logicTimes = cpm?.logicTimes
+  const logicDates: Record<string, { start: string; finish: string }> = {}
+  for (const a of work) {
+    if (!isOpen(a)) continue
+    const l = logicTimes?.[a.id]
+    const v = violationById.get(a.id)
+    const lf = l?.earlyFinish ?? (!logicTimes && v ? (v.logicFinish ?? (v.type === 'MFO' ? v.logicDate : null)) : null)
+    if (lf && a.earlyFinish && lf > a.earlyFinish) {
+      const ls = l?.earlyStart ?? v?.logicStart ?? a.earlyStart ?? lf
+      logicDates[a.id] = { start: a.actualStart || (a.earlyStart && a.earlyStart > ls ? a.earlyStart : ls), finish: lf }
+    }
+  }
   const forecastOf = (a: Activity): string | null => {
     if (!isOpen(a)) return a.actualFinish || a.earlyFinish
-    const v = violationById.get(a.id)
-    if (v && v.type === 'MFO') return v.logicDate
-    return a.earlyFinish
+    return logicDates[a.id]?.finish ?? a.earlyFinish
   }
   const finishes = work.map(forecastOf).filter((d): d is string => !!d).sort()
   const forecastFinish = cpm?.logicFinish && finishes.length ? [cpm.logicFinish, finishes[finishes.length - 1]].sort()[1] : (finishes[finishes.length - 1] ?? null)
+  const scheduledFinish = cpm?.projectFinish ?? work.map(a => (isOpen(a) ? a.earlyFinish : a.actualFinish || a.earlyFinish)).filter((d): d is string => !!d).sort().pop() ?? null
+  const logicFinish = cpm?.logicFinish ?? forecastFinish
+  const forecastBasis: 'scheduled' | 'logic' = forecastFinish && scheduledFinish && forecastFinish > scheduledFinish && (cpm?.violations.length ?? 0) > 0 ? 'logic' : 'scheduled'
 
   const fm = pickFinishMilestone(work, hasSucc, forecastOf, input.finishMilestoneId)
   let finishMilestone: FinishMilestone | null = null
@@ -182,6 +235,10 @@ export function analyzeSchedule(input: {
       constraint: fm.constraintType && fm.constraintDate ? { type: fm.constraintType, date: fm.constraintDate } : null,
       varianceDays: f && fm.baselineFinish ? calDays(fm.baselineFinish, f) : null,
       designated: !!want && (want === fm.id.toLowerCase() || want === fm.activityId.toLowerCase()),
+      scheduledFinish: isOpen(fm) ? fm.earlyFinish : fm.actualFinish || fm.earlyFinish,
+      logicFinish: isOpen(fm) ? (logicTimes?.[fm.id]?.earlyFinish ?? f) : f,
+      basis: logicDates[fm.id] ? 'logic' : 'scheduled',
+      heldBy: logicDates[fm.id] ? heldByOf(fm.id, input.links, cpm?.violations ?? [], work) : null,
     }
   }
 
@@ -226,6 +283,12 @@ export function analyzeSchedule(input: {
     varianceBasis = `No work has started${input.dataDate ? ` (data date ${fmtDate(input.dataDate)})` : ''}, so the file's baseline (target) dates are planned dates, not a statused baseline, and no slip is reported. ${varianceBasis.replace(/\.$/, '')}: ${Math.abs(diff)} calendar days ${diff > 0 ? 'later' : 'earlier'} by Planora's recalculation, a difference between the file's dates and its logic. Mark an upload of this project as Baseline to measure variance against it.`
   }
 
+  // State the basis when an overruled mandatory constraint holds the milestone's scheduled date.
+  if (finishMilestone?.basis === 'logic' && finishMilestone.heldBy) {
+    const h = finishMilestone.heldBy
+    varianceBasis = `${varianceBasis} Measured on the logic-driven date ${fmtDate(finishMilestone.forecastFinish)} (${FINISH_LABELS.logic.toLowerCase()}); as scheduled it shows ${fmtDate(finishMilestone.scheduledFinish)} only because the ${h.type === 'MFO' ? 'Mandatory Finish' : 'Mandatory Start'} ${fmtDate(h.constraintDate)} on ${h.code === finishMilestone.code ? 'it' : `${h.code} ${h.name}`} overrules logic by ${h.days} work day${h.days === 1 ? '' : 's'}.`
+  }
+
   // Float stays in work days of each activity's own calendar (P6 does the same): -10 on a 7-day
   // calendar is not -10 on a 5-day one, so the lowest value names its activity and calendar.
   const calName = (a: Activity) => {
@@ -238,6 +301,21 @@ export function analyzeSchedule(input: {
   const minFloatAt = lowest ? { code: lowest.activityId, calendar: calName(lowest) ?? 'own' } : null
   const negativeFloatCount = withFloat.filter(a => a.totalFloat < 0).length
   const violations = cpm?.violations ?? []
+
+  // The driving path to present (traced through constraints) and the findings on it.
+  const byId = new Map(work.map(a => [a.id, a]))
+  const trace = cpm?.drivingTrace ?? { basis: 'scheduled' as const, path: cpm?.longestPath ?? [], constraints: [] }
+  const drivingConstraints: DrivingConstraint[] = trace.constraints.map(c => ({ ...c, code: byId.get(c.id)?.activityId ?? c.id }))
+  const firstOpen = trace.path.map(id => byId.get(id)).find((a): a is Activity => !!a && isOpen(a))
+  const startConstraint = firstOpen && firstOpen.constraintType && firstOpen.constraintDate && !drivingConstraints.some(c => c.id === firstOpen.id)
+    && !(firstOpen.actualStart && START_TYPES.has(normType(firstOpen.constraintType)))
+    ? { id: firstOpen.id, code: firstOpen.activityId, type: normType(firstOpen.constraintType), date: firstOpen.constraintDate, effect: 'start' as const }
+    : null
+  if (startConstraint) drivingConstraints.unshift(startConstraint)
+  const endAct = trace.path.length ? byId.get(trace.path[trace.path.length - 1]) : undefined
+  const openEnd = endAct && isOpen(endAct) && endAct.activityType !== 'milestone' && !hasSucc.has(endAct.id) && endAct.id !== finishMilestone?.id
+    ? { id: endAct.id, code: endAct.activityId } : null
+  const drivingPath: NonNullable<ScheduleAnalysis['drivingPath']> = { basis: trace.basis, ids: trace.path, constraints: drivingConstraints, openEnd }
 
   const reasons: string[] = []
   let status: ScheduleStatus = 'on_track'
@@ -252,6 +330,17 @@ export function analyzeSchedule(input: {
       bump('at_risk', `${negativeFloatCount} open ${negativeFloatCount === 1 ? 'activity has' : 'activities have'} negative float (lowest ${minFloat} work days on ${lowest.activityId}, counted on ${cal ? `its "${cal}" calendar` : 'its own calendar'}).`)
     }
     if (violations.length) bump('at_risk', `${violations.length} mandatory constraint${violations.length === 1 ? ' overrules' : 's overrule'} logic (up to ${Math.max(...violations.map(v => v.days))} work days).`)
+    if (finishMilestone?.basis === 'logic' && finishMilestone.heldBy) {
+      const h = finishMilestone.heldBy
+      bump('at_risk', `${finishMilestone.code} ${finishMilestone.name}: ${FINISH_LABELS.logic.toLowerCase()} ${fmtDate(finishMilestone.logicFinish)}; ${FINISH_LABELS.scheduled.toLowerCase()} ${fmtDate(finishMilestone.scheduledFinish)}, held by the ${h.type === 'MFO' ? 'Mandatory Finish' : 'Mandatory Start'} ${fmtDate(h.constraintDate)} on ${h.code === finishMilestone.code ? 'the milestone itself' : h.code}.`)
+    }
+    for (const c of drivingConstraints.slice(0, 3)) {
+      const label = CONSTRAINT_NAMES[c.type] ?? c.type
+      bump('attention', c.effect === 'start'
+        ? `The driving path starts at ${c.code}, which carries a ${label} constraint ${fmtDate(c.date)}: a typed date, not logic, may be driving the finish.`
+        : `The driving path is traced through ${c.code}, whose ${label} constraint ${fmtDate(c.date)} holds it ${c.effect} than logic; the longest path stops there in P6.`)
+    }
+    if (openEnd) bump('attention', `${openEnd.code} has no successor but drives the project finish (an open end): tie it to the completion milestone.`)
     if (varianceDays != null && varianceDays > 14) bump('at_risk', `Forecast finish is ${varianceDays} calendar days behind baseline.`)
     else if (varianceDays != null && varianceDays > 0) bump('attention', `Forecast finish is ${varianceDays} calendar day${varianceDays === 1 ? '' : 's'} behind baseline.`)
     // Required completion is compared with the contract (finish) milestone, so a required date equal
@@ -308,7 +397,48 @@ export function analyzeSchedule(input: {
 
   return {
     version: 1, progressMode: cpm?.progressMode ?? 'retained', fileProgressMode: input.fileProgressMode ?? null, forecastFinish, reportedFinish: input.reportedFinish, mustFinishBy: input.mustFinishBy,
+    forecastBasis, scheduledFinish, logicFinish, logicDates, drivingPath,
     finishMilestone, varianceDays, varianceBasis, baseline: rb ? summarizeBaseline(rb) : null, minFloat, minFloatAt, negativeFloatCount, violations, longestPath: cpm?.longestPath ?? [],
     status, statusReasons: reasons, recalc,
   }
+}
+
+const CONSTRAINT_NAMES: Record<string, string> = {
+  SNET: 'Start On or After', SNLT: 'Start On or Before', FNET: 'Finish On or After', FNLT: 'Finish On or Before',
+  SO: 'Start On', FO: 'Finish On', MSO: 'Mandatory Start', MFO: 'Mandatory Finish',
+}
+const START_TYPES = new Set(['SNET', 'SNLT', 'SO', 'MSO'])
+const normType = (t: string) => {
+  const u = t.toUpperCase().replace(/^CS_/, '')
+  return ({ MANDSTART: 'MSO', MANDFIN: 'MFO', MANDFINISH: 'MFO', MEOA: 'FNET', MEOB: 'FNLT', MSOA: 'SNET', MSOB: 'SNLT', MEO: 'FO' } as Record<string, string>)[u] ?? u
+}
+
+/**
+ * The overruled mandatory constraint that holds an activity's scheduled date: on the activity itself,
+ * else the upstream one whose logic date is latest.
+ */
+function heldByOf(id: string, links: { from: string; to: string }[], violations: CpmResult['violations'], work: Activity[]): FinishMilestone['heldBy'] {
+  if (!violations.length) return null
+  const vById = new Map(violations.map(v => [v.id, v]))
+  const own = vById.get(id)
+  let v = own
+  if (!v) {
+    const preds = new Map<string, string[]>()
+    for (const l of links) preds.set(l.to, [...(preds.get(l.to) ?? []), l.from])
+    const seen = new Set<string>()
+    const stack = [...(preds.get(id) ?? [])]
+    const found: CpmResult['violations'] = []
+    while (stack.length) {
+      const cur = stack.pop()!
+      if (seen.has(cur)) continue
+      seen.add(cur)
+      const hit = vById.get(cur)
+      if (hit) found.push(hit)
+      stack.push(...(preds.get(cur) ?? []))
+    }
+    v = found.sort((a, b) => (b.logicFinish ?? b.logicDate).localeCompare(a.logicFinish ?? a.logicDate))[0]
+  }
+  if (!v) return null
+  const a = work.find(x => x.id === v!.id)
+  return { code: a?.activityId ?? v.id, name: a?.name ?? '', type: v.type, constraintDate: v.constraintDate, logicDate: v.logicFinish ?? v.logicDate, days: v.days }
 }

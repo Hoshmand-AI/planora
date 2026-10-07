@@ -42,6 +42,10 @@ export default function DashboardPage() {
   const statusReasons = (mx.statusReasons as string[]) ?? []
   const forecastFinish = (mx.forecastFinish as string) || null
   const reportedFinish = (mx.reportedFinish as string) || null
+  // Both finish bases, labelled, when an overruled mandatory constraint separates them.
+  const scheduledFinish = (mx.scheduledFinish as string) || null
+  const logicFinish = (mx.logicFinish as string) || null
+  const twoFinishes = mx.forecastBasis === 'logic' && !!scheduledFinish && !!logicFinish && scheduledFinish !== logicFinish
   const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete' } as const
   const STATUS_TONE = { on_track: 'on-track', attention: 'attention', at_risk: 'at-risk', complete: 'on-track' } as const
   const criticalCount = Number(m?.criticalCount ?? 0)
@@ -52,7 +56,7 @@ export default function DashboardPage() {
   // Activities changed by edits made in Planora (shown with an "Edited" tag)
   const editedIds = new Set((mx.editedActivityIds as string[] | undefined) ?? [])
   const editsCount = Number(mx.editsCount ?? 0)
-  const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean }[] } | null) ?? null
+  const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
   return (
@@ -81,11 +85,14 @@ export default function DashboardPage() {
       </StickyBar>
       <Link href="/dashboard/portfolio" className="inline-block text-[13px] font-medium text-accent-600 hover:underline">All projects and alerts (portfolio) →</Link>
 
-      {(statusReasons.length > 0 || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish)) && (
+      {(statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish)) && (
         <div className={`border-l-2 pl-3 py-1 text-[13px] text-warm-700 space-y-1 ${status === 'at_risk' ? 'border-status-at-risk' : status === 'attention' ? 'border-status-attention' : 'border-status-info'}`}>
           {statusReasons.map((r, i) => <p key={i}>{r}</p>)}
+          {twoFinishes && (
+            <p className="text-warm-700">Forecast (as scheduled, constraints honoured): <span className="tabular-nums font-medium">{fmtDate(scheduledFinish)}</span> · Logic-driven (mandatory constraints relaxed): <span className="tabular-nums font-medium">{fmtDate(logicFinish)}</span></p>
+          )}
           {reportedFinish && forecastFinish && reportedFinish !== forecastFinish && (
-            <p className="text-warm-500">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
+            <p className="text-warm-500">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
           )}
         </div>
       )}
@@ -103,7 +110,7 @@ export default function DashboardPage() {
           {brief.nextMilestones.length > 0 && (
             <div className="mt-3 text-[12.5px] text-warm-600">
               <span className="font-semibold text-navy-950">Next milestones: </span>
-              {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
+              {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.basis === 'logic' ? <span className="text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}> (logic-driven; {ms.scheduled} as scheduled)</span> : null}{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
             </div>
           )}
           {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-2 text-[12px] text-warm-500 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
@@ -168,7 +175,13 @@ export default function DashboardPage() {
                       Float: {task.totalFloat}d
                       {task.earlyStart && ` · ${fmtDate(task.earlyStart)}`}
                       {task.earlyFinish && ` → ${fmtDate(task.earlyFinish)}`}
+                      {task.dateBasis === 'logic' && ` (logic-driven; ${fmtDate(task.scheduledFinish)} as scheduled)`}
                     </div>
+                    {task.drivingConstraint && (
+                      <div className="text-[11px] text-status-attention mt-0.5">
+                        {task.drivingConstraint.effect === 'start' ? 'Path starts at its' : 'Held by its'} {task.drivingConstraint.type} {fmtDate(task.drivingConstraint.date)} constraint{task.drivingConstraint.effect === 'later' ? ' (later than logic)' : task.drivingConstraint.effect === 'earlier' ? ' (earlier than logic)' : ''}
+                      </div>
+                    )}
                   </div>
                   <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0">{task.duration}d</div>
                 </div>
@@ -209,6 +222,11 @@ interface ActivityRow {
   earlyFinish?: string
   isCritical: boolean
   status: string
+  /** 'logic' when earlyStart/earlyFinish are logic-driven dates (an overruled mandatory constraint holds the scheduled ones) */
+  dateBasis?: 'logic'
+  scheduledFinish?: string
+  /** A constraint the driving path is traced through or starts at */
+  drivingConstraint?: { type: string; date: string; effect: 'later' | 'earlier' | 'start' }
 }
 
 /* ─── Edited tag ─────────────────────────────────── */

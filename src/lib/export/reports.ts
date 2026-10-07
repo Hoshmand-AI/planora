@@ -17,6 +17,7 @@
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { DcmaReport } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import { FINISH_LABELS } from '@/lib/analysis/schedule-analysis'
 import type { ScheduleComparison } from '@/lib/analysis/compare'
 import type { ProjectBrief } from '@/lib/analysis/brief'
 import type { CpmLinkFloat } from '@/lib/planning/types'
@@ -83,7 +84,10 @@ function statusSection(r: ReportInput): string[] {
     table(['Item', 'Value'], [
       ['Baseline', baselineLine(r).replace(/^Baseline:\s*/, '')],
       ['Data date', d(s.dataDate)],
-      ['Forecast finish (Planora recalculation)', d(an.forecastFinish)],
+      ['Forecast finish (Planora recalculation)', `${d(an.forecastFinish)}${an.forecastBasis === 'logic' ? ' (logic-driven)' : ''}`],
+      ...(an.scheduledFinish && an.logicFinish && an.scheduledFinish !== an.logicFinish
+        ? [[FINISH_LABELS.scheduled, d(an.scheduledFinish)], [FINISH_LABELS.logic, d(an.logicFinish)]]
+        : []),
       ['Finish written in the file header', d(an.reportedFinish)],
       ['Required finish (Must Finish By)', d(an.mustFinishBy)],
       ['Finish milestone', fm ? `${fm.code} ${fm.name}` : '—'],
@@ -99,16 +103,20 @@ function statusSection(r: ReportInput): string[] {
 }
 
 /**
- * The forecast an activity's logic produces. Where a mandatory constraint (MFO/MSO) pins the
- * displayed date earlier than logic allows, the logic date is the forecast — the same rule the
- * headline variance uses (src/lib/analysis/schedule-analysis.ts), so tables agree with it.
+ * The forecast an activity's logic produces. Where a mandatory constraint (MFO/MSO) on it or
+ * upstream of it pins the displayed date earlier than logic allows, the logic-driven date is the
+ * forecast (analysis.logicDates) — the same rule the headline variance uses
+ * (src/lib/analysis/schedule-analysis.ts), so tables agree with it, successors of the constraint included.
  */
-function forecastOf(r: ReportInput, a: Activity): { start: string | null; finish: string | null; pinned: ScheduleAnalysis['violations'][number] | null } {
-  if (!open(a)) return { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish, pinned: null }
+function forecastOf(r: ReportInput, a: Activity): { start: string | null; finish: string | null; pinned: ScheduleAnalysis['violations'][number] | null; logic: boolean } {
+  if (!open(a)) return { start: a.actualStart || a.earlyStart, finish: a.actualFinish || a.earlyFinish, pinned: null, logic: false }
   const v = r.analysis.violations.find(x => x.id === a.id) ?? null
-  if (!v) return { start: a.actualStart || a.earlyStart, finish: a.earlyFinish, pinned: null }
-  // The CPM's logicDate is the logic-driven finish (a milestone's date) for MFO and MSO alike.
-  return { start: a.actualStart || (a.activityType === 'milestone' ? v.logicDate : a.earlyStart), finish: v.logicDate, pinned: v }
+  const l = r.analysis.logicDates?.[a.id]
+  if (l) return { start: a.actualStart || l.start, finish: l.finish, pinned: v, logic: true }
+  // Analyses stored before logicDates: the violation's own logic dates.
+  if (!v) return { start: a.actualStart || a.earlyStart, finish: a.earlyFinish, pinned: null, logic: false }
+  const finish = v.logicFinish ?? (v.type === 'MFO' || a.activityType === 'milestone' ? v.logicDate : a.earlyFinish)
+  return { start: a.actualStart || v.logicStart || (a.activityType === 'milestone' ? v.logicDate : a.earlyStart), finish, pinned: v, logic: true }
 }
 
 /**
@@ -128,14 +136,16 @@ function milestoneRows(r: ReportInput) {
     .map(m => ({ m, f: forecastOf(r, m), k: contractOf(r, m) }))
     .sort((x, y) => (x.f.finish || '').localeCompare(y.f.finish || ''))
     .map(({ m, f, k }) => [m.activityId, m.name, d(m.baselineFinish), d(f.finish),
-      m.actualFinish ? 'Actual' : f.pinned ? `Forecast by logic (${f.pinned.type} ${d(f.pinned.constraintDate)} overruled)` : 'Forecast',
+      m.actualFinish ? 'Actual' : f.pinned ? `Forecast by logic (${f.pinned.type} ${d(f.pinned.constraintDate)} overruled)` : f.logic ? `Forecast by logic (${d(m.earlyFinish)} as scheduled; a mandatory constraint upstream is overruled)` : 'Forecast',
       k ? `${k.label} ${d(k.date)}` : '—', k ? signed(calDays(k.date, f.finish)) : '—',
       signed(calDays(m.baselineFinish, f.finish)), open(m) ? m.totalFloat : '—'])
 }
 
+/** The driving path to present: traced through constraints that hold it (analysis.drivingPath), else the P6 longest path. */
 function drivingPath(r: ReportInput): Activity[] {
   const byId = new Map(r.activities.map(a => [a.id, a]))
-  return r.analysis.longestPath.map(id => byId.get(id)).filter((a): a is Activity => !!a && open(a))
+  const ids = r.analysis.drivingPath?.ids.length ? r.analysis.drivingPath.ids : r.analysis.longestPath
+  return ids.map(id => byId.get(id)).filter((a): a is Activity => !!a && open(a))
 }
 
 function executiveSummary(r: ReportInput): string[] {
@@ -195,16 +205,31 @@ function criticalPath(r: ReportInput): string[] {
     return fmtRel(best)
   }
   const branches = drivingBranches(r, path)
+  const an = r.analysis
+  const dp = an.drivingPath
+  const flags = new Map((dp?.constraints ?? []).map(c => [c.id, c]))
+  const flagText = (c: NonNullable<ScheduleAnalysis['drivingPath']>['constraints'][number]) =>
+    c.effect === 'start' ? `path starts at its ${c.type} ${d(c.date)}` : `${c.type} ${d(c.date)} holds it ${c.effect} than logic`
+  const p6 = an.longestPath.filter(id => { const a = r.activities.find(x => x.id === id); return a && open(a) }).length
   return [
     '## 1. Summary',
-    `- Longest (driving) path to the finish: ${path.length} open activities, from ${path[0] ? `${path[0].activityId} ${path[0].name}` : '—'} to ${path.length ? `${path[path.length - 1].activityId} ${path[path.length - 1].name}` : '—'}.`,
+    `- ${dp?.basis === 'logic' ? 'Logic-driven path (mandatory constraints relaxed) to the finish' : 'Longest (driving) path to the finish'}: ${path.length} open activities, from ${path[0] ? `${path[0].activityId} ${path[0].name}` : '—'} to ${path.length ? `${path[path.length - 1].activityId} ${path[path.length - 1].name}` : '—'}.`,
+    ...(dp?.constraints.length ? [`- Constraints on the driving path (flagged in the table): ${dp.constraints.map(c => `${c.code} (${flagText(c)})`).join('; ')}.${p6 < path.length ? ` P6's longest path stops at the constraint (${p6} open ${p6 === 1 ? 'activity' : 'activities'}); the path is traced back through it to the logic that feeds it.` : ''}`] : []),
+    ...(dp?.openEnd ? [`- ${dp.openEnd.code} has no successor but drives the project finish (an open end).`] : []),
     `- Critical (total float ≤ 0): ${critical.length} of ${opens.length} open activities (${opens.length ? Math.round((100 * critical.length) / opens.length) : 0}%).`,
     `- Near-critical (1–10 work days of float): ${near.length}.`,
-    `- Forecast finish ${d(r.analysis.forecastFinish)}${r.analysis.mustFinishBy ? `; required ${d(r.analysis.mustFinishBy)}` : ''}. Lowest float on open work: ${r.analysis.minFloat ?? '—'} work days.`,
+    `- ${FINISH_LABELS.scheduled}: ${d(an.scheduledFinish ?? an.forecastFinish)}; ${FINISH_LABELS.logic.charAt(0).toLowerCase() + FINISH_LABELS.logic.slice(1)}: ${d(an.logicFinish ?? an.forecastFinish)}${an.mustFinishBy ? `; required ${d(an.mustFinishBy)}` : ''}. Lowest float on open work: ${an.minFloat ?? '—'} work days.`,
     `- Out-of-sequence progress scheduled with ${r.analysis.progressMode === 'retained' ? 'retained logic' : 'progress override'}.`,
     '',
     '## 2. Driving path in sequence', table(['#', 'ID', 'Activity', 'Relationship in', 'Duration (wd)', 'Start', 'Finish', 'Float (wd)', 'Constraint'],
-      path.map((a, i) => [i + 1, a.activityId, a.name, linkInto(a, i), a.status === 'in_progress' ? `${a.remainingDuration} rem.` : a.duration, d(a.earlyStart), d(a.earlyFinish), a.totalFloat, a.constraintType ? `${a.constraintType} ${d(a.constraintDate)}` : ''])), '',
+      path.map((a, i) => {
+        const fc = forecastOf(r, a)
+        const k = flags.get(a.id)
+        return [i + 1, a.activityId, a.name, linkInto(a, i), a.status === 'in_progress' ? `${a.remainingDuration} rem.` : a.duration,
+          d(fc.start), fc.logic ? `${d(fc.finish)} (logic; ${d(a.earlyFinish)} as scheduled)` : d(fc.finish), a.totalFloat,
+          k ? `**${k.type} ${d(k.date)}: ${flagText(k)}**` : a.constraintType ? `${a.constraintType} ${d(a.constraintDate)}` : '']
+      })), '',
+    ...(path.some(a => forecastOf(r, a).logic) ? ['_Start/finish: the logic-driven date where an overruled mandatory constraint on or upstream of the activity holds the scheduled date (shown after it)._', ''] : []),
     '## 3. All driving branches to the finish (relationship free float 0)',
     ...(branches ? [
       branches.ties.length
@@ -216,7 +241,7 @@ function criticalPath(r: ReportInput): string[] {
     '## 4. Near-critical activities (1–10 work days of float)', table(['ID', 'Activity', 'Finish', 'Float (wd)'], near.slice(0, 30).map(a => [a.activityId, a.name, d(a.earlyFinish), a.totalFloat])), '',
     '## 5. Constraints on open work', table(['ID', 'Activity', 'Constraint', 'Date', 'Float (wd)'], constrained.map(a => [a.activityId, a.name, a.constraintType, d(a.constraintDate), a.totalFloat])), '',
     '## 6. Mandatory constraints that overrule logic',
-    r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date', 'Work days hidden'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._',
+    r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date (predecessor-driven)', 'Work days hidden (constraint to logic date)'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._',
   ]
 }
 

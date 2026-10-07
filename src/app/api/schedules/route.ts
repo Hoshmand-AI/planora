@@ -43,9 +43,22 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds } = data
 
     const criticalActivities = activities.filter(a => a.isCritical)
-    // Driving tasks: the longest path (P6 "longest path"), open work first, in sequence.
+    // Driving tasks: the driving path traced through any constraint that holds it (the P6 longest
+    // path stops there), open work first, in sequence, at their logic-driven dates where an
+    // overruled mandatory constraint holds the scheduled ones; constraints on the path are flagged.
     const byId = new Map(activities.map(a => [a.id, a]))
-    const longest = analysis.longestPath.map(id => byId.get(id)).filter((a): a is NonNullable<typeof a> => !!a && a.status !== 'complete')
+    const heldBy = new Map((analysis.drivingPath?.constraints ?? []).map(c => [c.id, c]))
+    const longest = (analysis.drivingPath?.ids.length ? analysis.drivingPath.ids : analysis.longestPath).map(id => byId.get(id))
+      .filter((a): a is NonNullable<typeof a> => !!a && a.status !== 'complete')
+      .map(a => {
+        const l = analysis.logicDates?.[a.id]
+        const k = heldBy.get(a.id)
+        return {
+          ...a,
+          ...(l ? { earlyStart: l.start, earlyFinish: l.finish, scheduledStart: a.earlyStart, scheduledFinish: a.earlyFinish, dateBasis: 'logic' as const } : {}),
+          ...(k ? { drivingConstraint: { type: k.type, date: k.date, effect: k.effect } } : {}),
+        }
+      })
     // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
     const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
@@ -66,6 +79,9 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         varianceBasis: analysis.varianceBasis,
         baseline: analysis.baseline?.header ?? null,
         forecastFinish: analysis.forecastFinish,
+        forecastBasis: analysis.forecastBasis ?? 'scheduled',
+        scheduledFinish: analysis.scheduledFinish ?? null,
+        logicFinish: analysis.logicFinish ?? null,
         reportedFinish: analysis.reportedFinish,
         status: analysis.status,
         statusReasons: analysis.statusReasons,
@@ -81,7 +97,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 
   // The list carries the headline analysis only (no driving-path ids or recalculation samples).
   const schedules = (await getSchedules(ctx.orgId)).map(s => s.analysis
-    ? { ...s, analysis: { ...s.analysis, longestPath: [], recalc: s.analysis.recalc ? { ...s.analysis.recalc, samples: [] } : null } }
+    ? { ...s, analysis: { ...s.analysis, longestPath: [], logicDates: undefined, drivingPath: undefined, recalc: s.analysis.recalc ? { ...s.analysis.recalc, samples: [] } : null } }
     : s)
   return NextResponse.json({ schedules })
 })

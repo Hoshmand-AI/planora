@@ -6,12 +6,14 @@ import { PROJECT_TYPE_LABELS, isCivilType, type ProjectType, type CanonicalCateg
 import { phaseOf } from '@/lib/semantic/taxonomy'
 import { phaseLabelsFor } from '@/lib/export/wbs'
 import { fmtDate } from '@/lib/format'
+import { FINISH_LABELS } from '@/lib/analysis/schedule-analysis'
 
 export interface ProjectBrief {
   headline: string
   facts: { label: string; value: string }[]
   scope: string[]
-  nextMilestones: { name: string; date: string; critical: boolean }[]
+  /** date: the forecast (logic-driven where an overruled mandatory constraint holds the scheduled date; then `scheduled` is the date shown on the activity) */
+  nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[]
   finishMilestone: { name: string; date: string } | null
   summary: string
   /** Plain-text block for model prompts */
@@ -53,12 +55,22 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
   }
   const scope = [...groups.entries()].sort((x, y) => x[1].first.localeCompare(y[1].first)).map(([k, v]) => `${k} (${v.n})`)
 
+  // Milestone forecasts: the logic-driven date where an overruled mandatory constraint on or upstream
+  // of the milestone holds the scheduled one (the same rule as the headline analysis).
+  const an = s.analysis ?? null
+  const logic = an?.logicDates ?? {}
+  const dateOf = (a: Activity) => (a.status !== 'complete' && logic[a.id]?.finish) || a.earlyFinish || a.earlyStart || ''
   const ms = work.filter(a => a.activityType === 'milestone')
   const upcoming = ms.filter(a => a.status !== 'complete' && (a.earlyFinish || a.earlyStart))
-    .sort((a, b) => (a.earlyFinish || a.earlyStart || '').localeCompare(b.earlyFinish || b.earlyStart || ''))
-  const finishMs = [...ms].filter(a => /substantial|final|complet|turnover|handover|occupan|\bco\b|c of o/i.test(a.name))
-    .sort((a, b) => (b.earlyFinish || '').localeCompare(a.earlyFinish || ''))[0] || upcoming[upcoming.length - 1] || null
-  const nextMilestones = upcoming.slice(0, 5).map(a => ({ name: a.name, date: fmtDate(a.earlyFinish || a.earlyStart), critical: a.isCritical }))
+    .sort((a, b) => dateOf(a).localeCompare(dateOf(b)))
+  const contract = an?.finishMilestone ? ms.find(a => a.id === an.finishMilestone!.id) : undefined
+  const finishMs = contract || [...ms].filter(a => /substantial|final|complet|turnover|handover|occupan|\bco\b|c of o/i.test(a.name))
+    .sort((a, b) => dateOf(b).localeCompare(dateOf(a)))[0] || upcoming[upcoming.length - 1] || null
+  const nextMilestones = upcoming.slice(0, 5).map(a => logic[a.id]
+    ? { name: a.name, date: fmtDate(logic[a.id].finish), critical: a.isCritical, basis: 'logic' as const, scheduled: fmtDate(a.earlyFinish || a.earlyStart) }
+    : { name: a.name, date: fmtDate(a.earlyFinish || a.earlyStart), critical: a.isCritical })
+  // Both finishes, labelled, when an overruled mandatory constraint separates them.
+  const twoFinishes = !!an?.scheduledFinish && !!an?.logicFinish && an.scheduledFinish !== an.logicFinish && an.forecastBasis === 'logic'
 
   const headline = `${s.name}${typeLabel ? ` — ${typeLabel.toLowerCase()}` : ''}${where ? ` in ${where}` : ''}`
   const facts = [
@@ -67,7 +79,9 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
     sqft && { label: 'Size', value: `${Math.round(sqft).toLocaleString()} sf` },
     value && { label: 'Construction value', value: `$${value.toLocaleString()}M` },
     start && { label: 'Start', value: fmtDate(start) },
-    finish && { label: 'Forecast finish', value: fmtDate(finish) },
+    ...(twoFinishes
+      ? [{ label: FINISH_LABELS.scheduled, value: fmtDate(an!.scheduledFinish) }, { label: FINISH_LABELS.logic, value: fmtDate(an!.logicFinish) }]
+      : [finish && { label: 'Forecast finish', value: fmtDate(finish) }]),
     start && finish && { label: 'Duration', value: `${monthsBetween(start, finish)} months` },
     dataDate && { label: 'Data date', value: fmtDate(dataDate) },
     { label: 'Progress', value: `${pct}% of ${work.length} activities complete` },
@@ -76,7 +90,8 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
   const sentences = [
     `${s.name} is ${typeLabel ? `a ${typeLabel.toLowerCase()} project` : 'a construction project'}${where ? ` in ${where}` : ''}${sqft ? ` of about ${Math.round(sqft).toLocaleString()} sf` : value ? ` of about $${value.toLocaleString()}M` : ''}${start && finish ? `, scheduled from ${fmtDate(start)} to ${fmtDate(finish)} (${monthsBetween(start, finish)} months)` : ''}.`,
     scope.length ? `The work runs through ${scope.map(x => x.replace(/ \(\d+\)$/, '').toLowerCase()).join(', ')}.` : '',
-    finishMs ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name} by ${fmtDate(finishMs.earlyFinish || finishMs.earlyStart)}${nextMilestones[0] && nextMilestones[0].name !== finishMs.name ? `; the next milestone is ${nextMilestones[0].name} on ${nextMilestones[0].date}` : ''}.` : '',
+    finishMs ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name} by ${fmtDate(dateOf(finishMs))}${logic[finishMs.id] ? ` (logic-driven; ${fmtDate(finishMs.earlyFinish || finishMs.earlyStart)} as scheduled, held by a mandatory constraint)` : ''}${nextMilestones[0] && nextMilestones[0].name !== finishMs.name ? `; the next milestone is ${nextMilestones[0].name} on ${nextMilestones[0].date}${nextMilestones[0].basis === 'logic' ? ' (logic-driven)' : ''}` : ''}.` : '',
+    twoFinishes ? `${FINISH_LABELS.scheduled}: ${fmtDate(an!.scheduledFinish)}; ${FINISH_LABELS.logic.charAt(0).toLowerCase() + FINISH_LABELS.logic.slice(1)}: ${fmtDate(an!.logicFinish)}.` : '',
     `${pct}% of activities are complete${dataDate ? ` as of ${fmtDate(dataDate)}` : ''}.`,
   ].filter(Boolean)
   const summary = sentences.join(' ')
@@ -84,7 +99,7 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
     `PROJECT OVERVIEW: ${summary}`,
     ...facts.map(f => `- ${f.label}: ${f.value}`),
     scope.length ? `- Scope by phase (activity count): ${scope.join('; ')}` : '',
-    nextMilestones.length ? `- Next milestones: ${nextMilestones.map(m => `${m.name} ${m.date}${m.critical ? ' (critical)' : ''}`).join('; ')}` : '',
+    nextMilestones.length ? `- Next milestones: ${nextMilestones.map(m => `${m.name} ${m.date}${m.basis === 'logic' ? ` (logic-driven; ${m.scheduled} as scheduled)` : ''}${m.critical ? ' (critical)' : ''}`).join('; ')}` : '',
   ].filter(Boolean).join('\n')
-  return { headline, facts, scope, nextMilestones, finishMilestone: finishMs ? { name: finishMs.name, date: fmtDate(finishMs.earlyFinish || finishMs.earlyStart) } : null, summary, text }
+  return { headline, facts, scope, nextMilestones, finishMilestone: finishMs ? { name: finishMs.name, date: fmtDate(dateOf(finishMs)) } : null, summary, text }
 }
