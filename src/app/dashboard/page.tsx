@@ -8,9 +8,14 @@ import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
 import Link from 'next/link'
 import { Portfolio } from '@/components/Portfolio'
 import { ScheduleTools } from '@/components/ScheduleTools'
+import { EarnedValue } from '@/components/EarnedValue'
+import { useEffect, useState } from 'react'
 
 export default function DashboardPage() {
   const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
+  // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
+  const [tab, setTab] = useState<'overview' | 'evm'>('overview')
+  useEffect(() => { setTab(typeof window !== 'undefined' && window.location.hash === '#earned-value' ? 'evm' : 'overview') }, [selectedSchedule?.id])
 
   if (!selectedSchedule) {
     return (
@@ -84,6 +89,13 @@ export default function DashboardPage() {
       </div>
       </StickyBar>
       <Link href="/dashboard/portfolio" className="inline-block text-[13px] font-medium text-accent-600 hover:underline">All projects and alerts (portfolio) →</Link>
+
+      {selectedSchedule.sourceType !== 'generated' && <ScheduleTabs tab={tab} onChange={setTab} />}
+      {selectedSchedule.sourceType !== 'generated' && (
+        <div role="tabpanel" id="tabpanel-evm" aria-labelledby="tab-evm" hidden={tab !== 'evm'}>{tab === 'evm' && <EarnedValue scheduleId={selectedSchedule.id} />}</div>
+      )}
+      <div role={selectedSchedule.sourceType !== 'generated' ? 'tabpanel' : undefined} id="tabpanel-overview" aria-labelledby={selectedSchedule.sourceType !== 'generated' ? 'tab-overview' : undefined}
+        hidden={tab !== 'overview' && selectedSchedule.sourceType !== 'generated'} className="space-y-6">
 
       {(statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish)) && (
         <div className={`border-l-2 pl-3 py-1 text-[13px] text-warm-700 space-y-1 ${status === 'at_risk' ? 'border-status-at-risk' : status === 'attention' ? 'border-status-attention' : 'border-status-info'}`}>
@@ -206,7 +218,35 @@ export default function DashboardPage() {
           origin={selectedSchedule.uploadOrigin ?? null} historyOverride={selectedSchedule.historyOverride ?? false}
           onChanged={() => { refreshSchedules(); refreshMetrics() }} />
       )}
+      </div>
 
+    </div>
+  )
+}
+
+/* ─── Tabs ───────────────────────────────────────── */
+const TABS = [{ id: 'overview', label: 'Overview' }, { id: 'evm', label: 'Earned value' }] as const
+function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t: 'overview' | 'evm') => void }) {
+  const select = (t: 'overview' | 'evm') => {
+    onChange(t)
+    if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : window.location.pathname + window.location.search)
+  }
+  return (
+    <div role="tablist" aria-label="Schedule views" className="flex gap-1 border-b border-warm-200"
+      onKeyDown={e => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+        const i = TABS.findIndex(x => x.id === tab)
+        const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id
+        select(next)
+        document.getElementById(`tab-${next}`)?.focus()
+      }}>
+      {TABS.map(t => (
+        <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`tabpanel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
+          onClick={() => select(t.id)}
+          className={`px-3 py-2 text-[13.5px] font-medium -mb-px border-b-2 ${tab === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
+          {t.label}
+        </button>
+      ))}
     </div>
   )
 }

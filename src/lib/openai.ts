@@ -26,7 +26,7 @@ interface ScheduleContext {
   /** Change since the previous upload of the same project */
   comparison?: ScheduleComparison | null
   /** Evidence every report carries whether or not a model wrote it: provenance, windows, reviewer dispositions, relationship float */
-  evidence?: Pick<ReportInput, 'provenance' | 'windows' | 'review' | 'linkFloat'>
+  evidence?: Pick<ReportInput, 'provenance' | 'windows' | 'review' | 'linkFloat' | 'evm' | 'evmTrend'>
 }
 
 export async function askScheduleQuestion(
