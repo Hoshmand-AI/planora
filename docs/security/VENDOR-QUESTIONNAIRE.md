@@ -45,7 +45,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 |---|---|---|
 | Is AI used? | Optional. The schedule engine, DCMA checks and reports are deterministic code. AI only phrases answers and suggestions | [../ai/AI-GOVERNANCE.md](../ai/AI-GOVERNANCE.md) |
 | Is it on by default? | No. New organizations start with AI off; an admin turns it on | `src/lib/server/org.ts` |
-| Is our data used to train models? | No. OpenAI API terms exclude API data from training. No other model provider is used | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
+| Is our data used to train models? | Cloud AI is off by default. When an admin turns it on, request-relevant content is sent to the selected provider: Anthropic (default) or OpenAI (approved alternate). Training and retention terms must be verified against the provider agreement in force; on-prem and air-gapped deployments send nothing to a cloud provider | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
 | CUI / classified projects | Cloud AI is refused for projects marked CUI, classified or withheld. The cloud service warns that CUI must not be stored there | [CUI-HANDLING.md](CUI-HANDLING.md) |
 
 ## 5. Secure development

@@ -8,7 +8,7 @@ _For customers' security reviews and procurement. Last updated 10/06/2026._
 |---|---|---|
 | Application | Next.js 16 (React 19), TypeScript strict, Node.js 22 | Hosted on Vercel (cloud) or run on-premises from the provided container image or with `npm start` ([ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)) |
 | Database | PostgreSQL 14+ (Neon in the cloud) | TLS with certificate and host-name verification; encrypted at rest by the provider |
-| AI (optional) | OpenAI API (cloud), any OpenAI-compatible on-prem model, or none | Organization-level switch, off by default for new organizations; air-gapped mode refuses non-private hosts; CUI/classified projects are never sent to a cloud model |
+| AI (optional) | Provider-agnostic gateway: Anthropic API (Claude, default cloud provider), OpenAI API (approved alternate), any OpenAI-compatible on-prem model, or none. Cloud calls send request-relevant content to the selected provider | Organization-level switch, off by default for new organizations; air-gapped mode refuses non-private hosts; CUI/classified projects are never sent to a cloud model |
 
 The scheduling engine (interview, CPM, DCMA checks, Monte Carlo risk analysis, recovery modeling, exports) is deterministic code that never depends on a model. Models only phrase answers and suggest extra interview questions.
 

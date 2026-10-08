@@ -15,6 +15,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "jsonwebtoken": "^9.0.3",

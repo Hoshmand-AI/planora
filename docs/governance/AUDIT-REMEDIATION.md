@@ -147,7 +147,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | 74 | Withheld-data protection | ✅ | Tests cover the brief, generated schedule and coercion paths |
 | 75 | Prompt minimization / inspection | ✅ | Every call is audited with a prompt SHA-256, sizes and purpose |
 | 76 | Structured output validation | ✅ | Unchanged validators; the quota error is surfaced instead of being swallowed |
-| 77 | Model / version governance | ✅ | Approved registry (`PLANORA_APPROVED_MODELS`); default pinned to `gpt-4o-2024-11-20`; [MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) |
+| 77 | Model / version governance | ✅ | Approved registry (`PLANORA_APPROVED_MODELS`); default pinned to `claude-opus-5-5` (Anthropic; `gpt-4o-2024-11-20` when the OpenAI provider is selected); certified vs approved-alternate flag per model; [MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) |
 | 78 | AI evaluation | ◐📄 | Golden prompts and acceptance criteria defined; an automated live-model harness is still to do |
 | 79 | AI monitoring / incidents | ✅ | `ai.request` events with ok/error and latency; incident handling in AI-GOVERNANCE.md |
 | 80 | Claims / calibration | ✅ | Scenario vs Monte Carlo labelling; method and assumptions shown with every result |

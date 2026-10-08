@@ -105,8 +105,10 @@ npm start                       # http://localhost:3000
 |---|---|---|
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `JWT_SECRET` | Yes | Auth refuses to start without it in production |
-| `PLANORA_AI_MODE` | No | `cloud`, `local` or `offline`. Default: cloud if `OPENAI_API_KEY` is set, else offline |
-| `OPENAI_API_KEY` | No | Cloud mode only |
+| `PLANORA_AI_MODE` | No | `cloud`, `local` or `offline`. Default: cloud if `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set, else offline |
+| `PLANORA_AI_PROVIDER` | No | `anthropic` or `openai`. Default: `anthropic` when `ANTHROPIC_API_KEY` is set, else `openai` when `OPENAI_API_KEY` is set |
+| `ANTHROPIC_API_KEY` | No | Cloud mode, Anthropic provider (default cloud provider) |
+| `OPENAI_API_KEY` | No | Cloud mode, OpenAI provider (approved alternate) |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | No | On-prem model (OpenAI-compatible API) |
 | `PLANORA_AIRGAPPED` | No | `true` refuses cloud AI and any non-private model host |
 | `PLANORA_ALLOWED_HOSTS` | No | Extra model hosts allowed in air-gapped mode |
@@ -242,7 +244,7 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | ID | Steps | Expected result |
 |---|---|---|
 | AI-01 | Run with `PLANORA_AI_MODE=offline` | Every function except AI follow-up questions and narrative Q&A works. The UI shows "AI offline — rules only" |
-| AI-02 | Set `PLANORA_AIRGAPPED=true` with a public model host (e.g. api.openai.com) | The model host is refused; no outbound call is made |
+| AI-02 | Set `PLANORA_AIRGAPPED=true` with a public model host (e.g. api.anthropic.com or api.openai.com) | The model host is refused; no outbound call is made |
 | AI-03 | Air-gapped with a private host (e.g. `*.internal`, 10.x.x.x) | Allowed |
 | AI-04 | Ask AI a status question on an uploaded schedule | The answer starts with "About this project", uses MM/DD/YYYY, and does not call activities critical when the file has no logic |
 

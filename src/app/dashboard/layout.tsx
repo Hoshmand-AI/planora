@@ -10,6 +10,7 @@ import {
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
 import { WorkspaceSelect } from '@/components/WorkspaceSelect'
+import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 
 /* ─── Types ─────────────────────────────────────────── */
 interface User     { id: string; email: string; name: string; plan: string; role?: string }
@@ -61,7 +62,9 @@ const TABS = [
 
 const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href || pathname.startsWith('/dashboard/portfolio') : pathname.startsWith(href)
 
-interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; host: string | null; error?: string }
+interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; provider?: ProviderName | null; model: string | null; certified?: boolean; host: string | null; error?: string }
+/** "claude-opus-5-5 (Anthropic (Claude))", plus a note when the model is an approved alternate rather than certified. */
+const modelLine = (l: LlmStatus) => `${l.model}${l.provider ? ` · ${PROVIDER_LABEL[l.provider]}` : ''}${l.certified === false ? ' · approved alternate (not certified; quality may differ)' : ''}`
 const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
 
 /** Schedule id a deep link asks for: /dashboard?schedule=<id> (portfolio links) or /dashboard?id=<id>. */
@@ -245,7 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
 
               {llm && (
-                <span title={llm.error || (llm.model ? `${llm.model} @ ${llm.host}` : 'Deterministic analysis only')}
+                <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only')}
                   className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-white/65 border border-white/10 rounded-md px-2 py-1">
                   {llm.airgapped && <Lock size={10} />}{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
                 </span>
@@ -492,8 +495,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
                     <div className="text-[13px] text-warm-700 font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
                     <div className="text-[12px] text-warm-500 mt-1">
-                      {llm.mode === 'cloud' && `Model ${llm.model} via ${llm.host}. Withheld answers are never sent.`}
-                      {llm.mode === 'local' && `Model ${llm.model} on ${llm.host}. Nothing leaves your network.`}
+                      {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
+                      {llm.mode === 'local' && `Model ${modelLine(llm)} on ${llm.host}. Nothing leaves your network.`}
                       {llm.mode === 'offline' && (llm.error || 'No model configured. Scheduling, CPM, quality checks and reports run fully offline.')}
                     </div>
                   </div>

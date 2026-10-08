@@ -49,7 +49,7 @@ const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.overr
 
 function summarize(e: AuditEvent): string {
   const d = e.detail as Record<string, unknown>
-  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.model ?? ''}`]
+  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.provider ? `${d.provider} ` : ''}${d.model ?? ''}${d.refused ? ' (declined)' : ''}`]
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
 

@@ -1,5 +1,5 @@
 import { Activity, Relationship, Schedule } from '@/lib/db'
-import { chat, llmStatus } from '@/lib/llm/provider'
+import { chat, llmStatus, AiRefusalError } from '@/lib/llm/provider'
 import { log } from '@/lib/server/log'
 import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
@@ -136,6 +136,8 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
     return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   } catch (error: unknown) {
     const err = error as Error
+    // A refusal is not an answer: say so plainly and give the schedule facts instead.
+    if (error instanceof AiRefusalError) return `${err.message}\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
     log('warn', 'model call failed', { purpose: 'ask_ai', error: err.message })
     return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
   }

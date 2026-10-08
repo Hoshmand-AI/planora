@@ -18,7 +18,7 @@ Planora works in three stages: **build** a schedule, **analyze** it, then **moni
 | **Private data.** Every firm is an organization, and every query is scoped by `org_id`. Firm history only ever reads that firm's own schedules. | `src/lib/db.ts` |
 | **Any file format.** Imports P6 XER (including calendars, constraints and WBS), MS Project XML, Excel/CSV (messy headers are handled) and PDF. Activity names and calendars are normalized to shared meanings (for example "SOG", "F/R/P footings" and "Hang/Tape/Finish GWB" each map to a standard category). Exports MS Project XML, CSV and a **Basis of Schedule** narrative. | `src/lib/parsers/*`, `src/lib/semantic/taxonomy.ts`, `src/lib/export/*` |
 | **Self-checking inputs.** Flags weekend or holiday work, out-of-sequence progress, invalid dates, dangling logic and other data issues. The scheduler answers each one inline. | `src/lib/analysis/input-checks.ts` |
-| **Secure / air-gapped use.** Runs with no model, with an on-prem model, or with a cloud model. In air-gapped mode it refuses any model host that is not private. Withheld answers are never sent to a model; withheld constraints become placeholders with reserved time. Small models get narrow, JSON-only tasks that are validated and retried. | `src/lib/llm/provider.ts`, `src/lib/planning/ai-questions.ts` |
+| **Secure / air-gapped use.** Runs with no model, with an on-prem model, or with a cloud model through a provider-agnostic AI gateway (default cloud provider: Anthropic Claude via `ANTHROPIC_API_KEY`; OpenAI is an approved alternate, selected with `PLANORA_AI_PROVIDER=openai`). Cloud AI calls send request-relevant content to the selected provider. In air-gapped mode it refuses any model host that is not private. Withheld answers are never sent to a model; withheld constraints become placeholders with reserved time. Small models get narrow, JSON-only tasks that are validated and retried. | `src/lib/llm/provider.ts`, `src/lib/llm/gateway.ts`, `src/lib/planning/ai-questions.ts` |
 | **Human control.** Every activity and link shows why it exists and where that came from. Overrides require a reason, report their impact on the finish date and critical path, survive regeneration, and are recorded in the audit trail and the narrative. | `src/lib/planning/overrides.ts` |
 
 The scheduling core is deterministic TypeScript and runs without any model:
@@ -88,7 +88,8 @@ src/lib/
   analysis/   dcma, input-checks
   parsers/    xer, xml, excel/csv, pdf, index
   export/     msp-xml, csv, narrative (Basis of Schedule)
-  llm/        provider (cloud / local / offline, air-gap guard)
+  llm/        gateway (provider-agnostic contract + model registry), provider (cloud / local / offline,
+              air-gap + CUI guard, quotas, audit), adapters: anthropic (default cloud), openai, local
 src/app/
   dashboard/plan        Build: interview → schedule → evaluation & review → audit
   dashboard/quality     DCMA + the tool's questions about uploaded data
