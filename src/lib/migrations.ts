@@ -461,6 +461,37 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE schedule_risk_inputs ADD COLUMN IF NOT EXISTS commitments JSONB NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    id: 13, name: 'standards_runs',
+    sql: `
+    -- Persisted standards-engine runs (src/lib/standards): the full result of running one or more
+    -- frameworks (GAO / DCMA 14-point / Planora Composite) against an uploaded schedule or a generated
+    -- plan, with the rules version hash and thresholds used, so a past assessment can be reproduced
+    -- exactly. Rows are written once and never updated. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS standards_runs (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      subject_type TEXT NOT NULL CHECK (subject_type IN ('schedule', 'plan')),
+      -- Exactly one subject; deleting the schedule or plan (user, retention, organization deletion) deletes its runs.
+      schedule_id TEXT REFERENCES schedules(id) ON DELETE CASCADE,
+      plan_id TEXT REFERENCES plans(id) ON DELETE CASCADE,
+      subject_version TEXT,
+      frameworks TEXT[] NOT NULL,
+      framework_versions JSONB NOT NULL DEFAULT '{}',
+      engine_version TEXT NOT NULL,
+      rules_version TEXT NOT NULL,
+      thresholds JSONB NOT NULL DEFAULT '{}',
+      basis TEXT,
+      results JSONB NOT NULL,
+      summary JSONB NOT NULL DEFAULT '{}',
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK ((schedule_id IS NULL) <> (plan_id IS NULL))
+    );
+    CREATE INDEX IF NOT EXISTS standards_runs_schedule_idx ON standards_runs(org_id, schedule_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS standards_runs_plan_idx ON standards_runs(org_id, plan_id, created_at DESC);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

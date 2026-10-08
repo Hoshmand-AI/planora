@@ -14,6 +14,7 @@ interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
   quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
+  standards?: { defaultFrameworks: string[]; gao: Record<string, number> }
   historyExcludeUploads: boolean
 }
 interface OrgData {
@@ -38,7 +39,7 @@ const ACTION_LABELS: Record<string, string> = {
   'plan.review': 'Reviewed', 'plan.publish': 'Published baseline', 'plan.decision': 'Quality decision', 'plan.recovery': 'Applied recovery option', 'plan.export': 'Exported', 'plan.ai_suggest': 'AI follow-up questions',
   'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.activity_category': 'Corrected activity category', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
-  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'standards.run': 'Recorded a standards assessment', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
   'workspace.created': 'Created workspace', 'workspace.updated': 'Changed workspace', 'workspace.deleted': 'Deleted workspace', 'workspace.member_added': 'Added to workspace', 'workspace.member_removed': 'Removed from workspace', 'workspace.member_restriction_changed': 'Changed workspace limit', 'workspace.item_assigned': 'Moved to workspace',
 }
 // Download links come from this fixed table, never from page text.
@@ -52,6 +53,8 @@ function summarize(e: AuditEvent): string {
   const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.provider ? `${d.provider} ` : ''}${d.model ?? ''}${d.refused ? ' (declined)' : ''}`]
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
+
+const STANDARD_FRAMEWORK_OPTIONS = [['PLANORA_COMPOSITE', 'Planora Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -229,6 +232,26 @@ export default function OrgPage() {
                 <Field label="High float above (work days)" hint="10–260.">{p => <input {...p} type="number" min={10} max={260} className={inputClass} value={settings.quality.highFloatDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highFloatDays: Number(e.target.value) } })} />}</Field>
                 <Field label="High duration above (work days)" hint="5–260.">{p => <input {...p} type="number" min={5} max={260} className={inputClass} value={settings.quality.highDurationDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highDurationDays: Number(e.target.value) } })} />}</Field>
                 <Field label="Min CPLI and BEI" hint="0.80–1.00.">{p => <input {...p} type="number" min={0.8} max={1} step={0.01} className={inputClass} value={settings.quality.indexTarget} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, indexTarget: Number(e.target.value) } })} />}</Field>
+              </div>
+            </fieldset>
+            <fieldset className="pt-2">
+              <legend className="text-[13.5px] font-medium text-navy-950">Default standards framework</legend>
+              <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
+              <div className="space-y-1.5">
+                {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
+                  const current = settings.standards?.defaultFrameworks ?? ['PLANORA_COMPOSITE']
+                  const on = current.includes(fw)
+                  return (
+                    <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
+                        onChange={e => {
+                          const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
+                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['PLANORA_COMPOSITE'] } })
+                        }} />
+                      {label}
+                    </label>
+                  )
+                })}
               </div>
             </fieldset>
             <Button disabled={busy === 'settings'} onClick={async () => { const d = await act('settings', { action: 'update_settings', settings }, 'Policies saved.'); if (d) load() }}>Save policies</Button>
