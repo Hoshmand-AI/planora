@@ -10,6 +10,7 @@ import { describeCalendarChange } from '@/lib/analysis/compare'
 import type { WindowsAnalysis } from '@/lib/analysis/windows'
 import { windowDriverRows, windowsTableRows, WINDOWS_COLUMNS } from '@/lib/analysis/windows'
 import { fmtDate, fmtDates } from '@/lib/format'
+import { EVM_PRINCIPLE_NOTE, percentTypeLabel, type EvmAnalysis, type EvmTrendPoint } from '@/lib/analysis/evm'
 import { neutralizeFormula } from './csv'
 import { addProvenance, type Provenance } from './provenance'
 import { markingRows, type ExportMarking } from './markings'
@@ -194,6 +195,76 @@ export async function exportLookaheadXlsx(rows: LookaheadRow[], prov: Provenance
   ws.getRow(1).font = { bold: true }
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   ws.autoFilter = rows.length ? { from: { row: 2, column: 1 }, to: { row: 2, column: 12 } } : undefined
+  markWorkbook(wb, marking)
+  return Buffer.from(await wb.xlsx.writeBuffer())
+}
+
+/* ─── Earned value ───────────────────────────────────── */
+
+/**
+ * GET /api/schedules/[id]/evm?format=xlsx: earned value of one update (src/lib/analysis/evm.ts) with
+ * its methods, WBS roll-up, activities, integrity checks and, in a series, the trend by update. Money
+ * cells are numbers in the file's currency. Only called when earned value is available or partial.
+ */
+export async function exportEvmXlsx(e: EvmAnalysis, prov: Provenance, title: string, trend?: EvmTrendPoint[] | null, marking?: ExportMarking | null): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook()
+  addProvenance(wb, prov, `Earned value — ${title}`)
+  const m = e.metrics
+  const es = e.earnedSchedule
+  const cur = e.currency.code || e.currency.symbol || 'currency'
+  addSheet(wb, 'Earned value', [{ header: 'Measure', key: 'k', width: 42 }, { header: `Value (${cur}, index or days)`, key: 'v', width: 20 }, { header: 'Meaning', key: 'm', width: 70 }], [
+    { k: 'Status', v: e.status === 'available' ? 'Available' : e.status === 'partial' ? 'Partial' : 'Not available', m: [...e.labels, ...e.missing.map(x => x.message)].join(' ') },
+    { k: 'Baseline', v: e.baseline.header.replace(/^Baseline:\s*/, ''), m: 'The one baseline every Planora surface measures against' },
+    { k: 'Data date', v: e.dataDate, m: 'Planned value counts the work planned before this date' },
+    { k: 'BAC (budget at completion)', v: m?.bac ?? null, m: 'Total baseline budget' },
+    { k: 'PV (planned value, BCWS)', v: m?.pv ?? null, m: 'Budget of the work planned by the data date' },
+    { k: 'EV (earned value, BCWP)', v: m?.ev ?? null, m: 'Budget of the work actually done' },
+    { k: 'AC (actual cost, ACWP)', v: m?.ac ?? null, m: m?.ac == null ? 'Not available: the file carries no recorded actual costs' : 'What the work done actually cost' },
+    { k: 'SV = EV − PV', v: m?.sv ?? null, m: 'Negative: less work done than planned' },
+    { k: 'CV = EV − AC', v: m?.cv ?? null, m: 'Negative: work done cost more than its budget' },
+    { k: 'SPI = EV ÷ PV', v: m?.spi ?? null, m: 'Below 1: behind the planned rate of work' },
+    { k: 'CPI = EV ÷ AC', v: m?.cpi ?? null, m: 'Below 1: over budget for the work done' },
+    { k: 'EAC (BAC ÷ CPI)', v: m?.eacCpi ?? null, m: 'Forecast cost at completion if cost efficiency continues' },
+    { k: 'EAC (AC + (BAC − EV) ÷ (CPI × SPI))', v: m?.eacCpiSpi ?? null, m: 'Forecast if cost and schedule efficiency both continue' },
+    { k: 'ETC (EAC − AC, CPI method)', v: m?.etcCpi ?? null, m: 'Cost still to spend' },
+    { k: 'ETC (CPI × SPI method)', v: m?.etcCpiSpi ?? null, m: 'Cost still to spend' },
+    { k: 'VAC (BAC − EAC)', v: m?.vac ?? null, m: 'Negative: forecast overrun' },
+    { k: 'TCPI to BAC', v: m?.tcpiBac ?? null, m: 'Cost efficiency needed on remaining work to finish on budget' },
+    { k: 'TCPI to EAC', v: m?.tcpiEac ?? null, m: 'Cost efficiency needed to finish at the CPI-method EAC' },
+    { k: "File's forecast at completion (actual + remaining cost)", v: m?.fileAtCompletion ?? null, m: 'As written in the file, for reference' },
+    { k: 'Earned schedule ES (calendar days from baseline start)', v: es?.es ?? null, m: es ? `The work done was planned by ${fmtDate(es.esDate)}` : '' },
+    { k: 'Actual time AT (calendar days)', v: es?.at ?? null, m: es ? `Baseline start ${fmtDate(es.baselineStart)} to the data date` : '' },
+    { k: 'SPI(t) = ES ÷ AT', v: es?.spiT ?? null, m: 'Time-based schedule efficiency' },
+    { k: 'SV(t) = ES − AT (calendar days)', v: es?.svT ?? null, m: 'Negative: behind the baseline plan' },
+    { k: 'IEAC(t) forecast finish', v: es?.forecastFinish ?? null, m: es ? `Planned duration ${es.pd} cd ÷ SPI(t); baseline finish ${fmtDate(es.baselineFinish)}` : '' },
+  ])
+  addSheet(wb, 'Methods', [{ header: 'Figure', key: 'k', width: 12 }, { header: 'How it is calculated', key: 'v', width: 140 }], [
+    { k: 'BAC', v: e.methods.bac }, { k: 'PV', v: e.methods.pv }, { k: 'EV', v: e.methods.ev }, { k: 'AC', v: e.methods.ac }, { k: 'ES', v: e.methods.es },
+  ])
+  addSheet(wb, 'By WBS', [
+    { header: 'WBS', key: 'label', width: 36 }, { header: 'Level', key: 'level', width: 7 }, { header: 'Activities', key: 'activities', width: 10 },
+    { header: 'BAC', key: 'bac', width: 14 }, { header: 'PV', key: 'pv', width: 14 }, { header: 'EV', key: 'ev', width: 14 }, { header: 'AC', key: 'ac', width: 14 },
+    { header: 'SV', key: 'sv', width: 14 }, { header: 'CV', key: 'cv', width: 14 }, { header: 'SPI', key: 'spi', width: 8 }, { header: 'CPI', key: 'cpi', width: 8 },
+  ], e.wbs.map(w => ({ ...w, level: w.level + 1 })) as unknown as Record<string, unknown>[])
+  addSheet(wb, 'Activities', [
+    { header: 'Activity ID', key: 'code', width: 14 }, { header: 'Activity Name', key: 'name', width: 40 }, { header: 'WBS', key: 'wbs', width: 24 },
+    { header: 'Baseline start', key: 'baselineStart', date: true }, { header: 'Baseline finish', key: 'baselineFinish', date: true },
+    { header: 'Baseline budget', key: 'baselineBudget', width: 14 }, { header: 'Current budget', key: 'budget', width: 14 },
+    { header: 'PV', key: 'pv', width: 14 }, { header: '% earned on', key: 'percent', width: 10 }, { header: 'Percent type', key: 'percentType', width: 22 },
+    { header: 'EV', key: 'ev', width: 14 }, { header: 'AC', key: 'ac', width: 14 },
+  ], e.activities.map(a => ({ ...a, percentType: percentTypeLabel(a.percentType) })) as unknown as Record<string, unknown>[])
+  if (trend && trend.length) {
+    addSheet(wb, 'Trend', [
+      { header: 'Update', key: 'version', width: 20 }, { header: 'Data date', key: 'dataDate', date: true }, { header: 'Status', key: 'status', width: 14 },
+      { header: 'BAC', key: 'bac', width: 14 }, { header: 'PV', key: 'pv', width: 14 }, { header: 'EV', key: 'ev', width: 14 }, { header: 'AC', key: 'ac', width: 14 },
+      { header: 'SPI', key: 'spi', width: 8 }, { header: 'CPI', key: 'cpi', width: 8 }, { header: 'SPI(t)', key: 'spiT', width: 8 }, { header: 'EAC (CPI)', key: 'eacCpi', width: 14 },
+    ], trend as unknown as Record<string, unknown>[])
+  }
+  addSheet(wb, 'Integrity checks', [
+    { header: 'Check', key: 'title', width: 44 }, { header: 'Result', key: 'result', width: 8 }, { header: 'Finding', key: 'detail', width: 80 },
+    { header: 'Activities (evidence)', key: 'codes', width: 50 }, { header: 'Principle (ANSI/EIA-748 oriented; not a compliance determination)', key: 'principle', width: 70 },
+  ], e.checks.map(c => ({ title: c.title, result: c.result.toUpperCase(), detail: c.detail, codes: c.activityCodes.join(', '), principle: c.principle })))
+  addSheet(wb, 'Notes', [{ header: 'Note', key: 'n', width: 140 }], [EVM_PRINCIPLE_NOTE, ...e.notes].map(n => ({ n })))
   markWorkbook(wb, marking)
   return Buffer.from(await wb.xlsx.writeBuffer())
 }

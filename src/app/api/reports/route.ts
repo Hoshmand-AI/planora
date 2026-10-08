@@ -12,6 +12,8 @@ import { loadProvenance } from '@/lib/export/provenance'
 import { fmtDates } from '@/lib/format'
 import { exportMarking, markText } from '@/lib/export/markings'
 import { scheduleClassification } from '@/lib/server/classification'
+import { CostCache, evmInputFor, evmSeriesFrom } from '@/lib/planning/evm-service'
+import { computeEvm, type EvmAnalysis, type EvmTrendPoint } from '@/lib/analysis/evm'
 
 const REPORT_TYPES = Object.keys(REPORT_TITLES) as ReportType[]
 
@@ -52,16 +54,27 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
 
   // Variance report in an update series: windows analysis up to this update, and the float / BEI trend.
   let windows: WindowsAnalysis | null = null
+  // Earned value (variance and executive reports): one section when the file carries real cost data.
+  let evm: EvmAnalysis | null = null
+  let evmTrend: EvmTrendPoint[] | null = null
   if (reportType === 'variance' && schedule.projectKey) {
     const { updates } = await loadSeriesUpdates(auth.orgId, schedule, { basis })
     const upTo = updates.slice(0, updates.findIndex(u => u.schedule.id === schedule.id) + 1)
     if (upTo.length >= 2) windows = analyzeWindows(upTo.map(u => ({ schedule: u.schedule, activities: u.activities, relationships: u.relationships, analysis: u.analysis })))
+    if (upTo.length) {
+      const s = await evmSeriesFrom(auth.orgId, upTo, schedule.id).catch(() => null)
+      if (s?.latest?.scheduleId === schedule.id) { evm = s.latest; evmTrend = s.points.length > 1 ? s.points : null }
+    }
+  }
+  if (!evm && (reportType === 'variance' || reportType === 'executive_summary')) {
+    evm = await evmInputFor(data, new CostCache(auth.orgId)).then(computeEvm).catch(() => null)
   }
   const evidence = {
     provenance: await loadProvenance(auth.orgId, [{ schedule, analysis, editsApplied: basis === 'scenario' ? data.editsApplied : 0 }], auth.settings.quality),
     windows,
     review: reportType === 'qa_qc' ? await getReviewState(schedule.id, auth.orgId) : null,
     linkFloat: data.cpm?.linkFloat ?? null,
+    evm, evmTrend,
   }
 
   const generated = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison, evidence })
