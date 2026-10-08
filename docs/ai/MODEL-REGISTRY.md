@@ -18,7 +18,7 @@ Every model is either **certified** (evaluated with the golden prompts in [AI-GO
 Model ids are exact strings (no date suffixes are added to the Claude ids). Prices feed the `estimatedCostUsd` field of each `ai.request` audit event; they are estimates, and the provider invoice is authoritative.
 
 ### Provider notes
-- **Anthropic (Claude):** system instructions are sent in the top-level `system` field; thinking is always on and depth is set with `output_config.effort` (`medium`); no sampling parameters are sent. A response with `stop_reason: "refusal"` is shown as a refusal (never as an answer) and audited with `refused: true`; `stop_reason: "max_tokens"` is audited as `truncated: true`.
+- **Anthropic (Claude):** system instructions are sent in the top-level `system` field; thinking is always on and depth is set with `output_config.effort` (`medium`); no sampling parameters are sent. Anthropic's server-side refusal fallback is on by default (beta `server-side-fallback-2026-07-01`, `fallbacks: "default"`): if the model declines, the API re-runs the request on a fallback model inside the same call. The `ai.request` event then records `fallbackUsed: true` and the served model in `modelVersion`. Set `PLANORA_AI_FALLBACK=off` to disable it (for example, if a fallback model has not been reviewed for your deployment). A final `stop_reason: "refusal"` means every model in the chain declined; it is shown as a refusal (never as an answer) and audited with `refused: true`; `stop_reason: "max_tokens"` is audited as `truncated: true`.
 - **OpenAI / on-prem:** Chat Completions API (`openai` SDK); the on-prem endpoint is any OpenAI-compatible server.
 
 ## Adding or changing a model

@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import { currentRequest } from '@/lib/server/context'
 import { log } from '@/lib/server/log'
 import {
-  AiRefusalError, DEFAULT_ANTHROPIC_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL, MODEL_REGISTRY, estimateCostUsd, registryEntry,
+  AiRefusalError, aiFallbackEnabled, DEFAULT_ANTHROPIC_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL, MODEL_REGISTRY, estimateCostUsd, registryEntry,
   type ChatMessage, type CloudProvider, type LlmAdapter, type ProviderName,
 } from './gateway'
 
@@ -17,6 +17,8 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 //                     otherwise openai when OPENAI_API_KEY is set). Cloud calls send request content to this provider.
 //   ANTHROPIC_API_KEY key for the Anthropic (Claude) API — the default cloud provider
 //   OPENAI_API_KEY    key for the OpenAI API — approved alternate cloud provider
+//   PLANORA_AI_FALLBACK  off → disable Anthropic's server-side refusal fallback (on by default: a declined request is
+//                     re-run on a fallback model inside the same call; the audit records fallbackUsed + served model)
 //   PLANORA_AIRGAPPED true → only loopback/private-network hosts are allowed; cloud mode is refused.
 //   LLM_BASE_URL      OpenAI-compatible endpoint for local mode (Ollama: http://localhost:11434/v1, vLLM: http://host:8000/v1)
 //   LLM_MODEL         model name (defaults: claude-opus-5-5 for anthropic, gpt-4o-2024-11-20 for openai, llama3.1:8b for local)
@@ -209,12 +211,13 @@ let cached: { key: string; adapter: LlmAdapter } | null = null
 
 /** Build (or reuse) the adapter for the route. SDKs are loaded lazily, so an unused provider's SDK is never initialized. */
 async function adapterFor(cfg: Route): Promise<LlmAdapter> {
-  const key = createHash('sha256').update(`${cfg.provider}|${cfg.baseURL ?? ''}|${cfg.apiKey ?? ''}`).digest('hex')
+  const fallback = cfg.provider === 'anthropic' && aiFallbackEnabled()
+  const key = createHash('sha256').update(`${cfg.provider}|${cfg.baseURL ?? ''}|${cfg.apiKey ?? ''}|${fallback}`).digest('hex')
   if (cached?.key === key) return cached.adapter
   let adapter: LlmAdapter
   if (cfg.provider === 'anthropic') {
     const { createAnthropicAdapter } = await import('./anthropic-adapter')
-    adapter = createAnthropicAdapter({ apiKey: cfg.apiKey ?? '' })
+    adapter = createAnthropicAdapter({ apiKey: cfg.apiKey ?? '', fallback })
   } else {
     const { createOpenAiCompatibleAdapter } = await import('./openai-adapter')
     adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL })
@@ -258,6 +261,8 @@ export interface AiCallRecord {
   outputTokens: number | null
   estimatedCostUsd: number | null
   truncated: boolean
+  /** A provider-side refusal fallback model served this turn (modelVersion is then the fallback model) */
+  fallbackUsed: boolean
   ms: number
   ok: boolean
   refused?: boolean
@@ -292,13 +297,13 @@ export async function chat(messages: ChatMessage[], opts: { temperature?: number
     if (res.truncated) log('warn', 'model output truncated at the token limit', { purpose: base.purpose, provider: res.provider, model: res.model })
     await recordCall({
       ...base, modelVersion: res.model, responseChars: res.text?.length ?? 0,
-      inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, estimatedCostUsd: estimateCostUsd(cfg.model, res.usage),
-      truncated: res.truncated, ms: Date.now() - started, ok: true,
+      inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, estimatedCostUsd: estimateCostUsd(res.fallbackUsed ? res.model : cfg.model, res.usage),
+      truncated: res.truncated, fallbackUsed: res.fallbackUsed ?? false, ms: Date.now() - started, ok: true,
     })
     return res.text
   } catch (err) {
     await recordCall({
-      ...base, modelVersion: null, responseChars: 0, inputTokens: null, outputTokens: null, estimatedCostUsd: null, truncated: false,
+      ...base, modelVersion: null, responseChars: 0, inputTokens: null, outputTokens: null, estimatedCostUsd: null, truncated: false, fallbackUsed: false,
       ms: Date.now() - started, ok: false, ...(err instanceof AiRefusalError ? { refused: true } : {}), error: (err as Error).message.slice(0, 200),
     })
     throw err

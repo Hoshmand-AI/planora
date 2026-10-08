@@ -29,6 +29,8 @@ export interface LlmResult {
   provider: ProviderName
   /** Output stopped at the token limit — the text may be incomplete */
   truncated: boolean
+  /** A provider-side fallback model served this turn (Anthropic server-side refusal fallback) */
+  fallbackUsed?: boolean
 }
 
 export interface LlmAdapter {
@@ -93,6 +95,11 @@ export function estimateCostUsd(model: string, usage: LlmUsage): number | null {
   const p = registryEntry(model)?.pricing
   if (!p) return null
   return Math.round(((usage.inputTokens * p.input + usage.outputTokens * p.output) / 1_000_000) * 1e6) / 1e6
+}
+
+/** Provider-side refusal fallback (Anthropic) is on unless PLANORA_AI_FALLBACK=off (also false / 0 / no / disabled). */
+export function aiFallbackEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return !/^(off|false|0|no|disabled?)$/i.test((env.PLANORA_AI_FALLBACK || '').trim())
 }
 
 /** Display names for the UI and docs. */

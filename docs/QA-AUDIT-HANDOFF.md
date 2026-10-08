@@ -108,6 +108,7 @@ npm start                       # http://localhost:3000
 | `PLANORA_AI_MODE` | No | `cloud`, `local` or `offline`. Default: cloud if `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set, else offline |
 | `PLANORA_AI_PROVIDER` | No | `anthropic` or `openai`. Default: `anthropic` when `ANTHROPIC_API_KEY` is set, else `openai` when `OPENAI_API_KEY` is set |
 | `ANTHROPIC_API_KEY` | No | Cloud mode, Anthropic provider (default cloud provider) |
+| `PLANORA_AI_FALLBACK` | No | `off` disables Anthropic's server-side refusal fallback (on by default) |
 | `OPENAI_API_KEY` | No | Cloud mode, OpenAI provider (approved alternate) |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | No | On-prem model (OpenAI-compatible API) |
 | `PLANORA_AIRGAPPED` | No | `true` refuses cloud AI and any non-private model host |

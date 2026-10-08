@@ -11,7 +11,8 @@ const sdk = vi.hoisted(() => {
   class RateLimitError extends APIError { constructor() { super(429) } }
   class InternalServerError extends APIError { constructor() { super(529) } }
   class APIConnectionError extends APIError { constructor() { super(undefined) } }
-  const create = vi.fn()
+  const create = vi.fn() // beta endpoint: server-side refusal fallback on (the default)
+  const plainCreate = vi.fn() // regular endpoint: PLANORA_AI_FALLBACK=off
   const constructed: unknown[] = []
   class Anthropic {
     static APIError = APIError
@@ -21,10 +22,11 @@ const sdk = vi.hoisted(() => {
     static RateLimitError = RateLimitError
     static InternalServerError = InternalServerError
     static APIConnectionError = APIConnectionError
-    messages = { create }
+    messages = { create: plainCreate }
+    beta = { messages: { create } }
     constructor(opts: unknown) { constructed.push(opts) }
   }
-  return { Anthropic, create, constructed, errors: { APIError, BadRequestError, AuthenticationError, PermissionDeniedError, RateLimitError, InternalServerError, APIConnectionError } }
+  return { Anthropic, create, plainCreate, constructed, errors: { APIError, BadRequestError, AuthenticationError, PermissionDeniedError, RateLimitError, InternalServerError, APIConnectionError } }
 })
 vi.mock('@anthropic-ai/sdk', () => ({ default: sdk.Anthropic }))
 
@@ -38,7 +40,7 @@ vi.mock('@/lib/server/rate-limit', () => ({
 vi.mock('@/lib/db', () => ({ query: vi.fn(async () => { throw new Error('db down') }) }))
 
 import { createAnthropicAdapter, toAnthropicPayload, ANTHROPIC_MAX_TOKENS } from './anthropic-adapter'
-import { AiProviderError, AiRefusalError, AI_REFUSAL_MESSAGE, estimateCostUsd, MODEL_REGISTRY } from './gateway'
+import { AiProviderError, AiRefusalError, AI_REFUSAL_MESSAGE, aiFallbackEnabled, estimateCostUsd, MODEL_REGISTRY } from './gateway'
 import { chat, chatJson, llmStatus, resolveLlmConfig, selectCloudProvider, RestrictedDataError, DEFAULT_CLOUD_MODEL, approvedModels } from './provider'
 import { runWithRequest, type RequestInfo } from '@/lib/server/context'
 
@@ -51,7 +53,7 @@ const reply = (over: Record<string, unknown> = {}) => ({
 
 const req = (over: Partial<RequestInfo> = {}): RequestInfo => ({ requestId: 't', method: 'POST', path: '/api/x', ip: null, userAgent: null, orgId: 'o1', userId: 'u1', ...over })
 
-beforeEach(() => { sdk.create.mockReset(); audits.length = 0 })
+beforeEach(() => { sdk.create.mockReset(); sdk.plainCreate.mockReset(); audits.length = 0 })
 afterEach(() => vi.unstubAllEnvs())
 
 describe('Anthropic adapter: request shape', () => {
@@ -74,12 +76,32 @@ describe('Anthropic adapter: request shape', () => {
     expect(toAnthropicPayload([{ role: 'user', content: 'only' }]).system).toBeUndefined()
   })
 
-  it('sends model, max_tokens, system, messages and effort — and no sampling or thinking parameters', async () => {
+  it('sends model, max_tokens, system, messages, effort and the server-side fallback — and no sampling or thinking parameters', async () => {
     sdk.create.mockResolvedValue(reply())
     await createAnthropicAdapter({ apiKey: 'k' }).complete({ model: 'claude-opus-5-5', maxTokens: 700, temperature: 0, messages: [{ role: 'system', content: 'S' }, { role: 'user', content: 'U' }] })
+    expect(sdk.plainCreate).not.toHaveBeenCalled()
     const body = sdk.create.mock.calls[0][0]
-    expect(body).toEqual({ model: 'claude-opus-5-5', max_tokens: ANTHROPIC_MAX_TOKENS, system: 'S', messages: [{ role: 'user', content: 'U' }], output_config: { effort: 'medium' } })
+    expect(body).toEqual({
+      model: 'claude-opus-5-5', max_tokens: ANTHROPIC_MAX_TOKENS, system: 'S', messages: [{ role: 'user', content: 'U' }], output_config: { effort: 'medium' },
+      betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+    })
     for (const k of ['temperature', 'top_p', 'top_k', 'thinking', 'budget_tokens']) expect(body).not.toHaveProperty(k)
+  })
+
+  it('uses the regular endpoint without fallback parameters when the fallback is switched off', async () => {
+    sdk.plainCreate.mockResolvedValue(reply())
+    const r = await createAnthropicAdapter({ apiKey: 'k', fallback: false }).complete({ model: 'claude-opus-5-5', maxTokens: 700, messages: [{ role: 'user', content: 'U' }] })
+    expect(sdk.create).not.toHaveBeenCalled()
+    const body = sdk.plainCreate.mock.calls[0][0]
+    expect(body).not.toHaveProperty('betas')
+    expect(body).not.toHaveProperty('fallbacks')
+    expect(r.fallbackUsed).toBe(false)
+  })
+
+  it('PLANORA_AI_FALLBACK=off disables the fallback; anything else leaves it on', () => {
+    expect(aiFallbackEnabled({})).toBe(true)
+    expect(aiFallbackEnabled({ PLANORA_AI_FALLBACK: 'on' })).toBe(true)
+    for (const v of ['off', 'OFF', 'false', '0', 'no', 'disabled']) expect(aiFallbackEnabled({ PLANORA_AI_FALLBACK: v })).toBe(false)
   })
 })
 
@@ -87,7 +109,21 @@ describe('Anthropic adapter: response handling', () => {
   it('extracts only text blocks and maps usage, model and provider', async () => {
     sdk.create.mockResolvedValue(reply())
     const r = await createAnthropicAdapter({ apiKey: 'k' }).complete({ model: 'claude-opus-5-5', maxTokens: 100, messages: [{ role: 'user', content: 'hi' }] })
-    expect(r).toEqual({ text: 'Hello there', usage: { inputTokens: 1200, outputTokens: 340 }, model: 'claude-opus-5-5', provider: 'anthropic', truncated: false })
+    expect(r).toEqual({ text: 'Hello there', usage: { inputTokens: 1200, outputTokens: 340 }, model: 'claude-opus-5-5', provider: 'anthropic', truncated: false, fallbackUsed: false })
+  })
+
+  it('reports when a fallback model served the turn, and which model it was', async () => {
+    sdk.create.mockResolvedValue(reply({
+      model: 'claude-opus-4-8',
+      usage: { input_tokens: 10, output_tokens: 5, iterations: [{ type: 'message', input_tokens: 10, output_tokens: 0 }, { type: 'fallback_message', input_tokens: 10, output_tokens: 5 }] },
+    }))
+    const r = await createAnthropicAdapter({ apiKey: 'k' }).complete({ model: 'claude-opus-5-5', maxTokens: 100, messages: [{ role: 'user', content: 'hi' }] })
+    expect(r).toMatchObject({ fallbackUsed: true, model: 'claude-opus-4-8', text: 'Hello there' })
+  })
+
+  it('a final refusal after the fallback chain is still a refusal', async () => {
+    sdk.create.mockResolvedValue(reply({ stop_reason: 'refusal', stop_details: { type: 'refusal', category: 'bio', explanation: null }, usage: { input_tokens: 1, output_tokens: 1, iterations: [{ type: 'fallback_message' }] } }))
+    await expect(createAnthropicAdapter({ apiKey: 'k' }).complete({ model: 'claude-opus-5-5', maxTokens: 100, messages: [{ role: 'user', content: 'x' }] })).rejects.toBeInstanceOf(AiRefusalError)
   })
 
   it('treats stop_reason "refusal" as a refusal, never as an answer', async () => {
@@ -191,15 +227,44 @@ describe('Gateway with the Anthropic provider', () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
     vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('PLANORA_AI_FALLBACK', '')
     sdk.create.mockResolvedValue(reply())
     const out = await runWithRequest(req(), () => chat([{ role: 'system', content: 'SECRET-SYSTEM' }, { role: 'user', content: 'SECRET-QUESTION' }], { purpose: 'ask_ai' }))
     expect(out).toBe('Hello there')
     const ev = audits.find(a => a.action === 'ai.request')!
-    expect(ev.detail).toMatchObject({ provider: 'anthropic', model: 'claude-opus-5-5', modelVersion: 'claude-opus-5-5', inputTokens: 1200, outputTokens: 340, ok: true, certified: true, truncated: false })
+    expect(ev.detail).toMatchObject({ provider: 'anthropic', model: 'claude-opus-5-5', modelVersion: 'claude-opus-5-5', inputTokens: 1200, outputTokens: 340, ok: true, certified: true, truncated: false, fallbackUsed: false })
     expect(ev.detail!.sdk).toMatch(/^@anthropic-ai\/sdk@/)
     expect(ev.detail!.estimatedCostUsd).toBeCloseTo((1200 * 4 + 340 * 20) / 1e6, 9)
     const serialized = JSON.stringify(audits)
     expect(serialized).not.toMatch(/SECRET-SYSTEM|SECRET-QUESTION|Hello there|sk-ant-test/)
+  })
+
+  it('audits that a fallback served the turn and the served model', async () => {
+    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
+    vi.stubEnv('PLANORA_AIRGAPPED', '')
+    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
+    vi.stubEnv('LLM_MODEL', '')
+    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('PLANORA_AI_FALLBACK', '')
+    sdk.create.mockResolvedValue(reply({ model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5, iterations: [{ type: 'fallback_message' }] } }))
+    await runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))
+    expect(audits.find(a => a.action === 'ai.request')!.detail).toMatchObject({ model: 'claude-opus-5-5', modelVersion: 'claude-opus-4-8', fallbackUsed: true, ok: true })
+  })
+
+  it('PLANORA_AI_FALLBACK=off routes Claude calls to the regular endpoint', async () => {
+    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
+    vi.stubEnv('PLANORA_AIRGAPPED', '')
+    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
+    vi.stubEnv('LLM_MODEL', '')
+    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('PLANORA_AI_FALLBACK', 'off')
+    sdk.plainCreate.mockResolvedValue(reply())
+    await expect(runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))).resolves.toBe('Hello there')
+    expect(sdk.create).not.toHaveBeenCalled()
+    expect(sdk.plainCreate).toHaveBeenCalledTimes(1)
+    expect(audits.find(a => a.action === 'ai.request')!.detail).toMatchObject({ fallbackUsed: false, ok: true })
   })
 
   it('records a refusal and surfaces it as a typed error; structured calls degrade to null', async () => {
@@ -209,6 +274,7 @@ describe('Gateway with the Anthropic provider', () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
     vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('PLANORA_AI_FALLBACK', '')
     sdk.create.mockResolvedValue(reply({ stop_reason: 'refusal', stop_details: { type: 'refusal', category: null, explanation: null } }))
     await expect(runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))).rejects.toBeInstanceOf(AiRefusalError)
     expect(audits.find(a => a.action === 'ai.request')!.detail).toMatchObject({ provider: 'anthropic', ok: false, refused: true })
@@ -228,6 +294,7 @@ describe('Gateway with the Anthropic provider', () => {
       await expect(runWithRequest(r, () => chatJson([{ role: 'user', content: 'x' }], v => v))).rejects.toBeInstanceOf(RestrictedDataError)
     }
     expect(sdk.create).not.toHaveBeenCalled()
+    expect(sdk.plainCreate).not.toHaveBeenCalled()
     expect(audits.filter(a => a.action === 'ai.blocked_restricted_data').every(a => a.detail?.provider === 'anthropic')).toBe(true)
   })
 
@@ -237,5 +304,6 @@ describe('Gateway with the Anthropic provider', () => {
     vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
     await expect(runWithRequest(req({ aiEnabled: false }), () => chat([{ role: 'user', content: 'x' }]))).resolves.toBeNull()
     expect(sdk.create).not.toHaveBeenCalled()
+    expect(sdk.plainCreate).not.toHaveBeenCalled()
   })
 })

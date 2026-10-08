@@ -44,33 +44,46 @@ export function mapAnthropicError(err: unknown): unknown {
   return err
 }
 
-export function createAnthropicAdapter(opts: { apiKey: string; timeoutMs?: number }): LlmAdapter {
+/** Beta flag for the server-side refusal fallback in its "default" form (the API routes by refusal category). */
+export const ANTHROPIC_FALLBACK_BETA = 'server-side-fallback-2026-07-01'
+
+export function createAnthropicAdapter(opts: { apiKey: string; timeoutMs?: number; fallback?: boolean }): LlmAdapter {
   const client = new Anthropic({ apiKey: opts.apiKey, timeout: opts.timeoutMs ?? 120_000, maxRetries: 1 })
+  const fallback = opts.fallback ?? true
   return {
     provider: 'anthropic',
     sdk: `@anthropic-ai/sdk@${VERSION}`,
     async complete(req: LlmRequest): Promise<LlmResult> {
       const payload = toAnthropicPayload(req.messages)
-      let res: Anthropic.Message
+      const body = {
+        model: req.model,
+        max_tokens: Math.max(ANTHROPIC_MAX_TOKENS, req.maxTokens),
+        ...payload,
+        output_config: { effort: ANTHROPIC_EFFORT },
+      }
+      let res: Anthropic.Message | Anthropic.Beta.BetaMessage
       try {
-        res = await client.messages.create({
-          model: req.model,
-          max_tokens: Math.max(ANTHROPIC_MAX_TOKENS, req.maxTokens),
-          ...payload,
-          output_config: { effort: ANTHROPIC_EFFORT },
-        })
+        // With the fallback on, a request the model declines is re-run server-side on a fallback
+        // model inside the same call; the response then reports the model that actually served it.
+        res = fallback
+          ? await client.beta.messages.create({ ...body, betas: [ANTHROPIC_FALLBACK_BETA], fallbacks: 'default' })
+          : await client.messages.create(body)
       } catch (err) {
         throw mapAnthropicError(err)
       }
-      // Check the stop reason before reading content: a refusal is not an answer.
+      // Check the stop reason before reading content: a refusal is not an answer. With the fallback
+      // on, a final "refusal" means every model in the chain declined.
       if (res.stop_reason === 'refusal') throw new AiRefusalError('anthropic', res.stop_details?.category ?? null)
-      const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+      const blocks: { type: string; text?: string }[] = res.content
+      const text = blocks.filter(b => b.type === 'text').map(b => b.text ?? '').join('')
+      const iterations: { type: string }[] = ('iterations' in res.usage ? res.usage.iterations : null) ?? []
       return {
         text: text || null,
         usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens },
         model: res.model || req.model,
         provider: 'anthropic',
         truncated: res.stop_reason === 'max_tokens',
+        fallbackUsed: iterations.some(e => e.type === 'fallback_message'),
       }
     },
   }
