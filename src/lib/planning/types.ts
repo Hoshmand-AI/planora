@@ -596,6 +596,8 @@ export interface GeneratedSchedule {
   qualifications?: { questionId: string; prompt: string; answer: string; note: string; activityIds: string[] }[]
   /** Owner/contract milestone targets from the interview, with the plan's forecast against each */
   milestoneTargets?: { key: string; label: string; target: string; activityId: string }[]
+  /** Resources and assignments (activity ids are this schedule's); exports write them out (XER RSRC/TASKRSRC, MSP Resources/Assignments) */
+  resources?: import('./resource-types').ResourceData | null
   cpm?: CpmResult
 }
 

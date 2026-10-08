@@ -4,6 +4,7 @@ import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, Weekday, WorkCalendar } from '@/lib/planning/types'
 import { randomUUID as uuid } from 'crypto'
 import { ParsedSchedule, makeActivity, isoDatePrefix, addDaysIso, round2 } from './types'
+import { mspResourceData } from './resources'
 
 /** Field id of Text1, which exportMspXml (and many P6→MSP exports) use for the activity code. */
 export const MSP_TEXT1_FIELD_ID = '188743731'
@@ -418,5 +419,6 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     defaultCalendarId,
     warnings,
     sourceType: 'ms_xml',
+    resources: mspResourceData(xml, byUid, defaultHpd),
   }
 }

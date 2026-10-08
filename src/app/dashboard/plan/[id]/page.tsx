@@ -19,6 +19,8 @@ import { useApp } from '../../layout'
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { SmartInterview } from '@/components/interview/SmartInterview'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
+import { Disclosure } from '@/components/Disclosure'
+import { ResourcesPanel } from '@/components/ResourcesPanel'
 
 interface Review { id: string; reviewer: string; verdict: string; comment: string; at: string }
 interface Plan {
@@ -675,6 +677,10 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       </p>
 
       <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
+
+      <Disclosure id="resources" tone="card" title="Resources: loading, over-allocation and leveling" meta={plan.generated?.resources?.assignments.length ? `${plan.generated.resources.assignments.length} assignments` : 'no resource data'}>
+        <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
+      </Disclosure>
 
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
 

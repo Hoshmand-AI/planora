@@ -3,6 +3,7 @@
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import type { EmbeddedBaseline } from '@/lib/analysis/baseline'
+import type { ResourceData } from '@/lib/planning/resource-types'
 import { randomUUID as uuid } from 'crypto'
 
 export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
@@ -27,6 +28,8 @@ export interface ParsedSchedule {
   sourceType: ParsedSourceType
   /** P6 only: resource assignments per source task id (TASKRSRC rows); undefined when the file has none */
   resourceCounts?: Record<string, number>
+  /** Resources and assignments (XER RSRC/TASKRSRC, MSP Resources/Assignments, spreadsheet resource columns); null when the file has none */
+  resources?: ResourceData | null
   /** P6 only: every table present in the file */
   sourceTables?: string[]
   /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */

@@ -8,6 +8,7 @@ import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoDatePrefix, serialToIso, round2, constraintFromLabel,
 } from './types'
+import { xerResourceData } from './resources'
 
 type Row = Record<string, string>
 
@@ -216,6 +217,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     activities, relationships, calendars, defaultCalendarId, warnings,
     sourceType: 'p6_xer', embeddedBaseline,
     resourceCounts: tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tasks) : undefined,
+    resources: xerResourceData(tables, byTaskId, dataDate),
     sourceTables: Object.keys(tables),
   }
 }
@@ -270,7 +272,7 @@ export function isPlanoraXer(content: string): boolean {
   return cols[0].trim() === 'ERMHDR' && cols[5]?.trim() === 'Planora'
 }
 
-const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS'])
+const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS', 'RSRC', 'RSRCRATE', 'TASKRSRC', 'UMEASURE'])
 const TABLE_LABELS: Record<string, string> = {
   ACTVTYPE: 'activity code types', ACTVCODE: 'activity code values', TASKACTV: 'activity code assignments',
   UDFTYPE: 'user-defined fields', UDFVALUE: 'user-defined field values', RSRC: 'resources', TASKRSRC: 'resource assignments',

@@ -519,7 +519,7 @@ export interface StoredScheduleEdit extends ScheduleEdit {
 function rowToEdit(r: Record<string, unknown>): StoredScheduleEdit {
   return {
     id: String(r.id), change: r.change as ScheduleEditChange, reason: String(r.reason), by: String(r.user_id ?? ''), byName: (r.user_name as string) ?? null,
-    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' ? 'recovery' : 'manual', optionId: (r.option_id as string) ?? null,
+    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' || r.source === 'leveling' ? r.source : 'manual', optionId: (r.option_id as string) ?? null,
     revertedAt: r.reverted_at ? new Date(String(r.reverted_at)).toISOString() : null, revertedBy: (r.reverted_by as string) ?? null, revertReason: (r.revert_reason as string) ?? null,
   }
 }

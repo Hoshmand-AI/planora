@@ -8,6 +8,7 @@ import { runDcma } from '@/lib/analysis/dcma'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { analyzableFromDb, basisFrom, basisLabel, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
+import { loadScheduleResources } from '@/lib/planning/resource-service'
 
 /** DCMA 14-point assessment + the tool's own questions about the imported data. */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth: ctx }) => {
@@ -21,6 +22,14 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (schedule.sourceType === 'p6_xer') {
     const f = await getScheduleFile(schedule.id, ctx.orgId).catch(() => undefined)
     if (f) resourceCounts = xerResourceCounts(decodeXer(f.content).text)
+  } else if (schedule.sourceType === 'ms_xml' || schedule.sourceType === 'excel' || schedule.sourceType === 'csv') {
+    // MS Project Assignments / spreadsheet resource columns (resource analysis reads the same data).
+    const rd = await loadScheduleResources(schedule, ctx.orgId, activities).catch(() => null)
+    if (rd) {
+      const byId = new Map(activities.map(x => [x.id, x.sourceId]))
+      resourceCounts = Object.fromEntries(activities.filter(x => x.sourceId).map(x => [x.sourceId!, 0]))
+      for (const x of rd.assignments) { const k = byId.get(x.activityId); if (k) resourceCounts[k] = (resourceCounts[k] || 0) + 1 }
+    }
   }
   const a = analyzableFromDb(schedule, activities, relationships, resourceCounts)
   const dcma = runDcma(a, ctx.settings.quality)
