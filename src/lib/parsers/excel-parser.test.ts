@@ -122,7 +122,11 @@ describe('parseSpreadsheet (xlsx)', async () => {
     expect(p.sourceType).toBe('excel')
     expect(p.warnings.some(w => w.includes('"Schedule"'))).toBe(true)
     expect(p.activities).toHaveLength(5)
-    expect(p.warnings.some(w => w.includes('Resource Names'))).toBe(true)
+    // Resource Names is read as the resource column (resource analysis), not ignored.
+    expect(p.warnings.some(w => w.includes('Resource Names'))).toBe(false)
+    expect(p.resources?.resources.map(r => r.name)).toEqual(['Architect'])
+    // Design: 10 days × 8 h at one unit (no units column, stated as an assumption); 50% complete.
+    expect(p.resources?.assignments[0]).toMatchObject({ budgetUnits: 80, actualUnits: 40, remainingUnits: 40 })
   })
 
   it('maps durations, Excel dates, percent fractions and types', () => {

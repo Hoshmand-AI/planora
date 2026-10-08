@@ -16,6 +16,7 @@ import { CSV_CUI_REFUSAL, exportMarking, markXer } from '@/lib/export/markings'
 import { scheduleClassification } from '@/lib/server/classification'
 import { exportLookaheadXlsx, lookaheadRows } from '@/lib/export/analysis-xlsx'
 import { loadProvenance } from '@/lib/export/provenance'
+import { loadScheduleResources } from '@/lib/planning/resource-service'
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -73,7 +74,9 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     return new NextResponse(body as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${file}"` } })
   }
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
-  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits)
+  // Resources and assignments from the stored file travel with the rebuilt XER and the MS Project XML.
+  const resources = format === 'xer' || format === 'xml' ? await loadScheduleResources(schedule, auth.orgId, data.activities).catch(() => null) : null
+  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits, { resources })
   // P6's progress option: written into the export when the scheduler changed it from the file's own.
   const mode = data.analysis.progressMode
   const fileMode = data.analysis.fileProgressMode ?? null
@@ -92,7 +95,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
       type = 'application/octet-stream'; file = `${slug}.xer`; break
     }
     // MS Project XML keeps level-of-effort activities and their relationships (as P6 → MSP does).
-    case 'xml': body = exportMspXml(uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true }), schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
+    case 'xml': body = exportMspXml(uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true, resources }), schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv': body = exportScheduleCsv(g); type = 'text/csv; charset=utf-8'; file = `${slug}.csv`; break
     case 'xlsx-import': body = await exportImportXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-import.xlsx`; break
     default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`

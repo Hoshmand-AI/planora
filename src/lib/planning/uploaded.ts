@@ -9,6 +9,7 @@ import type { AppliedEdit } from './uploaded-edits'
 import { phaseOf } from '@/lib/semantic/taxonomy'
 import { defaultCalendar } from './calendar'
 import { scheduledRemaining } from './complete-schedule'
+import { bindAssignments, type ResourceData } from './resource-types'
 
 const CSTR = new Set<string>(CONSTRAINT_TYPES)
 const isoOf = (v: unknown): string => {
@@ -34,11 +35,12 @@ export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
 }
 
 /**
+ * @param opts.resources resources and assignments read from the stored file (exports write them out)
  * @param opts.includeLoe keep level-of-effort activities and their relationships (flagged with
  *   `levelOfEffort`, which carries the file's dates). Only for exports that write them out (MS Project
  *   XML); the CPM, risk analysis and the other exports leave LOE out, as P6 does when scheduling.
  */
-export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = [], opts: { includeLoe?: boolean } = {}): GeneratedSchedule {
+export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = [], opts: { includeLoe?: boolean; resources?: ResourceData | null } = {}): GeneratedSchedule {
   const overrides = editOverrides(edits)
   const calendars = s.calendars?.length ? s.calendars : [defaultCalendar()]
   const defaultCalendarId = s.defaultCalendarId && calendars.some(c => c.id === s.defaultCalendarId) ? s.defaultCalendarId : calendars[0].id
@@ -73,5 +75,6 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
     dataDate: s.dataDate || undefined,
     mustFinishBy: analysis?.mustFinishBy || undefined,
     calendars, defaultCalendarId, activities: acts, links, assumptions: [], cpm: cpm || undefined,
+    ...(opts.resources ? { resources: bindAssignments(opts.resources, acts) } : {}),
   }
 }

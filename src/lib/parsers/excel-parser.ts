@@ -8,6 +8,7 @@ import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoFromUtcDate, serialToIso, round2, constraintFromLabel,
 } from './types'
+import { spreadsheetResourceData } from './resources'
 
 type Cell = string | number | boolean | Date | null
 
@@ -65,7 +66,7 @@ type Field =
   | 'code' | 'name' | 'duration' | 'remaining' | 'start' | 'finish' | 'lateStart' | 'lateFinish'
   | 'actualStart' | 'actualFinish' | 'baselineStart' | 'baselineFinish' | 'totalFloat' | 'freeFloat'
   | 'pct' | 'wbs' | 'calendar' | 'preds' | 'succs' | 'type' | 'constraint' | 'constraintDate'
-  | 'critical' | 'status' | 'milestone' | 'category'
+  | 'critical' | 'status' | 'milestone' | 'category' | 'resource' | 'resourceUnits'
 
 const SYNONYMS: Record<Field, string[]> = {
   code: ['activityid', 'taskid', 'id', 'actid', 'code', 'activitycode', 'taskcode', 'actcode', 'activitynumber', 'activityno', 'tasknumber'],
@@ -94,6 +95,8 @@ const SYNONYMS: Record<Field, string[]> = {
   status: ['activitystatus', 'status', 'taskstatus'],
   milestone: ['milestone', 'ismilestone'],
   category: ['category'],
+  resource: ['resource', 'resources', 'resourcename', 'resourcenames', 'resourceid', 'resourceids', 'crew', 'crewname'],
+  resourceUnits: ['budgetedunits', 'budgetedlaborunits', 'resourceunits', 'laborhours', 'labourhours', 'manhours', 'budgetedhours', 'plannedunits', 'work', 'workhours'],
 }
 
 const SYN_LOOKUP = new Map<string, Field>()
@@ -342,6 +345,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const headerTexts = new Set(sheet.grid[header.row].map(c => normHeader(cellText(c))))
   const activities: Activity[] = []
   const rawPreds: { act: Activity; preds: string; succs: string; row: number }[] = []
+  const resourceRows: { act: Activity; resources: string; units: Cell; hoursPerDay: number }[] = []
   const calendars = new Map<string, WorkCalendar>()
   let group = ''
   let computedDurations = 0
@@ -426,6 +430,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
       sourceId: code || String(activities.length + 1),
     })
     activities.push(act)
+    if (F.has('resource')) resourceRows.push({ act, resources: txt(row, 'resource'), units: get(row, 'resourceUnits'), hoursPerDay: (calName && calendars.get(calName)?.hoursPerDay) || 8 })
     rawPreds.push({ act, preds: txt(row, 'preds'), succs: txt(row, 'succs'), row: rowNum })
   })
 
@@ -491,6 +496,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     defaultCalendarId: calList.length ? mostCommonCalendar(activities) : null,
     warnings,
     sourceType: isCsv ? 'csv' : 'excel',
+    resources: spreadsheetResourceData(resourceRows, isCsv ? 'csv' : 'excel'),
   }
 }
 

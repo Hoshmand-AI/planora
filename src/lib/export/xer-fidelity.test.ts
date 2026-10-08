@@ -63,7 +63,10 @@ describe('XER import checks', () => {
   it('names the tables Planora does not model and counts resource assignments', () => {
     const p = parseXER(richXer(), 'r')
     const w = p.warnings.find(x => x.startsWith('Not used in Planora'))!
-    for (const t of ['ACTVTYPE', 'ACTVCODE', 'TASKACTV', 'UDFTYPE', 'UDFVALUE', 'RSRC', 'TASKRSRC']) expect(w).toContain(t)
+    for (const t of ['ACTVTYPE', 'ACTVCODE', 'TASKACTV', 'UDFTYPE', 'UDFVALUE']) expect(w).toContain(t)
+    // Resources and assignments are read (resource analysis), so they are not listed as unused.
+    for (const t of ['RSRC', 'TASKRSRC']) expect(w).not.toMatch(new RegExp(`\\b${t} \\(`))
+    expect(p.resources?.assignments).toHaveLength(1)
     expect(p.resourceCounts).toMatchObject({ '1004': 1, '1003': 0 })
     expect(parseXER(sample, 's').resourceCounts).toBeUndefined()
   })

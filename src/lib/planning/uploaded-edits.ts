@@ -33,8 +33,8 @@ export interface ScheduleEdit {
   by: string
   byName?: string | null
   at: string
-  /** 'recovery' when the edit came from a what-if / recovery option */
-  source?: 'manual' | 'recovery'
+  /** 'recovery' when the edit came from a what-if / recovery option; 'leveling' from a resource leveling run (the leveled scenario) */
+  source?: 'manual' | 'recovery' | 'leveling'
   optionId?: string | null
 }
 
