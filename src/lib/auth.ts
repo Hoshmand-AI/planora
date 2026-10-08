@@ -63,9 +63,11 @@ export function clearSessionCookie(res: NextResponse) {
   res.cookies.set(SESSION_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
 }
 
-export async function revokeSession(sessionId: string, userId?: string) {
+/** Revokes one session (only the given user's, when userId is passed). Returns whether a session was revoked. */
+export async function revokeSession(sessionId: string, userId?: string): Promise<boolean> {
   await initSchema()
-  await query(`UPDATE sessions SET revoked_at=NOW() WHERE id=$1 ${userId ? 'AND user_id=$2' : ''} AND revoked_at IS NULL`, userId ? [sessionId, userId] : [sessionId])
+  const res = await query(`UPDATE sessions SET revoked_at=NOW() WHERE id=$1 ${userId ? 'AND user_id=$2' : ''} AND revoked_at IS NULL`, userId ? [sessionId, userId] : [sessionId])
+  return (res.rowCount ?? 0) > 0
 }
 
 /** Revokes every session of a user, optionally keeping one (the current device). Returns how many. */

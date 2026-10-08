@@ -31,9 +31,10 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
   const baseId = req.nextUrl.searchParams.get('base')
   const format = req.nextUrl.searchParams.get('format') || 'json'
   if (format !== 'json' && format !== 'csv' && format !== 'xlsx') return NextResponse.json({ error: 'Unknown format. Use json, csv or xlsx.' }, { status: 400 })
-  if (id && baseId && id === baseId) return NextResponse.json({ error: 'A schedule cannot be compared with itself. Pick a different update to compare against.', code: 'same_schedule' }, { status: 400 })
+  // Look the schedule up first: another organization's id is "not found" whatever else the request says.
   const after = id ? await getScheduleById(id, auth.orgId) : undefined
   if (!after) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (baseId && id === baseId) return NextResponse.json({ error: 'A schedule cannot be compared with itself. Pick a different update to compare against.', code: 'same_schedule' }, { status: 400 })
   const series = orderSeries(after.projectKey ? await getScheduleSeries(auth.orgId, after.projectKey) : [after])
   let before = baseId ? await getScheduleById(baseId, auth.orgId) : undefined
   if (baseId && !before) return NextResponse.json({ error: 'Base schedule not found' }, { status: 404 })

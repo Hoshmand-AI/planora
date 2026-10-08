@@ -34,7 +34,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 |---|---|---|
 | Encryption in transit | TLS 1.2+ everywhere; HSTS preload | Response headers |
 | Encryption at rest | Neon storage encryption (AES-256). Secrets (SSO client secret, webhook secrets) are additionally encrypted by the application | [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md) |
-| Tenant isolation | Every query is scoped by organization; cross-tenant access is tested end to end | `scripts/e2e-security.mjs` |
+| Tenant isolation | Every query is scoped by organization; cross-tenant access is tested end to end for every object type | `scripts/e2e-tenant-isolation.mjs`, `src/lib/server/tenant-scope.test.ts` |
 | Original files / chain of custody | The uploaded file is kept unchanged with its SHA-256, which is also written to the tamper-evident audit log. It can be downloaded again | `src/app/api/schedules/[id]/export/route.ts` |
 | Audit log | Append-only and hash-chained; covers every answer, override, review, export and upload | `src/lib/server/audit.ts` |
 | Data export and deletion | Organization export; member and organization erasure | [../privacy/DATA-MAP.md](../privacy/DATA-MAP.md) |

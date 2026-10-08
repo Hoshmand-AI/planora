@@ -31,7 +31,7 @@ The scheduling engine (interview, CPM, DCMA checks, Monte Carlo risk analysis, r
 
 ## Tenant isolation
 
-Every firm is an organization and every query for firm data is scoped by `org_id`. Another firm's object ids return "not found". The end-to-end suite runs two competing firms against each other on every change.
+Every firm is an organization and every query for firm data is scoped by `org_id`. Another firm's object ids return "not found", exactly as an id that does not exist. On every change, `scripts/e2e-tenant-isolation.mjs` runs two organizations against each other across every tenant-owned object type and endpoint (reads, writes, deletes, exports, reports, mixed-organization comparisons, API keys, webhooks, anonymous calls), and `src/lib/server/tenant-scope.test.ts` checks that every SQL statement on firm data carries an `org_id` predicate.
 
 Inside an organization, **workspaces** separate client matters or engagements (ethical walls). A walled workspace's schedules and plans are visible only to its members; a member can be limited to their own workspaces; owners and admins see everything; API keys never see walled workspaces. The rule is applied in one place, the schedule and plan reads in `src/lib/db.ts`, so every list, read, export, comparison, report, portfolio and history endpoint enforces it (`src/lib/server/workspaces.test.ts`). Workspace changes are audited.
 

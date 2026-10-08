@@ -42,8 +42,8 @@ jobs:
           path: sbom.cdx.json
           retention-days: 90
 
-  # The real app against Postgres: end-to-end flows, security controls, backup + restore drill,
-  # and the WCAG 2.2 AA accessibility check.
+  # The real app against Postgres: end-to-end flows, security controls, cross-tenant isolation,
+  # backup + restore drill, and the WCAG 2.2 AA accessibility check.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -96,6 +96,8 @@ jobs:
           ADMIN_DATABASE_URL=postgres://planora:planora@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
       - name: Security and governance checks
         run: node scripts/e2e-security.mjs
+      - name: Cross-tenant isolation checks
+        run: node scripts/e2e-tenant-isolation.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium
