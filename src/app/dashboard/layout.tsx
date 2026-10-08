@@ -11,6 +11,8 @@ import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
 import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
+import { ImportExceptions } from '@/components/ImportExceptions'
+import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
 /* ─── Types ─────────────────────────────────────────── */
 interface User     { id: string; email: string; name: string; plan: string; role?: string }
@@ -105,7 +107,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showSettings,     setShowSettings]     = useState(false)
   const [uploading,        setUploading]        = useState(false)
   const [uploadError,      setUploadError]      = useState('')
-  const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[] } | null>(null)
+  const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[]; importExceptions?: ExceptionReport | null } | null>(null)
   const [llm,              setLlm]              = useState<LlmStatus | null>(null)
   const [org,              setOrg]              = useState<{ id: string; name: string } | null>(null)
   const [permissions,      setPermissions]      = useState<string[]>([])
@@ -192,7 +194,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  const sourceLabel = (t: string) => ({ p6_xer: 'P6', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Planora' } as Record<string, string>)[t] || t
+  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Planora' } as Record<string, string>)[t] || t
 
   return (
     <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can }}>
@@ -356,6 +358,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div>{uploadSummary.classifiedPct}% of activities mapped to standard work categories.</div>
                     {uploadSummary.warnings.slice(0, 4).map((w, i) => <div key={i} className="text-warm-500">· {w}</div>)}
                   </div>
+                  {uploadSummary.importExceptions && (
+                    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 max-h-[40vh] overflow-y-auto">
+                      <ImportExceptions report={uploadSummary.importExceptions} />
+                    </div>
+                  )}
                   {uploadSummary.dataQuestions > 0 && (
                     <div className="border-l-2 border-status-attention bg-status-attention-bg text-[13px] text-warm-700 px-3 py-2 rounded-md">
                       Planora has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
@@ -374,7 +381,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     type="file" name="file" accept=".xer,.xml,.pdf,.xlsx,.csv" required
                     className="w-full border border-warm-300 bg-warm-100 rounded-md px-3 py-2 text-[13.5px] text-warm-700 file:mr-3 file:bg-navy-900 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:text-[12px] file:font-medium"
                   />
-                  <p className="text-[11px] text-warm-400 mt-1.5">Primavera P6 (.xer), MS Project (.xml), Excel (.xlsx), CSV, or PDF</p>
+                  <p className="text-[11px] text-warm-400 mt-1.5">Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF</p>
                 </div>
                 <div className="mb-4">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></label>

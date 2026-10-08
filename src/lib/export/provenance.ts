@@ -13,6 +13,7 @@ import type { ProgressMode } from '@/lib/planning/types'
 import { DEFAULT_DCMA_RULES, type DcmaRules } from '@/lib/analysis/dcma'
 import { fmtDate } from '@/lib/format'
 import { neutralizeFormula } from './csv'
+import { exceptionRows, type ExceptionReport } from '@/lib/parsers/exceptions'
 
 export interface ProvenanceSource {
   /** e.g. "Earlier update" / "Later update"; omitted for a single-schedule output */
@@ -51,6 +52,8 @@ export interface Provenance {
   /** Calculation settings in plain language */
   settings: string[]
   generatedAt: string
+  /** What this output could not carry from the schedule (src/lib/export/exceptions.ts); omitted = not assessed */
+  exceptions?: ExceptionReport | null
 }
 
 /** The running release: the same rule as GET /api/health. */
@@ -91,6 +94,7 @@ export function provenanceRows(p: Provenance): [string, string][] {
   rows.push(['Planora version (release)', p.release])
   p.settings.forEach((x, i) => rows.push([i === 0 ? 'Calculation settings' : '', x]))
   rows.push(['Generated', `${fmtDate(p.generatedAt)} ${p.generatedAt.slice(11, 16)} UTC`])
+  if (p.exceptions) rows.push(...exceptionRows(p.exceptions, 'Export exceptions (not written or converted)'))
   return rows
 }
 

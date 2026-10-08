@@ -172,6 +172,6 @@ describe('parseScheduleFile', () => {
     await expect(parseScheduleFile('plan.mpp', Buffer.from('x'), 's')).rejects.toThrow(/export from MS Project as XML/)
     await expect(parseScheduleFile('plan.xls', Buffer.from('x'), 's')).rejects.toThrow(/\.xlsx/)
     await expect(parseScheduleFile('plan.docx', Buffer.from('x'), 's')).rejects.toThrow(/Unsupported/)
-    await expect(parseScheduleFile('p6.xml', Buffer.from('<APIBusinessObjects></APIBusinessObjects>'), 's')).rejects.toThrow(/xer/)
+    await expect(parseScheduleFile('p6.xml', Buffer.from('<APIBusinessObjects></APIBusinessObjects>'), 's')).rejects.toThrow(/no <Project>/)
   })
 })

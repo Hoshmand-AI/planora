@@ -9,10 +9,12 @@ import { fmtDate, fmtDates } from '@/lib/format'
 import { FINDING_DISPOSITIONS, FINDING_LABELS, SUBMISSION_DISPOSITIONS, SUBMISSION_LABELS, type FindingDisposition, type ItemDisposition, type ReviewState, type SubmissionDisposition } from '@/lib/analysis/review'
 import Link from 'next/link'
 import { StandardsPanel } from './standards-panel'
+import { ImportExceptions } from '@/components/ImportExceptions'
+import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
 interface Quality {
-  schedule: { id: string; name: string; version: string; sourceType: string; calendars: WorkCalendar[]; warnings: string[] }
+  schedule: { id: string; name: string; version: string; sourceType: string; calendars: WorkCalendar[]; warnings: string[]; importExceptions?: ExceptionReport | null }
   dcma: DcmaReport
   dataQuestions: QuestionRow[]
   classification: { counts: Record<string, number>; classifiedPct: number }
@@ -203,6 +205,11 @@ export default function QualityPage() {
             {data.schedule.warnings.length > 0 && (
               <div className="mt-3 pt-3 border-t border-warm-200 space-y-1">
                 {data.schedule.warnings.slice(0, 8).map((w, i) => <p key={i} className="text-[12px] text-warm-500">· {w}</p>)}
+              </div>
+            )}
+            {data.schedule.importExceptions && (
+              <div className="mt-3 pt-3 border-t border-warm-200">
+                <ImportExceptions report={data.schedule.importExceptions} />
               </div>
             )}
           </div>

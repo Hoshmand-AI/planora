@@ -549,6 +549,15 @@ export const MIGRATIONS: Migration[] = [
       FOR EACH ROW EXECUTE FUNCTION planora_tia_run_immutable();
     `,
   },
+  {
+    id: 15, name: 'import_exception_reports',
+    sql: `
+    -- The structured import exception report of an upload (src/lib/parsers/exceptions.ts): every table,
+    -- field or element the parser saw but did not map, and every value it converted or defaulted.
+    -- Additive: older code ignores the column; older uploads have none (NULL).
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS import_exceptions JSONB;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

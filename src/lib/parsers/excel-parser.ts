@@ -9,6 +9,7 @@ import {
   ParsedSchedule, makeActivity, isoFromUtcDate, serialToIso, round2, constraintFromLabel,
 } from './types'
 import { spreadsheetResourceData } from './resources'
+import { ExceptionCollector } from './exceptions'
 
 type Cell = string | number | boolean | Date | null
 
@@ -279,7 +280,7 @@ async function loadSheets(buffer: Buffer, isCsv: boolean): Promise<{ name: strin
   return sheets
 }
 
-interface HeaderInfo { row: number; fields: Map<Field, number>; unrecognized: string[]; duplicates: string[] }
+interface HeaderInfo { row: number; fields: Map<Field, number>; unrecognized: string[]; duplicates: string[]; ignoredCols: { label: string; col: number; duplicate: boolean }[] }
 
 function detectHeader(grid: Cell[][]): HeaderInfo | null {
   let best: HeaderInfo | null = null
@@ -288,17 +289,18 @@ function detectHeader(grid: Cell[][]): HeaderInfo | null {
     const fields = new Map<Field, number>()
     const unrecognized: string[] = []
     const duplicates: string[] = []
+    const ignoredCols: HeaderInfo['ignoredCols'] = []
     grid[r].forEach((c, i) => {
       const txt = cellText(c)
       if (!txt) return
       const f = matchHeader(txt)
-      if (!f) unrecognized.push(txt)
-      else if (fields.has(f)) duplicates.push(txt)
+      if (!f) { unrecognized.push(txt); ignoredCols.push({ label: txt, col: i, duplicate: false }) }
+      else if (fields.has(f)) { duplicates.push(txt); ignoredCols.push({ label: txt, col: i, duplicate: true }) }
       else fields.set(f, i)
     })
     const score = fields.size
     if (score > bestScore && score >= 2 && (fields.has('name') || fields.has('code'))) {
-      best = { row: r, fields, unrecognized, duplicates }
+      best = { row: r, fields, unrecognized, duplicates, ignoredCols }
       bestScore = score
     }
   }
@@ -311,6 +313,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const isCsv = /\.(csv|tsv|txt)$/i.test(fileName)
   const sheets = await loadSheets(buffer, isCsv)
   const warnings: string[] = []
+  const ex = new ExceptionCollector('import', isCsv ? 'csv' : 'excel')
 
   let sheet: { name: string; grid: Cell[][] } | null = null
   let header: HeaderInfo | null = null
@@ -321,13 +324,30 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   if (!sheet || !header) {
     throw new Error('No schedule table found: expected a header row (within the first 15 rows) with columns such as "Activity ID", "Activity Name", "Duration", "Start", "Finish"')
   }
-  if (!isCsv && sheets.length > 1) warnings.push(`Read worksheet "${sheet.name}" (workbook has ${sheets.length} sheets)`)
+  if (!isCsv && sheets.length > 1) {
+    warnings.push(`Read worksheet "${sheet.name}" (workbook has ${sheets.length} sheets)`)
+    const others = sheets.filter(x => x !== sheet && x.grid.some(r => r.some(c => cellText(c) !== '')))
+    if (others.length) ex.add({ severity: 'warning', entity: 'other', field: 'Worksheets', disposition: 'dropped', count: others.length, examples: others.map(x => x.name), message: `Only worksheet "${sheet.name}" was read; the other sheets were not imported` })
+  }
   if (header.unrecognized.length) warnings.push(`Unrecognized columns ignored: ${header.unrecognized.join(', ')}`)
   if (header.duplicates.length) warnings.push(`Duplicate columns ignored (an earlier column already supplies the field): ${header.duplicates.join(', ')}`)
 
   const F = header.fields
   const get = (row: Cell[], f: Field): Cell => (F.has(f) ? row[F.get(f)!] ?? null : null)
   const txt = (row: Cell[], f: Field) => cellText(get(row, f))
+  const rowKey = (row: Cell[], i: number) => txt(row, 'code') || txt(row, 'name') || `row ${header!.row + i + 2}`
+  {
+    // Columns that were not mapped: one record per column, counting the cells that carried data.
+    const body = sheet.grid.slice(header.row + 1)
+    for (const c of header.ignoredCols) {
+      const filled = body.map((r, i) => ({ r, i })).filter(({ r }) => cellText(r[c.col] ?? null) !== '')
+      ex.add({
+        severity: filled.length ? 'warning' : 'info', entity: 'other', field: `Column "${c.label}"`, disposition: 'dropped', count: Math.max(1, filled.length),
+        examples: filled.map(({ r, i }) => rowKey(r, i)),
+        message: c.duplicate ? 'Duplicate column: an earlier column already supplies this field' : `Unrecognized column: ${filled.length} cell${filled.length === 1 ? '' : 's'} with data not imported`,
+      })
+    }
+  }
 
   // Percent columns may hold fractions (0.5) when formatted as % in Excel
   const dataRows = sheet.grid.slice(header.row + 1)
@@ -348,6 +368,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const resourceRows: { act: Activity; resources: string; units: Cell; hoursPerDay: number }[] = []
   const calendars = new Map<string, WorkCalendar>()
   let group = ''
+  let groupRows = 0
   let computedDurations = 0
 
   dataRows.forEach((row, idx) => {
@@ -360,9 +381,9 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const start = parseDateCell(get(row, 'start'))
     const finish = parseDateCell(get(row, 'finish'))
     // WBS band / grouping row (P6 & MSP exports): a label with no id, duration or dates
-    if (F.has('code') && !code && cellText(durCell) === '' && !start && !finish) { group = name; return }
+    if (F.has('code') && !code && cellText(durCell) === '' && !start && !finish) { group = name; groupRows++; return }
     // Outline/summary row (MS Project "Outline Level" sheets number every row): no duration, dates or logic.
-    if (F.has('duration') && cellText(durCell) === '' && !start && !finish && !txt(row, 'preds') && !txt(row, 'succs')) { group = name; return }
+    if (F.has('duration') && cellText(durCell) === '' && !start && !finish && !txt(row, 'preds') && !txt(row, 'succs')) { group = name; groupRows++; return }
 
     let duration = parseDurationDays(durCell)
     if (duration === null && !F.has('duration') && start && finish) {
@@ -395,10 +416,20 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const cDate = parseDateCell(get(row, 'constraintDate'))
     let constraintType: string | null = null
     let constraintDate: string | null = null
-    if (cType === 'ALAP') warnings.push(`Row ${rowNum}: As Late As Possible constraint ignored`)
-    else if (cType && cDate) { constraintType = cType; constraintDate = cDate }
-    else if (cType) warnings.push(`Row ${rowNum}: constraint "${cLabel}" has no date; ignored`)
-    else if (cLabel && !/^(none|asap|as soon as possible)$/i.test(cLabel)) warnings.push(`Row ${rowNum}: unrecognized constraint "${cLabel}"`)
+    const exId = code || name
+    if (cType === 'ALAP') {
+      warnings.push(`Row ${rowNum}: As Late As Possible constraint ignored`)
+      ex.add({ severity: 'loss', entity: 'constraint', field: 'Constraint=ALAP', disposition: 'dropped', example: exId, message: 'As Late As Possible is not modeled; the activity is scheduled as soon as possible' })
+    } else if (cType && cDate) { constraintType = cType; constraintDate = cDate }
+    else if (cType) {
+      warnings.push(`Row ${rowNum}: constraint "${cLabel}" has no date; ignored`)
+      ex.add({ severity: 'loss', entity: 'constraint', field: 'Constraint Date', disposition: 'dropped', example: exId, message: 'Constraint without a date was ignored' })
+    } else if (cLabel && !/^(none|asap|as soon as possible)$/i.test(cLabel)) {
+      warnings.push(`Row ${rowNum}: unrecognized constraint "${cLabel}"`)
+      ex.add({ severity: 'loss', entity: 'constraint', field: 'Constraint', disposition: 'dropped', example: `${exId} (${cLabel})`, message: 'Unrecognized constraint type was ignored' })
+    }
+    if (duration === null && cellText(durCell) !== '') ex.add({ severity: 'warning', entity: 'activity', field: 'Duration', disposition: 'defaulted', example: exId, message: 'Unreadable duration; 0 days used' })
+    else if (typeof durCell === 'string' && /[a-z]/i.test(durCell) && !/^\s*[+-]?\d+(\.\d+)?\s*(d|dy|dys|day|days|wd|wds)?\.?\s*$/i.test(durCell)) ex.add({ severity: 'info', entity: 'activity', field: 'Duration', disposition: 'converted', example: `${exId} (${durCell})`, message: 'Duration in hours, weeks or months converted to work days (8 h, 5 d, 20 d)' })
 
     const calName = txt(row, 'calendar')
     if (calName && !calendars.has(calName)) calendars.set(calName, inferCalendar(calName))
@@ -434,8 +465,15 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     rawPreds.push({ act, preds: txt(row, 'preds'), succs: txt(row, 'succs'), row: rowNum })
   })
 
-  if (computedDurations) warnings.push(`No duration column: ${computedDurations} durations computed as Mon–Fri days between Start and Finish`)
-  if (calendars.size) warnings.push(`Calendar definitions inferred from names only (${Array.from(calendars.keys()).join(', ')}); verify work days, hours and holidays`)
+  if (computedDurations) {
+    warnings.push(`No duration column: ${computedDurations} durations computed as Mon–Fri days between Start and Finish`)
+    ex.add({ severity: 'warning', entity: 'activity', field: 'Duration', disposition: 'defaulted', count: computedDurations, message: 'No duration column: durations computed as Monday–Friday days between Start and Finish' })
+  }
+  if (calendars.size) {
+    warnings.push(`Calendar definitions inferred from names only (${Array.from(calendars.keys()).join(', ')}); verify work days, hours and holidays`)
+    ex.add({ severity: 'warning', entity: 'calendar', field: 'Calendar', disposition: 'defaulted', count: calendars.size, examples: Array.from(calendars.keys()), message: 'Calendars inferred from their names only (work days and hours); no holidays' })
+  } else ex.add({ severity: 'info', entity: 'calendar', field: 'Calendar', disposition: 'defaulted', message: 'No calendar column: activities use the standard Monday–Friday, 8-hour calendar' })
+  if (groupRows) ex.add({ severity: 'info', entity: 'activity', field: 'Grouping rows', disposition: 'converted', count: groupRows, message: 'Band / summary rows were read as the WBS of the activities below them' })
 
   /* resolve logic */
   const byCode = new Map<string, Activity>()
@@ -461,7 +499,11 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
         const other = resolve(cand.ref)
         if (!other) continue
         done = true
-        if (other === self) { warnings.push(`Row ${row}: ${self.activityId} references itself ("${token}"); skipped`); break }
+        if (other === self) {
+          warnings.push(`Row ${row}: ${self.activityId} references itself ("${token}"); skipped`)
+          ex.add({ severity: 'loss', entity: 'relationship', field: dir === 'pred' ? 'Predecessors' : 'Successors', disposition: 'dropped', example: `${self.activityId}: ${token}`, message: 'Self-reference skipped' })
+          break
+        }
         const [p, s] = dir === 'pred' ? [other, self] : [self, other]
         const key = `${p.id}|${s.id}|${cand.type}`
         if (!seen.has(key)) {
@@ -470,7 +512,10 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
         }
         break
       }
-      if (!done) unresolved.push(`row ${row} ${self.activityId}: ${dir === 'pred' ? 'predecessor' : 'successor'} "${token}"`)
+      if (!done) {
+        unresolved.push(`row ${row} ${self.activityId}: ${dir === 'pred' ? 'predecessor' : 'successor'} "${token}"`)
+        ex.add({ severity: 'loss', entity: 'relationship', field: dir === 'pred' ? 'Predecessors' : 'Successors', disposition: 'dropped', example: `${self.activityId}: ${token}`, message: 'Logic reference to an activity not in the sheet (or unreadable) was skipped' })
+      }
     }
   }
   for (const r of rawPreds) {
@@ -478,7 +523,11 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     if (r.succs) addLinks(r.act, r.succs, 'succ', r.row)
   }
   if (unresolved.length) warnings.push(`Unresolved logic references (${unresolved.length}): ${unresolved.slice(0, 50).join('; ')}${unresolved.length > 50 ? '; …' : ''}`)
-  if (!F.has('preds') && !F.has('succs')) warnings.push('No Predecessors/Successors column: the spreadsheet carries no logic')
+  if (!F.has('preds') && !F.has('succs')) {
+    warnings.push('No Predecessors/Successors column: the spreadsheet carries no logic')
+    ex.add({ severity: 'warning', entity: 'relationship', field: 'Predecessors', disposition: 'defaulted', count: Math.max(1, activities.length), message: 'No Predecessors/Successors column: the spreadsheet carries no logic' })
+  }
+  if (!F.has('constraint') && F.has('constraintDate')) ex.add({ severity: 'warning', entity: 'constraint', field: 'Constraint Date', disposition: 'dropped', message: 'Constraint dates without a constraint type column were not imported' })
 
   const starts = activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()
   const finishes = activities.map(a => a.actualFinish || a.earlyFinish).filter((d): d is string => !!d).sort()
@@ -495,6 +544,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     calendars: calList,
     defaultCalendarId: calList.length ? mostCommonCalendar(activities) : null,
     warnings,
+    exceptions: ex.report(),
     sourceType: isCsv ? 'csv' : 'excel',
     resources: spreadsheetResourceData(resourceRows, isCsv ? 'csv' : 'excel'),
   }
