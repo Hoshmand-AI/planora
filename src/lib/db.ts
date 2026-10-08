@@ -838,7 +838,8 @@ export async function exportOrganization(orgId: string) {
     scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
-  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
+  const standardsRuns = (await query('SELECT * FROM standards_runs WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, auditEvents: audit }
 }
 
 /**

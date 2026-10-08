@@ -86,12 +86,14 @@ src/lib/
   knowledge/  regions (permits, regulations, climate), long-lead, templates, applicability
   semantic/   taxonomy (activity + calendar normalization)
   analysis/   dcma, input-checks
+  standards/  versioned rules engine: GAO Schedule Assessment Guide profile, DCMA 14-point adapter,
+              Planora Composite (threshold conflicts reported, never blended); runs stored in standards_runs
   parsers/    xer, xml, excel/csv, pdf, index
   export/     msp-xml, csv, narrative (Basis of Schedule)
   llm/        provider (cloud / local / offline, air-gap guard)
 src/app/
   dashboard/plan        Build: interview → schedule → evaluation & review → audit
-  dashboard/quality     DCMA + the tool's questions about uploaded data
+  dashboard/quality     DCMA + the tool's questions about uploaded data; Standards tab (framework picker)
   dashboard/history     Firm data: private history, tagging, backtest
   api/plans/[id]/...    generate, edit, review, export, publish, suggest
 ```

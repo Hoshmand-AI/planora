@@ -8,6 +8,7 @@ import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/type
 import { fmtDate, fmtDates } from '@/lib/format'
 import { FINDING_DISPOSITIONS, FINDING_LABELS, SUBMISSION_DISPOSITIONS, SUBMISSION_LABELS, type FindingDisposition, type ItemDisposition, type ReviewState, type SubmissionDisposition } from '@/lib/analysis/review'
 import Link from 'next/link'
+import { StandardsPanel } from './standards-panel'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
 interface Quality {
@@ -32,6 +33,7 @@ export default function QualityPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [hideAnswered, setHideAnswered] = useState(true)
+  const [tab, setTab] = useState<QualityTab>('checks')
 
   const load = useCallback(async () => {
     if (!selectedSchedule) return
@@ -74,6 +76,20 @@ export default function QualityPage() {
   if (!selectedSchedule) {
     return <div className="px-6 py-16 text-center text-[14px] text-warm-500"><ShieldCheck size={22} className="mx-auto mb-2 text-warm-400" />Upload or select a schedule to run quality checks.</div>
   }
+  if (tab === 'standards') {
+    return (
+      <div className="px-4 md:px-6 pt-4 pb-8 space-y-5">
+        <div>
+          <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
+          <p className="text-[12.5px] text-warm-500 truncate">{selectedSchedule.name}</p>
+          <QualityTabs tab={tab} onChange={setTab} />
+        </div>
+        <div role="tabpanel" id="quality-panel-standards" aria-labelledby="quality-tab-standards">
+          <StandardsPanel key={selectedSchedule.id} endpoint={`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/standards`} canRecord={can('schedule.write')} />
+        </div>
+      </div>
+    )
+  }
   if (loading || !data) {
     return <div className="px-6 py-10 text-[14px] text-warm-400 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Checking logic, calendars and dates…</>}</div>
   }
@@ -87,13 +103,14 @@ export default function QualityPage() {
   const review = data.review ?? { items: [], submission: null }
   const dispositionOf = (id: string) => review.items.find(x => x.itemId === id) ?? null
   return (
-    <div className="px-4 md:px-6 pb-8 space-y-5">
+    <div id="quality-panel-checks" className="px-4 md:px-6 pb-8 space-y-5">
       {/* Frozen summary: the schedule and its key quality numbers stay visible while scrolling */}
       <div style={{ top: stickyTop }} className="sticky z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div className="min-w-0">
             <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
             <p className="text-[12.5px] text-warm-500 truncate">{data.schedule.name} · {data.schedule.version}</p>
+            <QualityTabs tab={tab} onChange={setTab} />
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
@@ -315,6 +332,32 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
         </div>
       )}
     </section>
+  )
+}
+
+type QualityTab = 'checks' | 'standards'
+const QUALITY_TABS: { id: QualityTab; label: string }[] = [{ id: 'checks', label: 'Checks & data questions' }, { id: 'standards', label: 'Standards' }]
+
+/** Tabs between the DCMA / data-question view and the standards (framework) view; arrow keys move between them. */
+function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: QualityTab) => void }) {
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    e.preventDefault()
+    const i = QUALITY_TABS.findIndex(t => t.id === tab)
+    const next = QUALITY_TABS[(i + (e.key === 'ArrowRight' ? 1 : QUALITY_TABS.length - 1)) % QUALITY_TABS.length]
+    onChange(next.id)
+    requestAnimationFrame(() => document.getElementById(`quality-tab-${next.id}`)?.focus())
+  }
+  return (
+    <div role="tablist" aria-label="Quality views" className="flex gap-1 mt-2" onKeyDown={onKey}>
+      {QUALITY_TABS.map(t => (
+        <button key={t.id} id={`quality-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={tab === t.id ? `quality-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1}
+          onClick={() => onChange(t.id)}
+          className={`px-3 py-1.5 rounded-md text-[12.5px] font-medium border ${tab === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-warm-50 text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+          {t.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
