@@ -492,6 +492,63 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS standards_runs_plan_idx ON standards_runs(org_id, plan_id, created_at DESC);
     `,
   },
+  {
+    id: 14, name: 'time_impact_analysis',
+    sql: `
+    -- Time Impact Analysis (src/lib/analysis/tia.ts). A delay event is modelled as a fragnet (new
+    -- activities and their ties to existing activity codes, stored as JSON) and inserted into an
+    -- accepted update (schedule_id) as of its data date. Responsibility is a label the user enters;
+    -- Planora makes no entitlement determination. Additive: older code ignores both tables.
+    CREATE TABLE IF NOT EXISTS delay_events (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      responsibility TEXT NOT NULL DEFAULT 'unassigned'
+        CHECK (responsibility IN ('owner', 'contractor', 'third_party', 'force_majeure', 'unassigned')),
+      event_start TEXT,
+      event_end TEXT,
+      notified_on TEXT,
+      evidence JSONB NOT NULL DEFAULT '[]',
+      fragnet JSONB NOT NULL DEFAULT '{"activities":[],"relationships":[]}',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'analyzed', 'accepted', 'rejected')),
+      status_note TEXT,
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS delay_events_schedule_idx ON delay_events(org_id, schedule_id, created_at);
+    -- One row per calculation. Immutable: a trigger rejects UPDATE (rows go only with their schedule
+    -- or organization). inputs_hash = SHA-256 of the canonical calculation inputs (network, fragnet,
+    -- event dates, previous update), so the same inputs give the same hash and the same results.
+    CREATE TABLE IF NOT EXISTS tia_runs (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      delay_event_id TEXT NOT NULL REFERENCES delay_events(id) ON DELETE CASCADE,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      inputs_hash TEXT NOT NULL,
+      result_hash TEXT NOT NULL,
+      engine TEXT NOT NULL,
+      inputs JSONB NOT NULL,
+      before_result JSONB NOT NULL,
+      after_result JSONB NOT NULL,
+      result JSONB NOT NULL,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS tia_runs_event_idx ON tia_runs(org_id, delay_event_id, created_at);
+    CREATE OR REPLACE FUNCTION planora_tia_run_immutable() RETURNS trigger AS $fn$
+    BEGIN
+      RAISE EXCEPTION 'tia_runs rows are immutable';
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS tia_runs_immutable ON tia_runs;
+    CREATE TRIGGER tia_runs_immutable BEFORE UPDATE ON tia_runs
+      FOR EACH ROW EXECUTE FUNCTION planora_tia_run_immutable();
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

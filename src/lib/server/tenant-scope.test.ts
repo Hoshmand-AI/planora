@@ -59,6 +59,8 @@ const ALLOWLIST: { file: string; sql: string; why: string }[] = [
   { file: 'src/lib/db.ts', sql: 'UPDATE plans SET user_id=$2 WHERE user_id=$1', why: "deleteAccountData: the member's own plans (users belong to one org)" },
   { file: 'src/lib/db.ts', sql: 'UPDATE schedules SET user_id=$2 WHERE user_id=$1', why: "deleteAccountData: the member's own uploads (users belong to one org)" },
   { file: 'src/lib/db.ts', sql: "UPDATE schedule_edits SET user_id=$2, user_name='Former member' WHERE user_id=$1", why: "deleteAccountData: the member's own edits (users belong to one org)" },
+  { file: 'src/lib/db.ts', sql: 'UPDATE delay_events SET created_by=$2 WHERE created_by=$1', why: "deleteAccountData: the member's own delay events (users belong to one org)" },
+  { file: 'src/lib/db.ts', sql: 'UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', why: "deleteAccountData: the member's own delay-event edits (users belong to one org)" },
   // The audit filter list starts with org_id=$1 and is built up in code.
   { file: 'src/lib/server/audit.ts', sql: 'SELECT * FROM audit_events WHERE ${where.join(', why: "listAudit: where = ['org_id=$1', ...]" },
   // API key resolution IS the authentication step: the key's org becomes the caller's org.

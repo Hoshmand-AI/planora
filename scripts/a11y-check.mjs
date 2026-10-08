@@ -38,7 +38,7 @@ const PAGES = [
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
   ['Overview', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
-  ['Portfolio', '/dashboard/portfolio'],
+  ['Portfolio', '/dashboard/portfolio'], ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
 ]
 
