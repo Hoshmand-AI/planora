@@ -3,6 +3,7 @@
 import type { ParsedSchedule } from './types'
 import { parseXER } from './xer-parser'
 import { parseMSProjectXML } from './xml-parser'
+import { parseP6Xml, isP6Xml } from './p6-xml-parser'
 import { parsePDF } from './pdf-parser'
 import { parseSpreadsheet } from './excel-parser'
 import { decodeCp1252 } from './xer-codec'
@@ -10,6 +11,8 @@ import { decodeCp1252 } from './xer-codec'
 export type { ParsedSchedule, ParsedSourceType } from './types'
 export { parseXER } from './xer-parser'
 export { parseMSProjectXML } from './xml-parser'
+export { parseP6Xml } from './p6-xml-parser'
+export type { ExceptionReport, ExceptionRecord } from './exceptions'
 export { parsePDF } from './pdf-parser'
 export { parseSpreadsheet } from './excel-parser'
 
@@ -33,9 +36,8 @@ export async function parseScheduleFile(fileName: string, data: Buffer, schedule
       return parseXER(decodeText(data), scheduleId, opts)
     case '.xml': {
       const text = decodeText(data)
-      if (/<APIBusinessObjects[\s>]/.test(text)) {
-        throw new Error('This is a Primavera P6 XML (PMXML) file, which is not supported — export the project from P6 as .xer instead')
-      }
+      if (!text.trim()) throw new Error('The XML file is empty')
+      if (isP6Xml(text)) return parseP6Xml(text, scheduleId, opts)
       if (!/<Project[\s>]/.test(text) || !/<Tasks[\s>]/.test(text)) {
         throw new Error('XML file is not a Microsoft Project XML export (no <Project>/<Tasks>) — in MS Project use File › Save As › XML')
       }
@@ -51,8 +53,11 @@ export async function parseScheduleFile(fileName: string, data: Buffer, schedule
       throw new Error('Native .mpp files are binary — export from MS Project as XML (File › Save As › XML format) and upload the .xml')
     case '.xls':
       throw new Error('Legacy .xls workbooks are not supported — save as .xlsx or .csv and upload again')
-    case '.pmxml':
-      throw new Error('Primavera P6 XML is not supported — export the project from P6 as .xer instead')
+    case '.pmxml': {
+      const text = decodeText(data)
+      if (!isP6Xml(text)) throw new Error('The file is not a Primavera P6 XML export (no <APIBusinessObjects>)')
+      return parseP6Xml(text, scheduleId, opts)
+    }
     case '.pp':
     case '.ppx':
       throw new Error('Asta Powerproject files are not supported — export to MS Project XML or .xlsx/.csv')

@@ -4,6 +4,7 @@
 import { Activity } from '@/lib/db'
 import { randomUUID as uuid } from 'crypto'
 import type { ParsedSchedule } from './types'
+import { ExceptionCollector } from './exceptions'
 
 export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<ParsedSchedule> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -89,6 +90,11 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
     })
   }
   
+  const ex = new ExceptionCollector('import', 'pdf')
+  ex.add({ severity: 'loss', entity: 'relationship', field: 'Logic', disposition: 'dropped', count: Math.max(1, activities.length), message: 'A PDF carries no machine-readable logic; no relationships were imported' })
+  ex.add({ severity: 'warning', entity: 'calendar', field: 'Calendar', disposition: 'defaulted', message: 'A PDF carries no calendars; the standard Monday–Friday, 8-hour calendar is used' })
+  ex.add({ severity: 'warning', entity: 'activity', field: 'Activity ID', disposition: 'defaulted', count: activities.length, examples: activities.map(a => a.name), message: 'Activities were read heuristically from the text and numbered PDF-1, PDF-2, ...; verify IDs, durations and dates' })
+  ex.add({ severity: 'loss', entity: 'other', field: 'Progress, float, constraints, WBS', disposition: 'dropped', count: Math.max(1, activities.length), message: 'Progress, float, constraints and WBS are not read from a PDF' })
   return {
     projectName,
     dataDate: null,
@@ -102,6 +108,7 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
       'PDF has no logic/calendars; relationships are not available',
       'Activities were extracted heuristically from PDF text; verify IDs, durations and dates',
     ],
+    exceptions: ex.report(),
     sourceType: 'pdf',
   }
 }

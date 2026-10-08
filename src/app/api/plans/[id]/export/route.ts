@@ -12,6 +12,8 @@ import { encodeXer } from '@/lib/parsers/xer-codec'
 import { exportPdf } from '@/lib/export/pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
 import { calculationSettings, planoraRelease, type Provenance } from '@/lib/export/provenance'
+import { exportExceptions, type ExportExceptionFormat } from '@/lib/export/exceptions'
+import { exceptionHeader, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { scheduleFingerprint } from '@/lib/server/approval'
 import { profileFrom } from '@/lib/planning/elicitation'
 import { runSra } from '@/lib/planning/sra'
@@ -32,6 +34,8 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  *   ?format=xlsx-import  Excel for importing into MS Project or P6
  *   ?format=csv          flat activity table
  *   ?format=md           Basis of Schedule narrative
+ * XER, XML, CSV and XLSX downloads carry an export exception report (what the format cannot hold) in the
+ * X-Planora-Export-Exceptions header (XLSX also in the Provenance sheet); &exceptions=json returns it.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
@@ -52,7 +56,11 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const sraFor = async () => g.cpm && entitlementsFor(ctx.plan).sra ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
   // A generated plan has no uploaded file: the hash is the SHA-256 of the generated schedule content
   // (the same fingerprint approvals are bound to).
+  const exKey: ExportExceptionFormat | null = format === 'xer' || format === 'xml' || format === 'csv' || format === 'xlsx-import' || format === 'xlsx-p6' ? format : null
+  const exceptions = exKey ? exportExceptions(g, exKey, { progressMode: g.cpm?.progressMode ?? null }) : null
+  if (exceptions && req.nextUrl.searchParams.get('exceptions') === 'json') return NextResponse.json({ format, exceptions, summary: summarizeExceptions(exceptions) })
   const prov = (): Provenance => ({
+    exceptions,
     sources: [{ scheduleName: plan.name, version: `plan version ${plan.version}`, fileName: `Generated in Planora (plan "${plan.name}")`, sha256: scheduleFingerprint(g), dataDate: g.dataDate ?? g.projectStart, progressMode: g.cpm?.progressMode ?? 'retained' }],
     release: planoraRelease(), generatedAt: new Date().toISOString(),
     settings: calculationSettings({ calendars: g.calendars, defaultCalendarId: g.defaultCalendarId }, { progressMode: g.cpm?.progressMode ?? 'retained', mustFinishBy: g.mustFinishBy ?? null, finishMilestone: null }, ctx.settings?.quality),
@@ -84,6 +92,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   }
   const rl = await hit(`export:user:${ctx.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
-  await audit({ action: 'plan.export', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, format, file, version: plan.version, activities: g.activities.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"` } })
+  const exSummary = exceptions ? summarizeExceptions(exceptions) : null
+  await audit({ action: 'plan.export', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, format, file, version: plan.version, activities: g.activities.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), ...(exSummary ? { exportExceptions: { records: exceptions!.records.length, total: exSummary.total, losses: exSummary.losses } } : {}) } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, ...(exceptions ? { 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } : {}) } })
 })

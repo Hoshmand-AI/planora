@@ -3,6 +3,7 @@ import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { BaselineMeta } from '@/lib/analysis/baseline'
+import { asExceptionReport, type ExceptionReport } from '@/lib/parsers/exceptions'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
 import type { SraCommitment, SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
@@ -221,7 +222,7 @@ export async function updateUser(id: string, updates: Partial<User>): Promise<Us
 
 /* ─── Schedules ─────────────────────────────────────── */
 
-export type SourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
+export type SourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
 
 export interface Schedule {
   id: string; userId: string; orgId: string; name: string; version: string
@@ -253,6 +254,8 @@ export interface Schedule {
   baselineScheduleId?: string | null
   /** Embedded P6 baseline and the assessment of the file's own target dates (src/lib/analysis/baseline.ts) */
   baselineMeta?: BaselineMeta | null
+  /** What the importer saw but did not map, converted or defaulted (src/lib/parsers/exceptions.ts); null for older uploads */
+  importExceptions?: ExceptionReport | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -275,6 +278,7 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     workspaceId: (row.workspace_id as string) ?? null,
     baselineScheduleId: (row.baseline_schedule_id as string) ?? null,
     baselineMeta: (row.baseline_meta as BaselineMeta) ?? null,
+    importExceptions: asExceptionReport(row.import_exceptions),
   }
 }
 
@@ -328,6 +332,12 @@ export async function setScheduleBaseline(id: string, orgId: string, baselineSch
 export async function setScheduleBaselineMeta(id: string, orgId: string, meta: BaselineMeta | null): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET baseline_meta=$3 WHERE id=$1 AND org_id=$2', [id, orgId, meta ? JSON.stringify(meta) : null])
+}
+
+/** The import exception report captured when the file was parsed. */
+export async function setScheduleImportExceptions(id: string, orgId: string, report: ExceptionReport | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET import_exceptions=$3 WHERE id=$1 AND org_id=$2', [id, orgId, report ? JSON.stringify(report) : null])
 }
 
 /** Designate (or clear, with null) the schedule's contract/finish milestone. */
