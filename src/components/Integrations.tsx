@@ -55,7 +55,7 @@ export function Integrations() {
 
       <h3 className="text-[13px] font-semibold text-navy-950 mb-2">API keys</h3>
       {data.keys.length > 0 ? (
-        <div className="overflow-x-auto mb-3">
+        <div className="relative overflow-x-auto mb-3">
           <table className="w-full text-[12.5px]">
             <caption className="sr-only">API keys</caption>
             <thead><tr className="text-left text-warm-500"><th scope="col" className="py-1.5 pr-3 font-medium">Name</th><th scope="col" className="pr-3 font-medium">Key</th><th scope="col" className="pr-3 font-medium">Role</th><th scope="col" className="pr-3 font-medium">Last used</th><th scope="col" className="pr-3 font-medium">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>

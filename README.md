@@ -32,11 +32,11 @@ Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v3, Postgres (`pg
 
 ## Security, governance and operations
 
-Roles (owner/admin/scheduler/reviewer/viewer), workspaces with ethical walls between client matters, invitations, two-step verification, OpenID Connect SSO, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
+Roles (owner/admin/scheduler/reviewer/viewer), workspaces with ethical walls between client matters, invitations, two-step verification, single sign-on with OpenID Connect or SAML 2.0, SCIM 2.0 user provisioning, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
 
 - Start with [docs/security/SECURITY-OVERVIEW.md](docs/security/SECURITY-OVERVIEW.md) and [docs/governance/AUDIT-REMEDIATION.md](docs/governance/AUDIT-REMEDIATION.md).
 - Operations docs are in [docs/operations](docs/operations); to report a vulnerability, see [SECURITY.md](SECURITY.md).
-- Every API route is built with `api({ permission })` or `publicApi()` from `src/lib/server/api.ts`. A test fails the build otherwise.
+- Every API route is built with `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (the SCIM 2.0 endpoints under `/api/scim/v2` use `scimApi()`, which accepts only an organization SCIM token). A test fails the build otherwise.
 
 ## Setup
 
@@ -56,6 +56,7 @@ BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs   # end-to-end against
 # with `PORT=4010 node scripts/mock-oidc.mjs` running and the app started with PLANORA_ALLOW_INSECURE_OIDC=1)
 # PLANORA_EMAIL_OUTBOX + PLANORA_ALLOW_INSECURE_WEBHOOKS=1 on the server enable the email and webhook checks
 BASE_URL=… DATABASE_URL=… OIDC_ISSUER=http://localhost:4010 PLANORA_EMAIL_OUTBOX=/tmp/outbox WEBHOOK_RECEIVER_PORT=4020 node scripts/e2e-security.mjs
+BASE_URL=… DATABASE_URL=… node scripts/e2e-scim.mjs        # SAML sign-in and SCIM provisioning (server with PLANORA_ALLOW_INSECURE_OIDC=1)
 BASE_URL=… node scripts/a11y-check.mjs                     # WCAG 2.2 AA (axe-core) on the main screens
 DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node scripts/restore-drill.mjs backups/*.dump
 ```

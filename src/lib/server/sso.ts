@@ -64,7 +64,7 @@ export const publicSso = (c: SsoConfig) => ({
   verification: c.verificationToken ? { host: '_planora-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
 })
 
-const insecureAllowed = () => /^(1|true)$/i.test(process.env.PLANORA_ALLOW_INSECURE_OIDC || '')
+export const insecureAllowed = () => /^(1|true)$/i.test(process.env.PLANORA_ALLOW_INSECURE_OIDC || '')
 
 export function validateIssuer(issuer: string): void {
   let u: URL
@@ -206,7 +206,8 @@ export async function saveSsoConfig(orgId: string, input: { enabled?: boolean; i
     }
   }
   await initSchema()
-  const taken = await query('SELECT domain FROM sso_domains WHERE domain = ANY($1) AND org_id<>$2', [next.domains, orgId])
+  // A domain belongs to one organization, whichever protocol (OIDC or SAML) claimed it.
+  const taken = await query('SELECT domain FROM sso_domains WHERE domain = ANY($1) AND org_id<>$2 UNION SELECT domain FROM saml_domains WHERE domain = ANY($1) AND org_id<>$2', [next.domains, orgId])
   if (taken.rows.length) throw new ApiError(409, `${taken.rows.map(r => r.domain).join(', ')} is already claimed by another organization.`)
   // Domains are claimed only while SSO is on and ownership has been verified.
   await query('DELETE FROM sso_domains WHERE org_id=$1', [orgId])

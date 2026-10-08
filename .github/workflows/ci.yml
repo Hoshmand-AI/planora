@@ -96,6 +96,8 @@ jobs:
           ADMIN_DATABASE_URL=postgres://planora:planora@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
       - name: Security and governance checks
         run: node scripts/e2e-security.mjs
+      - name: SAML single sign-on and SCIM provisioning checks
+        run: node scripts/e2e-scim.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium

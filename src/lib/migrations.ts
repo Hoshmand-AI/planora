@@ -461,6 +461,55 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE schedule_risk_inputs ADD COLUMN IF NOT EXISTS commitments JSONB NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    id: 19, name: 'saml_sso_and_scim_provisioning',
+    sql: `
+    -- SAML 2.0 single sign-on and SCIM 2.0 provisioning (src/lib/server/saml.ts, src/lib/server/scim.ts).
+    -- Additive: older code ignores the new column and tables.
+    -- SAML configuration per organization (IdP entity ID, SSO URL, signing certificates, mappings).
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS saml JSONB NOT NULL DEFAULT '{}';
+    CREATE INDEX IF NOT EXISTS organizations_saml_connection_idx ON organizations ((saml->>'connectionId'));
+    -- Email domains routed to an organization's SAML connection (unique across organizations, like sso_domains).
+    CREATE TABLE IF NOT EXISTS saml_domains (
+      domain TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE
+    );
+    -- AuthnRequest IDs we issued: a response must answer one of them, once, within ten minutes.
+    CREATE TABLE IF NOT EXISTS saml_requests (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      consumed_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS saml_requests_created_idx ON saml_requests(created_at);
+    -- Assertion IDs already accepted (replay protection) until the assertion itself expires.
+    CREATE TABLE IF NOT EXISTS saml_assertions (
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      assertion_id TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (org_id, assertion_id)
+    );
+    CREATE INDEX IF NOT EXISTS saml_assertions_expires_idx ON saml_assertions(expires_at);
+    -- SCIM bearer tokens: only a SHA-256 of the token is stored; shown once at creation.
+    CREATE TABLE IF NOT EXISTS scim_tokens (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS scim_tokens_org_idx ON scim_tokens(org_id);
+    -- SCIM bookkeeping on members: the identity provider's externalId, when SCIM last changed the
+    -- member, and SCIM DELETE (the account stays disabled; the firm keeps its project data).
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_external_id TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_modified_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_deleted_at TIMESTAMPTZ;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {
