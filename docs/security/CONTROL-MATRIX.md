@@ -6,7 +6,7 @@ Maps Planora's controls to common frameworks, with the evidence an assessor can 
 
 | Risk | Control | Evidence | Status |
 |---|---|---|---|
-| A01 Broken access control | RBAC on every route; org-scoped queries; 404 for other tenants; route-guard test | `src/lib/server/api.ts`, `permissions.ts`, `routes.test.ts`, `scripts/e2e-smoke.mjs` (two firms), `e2e-security.mjs` (roles) | Implemented |
+| A01 Broken access control | RBAC on every route; org-scoped queries; 404 for other tenants; route-guard test | `src/lib/server/api.ts`, `permissions.ts`, `routes.test.ts`, `scripts/e2e-smoke.mjs` (two firms), `e2e-security.mjs` (roles), `e2e-tenant-isolation.mjs` (every object, cross-org), `tenant-scope.test.ts` (org_id on every query) | Implemented |
 | A02 Security misconfiguration | CSP, HSTS, frame, CORP/COOP headers; `poweredByHeader` off; no stack traces | `next.config.js`, `api.ts` error handler, e2e header check | Implemented |
 | A03 Software supply chain | `npm audit` gate (runtime), Dependabot, SBOM artifact, pinned lockfile (`npm ci`), CodeQL | `.github/workflows/ci.yml`, `codeql.yml`, `dependabot.yml` | Implemented |
 | A04 Cryptographic failures | TLS to DB with verification; bcrypt; AES-256-GCM for MFA/SSO secrets; hashed recovery codes and invitation tokens | `databaseTlsConfig` in `src/lib/db.ts`, `src/lib/server/crypto.ts`, `security.test.ts` | Implemented |

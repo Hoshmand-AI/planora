@@ -65,7 +65,8 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
     }
     case 'revoke_session': {
       if (!b.sessionId) throw new ApiError(400, 'sessionId required')
-      await revokeSession(String(b.sessionId), user.id)
+      // Only this person's own active sessions; any other id (another member's, another firm's) is "not found".
+      if (!(await revokeSession(String(b.sessionId), user.id))) throw new ApiError(404, 'Session not found.')
       await audit({ action: 'account.session_revoked', targetType: 'user', targetId: user.id, detail: { sessionId: b.sessionId } })
       return json({ success: true })
     }
