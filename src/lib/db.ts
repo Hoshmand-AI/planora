@@ -835,7 +835,8 @@ export async function exportOrganization(orgId: string) {
       query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
       getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId), getReviewState(s.id, orgId),
     ])
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission })
+    const timeImpact = await import('./tia-db').then(m => m.exportTimeImpact(s.id, orgId))
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission, timeImpact })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
   return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
@@ -893,6 +894,8 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE schedules SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE data_question_responses SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q("UPDATE schedule_edits SET user_id=$2, user_name='Former member' WHERE user_id=$1", [userId, heir])
+    await q('UPDATE delay_events SET created_by=$2 WHERE created_by=$1', [userId, heir])
+    await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
     await q('DELETE FROM chat_messages WHERE user_id=$1', [userId])
     await q('DELETE FROM users WHERE id=$1', [userId])
   })
