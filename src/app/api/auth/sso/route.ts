@@ -4,6 +4,8 @@ import { hit } from '@/lib/server/rate-limit'
 import { currentRequest } from '@/lib/server/context'
 import { getOrganization } from '@/lib/db'
 import { entitlementsFor } from '@/lib/server/entitlements'
+import { samlOrgForEmail, startSaml, samlCookieOptions, SAML_COOKIE } from '@/lib/server/saml'
+import { appOrigin } from '@/lib/server/email'
 
 const SSO_COOKIE = 'planora-sso'
 
@@ -13,6 +15,17 @@ export const POST = publicApi(async req => {
   const email = String(b.email || '').trim().toLowerCase()
   const rl = await hit(`sso:ip:${currentRequest()?.ip || 'unknown'}`, 30, 15 * 60)
   if (!rl.ok) throw new ApiError(429, 'Too many attempts. Wait a few minutes.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
+  // SAML 2.0 connection for this domain (takes precedence over OIDC when both are on).
+  const saml = email ? await samlOrgForEmail(email) : null
+  if (saml) {
+    const org = await getOrganization(saml.orgId)
+    if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
+    const origin = appOrigin(req)
+    const { url, stateCookie } = await startSaml(saml.orgId, saml.config, origin)
+    const res = json({ url })
+    res.cookies.set(SAML_COOKIE, stateCookie, samlCookieOptions(origin, 600))
+    return res
+  }
   const found = email ? await orgForEmail(email) : null
   if (!found) throw new ApiError(404, "Single sign-on isn't set up for that email domain. Sign in with your password, or ask your admin.", 'sso_not_configured')
   const org = await getOrganization(found.orgId)

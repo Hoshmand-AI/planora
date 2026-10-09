@@ -12,7 +12,7 @@ import { applyNewOrganizationDefaults, findInvitation, markInvitationAccepted } 
 import { currentRequest } from '@/lib/server/context'
 import { permissionsOf, isRole } from '@/lib/server/permissions'
 import { consumeSecondFactor } from '@/lib/server/mfa'
-import { ssoConfigFor } from '@/lib/server/sso'
+import { ssoEnforced } from '@/lib/server/saml'
 import { markEmailVerified, sendVerificationEmail } from '@/lib/server/email-verification'
 import { emailConfigured, appOrigin } from '@/lib/server/email'
 import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
@@ -136,8 +136,7 @@ export const POST = publicApi(async req => {
     if (user.role !== 'owner') {
       // Organizations that enforce single sign-on: members sign in through their identity provider
       // (owners keep password sign-in as a break-glass account).
-      const sso = await ssoConfigFor(user.orgId)
-      if (sso.enabled && sso.enforce) throw new ApiError(403, 'Your organization requires single sign-on. Use “Sign in with SSO”.', 'sso_required')
+      if (await ssoEnforced(user.orgId)) throw new ApiError(403, 'Your organization requires single sign-on. Use “Sign in with SSO”.', 'sso_required')
     }
     if (user.mfaEnabledAt) return json({ mfaRequired: true, challenge: createMfaChallenge(user.id) })
     return startSession(user, 'password')

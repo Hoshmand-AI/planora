@@ -41,6 +41,12 @@ function schemaTables(): { all: Set<string>; withOrgId: Set<string> } {
  * repository root; `sql` is a substring of the statement (whitespace collapsed).
  */
 const ALLOWLIST: { file: string; sql: string; why: string }[] = [
+  // SAML / SCIM: resolving the org from a public connection id or a hashed token, and global expiry sweeps.
+  { file: 'src/lib/server/saml.ts', sql: "SELECT id, plan, saml FROM organizations WHERE saml->>'connectionId'=$1", why: 'SAML ACS/login: resolves the org that owns an unguessable connection id (no session yet)' },
+  { file: 'src/lib/server/saml.ts', sql: "DELETE FROM saml_requests WHERE created_at < NOW() - INTERVAL '1 day'", why: 'expiry sweep of one-time request ids, all orgs' },
+  { file: 'src/lib/server/saml.ts', sql: 'DELETE FROM saml_assertions WHERE expires_at < NOW()', why: 'expiry sweep of replay-protection ids, all orgs' },
+  { file: 'src/lib/server/scim.ts', sql: 'UPDATE scim_tokens SET last_used_at=NOW() WHERE id=$1', why: 'resolveScimToken: the row just found by its token hash' },
+  { file: 'src/lib/server/scim.ts', sql: 'FROM users WHERE ${where}', why: 'listScimUsers: ${where} always starts with org_id=$1 (LIVE)' },
   // Child rows of a schedule: every caller first loads the schedule with getScheduleById(id, orgId) or
   // loadScheduleData(id, orgId) (organization + workspace scoped) and passes that schedule's id.
   { file: 'src/lib/db.ts', sql: 'SELECT * FROM activities WHERE schedule_id=$1', why: 'getActivities: schedule id comes from an org-scoped schedule lookup' },

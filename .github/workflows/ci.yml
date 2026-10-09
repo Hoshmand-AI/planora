@@ -98,6 +98,8 @@ jobs:
         run: node scripts/e2e-security.mjs
       - name: Cross-tenant isolation checks
         run: node scripts/e2e-tenant-isolation.mjs
+      - name: SAML single sign-on and SCIM provisioning checks
+        run: node scripts/e2e-scim.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium

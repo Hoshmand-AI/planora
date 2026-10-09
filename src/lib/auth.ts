@@ -110,7 +110,7 @@ export interface AuthContext {
   settings: OrgSettings
   /** Subscription plan of the organization (see entitlements.ts) */
   plan: string
-  /** How this session was established: password, password+totp, password+recovery_code, sso */
+  /** How this session was established: password, password+totp, password+recovery_code, sso (OIDC), saml */
   sessionMethod: string
   mfaEnabled: boolean
   /** The organization requires two-step verification and this member hasn't enrolled yet. */
@@ -118,6 +118,9 @@ export interface AuthContext {
   /** The member confirmed their email address (undefined for API keys) */
   emailVerified?: boolean
 }
+
+/** Sessions established through the organization's identity provider: OpenID Connect ('sso') or SAML ('saml'). */
+export const isFederatedMethod = (method: string) => method === 'sso' || method === 'saml'
 
 function sessionIdFromToken(token: string): string | null {
   try {
@@ -155,10 +158,11 @@ export async function resolveSession(token: string): Promise<AuthContext | null>
   if (Date.now() - lastSeen > TOUCH_EVERY_MS) await query('UPDATE sessions SET last_seen_at=NOW() WHERE id=$1', [sid])
   const mfaEnabled = !!row.mfa_enabled_at
   const sessionMethod = row.method || 'password'
+  const federated = isFederatedMethod(sessionMethod)
   return {
     userId: row.id, email: row.email, name: row.name, orgId: row.org_id, orgName: row.org_name, role: row.role, sessionId: sid,
-    settings, plan: row.plan || 'free', sessionMethod, mfaEnabled, emailVerified: !!row.email_verified_at || sessionMethod === 'sso',
-    // Single sign-on sessions rely on the identity provider's own MFA policy.
-    mfaSetupRequired: settings.requireMfa && !mfaEnabled && sessionMethod !== 'sso',
+    settings, plan: row.plan || 'free', sessionMethod, mfaEnabled, emailVerified: !!row.email_verified_at || federated,
+    // Single sign-on sessions (OIDC or SAML) rely on the identity provider's own MFA policy.
+    mfaSetupRequired: settings.requireMfa && !mfaEnabled && !federated,
   }
 }

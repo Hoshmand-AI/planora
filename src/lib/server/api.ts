@@ -151,6 +151,76 @@ export function publicApi<P = Record<string, string>>(handler: (req: NextRequest
   }
 }
 
+/* ─── SCIM 2.0 provisioning endpoints ───────────────── */
+
+/** SCIM error (RFC 7644 §3.12): status plus an optional scimType such as invalidFilter, uniqueness, mutability. */
+export class ScimError extends ApiError {
+  constructor(status: number, detail: string, public scimType?: string) { super(status, detail, scimType) }
+}
+
+export const SCIM_ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error'
+export const SCIM_CONTENT_TYPE = 'application/scim+json'
+
+export function scimJson(data: unknown, status = 200, headers: Record<string, string> = {}) {
+  return new NextResponse(JSON.stringify(data), { status, headers: { 'Content-Type': SCIM_CONTENT_TYPE, ...headers } })
+}
+
+function scimErrorResponse(err: unknown): Response {
+  const r = currentRequest()
+  if (err instanceof ApiError) {
+    const scimType = err instanceof ScimError ? err.scimType : undefined
+    return scimJson({ schemas: [SCIM_ERROR_SCHEMA], status: String(err.status), ...(scimType ? { scimType } : {}), detail: err.message }, err.status,
+      err.status === 401 ? { 'WWW-Authenticate': 'Bearer realm="planora-scim"' } : err.status === 429 && err.extra?.retryAfterSec ? { 'Retry-After': String(err.extra.retryAfterSec) } : {})
+  }
+  log('error', 'unhandled scim error', errorFields(err))
+  return scimJson({ schemas: [SCIM_ERROR_SCHEMA], status: '500', detail: `Internal error (reference ${r?.requestId}).` }, 500)
+}
+
+export interface ScimContext { orgId: string; tokenId: string; tokenName: string; plan: string }
+type ScimCtx<P> = { params: P; scim: ScimContext }
+
+/**
+ * SCIM 2.0 route (src/app/api/scim/v2/…): authenticated only by an organization SCIM token
+ * (Authorization: Bearer scim_…), never by a session cookie or API key, and every handler operates
+ * on that token's organization only. Enterprise plan (same entitlement as SSO). Errors use the SCIM
+ * error schema. Request ids, logging and rate limits as for api().
+ */
+export function scimApi<P = Record<string, string>>(handler: (req: NextRequest, ctx: ScimCtx<P>) => Promise<Response>) {
+  return async (req: NextRequest, routeCtx: RouteContext = {}): Promise<Response> => {
+    const info = requestInfo(req)
+    const started = Date.now()
+    return runWithRequest(info, () => finish(info, started, async () => {
+      try {
+        const bearer = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') || '')?.[1]
+        if (!bearer) throw new ScimError(401, 'A SCIM bearer token is required (Organization → SCIM provisioning).')
+        const { resolveScimToken } = await import('./scim')
+        const scim = await resolveScimToken(bearer)
+        if (!scim) throw new ScimError(401, 'Invalid or revoked SCIM token.')
+        Object.assign(info, { orgId: scim.orgId, userId: `scim:${scim.tokenId}`, email: `scim-token:${scim.tokenName}`, name: `SCIM token “${scim.tokenName}”`, plan: scim.plan })
+        if (!entitlementsFor(scim.plan).sso) throw new ScimError(403, 'SCIM provisioning is part of the Enterprise plan.')
+        const rl = await hit(`scim:token:${scim.tokenId}`, LIMITS.apiPerUser.limit, LIMITS.apiPerUser.windowSec)
+        if (!rl.ok) throw new ScimError(429, 'Too many requests. Slow down and try again shortly.')
+        await maybeRunMaintenance()
+        const params = (await routeCtx.params) as P
+        return await handler(req, { params, scim })
+      } catch (err) {
+        return scimErrorResponse(err)
+      }
+    }))
+  }
+}
+
+/** Reads a SCIM JSON body; malformed JSON is a SCIM 400 invalidSyntax. */
+export async function scimBody<T = Record<string, unknown>>(req: Request): Promise<T> {
+  const text = await req.text()
+  if (text.length > 256 * 1024) throw new ScimError(413, 'Request body too large.')
+  try {
+    const v = JSON.parse(text) as unknown
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object')
+    return v as T
+  } catch { throw new ScimError(400, 'Request body must be a JSON object.', 'invalidSyntax') }
+}
+
 /** Reads a JSON body; a malformed body is a 400, not a 500. */
 export async function body<T = Record<string, unknown>>(req: Request): Promise<T> {
   try { return (await req.json()) as T } catch { throw new ApiError(400, 'Request body must be valid JSON.', 'bad_json') }
