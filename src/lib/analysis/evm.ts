@@ -160,6 +160,8 @@ const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p
 const ratio = (a: number, b: number | null | undefined): number | null => (b == null || Math.abs(b) < 1e-9 ? null : round(a / b, 3))
 const day = (v: string | null | undefined) => (v ? v.slice(0, 10) : null)
 const isSummary = (a: { activityType: string }) => a.activityType === 'summary'
+/** P6 cost data (XER or P6 XML): budgets are resource assignment and expense costs, summaries included. */
+const isP6Cost = (kind: CostSourceKind) => kind === 'p6_xer' || kind === 'p6_xml'
 
 export { EVM_PRINCIPLE_NOTE, fmtMoney, percentTypeLabel }
 
@@ -188,7 +190,7 @@ export function evmMissingInputs(input: EvmInput): EvmMissing[] {
   if (!budgets.some(r => (r.budget ?? 0) !== 0 || (r.baselineBudget ?? 0) !== 0)) out.push({ code: 'no_budget', message: 'No activity carries a budget (budgeted or baseline cost), so there is nothing to earn.' })
   if (input.baseline.source === 'none') out.push({ code: 'no_baseline', message: 'There is no baseline. Mark an upload of this project as Baseline, or export the P6 project baseline (or MS Project baseline) with the update.' })
   else if (!input.baselineBudget || !Object.values(input.baselineBudget.byCode).some(v => v !== 0)) {
-    out.push({ code: 'no_baseline_budget', message: input.baseline.source === 'file' && input.cost.kind !== 'p6_xer'
+    out.push({ code: 'no_baseline_budget', message: input.baseline.source === 'file' && !isP6Cost(input.cost.kind)
       ? 'The baseline dates in the file carry no baseline cost (MS Project: save the baseline after loading costs so Baseline Cost is set; spreadsheets: add a Baseline cost column).'
       : 'The designated baseline carries no budget (its file has no cost data).' })
   }
@@ -259,7 +261,7 @@ export function computeEvm(input: EvmInput): EvmAnalysis {
   const notes: string[] = [...(cost.notes ?? [])]
   const calById = new Map(input.calendars.map(c => [c.id, c]))
   const defCal = (input.defaultCalendarId && calById.get(input.defaultCalendarId)) || input.calendars[0] || defaultCalendar()
-  const work = input.activities.filter(a => !isSummary(a) || cost.kind === 'p6_xer')
+  const work = input.activities.filter(a => !isSummary(a) || isP6Cost(cost.kind))
   const byCode = new Map(work.map(a => [a.activityId, a]))
 
   // The baseline plan: every activity code the baseline budgets, with its baseline dates.
@@ -419,7 +421,7 @@ export function computeEvm(input: EvmInput): EvmAnalysis {
       pv: fileBcwsAll ? 'The file\'s own BCWS (MS Project / sheet), stated for every budgeted activity against the file\'s baseline.'
         : `Time-phased from the baseline budget: spread linearly over the working days of each activity's calendar between its baseline start and finish, summed for the working days before the data date ${fmtDate(dd)}.`,
       ev: `Baseline budget × percent complete. ${cost.evMethod} Completed activities earn 100%; level-of-effort activities earn their planned value.`,
-      ac: ac == null ? 'Not available.' : cost.kind === 'p6_xer' ? 'Actual cost to date: P6 resource assignment actual regular + overtime cost plus expense actual cost.' : cost.kind === 'ms_xml' ? 'Actual cost to date: MS Project Actual Cost.' : "Actual cost to date: the sheet's actual cost column.",
+      ac: ac == null ? 'Not available.' : isP6Cost(cost.kind) ? 'Actual cost to date: P6 resource assignment actual regular + overtime cost plus expense actual cost.' : cost.kind === 'ms_xml' ? 'Actual cost to date: MS Project Actual Cost.' : "Actual cost to date: the sheet's actual cost column.",
       es: 'Earned schedule: the day on which the baseline\'s cumulative planned value equals EV (interpolated), measured in calendar days from the baseline start; SPI(t) = ES ÷ AT, SV(t) = ES − AT.',
     },
     metrics, earnedSchedule, wbs, activities: rows, curve, checks, notes,

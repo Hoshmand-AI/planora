@@ -243,7 +243,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   for (const t of notModeled) {
     const [entity, severity] = TABLE_ENTITY[t] ?? ['other', 'info']
     ex.add({ severity, entity, field: t, disposition: 'preserved_in_raw', count: tables[t].length, examples: tables[t].map(rowKey),
-      message: `${TABLE_LABELS[t] ? `${TABLE_LABELS[t][0].toUpperCase()}${TABLE_LABELS[t].slice(1)}` : `Table ${t}`}: not used by Planora; kept in the original file and in this upload's P6 (.xer) export, not in the MS Project, Excel or CSV exports` })
+      message: `${TABLE_LABELS[t] ? `${TABLE_LABELS[t][0].toUpperCase()}${TABLE_LABELS[t].slice(1)}` : `Table ${t}`}: ${EV_ONLY_TABLES.has(t) ? 'read only for earned value (from the stored file), not otherwise imported' : 'not used by Planora'}; kept in the original file and in this upload's P6 (.xer) export, not in the MS Project, Excel or CSV exports` })
   }
   // Fields of the tables Planora reads that carry data it does not map.
   for (const [table, read] of Object.entries(READ_FIELDS)) {
@@ -258,8 +258,9 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
         message: FIELD_NOTES[`${table}.${f}`] ?? 'Field not mapped by Planora; kept in the original file and in this upload\'s P6 (.xer) export' })
     }
   }
-  if (notModeled.length) {
-    warnings.push(`Not used in Planora's analysis: ${notModeled.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
+  const unused = notModeled.filter(t => !EV_ONLY_TABLES.has(t))
+  if (unused.length) {
+    warnings.push(`Not used in Planora's analysis: ${unused.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
   }
 
   /* ── Scheduling options (P6 SCHEDOPTIONS) ─────────────── */
@@ -334,6 +335,8 @@ export function isPlanoraXer(content: string): boolean {
   return cols[0].trim() === 'ERMHDR' && cols[5]?.trim() === 'Planora'
 }
 
+/** Tables earned value reads from the stored original file (./costs.ts); the schedule import does not carry them. */
+const EV_ONLY_TABLES = new Set(['PROJCOST', 'CURRTYPE'])
 const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS', 'RSRC', 'RSRCRATE', 'TASKRSRC', 'UMEASURE'])
 
 /** Fields the importer reads from the tables it models; anything else with a value is reported. */

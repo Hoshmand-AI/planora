@@ -42,10 +42,19 @@ ERMHDR	19.12	2026-03-16	Project	admin	admin	dbxDatabaseNoName	Project Management
 %F	rsrc_id	rsrc_short_name	rsrc_name	rsrc_type
 %R	501	EXC	Excavator crew	RT_Equip
 %R	502	IW	Ironworkers	RT_Labor
+%T	RSRCRATE
+%F	rsrc_rate_id	rsrc_id	max_qty_per_hr	cost_per_qty	start_date
+%R	1	501	1	150	2026-01-01 00:00
+%R	2	502	6	75	2026-01-01 00:00
+%R	3	502	8	80	2026-06-01 00:00
 %T	TASKRSRC
-%F	taskrsrc_id	task_id	proj_id	rsrc_id	target_qty
-%R	1	1003	1	501	100
-%R	2	1006	1	502	960
+%F	taskrsrc_id	task_id	proj_id	rsrc_id	target_qty	act_reg_qty	act_ot_qty	remain_qty	target_qty_per_hr	target_cost	act_reg_cost	act_ot_cost	remain_cost
+%R	1	1003	1	501	100	40	0	60	1	15000	6500	0	9000
+%R	2	1006	1	502	960	0	0	960	8	72000	0	0	72000
+%R	3	1002	1	502	80	76	6	0	2	6000	5700	600	0
+%T	PROJCOST
+%F	cost_item_id	task_id	proj_id	cost_name	target_cost	act_cost	remain_cost
+%R	1	1004	1	Formwork rental	2500	0	2500
 %T	ACTVTYPE
 %F	actv_code_type_id	actv_code_type	proj_id
 %R	701	Area	1

@@ -42,7 +42,7 @@ export interface ResourceAssignment {
 }
 
 export interface ResourceData {
-  source: 'p6_xer' | 'ms_xml' | 'excel' | 'csv' | 'plan'
+  source: 'p6_xer' | 'p6_xml' | 'ms_xml' | 'excel' | 'csv' | 'plan'
   resources: ScheduleResource[]
   assignments: ResourceAssignment[]
   /** What the reader assumed or skipped, in plain words */

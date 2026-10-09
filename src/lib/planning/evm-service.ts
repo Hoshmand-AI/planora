@@ -5,7 +5,7 @@
 
 import type { Activity, Schedule } from '@/lib/db'
 import type { ResolvedBaseline } from '@/lib/analysis/baseline'
-import { costDataFromFile, type CostData } from '@/lib/parsers/costs'
+import { costDataFromFile, isP6Cost, type CostData } from '@/lib/parsers/costs'
 import { computeEvm, evmSeries, type EvmAnalysis, type EvmCostInput, type EvmInput, type EvmSeries } from '@/lib/analysis/evm'
 import { orderSeries } from '@/lib/analysis/compare'
 import { loadScheduleData, loadSeriesUpdates, remeasureSeries, type ScheduleBasis } from './service'
@@ -76,16 +76,16 @@ export async function baselineBudgetFor(
       byCode[code] = v
     }
     if (!Object.keys(byCode).length) return null
-    return { byCode, basis: `the budget of the Baseline upload "${baseline.label ?? ''}" (${fromBaseline ? 'its baseline cost' : cost.kind === 'p6_xer' ? 'P6 budgeted cost of resource assignments and expenses' : 'its planned cost'})` }
+    return { byCode, basis: `the budget of the Baseline upload "${baseline.label ?? ''}" (${fromBaseline ? 'its baseline cost' : isP6Cost(cost.kind) ? 'P6 budgeted cost of resource assignments and expenses' : 'its planned cost'})` }
   }
   if (baseline.source === 'p6_embedded') {
     const own = ctx.embeddedOwner
     const byCode = own?.cost && own.projectId ? own.cost.budgetByProjectCode?.[own.projectId] : undefined
     if (!byCode || !Object.keys(byCode).length) return null
-    return { byCode: { ...byCode }, basis: `the budgeted cost (resource assignments and expenses) of the P6 project baseline "${baseline.label ?? ''}" embedded in the XER` }
+    return { byCode: { ...byCode }, basis: `the budgeted cost (resource assignments and expenses) of the P6 project baseline "${baseline.label ?? ''}" embedded in the file` }
   }
   if (baseline.source === 'file' && ctx.current) {
-    const p6 = ctx.current.kind === 'p6_xer'
+    const p6 = isP6Cost(ctx.current.kind)
     const byCode: Record<string, number> = {}
     for (const [code, r] of Object.entries(ctx.current.byCode)) {
       const v = p6 ? r.budget : r.baselineBudget

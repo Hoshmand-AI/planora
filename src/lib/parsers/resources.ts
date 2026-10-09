@@ -1,11 +1,13 @@
 // Resource and assignment readers for the schedule parsers: P6 XER (RSRC, RSRCRATE, TASKRSRC, UMEASURE),
-// MS Project XML (Resources, Assignments) and spreadsheet resource columns. Kept apart from the
+// P6 XML (Resource, ResourceRate, ResourceAssignment, UnitOfMeasure), MS Project XML (Resources,
+// Assignments) and spreadsheet resource columns. Kept apart from the
 // parsers themselves so each parser only hands its tables / XML / rows over. Nothing is invented:
 // a file without resources gives null.
 
 import type { Activity } from '@/lib/db'
 import type { ResourceAssignment, ResourceData, ResourceKind, ScheduleResource } from '@/lib/planning/resource-types'
 import { round2 } from './types'
+import { children, childText, type XNode } from './xml-tree'
 
 type Row = Record<string, string>
 
@@ -81,6 +83,78 @@ export function xerResourceData(tables: Record<string, Row[]>, tasks: Map<string
   }
   resources.sort((a, b) => a.code.localeCompare(b.code))
   return { source: 'p6_xer', resources, assignments, notes }
+}
+
+/* ─── P6 XML ──────────────────────────────────────────────── */
+
+const P6XML_KIND: Record<string, ResourceKind> = { labor: 'labor', nonlabor: 'nonlabor', material: 'material' }
+
+/**
+ * Resources and assignments of the imported project from a P6 XML (PMXML) document, with the XER
+ * semantics: `tasks` maps Activity ObjectId to the parsed activity; Resource ObjectId is the resource
+ * id (as XER rsrc_id); max units per hour come from ResourceRate MaxUnitsPerTime (the rate in effect
+ * on the data date, else the earliest; else the Resource's own MaxUnitsPerTime); PlannedUnits is the
+ * budget, ActualRegularUnits + ActualOvertimeUnits (else ActualUnits) the actual and RemainingUnits the
+ * remaining units.
+ */
+export function p6XmlResourceData(root: XNode, project: XNode, tasks: Map<string, Activity>, dataDate: string | null): ResourceData | null {
+  const rows = [...children(project, 'ResourceAssignment'), ...children(root, 'ResourceAssignment')]
+  if (!rows.length) return null
+  const notes: string[] = []
+  const rsrcNodes = new Map<string, XNode>()
+  for (const r of children(root, 'Resource')) { const id = childText(r, 'ObjectId'); if (id && !rsrcNodes.has(id)) rsrcNodes.set(id, r) }
+  const units = new Map<string, string>()
+  for (const u of children(root, 'UnitOfMeasure')) if (childText(u, 'ObjectId')) units.set(childText(u, 'ObjectId'), childText(u, 'Abbreviation') || childText(u, 'Name'))
+  const rates = new Map<string, XNode[]>()
+  for (const r of children(root, 'ResourceRate')) { const id = childText(r, 'ResourceObjectId'); if (id) rates.set(id, [...(rates.get(id) || []), r]) }
+  const maxOf = (rsrcId: string): number | null => {
+    const list = (rates.get(rsrcId) || []).slice().sort((a, b) => childText(a, 'EffectiveDate').localeCompare(childText(b, 'EffectiveDate')))
+    const dd = dataDate || ''
+    const inEffect = list.length ? ([...list].reverse().find(r => !childText(r, 'EffectiveDate') || !dd || childText(r, 'EffectiveDate').slice(0, 10) <= dd) || list[0]) : rsrcNodes.get(rsrcId)
+    const v = num(childText(inEffect, 'MaxUnitsPerTime'))
+    return v !== null && v > 0 ? v : null
+  }
+
+  const assignments: ResourceAssignment[] = []
+  const used = new Set<string>()
+  let roleOnly = 0, otherProject = 0
+  for (const r of rows) {
+    const act = tasks.get(childText(r, 'ActivityObjectId'))
+    if (!act) { otherProject++; continue }
+    const rid = childText(r, 'ResourceObjectId')
+    if (!rid) { roleOnly++; continue }
+    const target = num(childText(r, 'PlannedUnits')) ?? 0
+    const reg = num(childText(r, 'ActualRegularUnits')), ot = num(childText(r, 'ActualOvertimeUnits'))
+    const actual = reg !== null || ot !== null ? (reg ?? 0) + (ot ?? 0) : num(childText(r, 'ActualUnits')) ?? 0
+    const done = act.status === 'complete' || !!act.actualFinish
+    const rem = num(childText(r, 'RemainingUnits'))
+    assignments.push({
+      activityId: act.id, sourceKey: act.sourceId ?? childText(r, 'ActivityObjectId'), activityCode: act.activityId, resourceId: rid,
+      budgetUnits: round2(target), actualUnits: round2(actual),
+      remainingUnits: round2(rem !== null ? Math.max(0, rem) : done ? 0 : Math.max(0, target - actual)),
+      unitsPerHour: num(childText(r, 'RemainingUnitsPerTime')) || num(childText(r, 'PlannedUnitsPerTime')) || null,
+    })
+    used.add(rid)
+  }
+  if (otherProject) notes.push(`${otherProject} ResourceAssignment${otherProject === 1 ? ' belongs' : 's belong'} to activities of another project in the file and ${otherProject === 1 ? 'was' : 'were'} not imported.`)
+  if (roleOnly) notes.push(`${roleOnly} assignment${roleOnly === 1 ? ' is' : 's are'} to a role with no resource; roles are not loaded.`)
+  if (!assignments.length) return null
+
+  const resources: ScheduleResource[] = []
+  for (const id of used) {
+    const r = rsrcNodes.get(id)
+    if (!r) notes.push(`Resource ${id} is assigned but not in the file's resources; shown by its id.`)
+    const kind = P6XML_KIND[childText(r, 'ResourceType').toLowerCase().replace(/[^a-z]/g, '')] ?? 'labor'
+    resources.push({
+      id, code: childText(r, 'Id') || `RSRC-${id}`, name: childText(r, 'Name') || childText(r, 'Id') || `Resource ${id}`,
+      kind,
+      unit: kind === 'material' ? (units.get(childText(r, 'UnitOfMeasureObjectId')) || null) : 'h',
+      maxUnitsPerHour: maxOf(id),
+      calendarId: childText(r, 'CalendarObjectId') || null,
+    })
+  }
+  resources.sort((a, b) => a.code.localeCompare(b.code))
+  return { source: 'p6_xml', resources, assignments, notes }
 }
 
 /* ─── MS Project XML ─────────────────────────────────────── */

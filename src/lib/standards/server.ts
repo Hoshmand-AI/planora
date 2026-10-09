@@ -3,10 +3,9 @@
 
 import type { OrgSettings } from '@/lib/server/settings'
 import { ApiError } from '@/lib/server/api'
-import { getScheduleFile, getScheduleRiskInputs } from '@/lib/db'
+import { getScheduleRiskInputs } from '@/lib/db'
 import { loadScheduleData, type ScheduleBasis } from '@/lib/planning/service'
-import { xerResourceCounts } from '@/lib/parsers/xer-parser'
-import { decodeXer } from '@/lib/parsers/xer-codec'
+import { scheduleResourceCounts } from '@/lib/planning/resource-service'
 import { normalizeFrameworkList } from './config'
 import { engineConfig } from './engine'
 import { scheduleStandardsInput } from './inputs'
@@ -37,12 +36,9 @@ export async function loadScheduleStandardsInput(id: string, orgId: string, basi
   const data = await loadScheduleData(id, orgId, { basis })
   if (!data) return null
   const { schedule } = data
-  // P6 resource assignments (TASKRSRC) are read from the original file, as on the Quality page.
-  let resourceCounts: Record<string, number> | null = null
-  if (schedule.sourceType === 'p6_xer') {
-    const f = await getScheduleFile(schedule.id, orgId).catch(() => undefined)
-    if (f) resourceCounts = xerResourceCounts(decodeXer(f.content).text)
-  }
+  // Resource assignments are read from the original file, as on the Quality page: P6 XER / P6 XML
+  // assignment rows, MS Project Assignments, spreadsheet resource columns (GAO best practice 3).
+  const resourceCounts = await scheduleResourceCounts(schedule, orgId, data.activities).catch(() => null)
   const risk = await getScheduleRiskInputs(schedule.id, orgId).catch(() => null)
   const hasRisk = !!risk && (risk.ranges.length + risk.events.length + risk.commitments.length) > 0
   return {
