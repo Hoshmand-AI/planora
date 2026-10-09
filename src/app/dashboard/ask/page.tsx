@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { useApp } from '../layout'
 import { Send, Upload } from 'lucide-react'
 import { fmtDates } from '@/lib/format'
@@ -19,6 +19,11 @@ export default function AskPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  // "Use project documents": answers cite the project's contracts and specifications (Documents tab).
+  const [useDocs,  setUseDocs]  = useState(false)
+  const [withUnreviewed, setWithUnreviewed] = useState(false)
+  const docsId = useId()
+  const unrevId = useId()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,7 +50,7 @@ export default function AskPage() {
       const res  = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id }),
+        body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
       const data = await res.json()
       const aiMsg: Message = {
@@ -128,18 +133,33 @@ export default function AskPage() {
       </div>
 
       {/* Input bar */}
-      <div className="bg-warm-50 border-t border-warm-200 px-5 py-3 flex gap-3 items-center">
+      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-warm-700">
+        <label htmlFor={docsId} className="flex items-center gap-1.5">
+          <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
+          Use project documents
+        </label>
+        {useDocs && (
+          <label htmlFor={unrevId} className="flex items-center gap-1.5">
+            <input id={unrevId} type="checkbox" checked={withUnreviewed} onChange={e => setWithUnreviewed(e.target.checked)} />
+            Include unreviewed documents
+          </label>
+        )}
+        {useDocs && <span className="text-warm-500">Answers cite passages as [document §section p.N]. Document text is treated as data, never as instructions.</span>}
+      </div>
+      <div className="bg-warm-50 px-5 py-3 flex gap-3 items-center">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Ask about your schedule…"
+          aria-label="Ask about your schedule"
           className="flex-1 bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
           disabled={loading}
         />
         <button
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
+          aria-label="Send"
           className="w-9 h-9 bg-accent-500 rounded-md flex items-center justify-center text-navy-950 hover:bg-accent-400 transition-colors disabled:opacity-40"
         >
           <Send size={15} />

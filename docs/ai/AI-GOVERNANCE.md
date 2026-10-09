@@ -18,6 +18,7 @@ Aligned with the NIST AI Risk Management Framework (Govern, Map, Measure, Manage
 - **Organization switch:** AI on or off. When off, nothing is sent to any model.
 - **"Can't share" answers:** never sent. Tested in `src/lib/server/security.test.ts` (brief, generated schedule, coercion).
 - **Air-gapped deployments:** only private or allowlisted model hosts are allowed (`isAllowedAirgapHost`).
+- **Project documents (retrieval-augmented answers):** passages from customer documents are sent only as delimited, untrusted data with provenance; passages flagged for prompt-injection text are never sent; every citation in an answer is checked against the passages actually retrieved and invented ones are removed; CUI/classified passages never go to an external model. Retrieval is scoped in SQL to the caller's organization, project and workspaces, and logged with ids and a query hash only. Candidate requirements extracted from documents are rule-based and never applied automatically. See [../privacy/PROJECT-DOCUMENTS.md](../privacy/PROJECT-DOCUMENTS.md).
 - **Request logging:** every request is logged as `ai.request` with model, purpose, character counts, latency, success and SHA-256 of the prompt. The content itself is never logged.
 
 ## Spend and abuse

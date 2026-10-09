@@ -12,6 +12,8 @@ import { loadProvenance } from '@/lib/export/provenance'
 import { fmtDates } from '@/lib/format'
 import { exportMarking, markText } from '@/lib/export/markings'
 import { scheduleClassification } from '@/lib/server/classification'
+import { reportGrounding } from '@/lib/rag/answer'
+import { projectClassification, projectScope } from '@/lib/rag/scope'
 
 const REPORT_TYPES = Object.keys(REPORT_TITLES) as ReportType[]
 
@@ -64,7 +66,14 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
     linkFloat: data.cpm?.linkFloat ?? null,
   }
 
-  const generated = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison, evidence })
+  // "Use project documents": passages go to the model only when allowed (CUI guard, no flagged text);
+  // otherwise they are listed in the report without generation. See src/lib/rag/answer.ts.
+  const docs = body?.useDocuments === true
+    ? await reportGrounding(String(reportType), { scope: (await projectScope(auth.orgId, schedule.id)).scope, includeUnreviewed: body?.includeUnreviewed === true, userId: auth.userId, projectClassification: await projectClassification(schedule.id, auth.orgId) })
+    : null
+  const raw = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison, evidence, grounding: docs?.grounding })
+  const grounded = docs ? await docs.finish(raw) : null
+  const generated = grounded ? grounded.report : raw
   // Edits made in Planora to the uploaded file are always listed (whether or not a model wrote the report).
   const edits = editsSection(data.edits, data.revertedEdits, basis === 'scenario')
   const withEdits = edits ? `${generated.trimEnd()}\n\n${edits}\n` : generated
@@ -77,6 +86,6 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   const classification = await scheduleClassification(schedule.id, auth.orgId).catch(() => 'classified' as const)
   const marking = exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name })
 
-  await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType, basis, editsApplied: basis === 'scenario' ? data.editsApplied : 0, sha256: evidence.provenance.sources[0]?.sha256 ?? null, release: evidence.provenance.release, marking: marking?.banner ?? null } })
-  return NextResponse.json({ success: true, reportType, basis, scheduleName: schedule.name, version: schedule.version, generatedAt: evidence.provenance.generatedAt, provenance: evidence.provenance, content: markText(fmtDates(report), marking), marking: marking ? { banner: marking.banner, designation: marking.designation } : null })
+  await audit({ action: 'schedule.report', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, reportType, basis, ...(grounded ? { projectDocuments: { mode: grounded.documents.mode, passages: grounded.documents.sources.length, flaggedExcluded: grounded.documents.flagged.length, citationsRemoved: grounded.documents.removedCitations } } : {}), editsApplied: basis === 'scenario' ? data.editsApplied : 0, sha256: evidence.provenance.sources[0]?.sha256 ?? null, release: evidence.provenance.release, marking: marking?.banner ?? null } })
+  return NextResponse.json({ success: true, reportType, basis, scheduleName: schedule.name, version: schedule.version, generatedAt: evidence.provenance.generatedAt, provenance: evidence.provenance, content: markText(fmtDates(report), marking), documents: grounded?.documents ?? null, marking: marking ? { banner: marking.banner, designation: marking.designation } : null })
 })

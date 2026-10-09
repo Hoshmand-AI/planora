@@ -90,6 +90,10 @@ jobs:
           curl -sf http://localhost:3000/api/health
       - name: End-to-end smoke test
         run: node scripts/e2e-smoke.mjs
+      - name: Project documents (retrieval, tenant isolation, injection, deletion)
+        run: |
+          node scripts/e2e-rag.mjs
+          RAG_TEST_DATABASE_URL="$DATABASE_URL" npx vitest run src/lib/rag/rag.db.test.ts
       - name: Backup and restore drill
         run: |
           node scripts/backup.mjs backups
