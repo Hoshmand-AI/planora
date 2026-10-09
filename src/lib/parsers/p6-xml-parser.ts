@@ -6,8 +6,10 @@
 //   days on the activity's calendar (lags on the predecessor's calendar, P6's default lag calendar);
 //   PlannedStart/Finish are the target dates (baseline fields, as XER target_start/end_date);
 //   PhysicalPercentComplete (else PercentComplete) is the progress, as XER phys_complete_pct.
-// Everything the file carries that Planora does not map (activity codes, UDFs, resources, notes,
-// other projects, baselines, unmapped fields) is listed in the import exception report.
+// Resources, resource rates and assignments are read for resource analysis (./resources.ts), and
+// assignment / expense costs for earned value (./costs.ts), with the XER semantics. Everything the file
+// carries that Planora does not use (activity codes, UDFs, roles, resource curves, notes, other
+// projects, baselines, unmapped fields) is listed in the import exception report.
 
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, ProgressMode, Weekday, WorkCalendar } from '@/lib/planning/types'
@@ -16,6 +18,7 @@ import { randomUUID as uuid } from 'crypto'
 import { ParsedSchedule, makeActivity, isoDatePrefix, round2, constraintFromLabel } from './types'
 import { ExceptionCollector, wasRounded, type ExceptionEntity, type ExceptionSeverity } from './exceptions'
 import { parseXmlTree, child, children, childText, XmlError, type XNode } from './xml-tree'
+import { p6XmlResourceData } from './resources'
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const yes = (v: string) => /^(true|1|y|yes)$/i.test(v.trim())
@@ -124,29 +127,29 @@ function parseCalendar(c: XNode, warnings: string[], ex: ExceptionCollector): { 
 /* ─── field coverage ────────────────────────────────────── */
 
 const READ_PROJECT = new Set(['ObjectId', 'Id', 'Name', 'DataDate', 'PlannedStartDate', 'StartDate', 'MustFinishByDate', 'ScheduledFinishDate', 'FinishDate', 'ActivityDefaultCalendarObjectId',
-  'CurrentBaselineProjectObjectId', 'LastRecalculationDate', 'Calendar', 'WBS', 'Activity', 'Relationship', 'ResourceAssignment', 'ScheduleOptions', 'ActivityCodeType', 'ActivityCode', 'UDF', 'ActivityNote', 'ProjectNote'])
+  'CurrentBaselineProjectObjectId', 'LastRecalculationDate', 'Calendar', 'WBS', 'Activity', 'Relationship', 'ResourceAssignment', 'ScheduleOptions', 'ActivityCodeType', 'ActivityCode', 'UDF', 'ActivityNote', 'ProjectNote',
+  'EarnedValueComputeType' /* earned value (./costs.ts) */])
 const READ_ACTIVITY = new Set(['ObjectId', 'Id', 'Name', 'Type', 'Status', 'CalendarObjectId', 'WBSObjectId', 'ProjectObjectId', 'PlannedDuration', 'RemainingDuration', 'AtCompletionDuration', 'ActualDuration',
   'PhysicalPercentComplete', 'PercentComplete', 'DurationPercentComplete', 'PercentCompleteType', 'PlannedStartDate', 'PlannedFinishDate', 'ActualStartDate', 'ActualFinishDate',
   'EarlyStartDate', 'EarlyFinishDate', 'RemainingEarlyStartDate', 'RemainingEarlyFinishDate', 'LateStartDate', 'LateFinishDate', 'StartDate', 'FinishDate', 'TotalFloat', 'FreeFloat',
   'PrimaryConstraintType', 'PrimaryConstraintDate', 'SecondaryConstraintType', 'SecondaryConstraintDate', 'DrivingPathFlag', 'IsLongestPath', 'IsCritical', 'Code', 'UDF',
-  'CalendarName', 'WBSCode', 'WBSName', 'ProjectId', 'GUID'])
+  'CalendarName', 'WBSCode', 'WBSName', 'ProjectId', 'GUID',
+  // units % complete for earned value (./costs.ts)
+  'ActualLaborUnits', 'ActualNonLaborUnits', 'RemainingLaborUnits', 'RemainingNonLaborUnits'])
 const READ_RELATIONSHIP = new Set(['ObjectId', 'PredecessorActivityObjectId', 'SuccessorActivityObjectId', 'Type', 'Lag', 'PredecessorProjectObjectId', 'SuccessorProjectObjectId',
   'PredecessorActivityId', 'SuccessorActivityId', 'PredecessorProjectId', 'SuccessorProjectId'])
 /** Values that carry no information (defaults P6 writes for every activity). */
 const EMPTYISH = /^(|0|0\.0+|false|<none>)$/i
 
 const ROOT_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity, string]> = {
-  Resource: ['resource', 'warning', 'Resources are not modeled'],
   Role: ['resource', 'info', 'Roles are not modeled'],
-  ResourceRate: ['resource', 'info', 'Resource rates are not modeled'],
-  ResourceAssignment: ['assignment', 'warning', 'Resource assignments are not modeled (counted for the DCMA resource check only)'],
   ActivityCodeType: ['code', 'warning', 'Activity code types are not modeled'],
   ActivityCode: ['code', 'warning', 'Activity code values are not modeled'],
   UDFType: ['udf', 'warning', 'User-defined field definitions are not modeled'],
   UDFValue: ['udf', 'warning', 'User-defined field values are not modeled'],
   BaselineProject: ['baseline', 'warning', 'Baseline projects other than the project\'s current baseline are not used'],
   CostAccount: ['other', 'info', 'Cost accounts are not modeled'],
-  Currency: ['other', 'info', 'Currencies are not modeled'],
+  Currency: ['other', 'info', 'Currencies: only the base currency symbol is read, for earned value'],
   EPS: ['other', 'info', 'EPS nodes are not modeled'],
   OBS: ['other', 'info', 'OBS nodes are not modeled'],
   FinancialPeriod: ['other', 'info', 'Financial periods are not modeled'],
@@ -157,13 +160,18 @@ const ROOT_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity, string]> 
   ResourceCode: ['code', 'info', 'Resource codes are not modeled'],
   UnitOfMeasure: ['other', 'info', 'Units of measure are not modeled'],
   ExpenseCategory: ['other', 'info', 'Expense categories are not modeled'],
-  ActivityExpense: ['other', 'info', 'Expenses are not modeled'],
+  ActivityExpense: ['other', 'info', 'Expenses are read only for earned value (from the stored file), not otherwise imported'],
+  ProjectExpense: ['other', 'info', 'Expenses are read only for earned value (from the stored file), not otherwise imported'],
   ActivityStep: ['activity', 'info', 'Activity steps are not modeled'],
   ActivityNote: ['activity', 'info', 'Activity notebooks are not modeled'],
   ProjectNote: ['project', 'info', 'Project / WBS notebooks are not modeled'],
   WBSMilestone: ['activity', 'info', 'WBS milestones are not modeled'],
   Risk: ['other', 'info', 'Risks are not modeled'],
 }
+/** Root elements the import reads (resources, rates, units of measure and assignments: resource analysis). */
+const READ_ROOT = new Set(['Project', 'Calendar', 'Relationship', 'Resource', 'ResourceRate', 'UnitOfMeasure', 'ResourceAssignment'])
+/** Elements earned value reads from the stored file; the schedule import and Planora's exports do not carry them. */
+const EV_ONLY = new Set(['ActivityExpense', 'ProjectExpense', 'Currency'])
 const ORIGINAL_ONLY = 'The original file is kept with the upload; this data is not used by Planora and is not written by its exports'
 
 /* ─── main ──────────────────────────────────────────────── */
@@ -291,7 +299,7 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     }
     if (status === 'complete' && pct === 0) pct = 100
     const pctType = childText(t, 'PercentCompleteType')
-    if (pctType && !/physical/i.test(pctType)) ex.add({ severity: 'warning', entity: 'activity', field: 'Activity.PercentCompleteType', disposition: 'converted', example: code, message: `Percent complete type ${pctType} is not modeled; Planora reads the physical % complete and the remaining duration` })
+    if (pctType && !/physical/i.test(pctType)) ex.add({ severity: 'info', entity: 'activity', field: 'Activity.PercentCompleteType', disposition: 'converted', example: code, message: `Percent complete type ${pctType}: earned value applies it; the schedule's progress (as for XER) is the physical % complete and the remaining duration` })
 
     const type = childText(t, 'Type').toLowerCase().replace(/\s+/g, '')
     let activityType: Activity['activityType'] = 'task'
@@ -401,8 +409,13 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
   }
   for (const [f, n] of relFields) ex.add({ severity: 'info', entity: 'relationship', field: `Relationship.${f}`, disposition: 'dropped', count: n, message: `Field not mapped by Planora; ${ORIGINAL_ONLY.toLowerCase()}` })
 
-  /* ── Resource assignments (counted, not modeled) ─────── */
+  /* ── Resources and assignments (resource analysis; counts for the DCMA resource check) ─ */
   const assignments = [...children(project, 'ResourceAssignment'), ...children(root, 'ResourceAssignment')].filter(r => byObjectId.has(childText(r, 'ActivityObjectId')))
+  const resources = p6XmlResourceData(root, project, byObjectId, dataDate)
+  const roleOnly = assignments.filter(r => !childText(r, 'ResourceObjectId'))
+  if (roleOnly.length) ex.add({ severity: 'info', entity: 'assignment', field: 'ResourceAssignment.RoleObjectId', disposition: 'dropped', count: roleOnly.length, examples: roleOnly.map(r => byObjectId.get(childText(r, 'ActivityObjectId'))!.activityId), message: `Assignments to a role with no resource are not loaded for resource analysis (they count for the DCMA resource check); ${ORIGINAL_ONLY.toLowerCase()}` })
+  const curved = assignments.filter(r => childText(r, 'ResourceCurveObjectId'))
+  if (curved.length) ex.add({ severity: 'info', entity: 'assignment', field: 'ResourceAssignment.ResourceCurveObjectId', disposition: 'dropped', count: curved.length, examples: curved.map(r => byObjectId.get(childText(r, 'ActivityObjectId'))!.activityId), message: `Resource curves are not modeled; resource analysis spreads each assignment's units evenly over the activity; ${ORIGINAL_ONLY.toLowerCase()}` })
   let resourceCounts: Record<string, number> | undefined
   if (assignments.length || children(project, 'ResourceAssignment').length) {
     resourceCounts = {}
@@ -441,13 +454,12 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     tally.set(name, t)
   }
   for (const n of root.children) {
-    if (n.name === 'Project' || n.name === 'Calendar' || n.name === 'Relationship') continue
+    if (READ_ROOT.has(n.name)) continue
     if (n.name === 'BaselineProject' && n === base) continue
-    if (n.name === 'ResourceAssignment' && !byObjectId.has(childText(n, 'ActivityObjectId'))) continue
     count(n.name, n)
   }
   for (const n of project.children) {
-    if (READ_PROJECT.has(n.name) && !['ResourceAssignment', 'ActivityCodeType', 'ActivityCode', 'UDF', 'ActivityNote', 'ProjectNote'].includes(n.name)) continue
+    if (READ_PROJECT.has(n.name) && !['ActivityCodeType', 'ActivityCode', 'UDF', 'ActivityNote', 'ProjectNote'].includes(n.name)) continue
     if (!n.children.length) {
       if (!EMPTYISH.test(n.text.trim())) count(`Project.${n.name}`, n)
       continue
@@ -456,16 +468,16 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
   }
   for (const [name, t] of tally) {
     const [entity, severity, message] = ROOT_ENTITY[name] ?? (name.startsWith('Project.') ? ['project', 'info', 'Project field not mapped by Planora'] : ['other', 'info', `Element <${name}> is not used by Planora`])
-    ex.add({ severity, entity, field: name, disposition: 'dropped', count: t.n, examples: t.examples, message: `${message}; ${ORIGINAL_ONLY.toLowerCase()}` })
+    ex.add({ severity, entity, field: name, disposition: 'dropped', count: t.n, examples: t.examples, message: `${message}; ${EV_ONLY.has(name) ? 'the original file is kept with the upload; Planora\'s exports do not write it' : ORIGINAL_ONLY.toLowerCase()}` })
   }
-  const notUsed = Array.from(tally.entries()).filter(([n]) => !n.startsWith('Project.'))
+  const notUsed = Array.from(tally.entries()).filter(([n]) => !n.startsWith('Project.') && !EV_ONLY.has(n))
   if (notUsed.length) warnings.push(`Not used in Planora's analysis: ${notUsed.map(([n, t]) => `${n} (${t.n})`).join('; ')}. They are kept in the original file but not in Planora's exports.`)
 
   return {
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,
     activities, relationships, calendars, defaultCalendarId, warnings,
     exceptions: ex.report(),
-    sourceType: 'p6_xml', embeddedBaseline, resourceCounts,
+    sourceType: 'p6_xml', embeddedBaseline, resourceCounts, resources,
   }
 }
 

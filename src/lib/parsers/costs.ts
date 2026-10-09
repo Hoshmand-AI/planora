@@ -11,6 +11,9 @@
 //               phys_complete_pct, durations or units for the percent EV earns; PROJECT ev_compute_type;
 //               the base currency from CURRTYPE. Budgets are also kept per project and activity code,
 //               so the P6 project baseline embedded in the same XER supplies its own budget.
+//   P6 XML      The same fields under their P6 XML names (ResourceAssignment PlannedCost / ActualRegularCost
+//               + ActualOvertimeCost / RemainingCost, ActivityExpense, Activity PercentCompleteType,
+//               Project EarnedValueComputeType, Currency), with the same semantics (p6XmlCostData).
 //   MS Project  Task Cost / ActualCost / RemainingCost / BCWS / BCWP / ACWP, Baseline (number 0) Cost,
 //   XML         PercentComplete / PhysicalPercentComplete with EarnedValueMethod; Assignment costs when
 //               a task carries none. MSPDI writes currency in hundredths (cents); values are divided by
@@ -22,8 +25,10 @@
 
 import { readXerTables } from './xer-parser'
 import { parseCsv } from './excel-parser'
+import { isP6Xml } from './p6-xml-parser'
+import { parseXmlTree, children, childText, type XNode } from './xml-tree'
 
-export type CostSourceKind = 'p6_xer' | 'ms_xml' | 'excel'
+export type CostSourceKind = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'excel'
 
 /** How an activity's percent complete is earned (EV = budget × percent). */
 export type EvPercentType = 'physical' | 'duration' | 'units' | 'zero_hundred' | 'fifty_fifty' | 'file_percent'
@@ -148,6 +153,120 @@ export function xerCostData(content: string): CostData | null {
   }
 }
 
+/* ─── P6 XML ──────────────────────────────────────────────── */
+
+/**
+ * The XER reading above applied to a P6 XML (PMXML) export: ResourceAssignment PlannedCost (budget),
+ * ActualRegularCost + ActualOvertimeCost (else ActualCost) and RemainingCost; ActivityExpense (or
+ * ProjectExpense) PlannedCost / ActualCost / RemainingCost; Activity PercentCompleteType with
+ * PhysicalPercentComplete, PlannedDuration / RemainingDuration or labor + nonlabor units; Project
+ * EarnedValueComputeType; the base currency (ExchangeRate 1). Records are keyed by Activity ObjectId
+ * (Activity.sourceId); budgets per project ObjectId and activity Id include BaselineProject elements,
+ * so the P6 project baseline exported with the project supplies its own budget.
+ */
+export function p6XmlCostData(content: string): CostData | null {
+  let root: XNode
+  try { root = parseXmlTree(content.replace(/^﻿/, '')) } catch { return null }
+  const projects = [...children(root, 'Project'), ...children(root, 'BaselineProject')]
+  const assignmentsOf = (p: XNode | null) => children(p, 'ResourceAssignment')
+  const expensesOf = (p: XNode | null) => [...children(p, 'ActivityExpense'), ...children(p, 'ProjectExpense')]
+  const rsrc = [...assignmentsOf(root), ...projects.flatMap(assignmentsOf)]
+  const exp = [...expensesOf(root), ...projects.flatMap(expensesOf)]
+  if (!rsrc.length && !exp.length) return null
+  const notes: string[] = []
+  const main = children(root, 'Project').find(p => children(p, 'Activity').length) ?? children(root, 'Project')[0]
+  const evCompute = childText(main, 'EarnedValueComputeType')
+  const ec = evCompute.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const technique: EvPercentType | null = ec === '0100' ? 'zero_hundred' : ec === '5050' ? 'fifty_fifty' : null
+  if (evCompute && !technique && ec !== 'activitypercentcomplete') notes.push(`The project's P6 earned value technique (${evCompute}) is not modeled; activity percent complete is used.`)
+
+  const sums = new Map<string, { budget: number | null; actual: number | null; remaining: number | null }>()
+  const sumInto = (actId: string, budget: number | null, actual: number | null, remaining: number | null) => {
+    const s = sums.get(actId) ?? { budget: null, actual: null, remaining: null }
+    s.budget = add(s.budget, budget); s.actual = add(s.actual, actual); s.remaining = add(s.remaining, remaining)
+    sums.set(actId, s)
+  }
+  const has = (n: XNode, f: string) => n.children.some(c => c.name === f)
+  const hasActualCol = rsrc.some(r => has(r, 'ActualRegularCost') || has(r, 'ActualCost')) || exp.some(r => has(r, 'ActualCost'))
+  const hasRemainCol = rsrc.some(r => has(r, 'RemainingCost')) || exp.some(r => has(r, 'RemainingCost'))
+  for (const r of rsrc) {
+    const id = childText(r, 'ActivityObjectId')
+    if (!id) continue
+    const split = has(r, 'ActualRegularCost') || has(r, 'ActualOvertimeCost')
+    sumInto(id, num(childText(r, 'PlannedCost')) ?? 0, split ? add(num(childText(r, 'ActualRegularCost')), num(childText(r, 'ActualOvertimeCost'))) : num(childText(r, 'ActualCost')), num(childText(r, 'RemainingCost')))
+  }
+  for (const r of exp) {
+    const id = childText(r, 'ActivityObjectId')
+    if (id) sumInto(id, num(childText(r, 'PlannedCost')) ?? 0, num(childText(r, 'ActualCost')), num(childText(r, 'RemainingCost')))
+  }
+
+  const bySource: Record<string, ActivityCostRecord> = {}
+  const budgetByProjectCode: Record<string, Record<string, number>> = {}
+  const known = new Set<string>()
+  for (const p of projects) {
+    const acts = children(p, 'Activity')
+    const pid = childText(p, 'ObjectId')
+    const isBaseline = p.name === 'BaselineProject'
+    // Percentages: P6 XML writes fractions (0.4 = 40%); a project with any value above 1 is read as 0–100.
+    const pctScale = acts.some(a => ['PhysicalPercentComplete', 'PercentComplete', 'DurationPercentComplete'].some(f => (parseFloat(childText(a, f)) || 0) > 1)) ? 1 : 100
+    for (const a of acts) {
+      const id = childText(a, 'ObjectId')
+      if (!id) continue
+      known.add(id)
+      const s = sums.get(id)
+      const budget = s?.budget ?? 0
+      const code = childText(a, 'Id')
+      if (code) (budgetByProjectCode[pid] ??= {})[code] = round2(budget)
+      if (isBaseline) continue
+      const st = childText(a, 'Status').toLowerCase().replace(/\s+/g, '')
+      const complete = st === 'completed'
+      const started = complete || st === 'inprogress' || !!childText(a, 'ActualStartDate')
+      const type = childText(a, 'PercentCompleteType').toLowerCase()
+      let evPercent: number
+      let evPercentType: EvPercentType
+      if (technique === 'zero_hundred') { evPercentType = 'zero_hundred'; evPercent = complete ? 100 : 0 }
+      else if (technique === 'fifty_fifty') { evPercentType = 'fifty_fifty'; evPercent = complete ? 100 : started ? 50 : 0 }
+      else if (type.startsWith('duration')) {
+        evPercentType = 'duration'
+        const od = num(childText(a, 'PlannedDuration')) ?? 0, rd = num(childText(a, 'RemainingDuration')) ?? od
+        evPercent = complete ? 100 : od > 0 ? clampPct((100 * (od - rd)) / od) : 0
+      } else if (type.startsWith('units')) {
+        evPercentType = 'units'
+        const act = (num(childText(a, 'ActualLaborUnits')) ?? 0) + (num(childText(a, 'ActualNonLaborUnits')) ?? 0)
+        const rem = (num(childText(a, 'RemainingLaborUnits')) ?? 0) + (num(childText(a, 'RemainingNonLaborUnits')) ?? 0)
+        evPercent = complete ? 100 : act + rem > 0 ? clampPct((100 * act) / (act + rem)) : 0
+      } else {
+        evPercentType = 'physical'
+        evPercent = complete ? 100 : clampPct((num(childText(a, 'PhysicalPercentComplete')) ?? 0) * pctScale)
+      }
+      bySource[id] = {
+        code: code || null,
+        budget: round2(budget), baselineBudget: null,
+        actualCost: hasActualCol ? round2(s?.actual ?? 0) : null,
+        remainingCost: hasRemainCol ? round2(s?.remaining ?? 0) : null,
+        fileBcws: null, fileBcwp: null, fileAcwp: null,
+        evPercent: round2(evPercent), evPercentType,
+      }
+    }
+  }
+  const orphans = [...sums.keys()].filter(k => !known.has(k)).length
+  if (orphans) notes.push(`${orphans} resource assignment or expense row${orphans === 1 ? '' : 's'} reference an activity not in the file and are left out.`)
+  const currencies = children(root, 'Currency')
+  const curr = currencies.find(c => num(childText(c, 'ExchangeRate')) === 1) ?? currencies[0]
+  return {
+    kind: 'p6_xml', bySource, budgetByProjectCode,
+    fields: { budget: true, baselineBudget: false, actualCost: hasActualCol, remainingCost: hasRemainCol, fileBcws: false, fileBcwp: false },
+    currency: { code: childText(curr, 'Id') || null, symbol: childText(curr, 'Symbol') || null },
+    evMethod: technique === 'zero_hundred' ? 'P6 0/100 technique: an activity earns its budget only when complete.'
+      : technique === 'fifty_fifty' ? 'P6 50/50 technique: half the budget at the actual start, the rest at completion.'
+      : "Each activity's P6 percent complete type: physical % complete, duration % complete ((original − remaining) ÷ original duration) or units % complete (actual ÷ at-completion units).",
+    notes,
+  }
+}
+
+/** P6 cost data (XER or P6 XML): budgets come from resource assignments and expenses. */
+export const isP6Cost = (kind: CostSourceKind | null | undefined) => kind === 'p6_xer' || kind === 'p6_xml'
+
 /* ─── MS Project XML ─────────────────────────────────────── */
 
 function blocks(xml: string, tag: string): string[] {
@@ -247,6 +366,12 @@ const COST_LOOKUP = new Map<string, CostField>()
 for (const [f, list] of Object.entries(COST_SYNONYMS) as [CostField, string[]][]) for (const s of list) COST_LOOKUP.set(s, f)
 const normH = (h: string) => h.toLowerCase().replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').replace(/%/g, 'pct').replace(/[^a-z0-9]/g, '')
 
+/** True when a spreadsheet column header is one of the cost columns earned value reads (not the activity code). */
+export function isCostColumn(label: string): boolean {
+  const f = COST_LOOKUP.get(normH(label))
+  return !!f && f !== 'code'
+}
+
 type Cell = string | number | boolean | Date | null
 const cellStr = (v: Cell): string => (v == null ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).trim())
 /** "$1,234.50" / "(1,000)" / 1234.5 → number; null when blank or not a number. */
@@ -290,7 +415,10 @@ export async function costDataFromFile(fileName: string, content: Buffer): Promi
     const { decodeXer } = await import('./xer-codec')
     return xerCostData(decodeXer(content).text)
   }
-  if (ext === '.xml') return mspCostData(new TextDecoder('utf-8').decode(content))
+  if (ext === '.xml' || ext === '.pmxml') {
+    const text = new TextDecoder('utf-8').decode(content)
+    return isP6Xml(text) ? p6XmlCostData(text) : ext === '.xml' ? mspCostData(text) : null
+  }
   if (ext === '.csv') {
     let s: string
     try { s = new TextDecoder('utf-8', { fatal: true }).decode(content) } catch { s = content.toString('latin1') }

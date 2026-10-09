@@ -223,9 +223,10 @@ const MSP_TASK_READ = new Set(['UID', 'ID', 'Name', 'OutlineLevel', 'IsNull', 'S
   'GUID', 'CreateDate', 'Type', 'DurationFormat', 'ActualDuration', 'Estimated', 'Active', 'Manual', 'ManualStart', 'ManualFinish', 'ManualDuration', 'StartText', 'FinishText',
   'PercentWorkComplete', 'PhysicalPercentComplete', 'StartSlack', 'FinishSlack', 'IgnoreResourceCalendar', 'CalendarName'])
 const MSP_EMPTYISH = /^(|0|0\.0+|-1|PT0H0M0S|false)$/i
+// Resources and Assignments are not listed here: resource analysis reads them (./resources.ts) and
+// earned value reads their costs (./costs.ts). The parts neither uses are reported by
+// resourceExceptions below.
 const MSP_COLLECTIONS: [string, string, ExceptionEntity, ExceptionSeverity, string][] = [
-  ['Resources', 'Resource', 'resource', 'warning', 'Resources are not modeled'],
-  ['Assignments', 'Assignment', 'assignment', 'warning', 'Resource assignments are not modeled'],
   ['OutlineCodes', 'OutlineCode', 'code', 'warning', 'Outline code definitions are not modeled'],
   ['WBSMasks', 'WBSMask', 'other', 'info', 'WBS code masks are not modeled'],
   ['Views', 'View', 'other', 'info', 'Views are not imported'],
@@ -235,6 +236,36 @@ const MSP_COLLECTIONS: [string, string, ExceptionEntity, ExceptionSeverity, stri
   ['Maps', 'Map', 'other', 'info', 'Import/export maps are not imported'],
   ['Reports', 'Report', 'other', 'info', 'Reports are not imported'],
 ]
+
+/**
+ * The parts of <Resources> / <Assignments> that resource analysis and earned value do not use:
+ * resource calendars that are not kept (not base calendars and used by no task), cost rate tables and
+ * dated rate changes, availability periods, timephased assignment data and work contours.
+ */
+function resourceExceptions(xml: string, keptCalendars: Set<string>, ex: ExceptionCollector) {
+  const resources = allBlocks(firstBlock(xml, 'Resources') || '', 'Resource')
+    .map(b => ({ b, own: stripBlocks(b, ['Baseline', 'ExtendedAttribute', 'AvailabilityPeriods', 'Rates', 'TimephasedData', 'WorkingTimes']) }))
+    .filter(r => tagText(r.own, 'UID') !== '0' && tagText(r.own, 'IsNull') !== '1')
+  const label = (r: { own: string }) => tagText(r.own, 'Name') || tagText(r.own, 'UID')
+  const ownCal = resources.filter(r => { const c = tagText(r.own, 'CalendarUID'); return c && c !== '-1' && !keptCalendars.has(c) })
+  if (ownCal.length) ex.add({ severity: 'info', entity: 'resource', field: 'Resource.CalendarUID', disposition: 'dropped', count: ownCal.length, examples: ownCal.map(label), message: 'Resource calendars (other than base calendars) are not kept; resource analysis uses the project and activity calendars for these resources' })
+  // MS Project writes rate tables A–E for every resource; only tables B–E with a rate, or more than
+  // one dated rate in table A, carry anything beyond the costs it already calculated.
+  const rated = resources.filter(r => {
+    const rates = allBlocks(firstBlock(r.b, 'Rates') || '', 'Rate')
+    const priced = (x: string) => ['StandardRate', 'OvertimeRate', 'CostPerUse'].some(f => (parseFloat(tagText(x, f)) || 0) !== 0)
+    return rates.filter(x => (tagText(x, 'RateTable') || '0') === '0').length > 1 || rates.some(x => (tagText(x, 'RateTable') || '0') !== '0' && priced(x))
+  })
+  if (rated.length) ex.add({ severity: 'info', entity: 'resource', field: 'Resource.Rates', disposition: 'dropped', count: rated.length, examples: rated.map(label), message: 'Cost rate tables and dated rate changes are not used; earned value reads the costs MS Project calculated (task and assignment cost fields)' })
+  const avail = resources.filter(r => allBlocks(firstBlock(r.b, 'AvailabilityPeriods') || '', 'AvailabilityPeriod').length > 1)
+  if (avail.length) ex.add({ severity: 'info', entity: 'resource', field: 'Resource.AvailabilityPeriods', disposition: 'dropped', count: avail.length, examples: avail.map(label), message: 'Availability that changes over time is not modeled; resource analysis uses the resource\'s Max Units' })
+  const asg = allBlocks(firstBlock(xml, 'Assignments') || '', 'Assignment').filter(b => tagText(b, 'ResourceUID') !== '-1' && tagText(b, 'ResourceUID') !== '-65535')
+  const asgLabel = (b: string) => `Task ${tagText(b, 'TaskUID')} / resource ${tagText(b, 'ResourceUID')}`
+  const phased = asg.filter(b => /<TimephasedData[\s>]/.test(b))
+  if (phased.length) ex.add({ severity: 'info', entity: 'assignment', field: 'Assignment.TimephasedData', disposition: 'dropped', count: phased.length, examples: phased.map(asgLabel), message: 'Timephased assignment work is not used; resource analysis spreads each assignment\'s work evenly over the activity\'s working days' })
+  const contoured = asg.filter(b => { const c = tagText(stripBlocks(b, ['Baseline', 'TimephasedData', 'ExtendedAttribute']), 'WorkContour'); return c !== '' && c !== '0' })
+  if (contoured.length) ex.add({ severity: 'info', entity: 'assignment', field: 'Assignment.WorkContour', disposition: 'converted', count: contoured.length, examples: contoured.map(asgLabel), message: 'Work contours are not modeled; the work is spread evenly (flat contour)' })
+}
 
 export function parseMSProjectXML(content: string, scheduleId: string): ParsedSchedule {
   const warnings: string[] = []
@@ -483,6 +514,10 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     } else ex.add({ severity: 'warning', entity: 'constraint', field: 'Task.Deadline', disposition: 'dropped', example: a.activityId, message: 'Deadline on a task that already has a constraint is not kept (the constraint is)' })
   }
 
+  // base calendars plus any (resource) calendar a task actually uses
+  const calendars = Array.from(calMap.values()).filter(c => baseIds.has(c.id) || c.id === defaultCalendarId || activities.some(a => a.calendarId === c.id))
+  resourceExceptions(xml, new Set(calendars.map(c => c.id)), ex)
+
   return {
     projectName: title || projectSummaryName || fileName || 'Imported Schedule',
     mustFinishBy,
@@ -492,8 +527,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     projectKey: title || projectSummaryName || fileName || null,
     activities,
     relationships,
-    // base calendars plus any (resource) calendar a task actually uses
-    calendars: Array.from(calMap.values()).filter(c => baseIds.has(c.id) || c.id === defaultCalendarId || activities.some(a => a.calendarId === c.id)),
+    calendars,
     defaultCalendarId,
     warnings,
     exceptions: ex.report(),

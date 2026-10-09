@@ -10,6 +10,18 @@
 import type { GeneratedSchedule, PlanActivity, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { ExceptionCollector, type ExceptionReport } from '@/lib/parsers/exceptions'
 import { xerText, P6_NAME_MAX } from './xer'
+import { hasResourceData } from '@/lib/planning/resource-types'
+
+/**
+ * Import exception fields that name the resources / assignments themselves. Older uploads (imported
+ * before resource analysis read them) still carry these records; the XER and MS Project XML exports
+ * write the resources and assignments, so for those formats the records are not losses. Records of
+ * the parts resource analysis does not use (rate tables, resource curves, timephased data, roles) keep
+ * their own field names and stay in the report.
+ */
+const RESOURCE_IMPORT_FIELDS = new Set(['RSRC', 'TASKRSRC', 'RSRCRATE', 'UMEASURE', 'Resources', 'Assignments', 'Resource', 'ResourceAssignment', 'ResourceRate', 'UnitOfMeasure'])
+/** Export formats that write resources and assignments (XER RSRC / RSRCRATE / TASKRSRC, MSP Resources / Assignments). */
+const WRITES_RESOURCES = new Set<ExportExceptionFormat>(['xer', 'xml'])
 
 export type ExportExceptionFormat = 'xer' | 'xer-original' | 'xml' | 'csv' | 'xlsx-import' | 'xlsx-p6'
 
@@ -41,9 +53,13 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
   // carried is written back, including what Planora does not model.
   if (format === 'xer-original') return ex.report()
 
+  const resources = hasResourceData(s.resources) ? s.resources : null
+  const writesResources = !!resources && WRITES_RESOURCES.has(format)
+
   /* 1. What the source file carried that Planora never imported */
   for (const r of ctx.importReport?.records || []) {
     if (r.disposition !== 'dropped' && r.disposition !== 'preserved_in_raw') continue
+    if (writesResources && RESOURCE_IMPORT_FIELDS.has(r.field)) continue
     ex.add({
       severity: r.severity, entity: r.entity, field: r.field, disposition: 'dropped', count: r.count, examples: r.examples,
       message: `Not imported into Planora, so not in this ${label} export${r.disposition === 'preserved_in_raw' ? ' (it is in the original file and in the upload\'s P6 .xer export)' : ' (the original file is kept with the upload)'}: ${r.message}`,
@@ -57,6 +73,13 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
   if (loe.length && format !== 'xml') ex.add({ severity: 'loss', entity: 'activity', field: 'Level of effort activities', disposition: 'dropped', count: loe.length, examples: loe.map(x => x.code), message: `Level of effort activities (and their links) are not written to the ${label} export; the MS Project XML export keeps them` })
 
   /* 3. What the format cannot hold */
+  if (resources && !WRITES_RESOURCES.has(format)) {
+    const ids = new Set(resources.resources.map(r => r.id))
+    const asg = resources.assignments.filter(a => ids.has(a.resourceId))
+    ex.add({ severity: 'warning', entity: 'resource', field: 'Resources', disposition: 'dropped', count: resources.resources.length, examples: resources.resources.map(r => r.code), message: `Resources are not written to the ${label} export; the P6 XER and MS Project XML exports carry them` })
+    ex.add({ severity: 'warning', entity: 'assignment', field: 'Resource assignments', disposition: 'dropped', count: asg.length, examples: asg.map(a => a.activityCode || a.activityId), message: `Resource assignments (budgeted, actual and remaining units) are not written to the ${label} export; the P6 XER and MS Project XML exports carry them` })
+  }
+
   const acts = s.activities
   const withConstraint = acts.filter(a => a.constraint)
   const started = acts.filter(a => a.actualStart || a.actualFinish || (a.status && a.status !== 'not_started'))
