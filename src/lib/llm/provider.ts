@@ -207,13 +207,14 @@ function route(): Route | null {
   return cfg as Route
 }
 
-let cached: { key: string; adapter: LlmAdapter } | null = null
+let cached: { provider: ProviderName; baseURL: string; apiKey: string; fallback: boolean; adapter: LlmAdapter } | null = null
 
 /** Build (or reuse) the adapter for the route. SDKs are loaded lazily, so an unused provider's SDK is never initialized. */
 async function adapterFor(cfg: Route): Promise<LlmAdapter> {
   const fallback = cfg.provider === 'anthropic' && aiFallbackEnabled()
-  const key = createHash('sha256').update(`${cfg.provider}|${cfg.baseURL ?? ''}|${cfg.apiKey ?? ''}|${fallback}`).digest('hex')
-  if (cached?.key === key) return cached.adapter
+  const baseURL = cfg.baseURL ?? '', apiKey = cfg.apiKey ?? ''
+  // Reuse the adapter while the route is unchanged (compared in memory; the key is never hashed or stored elsewhere).
+  if (cached && cached.provider === cfg.provider && cached.baseURL === baseURL && cached.apiKey === apiKey && cached.fallback === fallback) return cached.adapter
   let adapter: LlmAdapter
   if (cfg.provider === 'anthropic') {
     const { createAnthropicAdapter } = await import('./anthropic-adapter')
@@ -222,7 +223,7 @@ async function adapterFor(cfg: Route): Promise<LlmAdapter> {
     const { createOpenAiCompatibleAdapter } = await import('./openai-adapter')
     adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL })
   }
-  cached = { key, adapter }
+  cached = { provider: cfg.provider, baseURL, apiKey, fallback, adapter }
   return adapter
 }
 

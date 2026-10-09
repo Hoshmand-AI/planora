@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cross-tenant isolation suite against a running Planora server (same env as CI's e2e job).
-//   BASE_URL=http://localhost:3200 [DATABASE_URL=postgres://…] [PLANORA_EMAIL_OUTBOX=/tmp/outbox]
+//   BASE_URL=http://localhost:3200 DATABASE_URL=postgres://… (test owners are confirmed in the database)
 //   [WEBHOOK_RECEIVER_PORT=4020] node scripts/e2e-tenant-isolation.mjs
 //
 // Two organizations, A and B. A creates one of every tenant-owned object (plan, generated + published
@@ -21,12 +21,10 @@
 // exports, webhook deliveries) must never include A's items, and every write attempt must leave A's
 // objects unchanged. Prints a table of every check and exits non-zero on any failure.
 
-import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
 const ORIGIN = new URL(BASE).origin
-const OUTBOX = process.env.PLANORA_EMAIL_OUTBOX
 const HOOK_PORT = process.env.WEBHOOK_RECEIVER_PORT ? Number(process.env.WEBHOOK_RECEIVER_PORT) : null
 const PW = 'correct horse battery staple'
 
@@ -91,29 +89,17 @@ class Client {
   del(u, h) { return this.req('DELETE', u, undefined, h) }
 }
 
-async function mailLink(to, re) {
-  const path = await import('node:path')
-  for (let i = 0; i < 50; i++) {
-    const files = (await fs.promises.readdir(OUTBOX).catch(() => [])).sort().reverse()
-    for (const f of files) {
-      const m = JSON.parse(await fs.promises.readFile(path.join(OUTBOX, f), 'utf8'))
-      const hit = m.to === to && re.exec(m.text)
-      if (hit) return hit[0]
-    }
-    await new Promise(r => setTimeout(r, 100))
-  }
-  throw new Error(`no email to ${to}`)
-}
-
-/** Signs up a new organization and confirms the owner's email (when the server writes an outbox). */
+/** Signs up a new organization and confirms the owner's email (directly in the test database). */
 async function signupOrg(email, name, company) {
   const c = new Client(company)
   const r = await c.post('/api/auth', { action: 'signup', email, password: PW, name, company })
   if (r.status !== 200) fatal(`sign up ${company}`, r.data)
-  if (OUTBOX) {
-    const link = new URL(await mailLink(email, /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/))
-    const v = await c.get(link.pathname + link.search)
-    if (v.status !== 303 || !String(v.headers.get('location')).includes('verified=1')) fatal(`confirm email of ${company}`, v.status)
+  // Email confirmation itself is covered by e2e-security.mjs; here the test owner is marked confirmed in the test database.
+  if (process.env.DATABASE_URL) {
+    const { default: pg } = await import('pg')
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL })
+    await db.connect()
+    try { await db.query('UPDATE users SET email_verified_at=COALESCE(email_verified_at, NOW()) WHERE id=$1', [r.data.user.id]) } finally { await db.end() }
   }
   return { client: c, userId: r.data.user.id }
 }
