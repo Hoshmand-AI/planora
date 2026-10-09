@@ -607,6 +607,103 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_deleted_at TIMESTAMPTZ;
     `,
   },
+  {
+    id: 17, name: 'project_documents_retrieval',
+    sql: `
+    -- Retrieval-augmented grounding over customer project documents (contracts, scheduling
+    -- specifications, owner requirements). Only the EXTRACTED TEXT is stored, never the original file
+    -- bytes (sha256 + size are kept for chain of custody). Additive: older code ignores all four tables.
+    -- See src/lib/rag/* and docs/privacy/DATA-MAP.md (lifecycle).
+    CREATE TABLE IF NOT EXISTS project_documents (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      -- 'project': attached to an uploaded schedule and shared with every upload of its series
+      -- (same project_key); 'org': an organization standard / template (schedule_id NULL).
+      scope TEXT NOT NULL DEFAULT 'project' CHECK (scope IN ('project', 'org')),
+      schedule_id TEXT REFERENCES schedules(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      format TEXT NOT NULL,
+      doc_type TEXT NOT NULL CHECK (doc_type IN ('contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other')),
+      trust TEXT NOT NULL DEFAULT 'unreviewed' CHECK (trust IN ('approved', 'unreviewed')),
+      -- Inherited from the project at upload; the live project classification is also checked on use.
+      classification TEXT,
+      sha256 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      page_count INTEGER,
+      chunk_count INTEGER NOT NULL DEFAULT 0,
+      flagged_count INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT,
+      reviewed_by TEXT,
+      reviewed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      -- Deletion tombstone: chunks and derived rows are hard-deleted at once; the row keeps only
+      -- id, sha256, size and dates (title and file name are blanked).
+      deleted_at TIMESTAMPTZ,
+      CONSTRAINT project_documents_scope_anchor CHECK ((scope = 'project' AND (schedule_id IS NOT NULL OR deleted_at IS NOT NULL)) OR (scope = 'org' AND schedule_id IS NULL)),
+      UNIQUE (id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS project_documents_org_idx ON project_documents(org_id, schedule_id) WHERE deleted_at IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS project_documents_dedupe_idx ON project_documents(org_id, COALESCE(schedule_id, ''), sha256) WHERE deleted_at IS NULL;
+
+    -- Chunks carry org_id and a composite foreign key, so a chunk can never belong to a document of
+    -- another organization; deleting the document deletes its chunks.
+    CREATE TABLE IF NOT EXISTS document_chunks (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      ordinal INTEGER NOT NULL,
+      page INTEGER,
+      page_end INTEGER,
+      section TEXT,
+      heading TEXT,
+      text TEXT NOT NULL,
+      flagged BOOLEAN NOT NULL DEFAULT FALSE,
+      flag_reasons JSONB NOT NULL DEFAULT '[]',
+      tsv tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, COALESCE(heading, '') || ' ' || COALESCE(section, '') || ' ' || text)) STORED,
+      FOREIGN KEY (document_id, org_id) REFERENCES project_documents(id, org_id) ON DELETE CASCADE,
+      UNIQUE (document_id, ordinal)
+    );
+    CREATE INDEX IF NOT EXISTS document_chunks_tsv_idx ON document_chunks USING GIN (tsv);
+    CREATE INDEX IF NOT EXISTS document_chunks_org_doc_idx ON document_chunks(org_id, document_id);
+
+    -- A person's decision on a candidate scheduling requirement found in a document (never applied
+    -- automatically). Only the key is stored; the requirement text stays in the chunk.
+    CREATE TABLE IF NOT EXISTS document_requirement_reviews (
+      org_id TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      requirement_key TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('confirmed', 'dismissed')),
+      user_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (document_id, requirement_key),
+      FOREIGN KEY (document_id, org_id) REFERENCES project_documents(id, org_id) ON DELETE CASCADE
+    );
+
+    -- What each retrieval returned: ids and a hash of the query only (never query or passage text).
+    CREATE TABLE IF NOT EXISTS retrieval_log (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      user_id TEXT,
+      schedule_id TEXT,
+      purpose TEXT NOT NULL,
+      backend TEXT NOT NULL,
+      query_sha256 TEXT NOT NULL,
+      include_unreviewed BOOLEAN NOT NULL DEFAULT FALSE,
+      delivery TEXT NOT NULL,
+      document_ids TEXT[] NOT NULL DEFAULT '{}',
+      chunk_ids TEXT[] NOT NULL DEFAULT '{}',
+      flagged_chunk_ids TEXT[] NOT NULL DEFAULT '{}',
+      invalid_citations INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS retrieval_log_org_idx ON retrieval_log(org_id, created_at);
+    -- Ask AI answers that quoted project documents remember which ones, so deleting a document also
+    -- redacts the answers that quoted it.
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS document_ids TEXT[];
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

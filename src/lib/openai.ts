@@ -27,12 +27,15 @@ interface ScheduleContext {
   comparison?: ScheduleComparison | null
   /** Evidence every report carries whether or not a model wrote it: provenance, windows, reviewer dispositions, relationship float */
   evidence?: Pick<ReportInput, 'provenance' | 'windows' | 'review' | 'linkFloat' | 'evm' | 'evmTrend'>
+  /**
+   * Project-document grounding (src/lib/rag/grounding.ts): extra system rules, and the retrieved
+   * passages as a separate, delimited data message. Only set when the passages may go to this model.
+   */
+  grounding?: { system: string; data: string }
 }
 
-export async function askScheduleQuestion(
-  question: string,
-  context: ScheduleContext
-): Promise<string> {
+/** Ask AI: the system prompt (schedule facts) and the offline fallback for a question. */
+export function buildAskPrompt(question: string, context: ScheduleContext): { system: string; offline: () => string } {
   // Build smart context — don't send all activities, just relevant ones
   const { schedule, activities, relationships } = context
   
@@ -127,20 +130,35 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
     }
   }
   
+  return { system: systemPrompt + extraContext, offline: () => offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief) }
+}
+
+export async function askScheduleQuestion(
+  question: string,
+  context: ScheduleContext
+): Promise<string> {
+  const prompt = buildAskPrompt(question, context)
   try {
-    const answer = await chat([
-      { role: 'system', content: systemPrompt + extraContext },
-      { role: 'user', content: question },
-    ], { temperature: 0.3, maxTokens: 2000, purpose: 'ask_ai' })
+    const answer = await chat(askMessages(prompt.system, question, context.grounding), { temperature: 0.3, maxTokens: 2000, purpose: context.grounding ? 'ask_ai.documents' : 'ask_ai' })
     if (answer) return answer
-    return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
+    return prompt.offline()
   } catch (error: unknown) {
     const err = error as Error
     // A refusal is not an answer: say so plainly and give the schedule facts instead.
-    if (error instanceof AiRefusalError) return `${err.message}\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
+    if (error instanceof AiRefusalError) return `${err.message}\n\n` + prompt.offline()
     log('warn', 'model call failed', { purpose: 'ask_ai', error: err.message })
-    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
+    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + prompt.offline()
   }
+}
+
+/** Messages for Ask AI; project-document passages travel in their own data message, never in the instructions. */
+export function askMessages(system: string, question: string, grounding?: ScheduleContext['grounding']) {
+  if (!grounding) return [{ role: 'system' as const, content: system }, { role: 'user' as const, content: question }]
+  return [
+    { role: 'system' as const, content: `${system}\n\n${grounding.system}` },
+    { role: 'user' as const, content: grounding.data },
+    { role: 'user' as const, content: `QUESTION (answer it using the schedule data and, with citations, the project document passages above):\n${question}` },
+  ]
 }
 
 function offlineAnswer(stats: Record<string, string | number>, critical: Activity[], nearTerm: Activity[], extra: string, brief?: ProjectBrief): string {
@@ -251,13 +269,16 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
 `
 
   try {
-    const report = await chat([
-      {
-        role: 'system',
-        content: `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
-      },
+    const system = `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
+    const g = context.grounding
+    const report = await chat(g ? [
+      { role: 'system', content: `${system}\n\n${g.system}` },
+      { role: 'user', content: g.data },
+      { role: 'user', content: `${prompt}\nWhere the project document passages above set requirements (contract time, milestones, update and schedule-quality requirements), compare the schedule against them and cite each passage you rely on.` },
+    ] : [
+      { role: 'system', content: system },
       { role: 'user', content: prompt },
-    ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}` })
+    ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}${g ? '.documents' : ''}` })
     if (report) {
       // The model writes the narrative; the evidence sections are Planora's own calculation.
       if (!context.analysis) return withProvenance(report, context.evidence?.provenance)

@@ -34,6 +34,9 @@ const nextConfig = {
   // On-prem container image (Dockerfile): a self-contained server in .next/standalone. Only when
   // PLANORA_STANDALONE=1 is set at build time, so Vercel builds are unchanged.
   ...(process.env.PLANORA_STANDALONE === '1' ? { output: 'standalone' } : {}),
+  // pdf-parse (pdf.js) must load from node_modules at runtime: bundled, pdf.js evaluates browser-only
+  // globals (DOMMatrix) at module load and every PDF read fails (schedule PDFs and project documents).
+  serverExternalPackages: ['pdf-parse'],
   experimental: {},
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard, MessageSquare, FileText, Clock,
-  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users,
+  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen,
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
@@ -58,6 +58,7 @@ const TABS = [
   { href: '/dashboard/quality',  icon: ShieldCheck,     label: 'Quality'  },
   { href: '/dashboard/ask',      icon: MessageSquare,   label: 'Ask AI'   },
   { href: '/dashboard/reports',  icon: FileText,        label: 'Reports'  },
+  { href: '/dashboard/documents', icon: FolderOpen,     label: 'Documents' },
   { href: '/dashboard/timeline', icon: Clock,           label: 'Timeline' },
   { href: '/dashboard/resources', icon: Users,          label: 'Resources' },
   { href: '/dashboard/history',  icon: Database,        label: 'Firm data' },

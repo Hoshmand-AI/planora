@@ -66,6 +66,24 @@ limited to their workspaces must give one when they belong to more than one (`40
 `workspace_required`); an upload to an existing update series goes into that series' workspace by
 default.
 
+### Project documents (session only)
+
+API keys can't use these endpoints. All are scoped to the caller's organization, the project and
+the caller's workspaces; another firm's schedule or document is `404`.
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/schedules/{id}/documents` | read | Documents of the project (shared across its update series) and organization standards |
+| POST | `/api/schedules/{id}/documents` | scheduler | Multipart upload: `file` (PDF with text, .docx, .txt, .md; 15 MB), `docType` (`contract`, `scheduling_spec`, `owner_requirement`, `specification`, `other`), optional `title`, `scope=org` (owner / admin). Only extracted text is stored. Audited as `document.uploaded` |
+| PATCH | `/api/schedules/{id}/documents/{docId}` | owner / admin / reviewer | `{ "trust": "approved" \| "unreviewed" }` |
+| DELETE | `/api/schedules/{id}/documents/{docId}` | scheduler | Deletes the passages immediately; audited as `document.deleted` |
+| POST | `/api/schedules/{id}/documents/search` | read | `{ "query", "includeUnreviewed" }` → ranked passages with citations and flags |
+| GET / POST | `/api/schedules/{id}/documents/requirements` | read / scheduler | Candidate scheduling requirements with citations; POST `{ documentId, key, status: confirmed \| dismissed }` |
+
+`POST /api/ask` and `POST /api/reports` accept `useDocuments: true` (and `includeUnreviewed`) and
+return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restricted`, `no_match`),
+`sources`, `cited`, `removedCitations` and `flagged`. Details: [privacy/PROJECT-DOCUMENTS.md](privacy/PROJECT-DOCUMENTS.md).
+
 ## Webhooks
 
 - Add an HTTPS endpoint and pick the events you want (`GET /api/org/integrations` lists them).

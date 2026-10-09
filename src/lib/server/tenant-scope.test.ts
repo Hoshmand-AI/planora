@@ -41,6 +41,10 @@ function schemaTables(): { all: Set<string>; withOrgId: Set<string> } {
  * repository root; `sql` is a substring of the statement (whitespace collapsed).
  */
 const ALLOWLIST: { file: string; sql: string; why: string }[] = [
+  // Project documents: scope() in retrieval.ts injects d.org_id = $1, the org-scoped project CTE and workspace walls via ${sc.where}.
+  { file: 'src/lib/rag/retrieval.ts', sql: 'WITH ${sc.cte}, q AS (SELECT ${tsq} AS tsq)', why: 'retrieval: q is a tsquery CTE, not a table; chunks/documents filtered by ${sc.where} (org_id = $1)' },
+  { file: 'src/lib/rag/retrieval.ts', sql: 'SELECT d.* FROM project_documents d ${sc.join} WHERE ${sc.where}', why: 'getScopedDocument: ${sc.where} starts with d.org_id = $1' },
+  { file: 'src/lib/server/maintenance.ts', sql: "DELETE FROM retrieval_log WHERE created_at < NOW() - INTERVAL '400 days'", why: 'retention sweep, all orgs' },
   // SAML / SCIM: resolving the org from a public connection id or a hashed token, and global expiry sweeps.
   { file: 'src/lib/server/saml.ts', sql: "SELECT id, plan, saml FROM organizations WHERE saml->>'connectionId'=$1", why: 'SAML ACS/login: resolves the org that owns an unguessable connection id (no session yet)' },
   { file: 'src/lib/server/saml.ts', sql: "DELETE FROM saml_requests WHERE created_at < NOW() - INTERVAL '1 day'", why: 'expiry sweep of one-time request ids, all orgs' },
