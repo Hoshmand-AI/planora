@@ -3,6 +3,7 @@ import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { BaselineMeta } from '@/lib/analysis/baseline'
+import { asExceptionReport, type ExceptionReport } from '@/lib/parsers/exceptions'
 import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
 import type { SraCommitment, SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
@@ -221,7 +222,7 @@ export async function updateUser(id: string, updates: Partial<User>): Promise<Us
 
 /* ─── Schedules ─────────────────────────────────────── */
 
-export type SourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
+export type SourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
 
 export interface Schedule {
   id: string; userId: string; orgId: string; name: string; version: string
@@ -253,6 +254,8 @@ export interface Schedule {
   baselineScheduleId?: string | null
   /** Embedded P6 baseline and the assessment of the file's own target dates (src/lib/analysis/baseline.ts) */
   baselineMeta?: BaselineMeta | null
+  /** What the importer saw but did not map, converted or defaulted (src/lib/parsers/exceptions.ts); null for older uploads */
+  importExceptions?: ExceptionReport | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -275,6 +278,7 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     workspaceId: (row.workspace_id as string) ?? null,
     baselineScheduleId: (row.baseline_schedule_id as string) ?? null,
     baselineMeta: (row.baseline_meta as BaselineMeta) ?? null,
+    importExceptions: asExceptionReport(row.import_exceptions),
   }
 }
 
@@ -328,6 +332,12 @@ export async function setScheduleBaseline(id: string, orgId: string, baselineSch
 export async function setScheduleBaselineMeta(id: string, orgId: string, meta: BaselineMeta | null): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET baseline_meta=$3 WHERE id=$1 AND org_id=$2', [id, orgId, meta ? JSON.stringify(meta) : null])
+}
+
+/** The import exception report captured when the file was parsed. */
+export async function setScheduleImportExceptions(id: string, orgId: string, report: ExceptionReport | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET import_exceptions=$3 WHERE id=$1 AND org_id=$2', [id, orgId, report ? JSON.stringify(report) : null])
 }
 
 /** Designate (or clear, with null) the schedule's contract/finish milestone. */
@@ -519,7 +529,7 @@ export interface StoredScheduleEdit extends ScheduleEdit {
 function rowToEdit(r: Record<string, unknown>): StoredScheduleEdit {
   return {
     id: String(r.id), change: r.change as ScheduleEditChange, reason: String(r.reason), by: String(r.user_id ?? ''), byName: (r.user_name as string) ?? null,
-    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' ? 'recovery' : 'manual', optionId: (r.option_id as string) ?? null,
+    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' || r.source === 'leveling' ? r.source : 'manual', optionId: (r.option_id as string) ?? null,
     revertedAt: r.reverted_at ? new Date(String(r.reverted_at)).toISOString() : null, revertedBy: (r.reverted_by as string) ?? null, revertReason: (r.revert_reason as string) ?? null,
   }
 }
@@ -631,6 +641,8 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
 
 export interface ChatMessage {
   id: string; scheduleId: string; userId: string; role: 'user' | 'assistant'; content: string; createdAt: string
+  /** Project documents an answer quoted (redacted when one of them is deleted) */
+  documentIds?: string[]
 }
 
 export async function getChatMessages(scheduleId: string, userId: string): Promise<ChatMessage[]> {
@@ -641,6 +653,10 @@ export async function getChatMessages(scheduleId: string, userId: string): Promi
 
 export async function createChatMessage(msg: ChatMessage): Promise<void> {
   await initSchema()
+  if (msg.documentIds?.length) {
+    await query('INSERT INTO chat_messages (id,schedule_id,user_id,role,content,created_at,document_ids) VALUES ($1,$2,$3,$4,$5,$6,$7)', [msg.id, msg.scheduleId, msg.userId, msg.role, msg.content, msg.createdAt, msg.documentIds])
+    return
+  }
   await query('INSERT INTO chat_messages (id,schedule_id,user_id,role,content,created_at) VALUES ($1,$2,$3,$4,$5,$6)', [msg.id, msg.scheduleId, msg.userId, msg.role, msg.content, msg.createdAt])
 }
 
@@ -835,10 +851,16 @@ export async function exportOrganization(orgId: string) {
       query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
       getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId), getReviewState(s.id, orgId),
     ])
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission })
+    const timeImpact = await import('./tia-db').then(m => m.exportTimeImpact(s.id, orgId))
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission, timeImpact })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
-  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
+  const standardsRuns = (await query('SELECT * FROM standards_runs WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  // Project documents (extracted text and passages; original files are never stored) and the retrieval log (ids and query hashes only).
+  const { exportDocuments } = await import('@/lib/rag/store')
+  const projectDocuments = await exportDocuments(orgId)
+  const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, projectDocuments, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -853,6 +875,11 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
       (SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1) AS last_hash`, [orgId])).rows[0]
     await q(`SELECT set_config('planora.audit_purge', 'on', true)`)
     await q('DELETE FROM audit_events WHERE org_id=$1', [orgId])
+    // Project documents: passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    await q('DELETE FROM document_chunks WHERE org_id=$1', [orgId])
+    await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
+    await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])
+    await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
     await q('DELETE FROM plans WHERE org_id=$1', [orgId])
     await q('DELETE FROM invitations WHERE org_id=$1', [orgId])
@@ -893,6 +920,12 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE schedules SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE data_question_responses SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q("UPDATE schedule_edits SET user_id=$2, user_name='Former member' WHERE user_id=$1", [userId, heir])
+    await q('UPDATE delay_events SET created_by=$2 WHERE created_by=$1', [userId, heir])
+    await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
+    await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE retrieval_log SET user_id=NULL WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('DELETE FROM chat_messages WHERE user_id=$1', [userId])
     await q('DELETE FROM users WHERE id=$1', [userId])
   })

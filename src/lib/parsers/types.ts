@@ -3,9 +3,11 @@
 import type { Activity, Relationship } from '@/lib/db'
 import type { ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import type { EmbeddedBaseline } from '@/lib/analysis/baseline'
+import type { ResourceData } from '@/lib/planning/resource-types'
+import type { ExceptionReport } from './exceptions'
 import { randomUUID as uuid } from 'crypto'
 
-export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
+export type ParsedSourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
 
 export interface ParsedSchedule {
   projectName: string
@@ -24,16 +26,23 @@ export interface ParsedSchedule {
   calendars: WorkCalendar[]
   defaultCalendarId: string | null
   warnings: string[]
+  /**
+   * Structured import exception report: every table / field / element the parser saw but did not map,
+   * and every value it converted or defaulted (src/lib/parsers/exceptions.ts). Stored with the upload.
+   */
+  exceptions?: ExceptionReport
   sourceType: ParsedSourceType
-  /** P6 only: resource assignments per source task id (TASKRSRC rows); undefined when the file has none */
+  /** P6 only: resource assignments per source task id (XER TASKRSRC rows / P6 XML ResourceAssignment); undefined when the file has none */
   resourceCounts?: Record<string, number>
+  /** Resources and assignments (XER RSRC/TASKRSRC, MSP Resources/Assignments, spreadsheet resource columns); null when the file has none */
+  resources?: ResourceData | null
   /** P6 only: every table present in the file */
   sourceTables?: string[]
   /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */
   progressMode?: ProgressMode | null
   /** The file was written by Planora's own exporter (a re-import of Planora output, not a project record) */
   planoraExport?: boolean
-  /** P6 only: the project baseline exported in the same XER (per-activity baseline by task_code) */
+  /** P6 only: the project baseline exported in the same file (per-activity baseline by activity id) */
   embeddedBaseline?: EmbeddedBaseline | null
 }
 

@@ -16,9 +16,10 @@ Planora works in three stages: **build** a schedule, **analyze** it, then **moni
 | **Grounding.** Durations and logic come from regional permit and regulation catalogs (10 regions, 50 permits, 20 regulations), long-lead equipment lead times (27 items), activity templates for 9 facility types, and **the firm's own completed projects** (actual vs. planned). | `src/lib/knowledge/*`, `src/lib/planning/history.ts` |
 | **Evaluation.** Each plan gets a DCMA 14-point score, benchmarks against the firm's actual outcomes, risk-adjusted P50/P80 finish dates, a check that every grounded requirement is covered, recorded expert review, and a **leave-one-out backtest** against the firm's completed projects. | `src/lib/planning/evaluation.ts` |
 | **Private data.** Every firm is an organization, and every query is scoped by `org_id`. Firm history only ever reads that firm's own schedules. | `src/lib/db.ts` |
-| **Any file format.** Imports P6 XER (including calendars, constraints and WBS), MS Project XML, Excel/CSV (messy headers are handled) and PDF. Activity names and calendars are normalized to shared meanings (for example "SOG", "F/R/P footings" and "Hang/Tape/Finish GWB" each map to a standard category). Exports MS Project XML, CSV and a **Basis of Schedule** narrative. | `src/lib/parsers/*`, `src/lib/semantic/taxonomy.ts`, `src/lib/export/*` |
+| **Any file format.** Imports P6 XER and P6 XML (including calendars, constraints and WBS; the same project in either format gives identical CPM results), MS Project XML, Excel/CSV (messy headers are handled) and PDF. Nothing is dropped silently: every import and export carries an exception report of what was not mapped, converted or defaulted (`src/lib/parsers/exceptions.ts`). Activity names and calendars are normalized to shared meanings (for example "SOG", "F/R/P footings" and "Hang/Tape/Finish GWB" each map to a standard category). Exports MS Project XML, CSV and a **Basis of Schedule** narrative. | `src/lib/parsers/*`, `src/lib/semantic/taxonomy.ts`, `src/lib/export/*` |
 | **Self-checking inputs.** Flags weekend or holiday work, out-of-sequence progress, invalid dates, dangling logic and other data issues. The scheduler answers each one inline. | `src/lib/analysis/input-checks.ts` |
-| **Secure / air-gapped use.** Runs with no model, with an on-prem model, or with a cloud model. In air-gapped mode it refuses any model host that is not private. Withheld answers are never sent to a model; withheld constraints become placeholders with reserved time. Small models get narrow, JSON-only tasks that are validated and retried. | `src/lib/llm/provider.ts`, `src/lib/planning/ai-questions.ts` |
+| **Secure / air-gapped use.** Runs with no model, with an on-prem model, or with a cloud model through a provider-agnostic AI gateway (default cloud provider: Anthropic Claude via `ANTHROPIC_API_KEY`; OpenAI is an approved alternate, selected with `PLANORA_AI_PROVIDER=openai`). Cloud AI calls send request-relevant content to the selected provider. In air-gapped mode it refuses any model host that is not private. Withheld answers are never sent to a model; withheld constraints become placeholders with reserved time. Small models get narrow, JSON-only tasks that are validated and retried. | `src/lib/llm/provider.ts`, `src/lib/llm/gateway.ts`, `src/lib/planning/ai-questions.ts` |
+| **Project documents.** Contracts, scheduling specifications and owner requirements are indexed per project (Postgres full-text search, scoped in SQL to the firm, project and workspace). Ask AI and reports can answer from them with verified citations like [Spec §1.3.4 p.3]; document text is treated as untrusted data, passages that read like prompt injection are never sent to a model, CUI passages never reach a cloud model, and candidate scheduling requirements (max duration, update frequency, float, NTP, completion, LDs) are suggested for people to confirm. | `src/lib/rag/*`, [docs/privacy/PROJECT-DOCUMENTS.md](docs/privacy/PROJECT-DOCUMENTS.md) |
 | **Human control.** Every activity and link shows why it exists and where that came from. Overrides require a reason, report their impact on the finish date and critical path, survive regeneration, and are recorded in the audit trail and the narrative. | `src/lib/planning/overrides.ts` |
 
 The scheduling core is deterministic TypeScript and runs without any model:
@@ -32,11 +33,11 @@ Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v3, Postgres (`pg
 
 ## Security, governance and operations
 
-Roles (owner/admin/scheduler/reviewer/viewer), workspaces with ethical walls between client matters, invitations, two-step verification, OpenID Connect SSO, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
+Roles (owner/admin/scheduler/reviewer/viewer), workspaces with ethical walls between client matters, invitations, two-step verification, single sign-on with OpenID Connect or SAML 2.0, SCIM 2.0 user provisioning, revocable sessions, rate limits and lockout, a hash-chained append-only audit log, retention and privacy controls, plan entitlements, and Monte Carlo schedule risk analysis.
 
 - Start with [docs/security/SECURITY-OVERVIEW.md](docs/security/SECURITY-OVERVIEW.md) and [docs/governance/AUDIT-REMEDIATION.md](docs/governance/AUDIT-REMEDIATION.md).
 - Operations docs are in [docs/operations](docs/operations); to report a vulnerability, see [SECURITY.md](SECURITY.md).
-- Every API route is built with `api({ permission })` or `publicApi()` from `src/lib/server/api.ts`. A test fails the build otherwise.
+- Every API route is built with `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (the SCIM 2.0 endpoints under `/api/scim/v2` use `scimApi()`, which accepts only an organization SCIM token). A test fails the build otherwise.
 
 ## Setup
 
@@ -56,6 +57,10 @@ BASE_URL=http://localhost:3000 node scripts/e2e-smoke.mjs   # end-to-end against
 # with `PORT=4010 node scripts/mock-oidc.mjs` running and the app started with PLANORA_ALLOW_INSECURE_OIDC=1)
 # PLANORA_EMAIL_OUTBOX + PLANORA_ALLOW_INSECURE_WEBHOOKS=1 on the server enable the email and webhook checks
 BASE_URL=… DATABASE_URL=… OIDC_ISSUER=http://localhost:4010 PLANORA_EMAIL_OUTBOX=/tmp/outbox WEBHOOK_RECEIVER_PORT=4020 node scripts/e2e-security.mjs
+BASE_URL=… DATABASE_URL=… WEBHOOK_RECEIVER_PORT=4020 node scripts/e2e-tenant-isolation.mjs   # org B vs every object of org A
+BASE_URL=… DATABASE_URL=… node scripts/e2e-scim.mjs        # SAML sign-in and SCIM provisioning (server with PLANORA_ALLOW_INSECURE_OIDC=1)
+BASE_URL=… node scripts/e2e-rag.mjs                         # project documents: isolation, injection, citations, deletion
+RAG_TEST_DATABASE_URL=… npx vitest run src/lib/rag/rag.db.test.ts   # retrieval SQL against a real Postgres
 BASE_URL=… node scripts/a11y-check.mjs                     # WCAG 2.2 AA (axe-core) on the main screens
 DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node scripts/restore-drill.mjs backups/*.dump
 ```
@@ -86,12 +91,17 @@ src/lib/
   knowledge/  regions (permits, regulations, climate), long-lead, templates, applicability
   semantic/   taxonomy (activity + calendar normalization)
   analysis/   dcma, input-checks
+  standards/  versioned rules engine: GAO Schedule Assessment Guide profile, DCMA 14-point adapter,
+              Planora Composite (threshold conflicts reported, never blended); runs stored in standards_runs
   parsers/    xer, xml, excel/csv, pdf, index
   export/     msp-xml, csv, narrative (Basis of Schedule)
-  llm/        provider (cloud / local / offline, air-gap guard)
+  llm/        gateway (provider-agnostic contract + model registry), provider (cloud / local / offline,
+              air-gap + CUI guard, quotas, audit), adapters: anthropic (default cloud), openai, local
+  rag/        project documents: extraction, chunking, injection screening, scoped retrieval,
+              grounding, citation checks, requirement extraction
 src/app/
   dashboard/plan        Build: interview → schedule → evaluation & review → audit
-  dashboard/quality     DCMA + the tool's questions about uploaded data
+  dashboard/quality     DCMA + the tool's questions about uploaded data; Standards tab (framework picker)
   dashboard/history     Firm data: private history, tagging, backtest
   api/plans/[id]/...    generate, edit, review, export, publish, suggest
 ```

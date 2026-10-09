@@ -18,7 +18,7 @@
 3. **Contain:**
    - roll back (Vercel → Instant Rollback);
    - revoke sessions (`UPDATE sessions SET revoked_at=NOW()` for affected users, or rotate `JWT_SECRET` to end every session);
-   - rotate secrets: `OPENAI_API_KEY`, the database password, `PLANORA_ENCRYPTION_KEY` (MFA secrets would need re-enrollment);
+   - rotate secrets: `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, the database password, `PLANORA_ENCRYPTION_KEY` (MFA secrets would need re-enrollment);
    - switch AI off for affected organizations.
 4. **Fix:** a pull request with a test that reproduces the problem; CI must be green.
 5. **Communicate:** tell affected organization owners what happened, what data was involved, what we did and what they should do.
@@ -29,4 +29,4 @@
 ## Contacts
 - Security reports: security@hoshmand.ai.
 - Customer notifications: organization owners' emails (Organization → Members).
-- Vendors: Vercel support, Neon support, OpenAI support.
+- Vendors: Vercel support, Neon support, Anthropic support (or OpenAI support if that provider is selected).

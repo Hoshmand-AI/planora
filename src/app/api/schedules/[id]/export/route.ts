@@ -16,6 +16,9 @@ import { CSV_CUI_REFUSAL, exportMarking, markXer } from '@/lib/export/markings'
 import { scheduleClassification } from '@/lib/server/classification'
 import { exportLookaheadXlsx, lookaheadRows } from '@/lib/export/analysis-xlsx'
 import { loadProvenance } from '@/lib/export/provenance'
+import { loadScheduleResources } from '@/lib/planning/resource-service'
+import { exportExceptions, type ExportExceptionFormat } from '@/lib/export/exceptions'
+import { exceptionHeader, summarizeExceptions } from '@/lib/parsers/exceptions'
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -35,6 +38,9 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * the original XER (durations, constraints, TASKPRED rows), and in the other formats through the edited
  * network, with their reasons as notes; its file name says "with-N-edits" and its provenance says
  * "derived from <sha> with N edits" rather than printing the original file's SHA-256 as the content's.
+ * Export exceptions: every download says what the format could not carry (header
+ * X-Planora-Export-Exceptions; XLSX also in the Provenance sheet); &exceptions=json returns that report
+ * as JSON instead of the file.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const format = req.nextUrl.searchParams.get('format') || 'xer'
@@ -63,7 +69,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const classification = await scheduleClassification(schedule.id, auth.orgId).catch(() => 'classified' as const)
   const marking = exportMarking(classification, { controlledBy: auth.orgName, poc: auth.name })
   if (marking && format === 'csv') return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
-  const prov = () => loadProvenance(auth.orgId, [{ schedule, analysis: data.analysis, editsApplied }], auth.settings.quality)
+  const prov = async (exceptions?: ReturnType<typeof exportExceptions>) => ({ ...await loadProvenance(auth.orgId, [{ schedule, analysis: data.analysis, editsApplied }], auth.settings.quality), exceptions })
   if (format === 'lookahead-xlsx') {
     if (!schedule.dataDate) return NextResponse.json({ error: 'This schedule has no data date, so a look-ahead cannot be built.' }, { status: 400 })
     const rows = lookaheadRows(data.activities, data.relationships, schedule.dataDate, 21)
@@ -73,16 +79,30 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     return new NextResponse(body as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${file}"` } })
   }
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
-  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits)
+  // Resources and assignments from the stored file travel with the rebuilt XER and the MS Project XML.
+  const resources = format === 'xer' || format === 'xml' ? await loadScheduleResources(schedule, auth.orgId, data.activities).catch(() => null) : null
+  const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits, { resources })
   // P6's progress option: written into the export when the scheduler changed it from the file's own.
   const mode = data.analysis.progressMode
   const fileMode = data.analysis.fileProgressMode ?? null
   const changedMode = fileMode ? (mode !== fileMode ? mode : null) : mode === 'override' ? mode : null
 
+  // What this format cannot carry: the file's own unmapped data, activities the export model leaves
+  // out (WBS summaries; level of effort outside MS Project XML), and the format's own limits.
+  const original = format === 'xer' && schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId) : undefined
+  const exKey: ExportExceptionFormat = original ? 'xer-original' : format === 'xlsx-import' || format === 'xlsx-p6' || format === 'xml' || format === 'csv' ? format : format === 'xer' ? 'xer' : 'xlsx-p6'
+  const mspG = format === 'xml' ? uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true, resources }) : null
+  const exceptions = exportExceptions(mspG ?? g, exKey, {
+    importReport: schedule.importExceptions ?? null, progressMode: mode,
+    excluded: data.activities.filter(a => a.activityType === 'summary' || a.activityType === 'loe').map(a => ({ code: a.activityId, type: a.activityType === 'loe' ? 'loe' as const : 'summary' as const })),
+  })
+  if (req.nextUrl.searchParams.get('exceptions') === 'json') {
+    return NextResponse.json({ format, basis, exceptions, summary: summarizeExceptions(exceptions) })
+  }
+
   let body: string | Buffer, type: string, file: string
   switch (format) {
     case 'xer': {
-      const original = schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId) : undefined
       if (original) {
         const { text, encoding, bom } = decodeXer(original.content)
         body = encodeXer(markXer(exportXerFromOriginal(text, xerUpdatesFrom(data.activities, data.cpm), { forecastFinish: data.analysis.forecastFinish, edits: xerEditsFrom(data.activities, scenarioEdits), progressMode: changedMode }), marking), encoding, bom)
@@ -92,11 +112,12 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
       type = 'application/octet-stream'; file = `${slug}.xer`; break
     }
     // MS Project XML keeps level-of-effort activities and their relationships (as P6 → MSP does).
-    case 'xml': body = exportMspXml(uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true }), schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
+    case 'xml': body = exportMspXml(mspG!, schedule.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv': body = exportScheduleCsv(g); type = 'text/csv; charset=utf-8'; file = `${slug}.csv`; break
-    case 'xlsx-import': body = await exportImportXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-import.xlsx`; break
-    default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`
+    case 'xlsx-import': body = await exportImportXlsx(g, schedule.name, { marking, prov: await prov(exceptions) }); type = XLSX; file = `${slug}-import.xlsx`; break
+    default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov(exceptions) }); type = XLSX; file = `${slug}-p6-layout.xlsx`
   }
-  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInPlanora: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted' } })
+  const exSummary = summarizeExceptions(exceptions)
+  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInPlanora: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), exportExceptions: { records: exceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } })
 })

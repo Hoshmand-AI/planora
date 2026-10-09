@@ -5,6 +5,7 @@ import type { ConstraintType, GeneratedSchedule, LinkType, PlanActivity, WorkCal
 import { compileCalendar, fromDayNumber, toDayNumber } from '@/lib/planning/calendar'
 import { buildWbs, type WbsNode } from './wbs'
 import { markedTitle, type ExportMarking } from './markings'
+import { mspResourcesXml } from './resources'
 
 const MSP_LINK_TYPE: Record<LinkType, number> = { FF: 0, FS: 1, SF: 2, SS: 3 }
 // MS Project has no two-sided "Start On"/"Finish On"; its Must Start/Finish On is the closest match.
@@ -425,6 +426,8 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string, opts: { 
     x += '    </Task>\n'
   })
   x += `${h}</Tasks>\n`
+  // Resources and assignments, so a round trip keeps them.
+  x += mspResourcesXml(s, uidById, calUid)
   x += '</Project>\n'
   return x
 }

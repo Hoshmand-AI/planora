@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useApp } from '../layout'
 import { BarChart3, Activity, FileText, CheckCircle, Download, X, Loader2, Upload } from 'lucide-react'
 import { fmtDates, fmtDateTime } from '@/lib/format'
@@ -27,6 +27,10 @@ export default function ReportsPage() {
   const [llm, setLlm] = useState<{ mode: AiMode; error?: string } | null>(null)
   useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setLlm(d.llm || null)).catch(() => {}) }, [])
   const [generating, setGenerating] = useState<string | null>(null)
+  const [useDocs, setUseDocs] = useState(false)
+  const [withUnreviewed, setWithUnreviewed] = useState(false)
+  const docsId = useId()
+  const unrevId = useId()
   const [report, setReport] = useState<{ type: string; content: string; scheduleName: string; generatedAt: string } | null>(null)
 
   const handleGenerate = async (reportType: string) => {
@@ -37,7 +41,7 @@ export default function ReportsPage() {
       const res  = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportType, scheduleId: selectedSchedule.id }),
+        body: JSON.stringify({ reportType, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
       setReport({
@@ -109,7 +113,19 @@ export default function ReportsPage() {
   return (
     <div className="p-5 md:p-6">
       <h2 className="font-display text-[22px] text-navy-950 mb-1">Generate Reports</h2>
-      <p className="text-[13.5px] text-warm-500 mb-5">{reportMethod(llm)} for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
+      <p className="text-[13.5px] text-warm-500 mb-3">{reportMethod(llm)} for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
+      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-warm-700">
+        <label htmlFor={docsId} className="flex items-center gap-1.5">
+          <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
+          Use project documents (contract and specification requirements, with citations)
+        </label>
+        {useDocs && (
+          <label htmlFor={unrevId} className="flex items-center gap-1.5">
+            <input id={unrevId} type="checkbox" checked={withUnreviewed} onChange={e => setWithUnreviewed(e.target.checked)} />
+            Include unreviewed documents
+          </label>
+        )}
+      </div>
       <div className="grid md:grid-cols-2 gap-3">
         {REPORT_TYPES.map(rt => (
           <button

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractJson, isAllowedAirgapHost, resolveLlmConfig, DEFAULT_CLOUD_MODEL } from './provider'
+import { extractJson, isAllowedAirgapHost, resolveLlmConfig, DEFAULT_CLOUD_MODEL, DEFAULT_OPENAI_MODEL } from './provider'
 
 describe('LLM provider routing', () => {
   it('defaults to cloud with a key, offline without', () => {
@@ -28,7 +28,8 @@ describe('LLM provider routing', () => {
   })
 
   it('only uses models in the approved registry, pinned by default', () => {
-    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k' }).model).toBe(DEFAULT_CLOUD_MODEL)
+    expect(resolveLlmConfig({ ANTHROPIC_API_KEY: 'k' }).model).toBe(DEFAULT_CLOUD_MODEL)
+    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k' }).model).toBe(DEFAULT_OPENAI_MODEL)
     const refused = resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'some-unreviewed-model' })
     expect(refused.mode).toBe('offline')
     expect(refused.error).toMatch(/approved model registry/)

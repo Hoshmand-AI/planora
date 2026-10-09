@@ -4,7 +4,7 @@ Owner: founder, Hoshmand AI. Reviewed: every 12 months, after a SEV1 incident, o
 
 1. **Access control.**
    - Least privilege, with one account per person.
-   - Production access (Vercel, Neon, GitHub admin, OpenAI) is limited to named people, with MFA on every provider account.
+   - Production access (Vercel, Neon, GitHub admin, Anthropic, OpenAI) is limited to named people, with MFA on every provider account.
    - Access is reviewed every quarter and removed within 1 business day of a role change or departure.
 2. **Data handling.**
    - Customer data is used only to provide the service.

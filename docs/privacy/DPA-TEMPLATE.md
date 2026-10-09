@@ -19,7 +19,7 @@ The customer is the controller of the personal data in its account. Hoshmand AI 
 - Delete or return the data within 30 days of termination, except where retention is required by law. Backups age out on their normal cycle.
 
 ## 4. Subprocessors
-The current list is in [SUBPROCESSORS.md](SUBPROCESSORS.md). Planora gives 30 days' notice of a new subprocessor, and the customer may object. Cloud AI (OpenAI) is used only if the customer's admin turns it on.
+The current list is in [SUBPROCESSORS.md](SUBPROCESSORS.md). Planora gives 30 days' notice of a new subprocessor, and the customer may object. Cloud AI (Anthropic by default; OpenAI as an approved alternate) is used only if the customer's admin turns it on, and then request-relevant content is sent to the selected provider.
 
 ## 5. Transfers
 Data is stored in the United States. Customers that need another region should use the on-premises deployment until regional hosting is available.

@@ -26,6 +26,7 @@ import { trendMarkdown, windowsMarkdown } from '@/lib/analysis/windows'
 import type { ReviewState } from '@/lib/analysis/review'
 import { reviewMarkdown } from '@/lib/analysis/review'
 import { provenanceMarkdown, type Provenance } from './provenance'
+import { evmMarkdown, type EvmAnalysis, type EvmTrendPoint } from '@/lib/analysis/evm'
 import { fmtDate, fmtDates } from '@/lib/format'
 
 export type ReportType = 'executive_summary' | 'critical_path' | 'variance' | 'qa_qc'
@@ -55,6 +56,10 @@ export interface ReportInput {
   review?: ReviewState | null
   /** Relationship free float from the recalculation (critical path report: tied driving branches) */
   linkFloat?: CpmLinkFloat[] | null
+  /** Earned value (variance and executive reports): one section when available, omitted otherwise */
+  evm?: EvmAnalysis | null
+  /** Earned value trend over the update series (variance report) */
+  evmTrend?: EvmTrendPoint[] | null
 }
 
 const DAY = 86_400_000
@@ -167,6 +172,7 @@ function executiveSummary(r: ReportInput): string[] {
     `## 6. Next 14 days (${d(from)}–${d(to)})`, table(['ID', 'Activity', 'Start', 'Float (wd)'], next.slice(0, 15).map(a => [a.activityId, a.name, d(a.earlyStart), a.totalFloat])), '',
     '## 7. Issues to resolve',
     ...issues(r, failing),
+    ...withBlank(evmMarkdown(r.evm)),
   ]
 }
 
@@ -339,8 +345,12 @@ function variance(r: ReportInput): string[] {
       '## 7. Driving-path float and execution trend', 'Finish-milestone total float (the driving path\'s float), lowest float, BEI and missed tasks (baseline finishes before each data date) per update.', '',
       ...trendMarkdown(w.trend, d),
     ] : []),
+    ...withBlank(evmMarkdown(r.evm, r.evmTrend)),
   ]
 }
+
+/** A section preceded by a blank line, or nothing. */
+const withBlank = (lines: string[]) => (lines.length ? ['', ...lines] : [])
 
 /**
  * QA/QC section 5: every activity whose file dates or float differ from Planora's recalculation, with
@@ -409,6 +419,7 @@ export function editsSection(edits: { label: string; before: string; after: stri
 export function reportSupplement(type: string, r: ReportInput): string {
   const out: string[] = [`**${baselineLine(r)}.** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
   if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (Planora calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
+  if (type === 'variance' || type === 'executive_summary') { const e = evmMarkdown(r.evm, type === 'variance' ? r.evmTrend : null); if (e.length) out.push(...e, '') }
   if (type === 'qa_qc') out.push('## Reviewer disposition', ...reviewMarkdown(r.review, { dcma: r.dcma.checks.map(c => ({ id: c.id, name: c.name, result: c.result })), questions: (r.dataQuestions ?? []).filter(q => q.id).map(q => ({ id: q.id!, question: q.question })) }), '')
   if (r.provenance) out.push(...provenanceMarkdown(r.provenance))
   return fmtDates(out.join('\n'))

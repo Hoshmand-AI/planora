@@ -111,7 +111,12 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
       </Disclosure>
 
-      <Disclosure title="Compare with another update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
+      <Disclosure title="Time impact analysis (delay events)">
+        <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
+        <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
+      </Disclosure>
+
+      <Disclosure title="Compare with another update"meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
           <label className="block text-[13px] text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>

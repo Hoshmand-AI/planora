@@ -6,13 +6,13 @@ Maps Planora's controls to common frameworks, with the evidence an assessor can 
 
 | Risk | Control | Evidence | Status |
 |---|---|---|---|
-| A01 Broken access control | RBAC on every route; org-scoped queries; 404 for other tenants; route-guard test | `src/lib/server/api.ts`, `permissions.ts`, `routes.test.ts`, `scripts/e2e-smoke.mjs` (two firms), `e2e-security.mjs` (roles) | Implemented |
+| A01 Broken access control | RBAC on every route; org-scoped queries; 404 for other tenants; route-guard test (incl. SCIM routes, which accept only their organization's SCIM token) | `src/lib/server/api.ts`, `permissions.ts`, `routes.test.ts`, `scim.test.ts`, `scripts/e2e-smoke.mjs` (two firms), `e2e-security.mjs` (roles), `e2e-tenant-isolation.mjs` (every object, cross-org), `tenant-scope.test.ts` (org_id on every query), `e2e-scim.mjs` (cross-organization SCIM) | Implemented |
 | A02 Security misconfiguration | CSP, HSTS, frame, CORP/COOP headers; `poweredByHeader` off; no stack traces | `next.config.js`, `api.ts` error handler, e2e header check | Implemented |
 | A03 Software supply chain | `npm audit` gate (runtime), Dependabot, SBOM artifact, pinned lockfile (`npm ci`), CodeQL | `.github/workflows/ci.yml`, `codeql.yml`, `dependabot.yml` | Implemented |
 | A04 Cryptographic failures | TLS to DB with verification; bcrypt; AES-256-GCM for MFA/SSO secrets; hashed recovery codes and invitation tokens | `databaseTlsConfig` in `src/lib/db.ts`, `src/lib/server/crypto.ts`, `security.test.ts` | Implemented |
 | A05 Injection | Parameterized SQL only (`pg`), formula-injection neutralization in CSV, no dynamic code | `src/lib/db.ts`, `src/lib/export/csv.ts`, Semgrep in CI | Implemented |
 | A06 Insecure design | Deterministic scheduling core separated from AI; optimistic locking; separation-of-duties policies | `src/lib/planning/*`, `savePlan`, review/publish routes | Implemented |
-| A07 Authentication failures | Password policy, lockout, rate limits, TOTP MFA, OIDC SSO, revocable sessions, generic errors | `src/lib/auth.ts`, `src/app/api/auth/*`, `src/lib/server/email-verification.ts`, `e2e-security.mjs` | Implemented (email verification built; provider key: Owner action) |
+| A07 Authentication failures | Password policy, lockout, rate limits, TOTP MFA, OIDC and SAML 2.0 SSO (signed assertions, audience/recipient/issuer/time checks, one-time request IDs, assertion replay protection), revocable sessions, generic errors | `src/lib/auth.ts`, `src/app/api/auth/*`, `src/lib/server/saml.ts`, `saml.test.ts`, `src/lib/server/email-verification.ts`, `e2e-security.mjs`, `e2e-scim.mjs` | Implemented (email verification built; provider key: Owner action) |
 | A08 Software/data integrity | Hash-chained, DB-enforced append-only audit log; backup manifests with SHA-256 | `src/lib/server/audit.ts`, migration 2 trigger, `scripts/restore-drill.mjs` | Implemented |
 | A09 Logging & alerting failures | Structured JSON logs with request ids; audit log; uptime probe → incident issue | `src/lib/server/log.ts`, `src/lib/server/webhooks.ts` (security alerts), `.github/workflows/uptime.yml` | Implemented (alert channel URL and central log retention: Owner action) |
 | A01/A10 Server-side request forgery (webhooks) | HTTPS only, DNS resolution checked against private/loopback/link-local/metadata ranges, no redirects, timeout | `src/lib/server/webhooks.ts`, `security.test.ts` | Implemented |
@@ -35,9 +35,9 @@ Planora's cloud service is **not** offered for Controlled Unclassified Informati
 
 | Family | Application control | Status |
 |---|---|---|
-| 03.01 Access control | RBAC, least privilege, project-level workspaces (ethical walls), session termination (idle timeout, revocation), unsuccessful-logon lockout | Implemented |
+| 03.01 Access control | RBAC, least privilege, project-level workspaces (ethical walls), session termination (idle timeout, revocation), unsuccessful-logon lockout; account management from the customer's directory via SCIM 2.0 (deprovisioning disables the account and revokes its sessions at once) | Implemented |
 | 03.03 Audit & accountability | Event logging with actor/time/source, protection of audit information (append-only + hash chain), review/export | Implemented |
-| 03.05 Identification & authentication | Unique accounts, MFA (TOTP) or federated SSO, password policy, replay-resistant codes | Implemented |
+| 03.05 Identification & authentication | Unique accounts, MFA (TOTP) or federated SSO (OpenID Connect or SAML 2.0, optionally required for all members but owners), password policy, replay-resistant codes and SAML assertions | Implemented |
 | 03.13 System & communications protection | TLS to DB with verification; air-gapped model-host allowlist; no external calls at runtime | Implemented |
 | 03.14 System & information integrity | Dependency scanning, SAST, flaw remediation SLAs | Implemented (process) |
 | 03.04 Configuration management, 03.06 Incident response, 03.08 Media protection, 03.10 Physical, 03.12 Assessment | Hosting-environment and organizational controls | Owner action (customer/enclave) |

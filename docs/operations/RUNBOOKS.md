@@ -53,4 +53,5 @@ Follow INCIDENT-RESPONSE.md. Useful queries:
 | `JWT_SECRET` | Signs session and challenge tokens | Yearly, or after an incident. Signs everyone out |
 | `PLANORA_ENCRYPTION_KEY` | Encrypts MFA and SSO secrets (falls back to `JWT_SECRET`) | Rotating it requires re-enrolling MFA and re-entering SSO secrets |
 | `DATABASE_URL` | Database | Rotate the password in Neon, update it in Vercel, redeploy |
-| `OPENAI_API_KEY` | Cloud AI | Yearly, or after an incident |
+| `ANTHROPIC_API_KEY` | Cloud AI (default provider) | Yearly, or after an incident |
+| `OPENAI_API_KEY` | Cloud AI (alternate provider, if used) | Yearly, or after an incident |

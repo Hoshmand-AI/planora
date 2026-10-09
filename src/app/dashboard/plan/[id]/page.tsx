@@ -18,6 +18,9 @@ import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 import { useApp } from '../../layout'
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { SmartInterview } from '@/components/interview/SmartInterview'
+import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
+import { Disclosure } from '@/components/Disclosure'
+import { ResourcesPanel } from '@/components/ResourcesPanel'
 
 interface Review { id: string; reviewer: string; verdict: string; comment: string; at: string }
 interface Plan {
@@ -27,7 +30,7 @@ interface Plan {
 }
 interface View {
   plan: Plan; elicitation: ElicitationResult; adaptive: AdaptiveInterview; evaluation: Evaluation | null
-  llm: { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; error?: string; cuiWarning?: string }
+  llm: { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; provider?: ProviderName | null; model: string | null; certified?: boolean; error?: string; cuiWarning?: string }
   history: { projectCount: number; similarCount: number } | null
   answered: { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }[]
   recovery: RecoveryPlan | null
@@ -214,7 +217,7 @@ export default function PlanPage() {
             <button onClick={() => { setTab('schedule'); setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }}
               className="pressable rounded-full bg-status-at-risk-bg text-status-at-risk px-2.5 py-0.5 text-[12.5px] font-semibold">{lateDays} days late</button>
           )}
-          <span className="text-[12px] text-warm-500 inline-flex items-center gap-1">{llm.airgapped && <Lock size={10} aria-hidden />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'}</span>
+          <span className="text-[12px] text-warm-500 inline-flex items-center gap-1" title={llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : undefined}>{llm.airgapped && <Lock size={10} aria-hidden />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'}</span>
         </div>
         <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/70 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
@@ -674,6 +677,10 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       </p>
 
       <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
+
+      <Disclosure id="resources" tone="card" title="Resources: loading, over-allocation and leveling" meta={plan.generated?.resources?.assignments.length ? `${plan.generated.resources.assignments.length} assignments` : 'no resource data'}>
+        <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
+      </Disclosure>
 
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
 

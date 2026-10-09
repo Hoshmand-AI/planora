@@ -3,11 +3,13 @@ import { api } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { getDataQuestionResponses, getReviewState, getScheduleById, getScheduleFile, saveDataQuestionResponse } from '@/lib/db'
 import { xerResourceCounts } from '@/lib/parsers/xer-parser'
+import { p6XmlResourceCounts } from '@/lib/parsers/p6-xml-parser'
 import { decodeXer } from '@/lib/parsers/xer-codec'
 import { runDcma } from '@/lib/analysis/dcma'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { analyzableFromDb, basisFrom, basisLabel, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
+import { loadScheduleResources } from '@/lib/planning/resource-service'
 
 /** DCMA 14-point assessment + the tool's own questions about the imported data. */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth: ctx }) => {
@@ -16,11 +18,23 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
   const [responses, review] = await Promise.all([getDataQuestionResponses(schedule.id), getReviewState(schedule.id, ctx.orgId)])
-  // P6 resource assignments (TASKRSRC) are not stored per activity; read them from the original file.
+  // P6 resource assignments (XER TASKRSRC / P6 XML ResourceAssignment) are not stored per activity;
+  // read them from the original file.
   let resourceCounts: Record<string, number> | null = null
-  if (schedule.sourceType === 'p6_xer') {
+  if (schedule.sourceType === 'p6_xer' || schedule.sourceType === 'p6_xml') {
     const f = await getScheduleFile(schedule.id, ctx.orgId).catch(() => undefined)
-    if (f) resourceCounts = xerResourceCounts(decodeXer(f.content).text)
+    if (f) {
+      const text = decodeXer(f.content).text
+      resourceCounts = schedule.sourceType === 'p6_xer' ? xerResourceCounts(text) : p6XmlResourceCounts(text, { projectId: schedule.projectKey ?? null })
+    }
+  } else if (schedule.sourceType === 'ms_xml' || schedule.sourceType === 'excel' || schedule.sourceType === 'csv') {
+    // MS Project Assignments / spreadsheet resource columns (resource analysis reads the same data).
+    const rd = await loadScheduleResources(schedule, ctx.orgId, activities).catch(() => null)
+    if (rd) {
+      const byId = new Map(activities.map(x => [x.id, x.sourceId]))
+      resourceCounts = Object.fromEntries(activities.filter(x => x.sourceId).map(x => [x.sourceId!, 0]))
+      for (const x of rd.assignments) { const k = byId.get(x.activityId); if (k) resourceCounts[k] = (resourceCounts[k] || 0) + 1 }
+    }
   }
   const a = analyzableFromDb(schedule, activities, relationships, resourceCounts)
   const dcma = runDcma(a, ctx.settings.quality)
@@ -36,7 +50,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     basisNote: basisWarning(data.basis, data.editsApplied),
     guidance,
     brief: data.brief,
-    schedule: { id: schedule.id, name: schedule.name, version: schedule.version, sourceType: schedule.sourceType, calendars: schedule.calendars, warnings: schedule.warnings },
+    schedule: { id: schedule.id, name: schedule.name, version: schedule.version, sourceType: schedule.sourceType, calendars: schedule.calendars, warnings: schedule.warnings, importExceptions: schedule.importExceptions ?? null },
     dcma,
     dataQuestions: questions.map(q => ({ ...q, response: byId.get(q.id) ?? null })),
     classification: summarizeCategories(activities.map(x => x.category || 'other')),

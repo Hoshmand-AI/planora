@@ -8,11 +8,14 @@ import { randomUUID as uuid } from 'crypto'
 import {
   ParsedSchedule, makeActivity, isoDatePrefix, serialToIso, round2, constraintFromLabel,
 } from './types'
+import { xerResourceData } from './resources'
+import { ExceptionCollector, wasRounded, type ExceptionEntity, type ExceptionSeverity } from './exceptions'
 
 type Row = Record<string, string>
 
 export function parseXER(content: string, scheduleId: string, opts: { projectId?: string | null } = {}): ParsedSchedule {
   const warnings: string[] = []
+  const ex = new ExceptionCollector('import', 'p6_xer')
   const tables = readTables(content)
 
   /* ── Project ─────────────────────────────────────────── */
@@ -28,11 +31,15 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   if (projects.length > 1) {
     const others = projects.filter(p => p !== project).map(p => `"${p['proj_short_name'] || p['proj_id']}"${p['orig_proj_id'] ? ' (baseline)' : ''}`)
     warnings.push(`XER contains ${projects.length} projects; imported "${project['proj_short_name'] || projId}" only. Not imported: ${others.join(', ')}.`)
+    ex.add({ severity: 'warning', entity: 'project', field: 'PROJECT', disposition: 'preserved_in_raw', count: others.length, examples: projects.filter(p => p !== project).map(p => p['proj_short_name'] || p['proj_id']),
+      message: `Only "${project['proj_short_name'] || projId}" was imported; the other projects (and their activities) stay in the original file` })
   }
   const inProject = (r: Row) => !projId || !r['proj_id'] || r['proj_id'] === projId
   const embeddedBaseline = projId ? embeddedBaselineOf(projects, project, tables['TASK'] || []) : null
   if (embeddedBaseline) warnings.push(`The file carries the P6 project baseline "${embeddedBaseline.name}" (${Object.keys(embeddedBaseline.finishes).length} activities); variance, BEI and missed tasks are measured against it unless an upload of this project is designated as Baseline.`)
   if (projId) {
+    const otherTasks = (tables['TASK'] || []).filter(t => !inProject(t))
+    if (otherTasks.length) ex.add({ severity: 'warning', entity: 'activity', field: 'TASK (other projects)', disposition: 'preserved_in_raw', count: otherTasks.length, examples: otherTasks.map(t => t['task_code'] || t['task_id']), message: 'Activities of the projects not imported' })
     tables['TASK'] = (tables['TASK'] || []).filter(inProject)
     tables['PROJWBS'] = (tables['PROJWBS'] || []).filter(inProject)
     const keep = new Set(tables['TASK'].map(t => t['task_id']))
@@ -53,7 +60,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   for (const c of tables['CALENDAR'] || []) {
     const id = c['clndr_id']
     if (!id) continue
-    const cal = parseCalendarRow(c, warnings)
+    const cal = parseCalendarRow(c, warnings, ex)
     calendars.push(cal)
     calById.set(id, cal)
     if (c['default_flag'] === 'Y' && !defaultCalFlag) defaultCalFlag = id
@@ -104,13 +111,26 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     seenTaskIds.add(id)
     return true
   })
-  if (duplicates.length) warnings.push(`TASK table repeats task_id ${duplicates.slice(0, 10).join(', ')}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ''}; only the first row of each was imported.`)
+  if (duplicates.length) {
+    warnings.push(`TASK table repeats task_id ${duplicates.slice(0, 10).join(', ')}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ''}; only the first row of each was imported.`)
+    ex.add({ severity: 'loss', entity: 'activity', field: 'TASK.task_id', disposition: 'dropped', count: duplicates.length, examples: duplicates, message: 'Repeated task_id rows; only the first row of each was imported' })
+  }
   const byTaskId = new Map<string, Activity>()
   const activities: Activity[] = tasks.map(t => {
     const clndrId = t['clndr_id'] || defaultCalendarId
-    if (t['clndr_id'] && !calById.has(t['clndr_id'])) warnings.push(`Activity ${t['task_code']}: calendar ${t['clndr_id']} not found in CALENDAR table; using ${hoursPerDay(null)}h/day`)
+    const code = t['task_code'] || t['task_id']
+    if (t['clndr_id'] && !calById.has(t['clndr_id'])) {
+      warnings.push(`Activity ${t['task_code']}: calendar ${t['clndr_id']} not found in CALENDAR table; using ${hoursPerDay(null)}h/day`)
+      ex.add({ severity: 'warning', entity: 'calendar', field: 'TASK.clndr_id', disposition: 'defaulted', example: code, message: `Activity calendar not in the CALENDAR table; the project default calendar's hours per day were used` })
+    }
     const hpd = hoursPerDay(clndrId)
-    const hrs = (v: string | undefined) => (v === undefined || v === '' ? null : round2(parseFloat(v) / hpd))
+    const hrs = (v: string | undefined, field?: string) => {
+      if (v === undefined || v === '') return null
+      const exact = parseFloat(v) / hpd
+      const r = round2(exact)
+      if (field && wasRounded(exact, r)) ex.add({ severity: 'info', entity: 'activity', field, disposition: 'converted', example: code, message: 'Hours converted to work days on the activity calendar and rounded to 0.01 day' })
+      return r
+    }
 
     let status: Activity['status'] = 'not_started'
     if (t['status_code'] === 'TK_Complete') status = 'complete'
@@ -119,9 +139,13 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     let pct = parseFloat(t['phys_complete_pct'] || t['complete_pct'] || '0') || 0
     if (pct < 0 || pct > 100) {
       warnings.push(`Activity ${t['task_code'] || t['task_id']}: percent complete ${pct} is outside 0–100; set to ${pct < 0 ? 0 : 100}`)
+      ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.phys_complete_pct', disposition: 'converted', example: code, message: 'Percent complete outside 0–100 was clamped' })
       pct = pct < 0 ? 0 : 100
     }
     if (status === 'complete' && pct === 0) pct = 100
+    const pctType = t['complete_pct_type']
+    if (pctType && pctType !== 'CP_Phys') ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.complete_pct_type', disposition: 'converted', example: code, message: `Percent complete type ${pctType === 'CP_Drtn' ? 'Duration' : pctType === 'CP_Units' ? 'Units' : pctType} is not modeled; Planora reads the physical % complete and the remaining duration` })
+    if (t['task_type'] === 'TT_Rsrc') ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.task_type', disposition: 'converted', example: code, message: 'Resource dependent activities are scheduled as task dependent (on the activity calendar, not resource calendars)' })
 
     let activityType: Activity['activityType'] = 'task'
     let milestoneKind: Activity['milestoneKind'] = null
@@ -141,22 +165,33 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     const cstr = t['cstr_type']
     if (cstr) {
       const mapped = constraintFromLabel(cstr)
-      if (mapped === 'ALAP') warnings.push(`Activity ${t['task_code']}: As Late As Possible constraint is not modeled; ignored`)
-      else if (mapped) {
+      if (mapped === 'ALAP') {
+        warnings.push(`Activity ${t['task_code']}: As Late As Possible constraint is not modeled; ignored`)
+        ex.add({ severity: 'loss', entity: 'constraint', field: 'TASK.cstr_type=CS_ALAP', disposition: 'dropped', example: code, message: 'As Late As Possible is not modeled; the activity is scheduled as soon as possible' })
+      } else if (mapped) {
         constraintType = mapped
         constraintDate = isoDatePrefix(t['cstr_date'])
-        if (!constraintDate) warnings.push(`Activity ${t['task_code']}: constraint ${cstr} has no date; ignored`)
+        if (!constraintDate) {
+          warnings.push(`Activity ${t['task_code']}: constraint ${cstr} has no date; ignored`)
+          ex.add({ severity: 'loss', entity: 'constraint', field: 'TASK.cstr_date', disposition: 'dropped', example: code, message: 'Constraint without a date was ignored' })
+        }
         if (!constraintDate) constraintType = null
-      } else warnings.push(`Activity ${t['task_code']}: unrecognized constraint type "${cstr}"`)
+      } else {
+        warnings.push(`Activity ${t['task_code']}: unrecognized constraint type "${cstr}"`)
+        ex.add({ severity: 'loss', entity: 'constraint', field: 'TASK.cstr_type', disposition: 'dropped', example: `${code} (${cstr})`, message: 'Unrecognized constraint type was ignored' })
+      }
     }
-    if (t['cstr_type2']) warnings.push(`Activity ${t['task_code']}: secondary constraint ${t['cstr_type2']} ignored`)
+    if (t['cstr_type2']) {
+      warnings.push(`Activity ${t['task_code']}: secondary constraint ${t['cstr_type2']} ignored`)
+      ex.add({ severity: 'loss', entity: 'constraint', field: 'TASK.cstr_type2', disposition: 'dropped', example: `${code} (${t['cstr_type2']})`, message: 'Secondary constraints are not modeled; only the primary constraint is used' })
+    }
 
     const a = makeActivity(scheduleId, {
       activityId: t['task_code'] || t['task_id'] || '',
       name: t['task_name'] || 'Unnamed Activity',
       wbs: wbsPath(t['wbs_id'] || ''),
-      duration: hrs(t['target_drtn_hr_cnt']) ?? 0,
-      remainingDuration: hrs(t['remain_drtn_hr_cnt']) ?? 0,
+      duration: hrs(t['target_drtn_hr_cnt'], 'TASK.target_drtn_hr_cnt') ?? 0,
+      remainingDuration: hrs(t['remain_drtn_hr_cnt'], 'TASK.remain_drtn_hr_cnt') ?? 0,
       percentComplete: pct,
       earlyStart: isoDatePrefix(t['early_start_date']) || isoDatePrefix(t['restart_date']),
       earlyFinish: isoDatePrefix(t['early_end_date']) || isoDatePrefix(t['reend_date']),
@@ -189,18 +224,40 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     const succ = byTaskId.get(p['task_id'])
     if (!pred || !succ) {
       warnings.push(`Relationship ${p['pred_task_id']} → ${p['task_id']} references an activity not in this file (external project?); skipped`)
+      ex.add({ severity: 'loss', entity: 'relationship', field: 'TASKPRED', disposition: 'dropped', example: `${p['pred_task_id']} -> ${p['task_id']}`, message: 'Relationship to an activity not in the imported project (external project?) was skipped' })
       continue
     }
     const t = (p['pred_type'] || 'PR_FS').replace('PR_', '')
     const type: Relationship['type'] = t === 'SS' || t === 'FF' || t === 'SF' ? t : 'FS'
+    if (p['pred_type'] && !['PR_FS', 'PR_SS', 'PR_FF', 'PR_SF'].includes(p['pred_type'])) ex.add({ severity: 'warning', entity: 'relationship', field: 'TASKPRED.pred_type', disposition: 'converted', example: `${pred.activityId} -> ${succ.activityId} (${p['pred_type']})`, message: 'Unknown relationship type read as finish-to-start' })
     // P6's default lag calendar is the predecessor's ("Calendar for scheduling relationship lag")
-    const lag = round2((parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(pred.calendarId))
+    const lagExact = (parseFloat(p['lag_hr_cnt'] || '0') || 0) / hoursPerDay(pred.calendarId)
+    const lag = round2(lagExact)
+    if (wasRounded(lagExact, lag)) ex.add({ severity: 'info', entity: 'relationship', field: 'TASKPRED.lag_hr_cnt', disposition: 'converted', example: `${pred.activityId} -> ${succ.activityId}`, message: 'Lag hours converted to work days on the predecessor calendar and rounded to 0.01 day' })
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
 
   // Tables Planora does not model. They stay in the stored original file and the .xer export of this
   // upload passes them through unchanged (see exportXerFromOriginal); other exports leave them out.
   const notModeled = Object.keys(tables).filter(t => !MODELED_TABLES.has(t) && tables[t].length > 0)
+  for (const t of notModeled) {
+    const [entity, severity] = TABLE_ENTITY[t] ?? ['other', 'info']
+    ex.add({ severity, entity, field: t, disposition: 'preserved_in_raw', count: tables[t].length, examples: tables[t].map(rowKey),
+      message: `${TABLE_LABELS[t] ? `${TABLE_LABELS[t][0].toUpperCase()}${TABLE_LABELS[t].slice(1)}` : `Table ${t}`}: not used by Planora; kept in the original file and in this upload's P6 (.xer) export, not in the MS Project, Excel or CSV exports` })
+  }
+  // Fields of the tables Planora reads that carry data it does not map.
+  for (const [table, read] of Object.entries(READ_FIELDS)) {
+    const rows = tables[table] || []
+    if (!rows.length) continue
+    const fields = new Set<string>()
+    for (const r of rows) for (const f of Object.keys(r)) if (!read.has(f) && r[f] !== '') fields.add(f)
+    for (const f of fields) {
+      const withValue = rows.filter(r => r[f] !== '')
+      const [entity, severity] = FIELD_ENTITY[`${table}.${f}`] ?? [TABLE_ENTITY[table]?.[0] ?? 'other', 'info' as ExceptionSeverity]
+      ex.add({ severity, entity, field: `${table}.${f}`, disposition: 'preserved_in_raw', count: withValue.length, examples: withValue.map(r => r['task_code'] || rowKey(r)),
+        message: FIELD_NOTES[`${table}.${f}`] ?? 'Field not mapped by Planora; kept in the original file and in this upload\'s P6 (.xer) export' })
+    }
+  }
   if (notModeled.length) {
     warnings.push(`Not used in Planora's analysis: ${notModeled.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
   }
@@ -208,14 +265,21 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   /* ── Scheduling options (P6 SCHEDOPTIONS) ─────────────── */
   const opt = (tables['SCHEDOPTIONS'] || []).find(o => !projId || !o['proj_id'] || o['proj_id'] === projId)
   const progressMode = progressModeFromSchedOptions(opt)
-  if (opt && !progressMode) warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Planora does not model; Planora uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
+  if (opt && !progressMode) {
+    warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Planora does not model; Planora uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
+    ex.add({ severity: 'warning', entity: 'project', field: 'SCHEDOPTIONS.sched_retained_logic', disposition: 'converted', example: project['proj_short_name'] || projId, message: 'Out-of-sequence progress "Actual Dates" is not modeled; Retained Logic is used' })
+  }
+  const lagCal = opt?.['sched_calendar_on_relationship_lag']
+  if (lagCal && !/predecessor/i.test(lagCal)) ex.add({ severity: 'warning', entity: 'relationship', field: 'SCHEDOPTIONS.sched_calendar_on_relationship_lag', disposition: 'converted', example: lagCal, message: 'Lags are converted and scheduled on the predecessor calendar (P6 default); the file schedules lags on another calendar' })
 
   return {
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,
     planoraExport: isPlanoraXer(content),
     activities, relationships, calendars, defaultCalendarId, warnings,
+    exceptions: ex.report(),
     sourceType: 'p6_xer', embeddedBaseline,
     resourceCounts: tables['TASKRSRC'] ? resourceCountsFrom(tables['TASKRSRC'], tasks) : undefined,
+    resources: xerResourceData(tables, byTaskId, dataDate),
     sourceTables: Object.keys(tables),
   }
 }
@@ -270,7 +334,49 @@ export function isPlanoraXer(content: string): boolean {
   return cols[0].trim() === 'ERMHDR' && cols[5]?.trim() === 'Planora'
 }
 
-const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS'])
+const MODELED_TABLES = new Set(['CALENDAR', 'PROJECT', 'PROJWBS', 'TASK', 'TASKPRED', 'SCHEDOPTIONS', 'RSRC', 'RSRCRATE', 'TASKRSRC', 'UMEASURE'])
+
+/** Fields the importer reads from the tables it models; anything else with a value is reported. */
+const READ_FIELDS: Record<string, Set<string>> = {
+  PROJECT: new Set(['proj_id', 'proj_short_name', 'proj_long_name', 'plan_start_date', 'plan_end_date', 'scd_end_date', 'last_recalc_date', 'next_data_date', 'clndr_id', 'orig_proj_id', 'sum_base_proj_id']),
+  CALENDAR: new Set(['clndr_id', 'clndr_name', 'clndr_data', 'default_flag', 'day_hr_cnt', 'proj_id']),
+  PROJWBS: new Set(['wbs_id', 'proj_id', 'wbs_short_name', 'wbs_name', 'parent_wbs_id', 'proj_node_flag']),
+  TASK: new Set(['task_id', 'proj_id', 'wbs_id', 'clndr_id', 'task_code', 'task_name', 'status_code', 'phys_complete_pct', 'complete_pct', 'complete_pct_type', 'task_type',
+    'total_float_hr_cnt', 'free_float_hr_cnt', 'cstr_type', 'cstr_date', 'cstr_type2', 'target_drtn_hr_cnt', 'remain_drtn_hr_cnt', 'early_start_date', 'early_end_date',
+    'restart_date', 'reend_date', 'late_start_date', 'late_end_date', 'act_start_date', 'act_end_date', 'target_start_date', 'target_end_date', 'driving_path_flag']),
+  TASKPRED: new Set(['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt']),
+  SCHEDOPTIONS: new Set(['schedoptions_id', 'proj_id', 'sched_retained_logic', 'sched_progress_override', 'sched_calendar_on_relationship_lag']),
+}
+/** Entity and severity of the tables Planora does not model. */
+const TABLE_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity]> = {
+  ACTVTYPE: ['code', 'warning'], ACTVCODE: ['code', 'warning'], TASKACTV: ['code', 'warning'], PCATTYPE: ['code', 'info'], PCATVAL: ['code', 'info'], PROJPCAT: ['code', 'info'],
+  RCATTYPE: ['code', 'info'], RCATVAL: ['code', 'info'], RSRCRCAT: ['code', 'info'],
+  UDFTYPE: ['udf', 'warning'], UDFVALUE: ['udf', 'warning'],
+  RSRC: ['resource', 'warning'], RSRCRATE: ['resource', 'info'], ROLES: ['resource', 'info'], ROLERATE: ['resource', 'info'], RSRCROLE: ['resource', 'info'], RSRCCURVDATA: ['resource', 'info'],
+  TASKRSRC: ['assignment', 'warning'],
+  ACCOUNT: ['other', 'info'], PROJCOST: ['other', 'info'], COSTTYPE: ['other', 'info'], FINDATES: ['other', 'info'], TRSRCFIN: ['other', 'info'], TASKFIN: ['other', 'info'],
+  CURRTYPE: ['other', 'info'], TASKMEMO: ['activity', 'info'], MEMOTYPE: ['activity', 'info'], TASKPROC: ['activity', 'info'], OBS: ['other', 'info'],
+  PROJWBS: ['activity', 'info'], TASK: ['activity', 'info'], TASKPRED: ['relationship', 'info'], CALENDAR: ['calendar', 'info'], PROJECT: ['project', 'info'], SCHEDOPTIONS: ['project', 'info'],
+}
+const FIELD_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity]> = {
+  'TASK.cstr_date2': ['constraint', 'loss'], 'TASK.duration_type': ['activity', 'info'], 'TASK.float_path': ['activity', 'info'],
+  'TASK.expect_end_date': ['activity', 'warning'], 'TASK.suspend_date': ['activity', 'warning'], 'TASK.resume_date': ['activity', 'warning'],
+  'TASK.rsrc_id': ['resource', 'info'], 'CALENDAR.base_clndr_id': ['calendar', 'info'], 'PROJWBS.seq_num': ['activity', 'info'],
+}
+const FIELD_NOTES: Record<string, string> = {
+  'TASK.cstr_date2': 'Secondary constraint dates are not modeled',
+  'TASK.expect_end_date': 'Expected finish is not modeled; the remaining duration is used',
+  'TASK.suspend_date': 'Suspend / resume dates are not modeled',
+  'TASK.resume_date': 'Suspend / resume dates are not modeled',
+  'CALENDAR.base_clndr_id': 'Base calendar link not kept; the calendar\'s own work week and exceptions are used',
+}
+/** Fields that identify a row to a scheduler, most telling first. */
+const ROW_KEYS = ['task_code', 'wbs_short_name', 'proj_short_name', 'rsrc_short_name', 'role_short_name', 'short_name', 'clndr_name', 'actv_code_type', 'udf_type_label', 'acct_short_name', 'memo_type', 'fk_id', 'task_id']
+/** A short identifier for a row of any table: a known name / code field, else its first *_id. */
+function rowKey(r: Row): string {
+  const k = ROW_KEYS.find(f => r[f]) || Object.keys(r).find(f => /_id$/.test(f) && r[f]) || Object.keys(r)[0]
+  return k ? r[k] : ''
+}
 const TABLE_LABELS: Record<string, string> = {
   ACTVTYPE: 'activity code types', ACTVCODE: 'activity code values', TASKACTV: 'activity code assignments',
   UDFTYPE: 'user-defined fields', UDFVALUE: 'user-defined field values', RSRC: 'resources', TASKRSRC: 'resource assignments',
@@ -301,7 +407,7 @@ export function readXerTables(content: string): Record<string, Row[]> {
 /** A P6 calendar row's hours per day and the time of day work starts and ends (from clndr_data). */
 export function xerCalendarTimes(c: Row): { hoursPerDay: number; start: string; finish: string } {
   const warnings: string[] = []
-  const cal = parseCalendarRow(c, warnings)
+  const cal = parseCalendarRow(c, warnings, null)
   const dow = findChild(c['clndr_data'] ? parseClndrData(c['clndr_data']) : null, 'DaysOfWeek')
   let start: number | null = null, finish: number | null = null
   for (const d of dow?.children || []) {
@@ -415,7 +521,8 @@ function findChild(n: CNode | null | undefined, name: string): CNode | undefined
   return undefined
 }
 
-function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
+function parseCalendarRow(c: Row, warnings: string[], ex: ExceptionCollector | null): WorkCalendar {
+  const calName = c['clndr_name'] || `Calendar ${c['clndr_id']}`
   const tree = c['clndr_data'] ? parseClndrData(c['clndr_data']) : null
   const workDays: Weekday[] = []
   const dayHours: number[] = []
@@ -437,6 +544,7 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
   } else {
     workDays.push(1, 2, 3, 4, 5)
     warnings.push(`Calendar "${c['clndr_name']}" has no DaysOfWeek data; assumed Mon–Fri`)
+    ex?.add({ severity: 'warning', entity: 'calendar', field: 'CALENDAR.clndr_data', disposition: 'defaulted', example: calName, message: 'Calendar without a work week; Monday–Friday assumed' })
   }
   workDays.sort((a, b) => a - b)
 
@@ -456,12 +564,14 @@ function parseCalendarRow(c: Row, warnings: string[]): WorkCalendar {
       if (workDays.includes(wd)) holidays.push(iso)
     } else if (!workDays.includes(wd)) {
       extraWorkDays.push(iso)
+    } else if (Math.abs(intervalHours(e.children) - (dayHours[workDays.indexOf(wd)] ?? 0)) > 0.01) {
+      ex?.add({ severity: 'info', entity: 'calendar', field: 'CALENDAR.clndr_data.Exceptions', disposition: 'converted', example: `${calName} ${iso}`, message: 'Exception changes the work hours of a work day; Planora counts it as a normal work day' })
     }
   }
   holidays.sort()
   extraWorkDays.sort()
 
-  const name = c['clndr_name'] || `Calendar ${c['clndr_id']}`
+  const name = calName
   return {
     id: c['clndr_id'],
     name,

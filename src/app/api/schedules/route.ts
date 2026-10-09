@@ -4,10 +4,11 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta, setScheduleImportExceptions } from '@/lib/db'
 import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
+import { emptyReport, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
@@ -100,10 +101,12 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     })
   }
 
-  // The list carries the headline analysis only (no driving-path ids or recalculation samples).
-  const schedules = (await getSchedules(ctx.orgId)).map(s => s.analysis
-    ? { ...s, analysis: { ...s.analysis, longestPath: [], logicDates: undefined, drivingPath: undefined, recalc: s.analysis.recalc ? { ...s.analysis.recalc, samples: [] } : null } }
-    : s)
+  // The list carries the headline analysis only (no driving-path ids or recalculation samples) and
+  // the import exception counts, not the full report (GET ?id= returns it).
+  const schedules = (await getSchedules(ctx.orgId)).map(s => ({ ...s, importExceptions: undefined, importExceptionSummary: s.importExceptions ? summarizeExceptions(s.importExceptions) : null }))
+    .map(s => s.analysis
+      ? { ...s, analysis: { ...s.analysis, longestPath: [], logicDates: undefined, drivingPath: undefined, recalc: s.analysis.recalc ? { ...s.analysis.recalc, samples: [] } : null } }
+      : s)
   return NextResponse.json({ schedules })
 })
 
@@ -174,7 +177,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
           activitiesImported: existing.activityCount, relationshipsImported: existing.relationshipCount, calendarsImported: existing.calendars.length,
           criticalCount: existing.criticalCount, projectStart: existing.projectStart, projectFinish: existing.projectFinish, forecastFinish: existing.analysis?.forecastFinish ?? existing.projectFinish,
           varianceDays: existing.varianceDays, status: existing.analysis?.status ?? null, sha256, series: series.length, classifiedPct: 0, dataQuestions: 0,
-          warnings: [warning],
+          warnings: [warning], importExceptions: existing.importExceptions ?? null,
         },
       })
     }
@@ -294,7 +297,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const meta = { classification: classificationInput, uploadOrigin: originInput, planoraExport, historyOverride: history.historyOverride }
     await updateScheduleMeta(schedule.id, ctx.orgId, meta)
     await setScheduleBaselineMeta(schedule.id, ctx.orgId, baselineMeta)
-    Object.assign(schedule, meta, { baselineMeta })
+    // What the parser saw but did not map, converted or defaulted (never dropped silently).
+    const importExceptions = parsed.exceptions ?? emptyReport('import', parsed.sourceType)
+    await setScheduleImportExceptions(schedule.id, ctx.orgId, importExceptions)
+    Object.assign(schedule, meta, { baselineMeta, importExceptions })
+    const exSummary = summarizeExceptions(importExceptions)
 
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
@@ -302,7 +309,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, planoraExport, progressMode, workspaceId } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, planoraExport, progressMode, workspaceId, importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -324,6 +331,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
         classifiedPct: parsed.activities.length ? Math.round((classified / parsed.activities.length) * 100) : 0,
         dataQuestions: dataQuestions.length,
         warnings,
+        importExceptions,
+        importExceptionSummary: exSummary,
       },
     })
   }

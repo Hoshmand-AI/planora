@@ -21,7 +21,8 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 ## 2. Access control
 | Question | Answer | Evidence |
 |---|---|---|
-| SSO | OpenID Connect (Azure AD / Entra, Okta, Google); per-domain enforcement | `src/lib/server/sso.ts` |
+| SSO | OpenID Connect and SAML 2.0 (Azure AD / Entra, Okta, Google, Ping, ADFS and other SAML IdPs), Enterprise plan. SAML: SP-initiated, signed responses or assertions verified against the configured IdP certificates (rollover supported), audience/recipient/issuer/time checks, one-time request IDs and assertion replay protection; SP metadata download and an admin test sign-in. Just-in-time provisioning in DNS-verified domains, group-to-role mapping, optional enforcement (owners keep a break-glass password) | `src/lib/server/sso.ts`, `src/lib/server/saml.ts`, [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md) |
+| User provisioning (SCIM) | SCIM 2.0 Users endpoint (create, update, PATCH, deactivate, delete; `userName` filter and paging), Enterprise plan. Per-organization bearer tokens stored as hashes, shown once and revocable. Deactivating or deleting a user disables the account and ends all of its sessions immediately. Every change is audited. Groups are not supported; roles are set through the `roles` attribute | `src/lib/server/scim.ts`, `/api/scim/v2` |
 | MFA | TOTP with single-use recovery codes. Replayed codes are rejected. An organization can require MFA | `src/lib/server/mfa.ts` |
 | Roles | Owner, admin, scheduler, reviewer, viewer. Every API route declares its permission and a test enforces it | `src/lib/server/routes.test.ts` |
 | Project-level access (ethical walls) | Workspaces group schedules and plans by client matter or engagement. A walled workspace is visible only to its members; members can be limited to their own workspaces; owners and admins see all. Enforced on every list, read and export endpoint, and audited | `src/lib/server/workspaces.ts`, `src/lib/server/workspaces.test.ts` |
@@ -34,7 +35,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 |---|---|---|
 | Encryption in transit | TLS 1.2+ everywhere; HSTS preload | Response headers |
 | Encryption at rest | Neon storage encryption (AES-256). Secrets (SSO client secret, webhook secrets) are additionally encrypted by the application | [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md) |
-| Tenant isolation | Every query is scoped by organization; cross-tenant access is tested end to end | `scripts/e2e-security.mjs` |
+| Tenant isolation | Every query is scoped by organization; cross-tenant access is tested end to end for every object type | `scripts/e2e-tenant-isolation.mjs`, `src/lib/server/tenant-scope.test.ts` |
 | Original files / chain of custody | The uploaded file is kept unchanged with its SHA-256, which is also written to the tamper-evident audit log. It can be downloaded again | `src/app/api/schedules/[id]/export/route.ts` |
 | Audit log | Append-only and hash-chained; covers every answer, override, review, export and upload | `src/lib/server/audit.ts` |
 | Data export and deletion | Organization export; member and organization erasure | [../privacy/DATA-MAP.md](../privacy/DATA-MAP.md) |
@@ -45,7 +46,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 |---|---|---|
 | Is AI used? | Optional. The schedule engine, DCMA checks and reports are deterministic code. AI only phrases answers and suggestions | [../ai/AI-GOVERNANCE.md](../ai/AI-GOVERNANCE.md) |
 | Is it on by default? | No. New organizations start with AI off; an admin turns it on | `src/lib/server/org.ts` |
-| Is our data used to train models? | No. OpenAI API terms exclude API data from training. No other model provider is used | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
+| Is our data used to train models? | Cloud AI is off by default. When an admin turns it on, request-relevant content is sent to the selected provider: Anthropic (default) or OpenAI (approved alternate). Training and retention terms must be verified against the provider agreement in force; on-prem and air-gapped deployments send nothing to a cloud provider | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
 | CUI / classified projects | Cloud AI is refused for projects marked CUI, classified or withheld. The cloud service warns that CUI must not be stored there | [CUI-HANDLING.md](CUI-HANDLING.md) |
 
 ## 5. Secure development

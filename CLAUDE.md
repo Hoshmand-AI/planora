@@ -10,7 +10,7 @@ The owner has asked Claude to ship without waiting on them:
 Rollback: Vercel → Deployments → Instant Rollback.
 
 ## Checks
-`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (CI runs all of them — see `.github/workflows/ci.yml` for the env).
+`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/e2e-tenant-isolation.mjs`, `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (CI runs all of them — see `.github/workflows/ci.yml` for the env).
 
 ## Security rules for changes
 - Every API handler uses `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (enforced by `src/lib/server/routes.test.ts`).

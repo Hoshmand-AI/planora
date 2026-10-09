@@ -117,7 +117,7 @@ These are all the environment variables the application and its scripts read (co
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PLANORA_AI_MODE` | `offline` in the image | `offline` (no model), `local` (an OpenAI-compatible server in your network) or `cloud` (OpenAI; not for CUI). |
+| `PLANORA_AI_MODE` | `offline` in the image | `offline` (no model), `local` (an OpenAI-compatible server in your network) or `cloud` (Anthropic by default, or OpenAI with `PLANORA_AI_PROVIDER=openai`; sends request content to that provider; not for CUI). |
 | `PLANORA_AIRGAPPED` | `true` in Compose | Refuses cloud AI and any model host that is not loopback, private-network, `*.local`, `*.internal`, or listed in `PLANORA_ALLOWED_HOSTS`. |
 | `LLM_BASE_URL` | — | Local model endpoint, e.g. `http://gpu01.enclave.internal:11434/v1`. |
 | `LLM_MODEL` | `llama3.1:8b` (local) | Model name. Must be in the approved list. |
@@ -125,7 +125,7 @@ These are all the environment variables the application and its scripts read (co
 | `PLANORA_ALLOWED_HOSTS` | — | Extra on-prem model host names allowed in air-gapped mode (comma-separated). |
 | `PLANORA_APPROVED_MODELS` | list in [../ai/MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) | Comma-separated registry; any other model is refused. |
 | `PLANORA_AI_DAILY_LIMIT` | 300 | Ceiling on each organization's AI requests per day. |
-| `OPENAI_API_KEY` | — | Cloud mode only. Leave unset on CUI instances. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PLANORA_AI_PROVIDER` | — | Cloud mode only. Leave unset on CUI instances. |
 
 Organizations also have their own AI switch (off by default for new organizations) under
 Organization → Policies. Projects marked CUI or classified are never sent to a model outside your

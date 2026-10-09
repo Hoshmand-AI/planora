@@ -1,4 +1,5 @@
 import { DEFAULT_DCMA_RULES, normalizeDcmaRules, type DcmaRules } from '@/lib/analysis/dcma'
+import { DEFAULT_STANDARDS_SETTINGS, normalizeStandardsSettings, type StandardsSettings } from '@/lib/standards/config'
 
 // Organization-level policy, editable by admins. Stored as JSON on the organization; always read
 // through normalizeSettings so missing or invalid values fall back to safe defaults.
@@ -24,6 +25,8 @@ export interface OrgSettings {
   quality: DcmaRules
   /** Never use this organization's uploaded schedules to calibrate firm history */
   historyExcludeUploads: boolean
+  /** Standards engine: default framework(s) and GAO screening thresholds (src/lib/standards) */
+  standards: StandardsSettings
 }
 
 export const DEFAULT_SETTINGS: OrgSettings = {
@@ -37,6 +40,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   projectRetentionDays: 0,
   quality: DEFAULT_DCMA_RULES,
   historyExcludeUploads: false,
+  standards: DEFAULT_STANDARDS_SETTINGS,
 }
 
 /**
@@ -66,5 +70,6 @@ export function normalizeSettings(raw: unknown): OrgSettings {
     projectRetentionDays: clamp(r.projectRetentionDays, 0, 3650, DEFAULT_SETTINGS.projectRetentionDays),
     quality: normalizeDcmaRules(r.quality),
     historyExcludeUploads: b('historyExcludeUploads'),
+    standards: normalizeStandardsSettings(r.standards),
   }
 }

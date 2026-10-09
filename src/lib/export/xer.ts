@@ -15,6 +15,7 @@ import type { CpmResult, GeneratedSchedule, LinkType, ConstraintType, ProgressMo
 import { buildWbs } from './wbs'
 import { isCp1252 } from '@/lib/parsers/xer-codec'
 import { readXerTables, xerCalendarTimes } from '@/lib/parsers/xer-parser'
+import { xerResourceTables } from './resources'
 
 const PRED: Record<LinkType, string> = { FS: 'PR_FS', SS: 'PR_SS', FF: 'PR_FF', SF: 'PR_SF' }
 const CSTR: Record<ConstraintType, string> = { SNET: 'CS_MSOA', SNLT: 'CS_MSOB', FNET: 'CS_MEOA', FNLT: 'CS_MEOB', SO: 'CS_MSO', FO: 'CS_MEO', MSO: 'CS_MANDSTART', MFO: 'CS_MANDFIN' }
@@ -180,6 +181,9 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     predRows.push([nextPred++, to, from, PROJ, PROJ, PRED[l.type], l.lag * hoursOf(pred?.calendarId)])
   }
   table('TASKPRED', ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt'], predRows)
+
+  // Resources and assignments (RSRC, RSRCRATE, TASKRSRC), so a round trip keeps them.
+  for (const t of xerResourceTables(s, taskId, calId, PROJ, s.dataDate || s.projectStart)) table(t.name, t.fields, t.rows)
 
   // Notebook: the reasons recorded for the scheduler's overrides, so they travel with the activity.
   const memoRows: (string | number)[][] = []

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
 import { Integrations } from '@/components/Integrations'
+import { EnterpriseIdentity } from '@/components/EnterpriseIdentity'
 import { Workspaces } from '@/components/Workspaces'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
@@ -14,6 +15,7 @@ interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
   quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
+  standards?: { defaultFrameworks: string[]; gao: Record<string, number> }
   historyExcludeUploads: boolean
 }
 interface OrgData {
@@ -39,19 +41,24 @@ const ACTION_LABELS: Record<string, string> = {
   'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.activity_category': 'Corrected activity category', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
   'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'org.sso_changed': 'Changed single sign-on', 'org.saml_changed': 'Changed SAML single sign-on', 'org.saml_tested': 'Tested SAML sign-in', 'auth.sso_failed': 'Failed single sign-on',
+  'scim.user_created': 'Provisioned a member (SCIM)', 'scim.user_updated': 'Updated a member (SCIM)', 'scim.user_deprovisioned': 'Deprovisioned a member (SCIM)', 'scim.user_reactivated': 'Reactivated a member (SCIM)', 'scim.user_deleted': 'Deleted a member (SCIM)', 'scim.token_created': 'Created SCIM token', 'scim.token_revoked': 'Revoked SCIM token',
+  'standards.run': 'Recorded a standards assessment',
   'workspace.created': 'Created workspace', 'workspace.updated': 'Changed workspace', 'workspace.deleted': 'Deleted workspace', 'workspace.member_added': 'Added to workspace', 'workspace.member_removed': 'Removed from workspace', 'workspace.member_restriction_changed': 'Changed workspace limit', 'workspace.item_assigned': 'Moved to workspace',
 }
 // Download links come from this fixed table, never from page text.
-const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'workspace.', 'ai.', 'privacy.'] as const
+const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'scim.', 'workspace.', 'ai.', 'privacy.'] as const
 const AUDIT_CSV: Record<string, string> = Object.fromEntries(AUDIT_FILTERS.map(f => [f, f ? `/api/audit?format=csv&action=${f}` : '/api/audit?format=csv']))
 
 const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.override') ? 'Override' : a)
 
 function summarize(e: AuditEvent): string {
   const d = e.detail as Record<string, unknown>
-  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.model ?? ''}`]
+  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.provider ? `${d.provider} ` : ''}${d.model ?? ''}${d.refused ? ' (declined)' : ''}`]
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
+
+const STANDARD_FRAMEWORK_OPTIONS = [['PLANORA_COMPOSITE', 'Planora Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -124,7 +131,7 @@ export default function OrgPage() {
 
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Organization members</caption>
             <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
@@ -231,13 +238,33 @@ export default function OrgPage() {
                 <Field label="Min CPLI and BEI" hint="0.80–1.00.">{p => <input {...p} type="number" min={0.8} max={1} step={0.01} className={inputClass} value={settings.quality.indexTarget} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, indexTarget: Number(e.target.value) } })} />}</Field>
               </div>
             </fieldset>
+            <fieldset className="pt-2">
+              <legend className="text-[13.5px] font-medium text-navy-950">Default standards framework</legend>
+              <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
+              <div className="space-y-1.5">
+                {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
+                  const current = settings.standards?.defaultFrameworks ?? ['PLANORA_COMPOSITE']
+                  const on = current.includes(fw)
+                  return (
+                    <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
+                        onChange={e => {
+                          const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
+                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['PLANORA_COMPOSITE'] } })
+                        }} />
+                      {label}
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
             <Button disabled={busy === 'settings'} onClick={async () => { const d = await act('settings', { action: 'update_settings', settings }, 'Policies saved.'); if (d) load() }}>Save policies</Button>
           </div>
         </Section>
       )}
 
       {manage && (
-        <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider). People with an allowed email domain are added on first sign-in with the default role.">
+        <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider; for SAML 2.0 see below). People with an allowed email domain are added on first sign-in with the default role.">
           {note('sso')}
           {!data.plan.sso ? <p className="text-[13px] text-warm-600">Single sign-on is part of the Enterprise plan.</p> : (
             <form className="space-y-3" onSubmit={async e => {
@@ -270,6 +297,8 @@ export default function OrgPage() {
         </Section>
       )}
 
+      {manage && <EnterpriseIdentity roles={data.roles} />}
+
       {manage && <Integrations />}
 
       {can('audit.read') && (
@@ -279,7 +308,7 @@ export default function OrgPage() {
             <Field label="Filter">{p => (
               <select {...p} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
                 <option value="">All activity</option><option value="auth.">Sign-ins</option><option value="plan.">Plans</option><option value="schedule.">Schedules</option>
-                <option value="member.">Members</option><option value="org.">Organization</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
+                <option value="member.">Members</option><option value="org.">Organization</option><option value="scim.">Provisioning (SCIM)</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
               </select>
             )}</Field>
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {
@@ -293,7 +322,7 @@ export default function OrgPage() {
               : <Alert tone="error"><XCircle size={14} className="inline mr-1" aria-hidden="true" />Integrity check failed at record #{verify.brokenAt?.seq}: {verify.brokenAt?.reason}</Alert>}
             </div>
           )}
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <caption className="sr-only">Audit log, newest first</caption>
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
