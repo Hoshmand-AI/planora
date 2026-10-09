@@ -9,6 +9,7 @@ import {
   ParsedSchedule, makeActivity, isoFromUtcDate, serialToIso, round2, constraintFromLabel,
 } from './types'
 import { spreadsheetResourceData } from './resources'
+import { isCostColumn } from './costs'
 import { ExceptionCollector } from './exceptions'
 
 type Cell = string | number | boolean | Date | null
@@ -329,7 +330,10 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const others = sheets.filter(x => x !== sheet && x.grid.some(r => r.some(c => cellText(c) !== '')))
     if (others.length) ex.add({ severity: 'warning', entity: 'other', field: 'Worksheets', disposition: 'dropped', count: others.length, examples: others.map(x => x.name), message: `Only worksheet "${sheet.name}" was read; the other sheets were not imported` })
   }
-  if (header.unrecognized.length) warnings.push(`Unrecognized columns ignored: ${header.unrecognized.join(', ')}`)
+  // Cost columns (Budget, Actual cost, BCWS, ...) are not schedule fields but earned value reads them
+  // from the stored file (./costs.ts), so they are not reported as ignored.
+  const unrecognized = header.unrecognized.filter(l => !isCostColumn(l))
+  if (unrecognized.length) warnings.push(`Unrecognized columns ignored: ${unrecognized.join(', ')}`)
   if (header.duplicates.length) warnings.push(`Duplicate columns ignored (an earlier column already supplies the field): ${header.duplicates.join(', ')}`)
 
   const F = header.fields
@@ -340,6 +344,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     // Columns that were not mapped: one record per column, counting the cells that carried data.
     const body = sheet.grid.slice(header.row + 1)
     for (const c of header.ignoredCols) {
+      if (!c.duplicate && isCostColumn(c.label)) continue
       const filled = body.map((r, i) => ({ r, i })).filter(({ r }) => cellText(r[c.col] ?? null) !== '')
       ex.add({
         severity: filled.length ? 'warning' : 'info', entity: 'other', field: `Column "${c.label}"`, disposition: 'dropped', count: Math.max(1, filled.length),

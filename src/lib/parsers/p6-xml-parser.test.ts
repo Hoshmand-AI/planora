@@ -85,8 +85,11 @@ describe('parseP6Xml: same project as XER', () => {
     const find = (field: string) => r.records.find(x => x.field === field)
     expect(find('Activity.Code')).toMatchObject({ entity: 'code', count: 3, disposition: 'dropped' })
     expect(find('Activity.UDF')).toMatchObject({ entity: 'udf', count: 2 })
-    expect(find('Resource')).toMatchObject({ entity: 'resource', count: 2, examples: ['EXC', 'IW'] })
-    expect(find('ResourceAssignment')).toMatchObject({ entity: 'assignment', count: 2 })
+    // Resources, rates and assignments are read (resource analysis, earned value), so not listed as unused.
+    expect(find('Resource')).toBeUndefined()
+    expect(find('ResourceRate')).toBeUndefined()
+    expect(find('ResourceAssignment')).toBeUndefined()
+    expect(xml.resources?.assignments).toHaveLength(3)
     expect(find('ActivityCodeType')).toMatchObject({ entity: 'code', count: 1 })
     expect(find('UDFType')).toMatchObject({ entity: 'udf', count: 1 })
     expect(find('Activity.SecondaryConstraintType')).toMatchObject({ entity: 'constraint', severity: 'loss', examples: ['A1040 (Finish On or Before)'] })

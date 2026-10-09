@@ -102,10 +102,38 @@ describe('MS Project XML import exceptions', () => {
   it('lists the project collections Planora does not model', () => {
     expect(xml).toContain('<Notes>Bring the trailer</Notes>')
     expect(r.format).toBe('ms_xml')
-    expect(rec(r, 'Resources')).toMatchObject({ entity: 'resource', count: 2, disposition: 'dropped', examples: ['Concrete crew', 'Crane'] })
-    expect(rec(r, 'Assignments')).toMatchObject({ entity: 'assignment', count: 1 })
+    // Resources and assignments are read by resource analysis (and their costs by earned value).
+    expect(rec(r, 'Resources')).toBeUndefined()
+    expect(rec(r, 'Assignments')).toBeUndefined()
+    expect(p.resources?.assignments).toHaveLength(1)
     expect(rec(r, 'OutlineCodes')).toMatchObject({ entity: 'code', count: 1, examples: ['Phase code'] })
     expect(rec(r, 'ExtendedAttributes')).toMatchObject({ entity: 'udf', count: 1, examples: ['Area'] })
+  })
+
+  it('lists only the resource parts resource analysis does not use: resource calendars, rate tables, availability, timephased work, contours', () => {
+    const doc = base.replace(/<\/Project>\s*$/, `
+  <Resources>
+    <Resource><UID>1</UID><Name>Concrete crew</Name><Type>1</Type><MaxUnits>2</MaxUnits><CalendarUID>77</CalendarUID>
+      <AvailabilityPeriods><AvailabilityPeriod><AvailableUnits>1</AvailableUnits></AvailabilityPeriod><AvailabilityPeriod><AvailableUnits>2</AvailableUnits></AvailabilityPeriod></AvailabilityPeriods>
+      <Rates><Rate><RateTable>0</RateTable><StandardRate>50</StandardRate></Rate><Rate><RateTable>1</RateTable><StandardRate>65</StandardRate></Rate></Rates></Resource>
+    <Resource><UID>2</UID><Name>Crane</Name><Type>1</Type><Rates><Rate><RateTable>0</RateTable><StandardRate>200</StandardRate></Rate><Rate><RateTable>1</RateTable><StandardRate>0</StandardRate></Rate></Rates></Resource>
+  </Resources>
+  <Assignments>
+    <Assignment><UID>1</UID><TaskUID>2</TaskUID><ResourceUID>1</ResourceUID><Work>PT40H0M0S</Work><WorkContour>3</WorkContour><TimephasedData><Type>1</Type><Value>PT8H0M0S</Value></TimephasedData></Assignment>
+    <Assignment><UID>2</UID><TaskUID>3</TaskUID><ResourceUID>2</ResourceUID><Work>PT16H0M0S</Work></Assignment>
+  </Assignments>
+</Project>`)
+    const q = parseMSProjectXML(doc, 's')
+    const x = q.exceptions!
+    expect(q.resources?.assignments).toHaveLength(2)
+    expect(rec(x, 'Resources')).toBeUndefined()
+    expect(rec(x, 'Assignments')).toBeUndefined()
+    expect(rec(x, 'Resource.CalendarUID')).toMatchObject({ entity: 'resource', count: 1, examples: ['Concrete crew'] })
+    // Crane's table B carries no rate, so only Concrete crew's rate tables are reported.
+    expect(rec(x, 'Resource.Rates')).toMatchObject({ count: 1, examples: ['Concrete crew'] })
+    expect(rec(x, 'Resource.AvailabilityPeriods')).toMatchObject({ count: 1 })
+    expect(rec(x, 'Assignment.TimephasedData')).toMatchObject({ entity: 'assignment', count: 1 })
+    expect(rec(x, 'Assignment.WorkContour')).toMatchObject({ disposition: 'converted', count: 1 })
   })
 
   it('lists task-level elements it did not map: other baselines, custom field values, notes', () => {

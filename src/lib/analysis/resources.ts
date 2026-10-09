@@ -256,7 +256,7 @@ export interface ResourceAnalysis {
   unscheduled: string[]
 }
 
-export const NO_RESOURCE_MESSAGE = 'This schedule has no resource data: the file carries no resources or resource assignments (P6 RSRC / TASKRSRC, MS Project Resources / Assignments, or a spreadsheet resource column). Planora does not invent resources; load them in the source schedule and upload it again.'
+export const NO_RESOURCE_MESSAGE = 'This schedule has no resource data: the file carries no resources or resource assignments (P6 RSRC / TASKRSRC or P6 XML Resource / ResourceAssignment, MS Project Resources / Assignments, or a spreadsheet resource column). Planora does not invent resources; load them in the source schedule and upload it again.'
 
 const bucketStart = (day: number, bucket: HistogramBucket): number => {
   if (bucket === 'day') return day

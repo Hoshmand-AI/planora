@@ -134,7 +134,7 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
         </ul>
       </div>
 
-      <Disclosure title="How these figures are calculated" meta={evm.costSource === 'p6_xer' ? 'P6 XER' : evm.costSource === 'ms_xml' ? 'MS Project XML' : 'Spreadsheet'}>
+      <Disclosure title="How these figures are calculated" meta={evm.costSource === 'p6_xer' ? 'P6 XER' : evm.costSource === 'p6_xml' ? 'P6 XML' : evm.costSource === 'ms_xml' ? 'MS Project XML' : 'Spreadsheet'}>
         <dl className="text-[12.5px] text-warm-700 space-y-1.5">
           {(['bac', 'pv', 'ev', 'ac', 'es'] as const).map(k => <div key={k}><dt className="inline font-semibold text-navy-950">{k.toUpperCase()}: </dt><dd className="inline">{evm.methods[k]}</dd></div>)}
         </dl>

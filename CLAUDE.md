@@ -10,10 +10,10 @@ The owner has asked Claude to ship without waiting on them:
 Rollback: Vercel → Deployments → Instant Rollback.
 
 ## Checks
-`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/e2e-tenant-isolation.mjs`, `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (CI runs all of them — see `.github/workflows/ci.yml` for the env).
+`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/e2e-tenant-isolation.mjs`, `scripts/e2e-scim.mjs`, `scripts/e2e-rag.mjs`, `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (CI runs all of them — see `.github/workflows/ci.yml` for the env).
 
 ## Security rules for changes
-- Every API handler uses `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (enforced by `src/lib/server/routes.test.ts`).
+- Every API handler uses `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (enforced by `src/lib/server/routes.test.ts`); SCIM provisioning routes (`/api/scim/v2/...`) use `scimApi()` instead (organization SCIM bearer token; also enforced by `routes.test.ts`).
 - Schema changes: add a new numbered migration in `src/lib/migrations.ts`; never edit a shipped one; keep migrations additive (rollback safety).
 - Record material actions with `audit()` from `src/lib/server/audit.ts`; never log secrets or prompt content.
 - Change management: docs/operations/CHANGE-MANAGEMENT.md. If code-owner review is enabled on `main`, PRs touching `.github/CODEOWNERS` paths wait for the owner's approval instead of self-merging.

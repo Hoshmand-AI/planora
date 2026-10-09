@@ -195,6 +195,24 @@
     <ObjectId>502</ObjectId>
     <ResourceType>Labor</ResourceType>
   </Resource>
+  <ResourceRate>
+    <EffectiveDate>2026-01-01T00:00:00</EffectiveDate>
+    <MaxUnitsPerTime>1</MaxUnitsPerTime>
+    <ObjectId>1</ObjectId>
+    <ResourceObjectId>501</ResourceObjectId>
+  </ResourceRate>
+  <ResourceRate>
+    <EffectiveDate>2026-01-01T00:00:00</EffectiveDate>
+    <MaxUnitsPerTime>6</MaxUnitsPerTime>
+    <ObjectId>2</ObjectId>
+    <ResourceObjectId>502</ResourceObjectId>
+  </ResourceRate>
+  <ResourceRate>
+    <EffectiveDate>2026-06-01T00:00:00</EffectiveDate>
+    <MaxUnitsPerTime>8</MaxUnitsPerTime>
+    <ObjectId>3</ObjectId>
+    <ResourceObjectId>502</ResourceObjectId>
+  </ResourceRate>
   <ActivityCodeType>
     <Name>Area</Name>
     <ObjectId>701</ObjectId>
@@ -631,18 +649,57 @@
       <SuccessorProjectObjectId>1</SuccessorProjectObjectId>
       <Type>Finish to Finish</Type>
     </Relationship>
+    <ActivityExpense>
+      <ActivityObjectId>1004</ActivityObjectId>
+      <ActualCost>0</ActualCost>
+      <ExpenseItem>Formwork rental</ExpenseItem>
+      <ObjectId>1</ObjectId>
+      <PlannedCost>2500</PlannedCost>
+      <RemainingCost>2500</RemainingCost>
+    </ActivityExpense>
     <ResourceAssignment>
       <ActivityObjectId>1003</ActivityObjectId>
+      <ActualOvertimeCost>0</ActualOvertimeCost>
+      <ActualOvertimeUnits>0</ActualOvertimeUnits>
+      <ActualRegularCost>6500</ActualRegularCost>
+      <ActualRegularUnits>40</ActualRegularUnits>
       <ObjectId>1</ObjectId>
+      <PlannedCost>15000</PlannedCost>
       <PlannedUnits>100</PlannedUnits>
+      <PlannedUnitsPerTime>1</PlannedUnitsPerTime>
       <ProjectObjectId>1</ProjectObjectId>
+      <RemainingCost>9000</RemainingCost>
+      <RemainingUnits>60</RemainingUnits>
       <ResourceObjectId>501</ResourceObjectId>
     </ResourceAssignment>
     <ResourceAssignment>
       <ActivityObjectId>1006</ActivityObjectId>
+      <ActualOvertimeCost>0</ActualOvertimeCost>
+      <ActualOvertimeUnits>0</ActualOvertimeUnits>
+      <ActualRegularCost>0</ActualRegularCost>
+      <ActualRegularUnits>0</ActualRegularUnits>
       <ObjectId>2</ObjectId>
+      <PlannedCost>72000</PlannedCost>
       <PlannedUnits>960</PlannedUnits>
+      <PlannedUnitsPerTime>8</PlannedUnitsPerTime>
       <ProjectObjectId>1</ProjectObjectId>
+      <RemainingCost>72000</RemainingCost>
+      <RemainingUnits>960</RemainingUnits>
+      <ResourceObjectId>502</ResourceObjectId>
+    </ResourceAssignment>
+    <ResourceAssignment>
+      <ActivityObjectId>1002</ActivityObjectId>
+      <ActualOvertimeCost>600</ActualOvertimeCost>
+      <ActualOvertimeUnits>6</ActualOvertimeUnits>
+      <ActualRegularCost>5700</ActualRegularCost>
+      <ActualRegularUnits>76</ActualRegularUnits>
+      <ObjectId>3</ObjectId>
+      <PlannedCost>6000</PlannedCost>
+      <PlannedUnits>80</PlannedUnits>
+      <PlannedUnitsPerTime>2</PlannedUnitsPerTime>
+      <ProjectObjectId>1</ProjectObjectId>
+      <RemainingCost>0</RemainingCost>
+      <RemainingUnits>0</RemainingUnits>
       <ResourceObjectId>502</ResourceObjectId>
     </ResourceAssignment>
     <ScheduleOptions>

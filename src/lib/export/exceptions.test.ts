@@ -87,6 +87,27 @@ describe('export exception reports', () => {
     expect(lines).not.toMatch(/2026-07-31/)
   })
 
+  it('resources: written by XER and MS Project XML (not reported), reported as dropped by CSV and Excel', () => {
+    const gr = uploadedToGenerated(schedule, done.activities, parsed.relationships, done.cpm, analysis, [], { resources: parsed.resources })
+    const grLoe = uploadedToGenerated(schedule, done.activities, parsed.relationships, done.cpm, analysis, [], { includeLoe: true, resources: parsed.resources })
+    // An older upload's import report that still names the resource tables as not imported.
+    const old = { ...parsed.exceptions!, records: [...parsed.exceptions!.records,
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'resource' as const, field: 'RSRC', count: 2, examples: ['EXC', 'IW'], disposition: 'preserved_in_raw' as const, message: 'Resources: not used by Planora' },
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'assignment' as const, field: 'TASKRSRC', count: 3, examples: [], disposition: 'preserved_in_raw' as const, message: 'Resource assignments: not used by Planora' }] }
+    for (const [f, s] of [['xer', gr], ['xml', grLoe]] as const) {
+      const r = exportExceptions(s, f, { ...ctx, importReport: old })
+      expect(r.records.filter(x => x.entity === 'resource' || x.entity === 'assignment'), f).toEqual([])
+    }
+    for (const f of ['csv', 'xlsx-import', 'xlsx-p6'] as const) {
+      const r = exportExceptions(gr, f, { ...ctx, importReport: old })
+      expect(rec(r, 'Resources'), f).toMatchObject({ entity: 'resource', disposition: 'dropped', count: 2, examples: ['EXC', 'IW'] })
+      expect(rec(r, 'Resource assignments'), f).toMatchObject({ entity: 'assignment', count: 3 })
+      expect(rec(r, 'RSRC'), f).toMatchObject({ disposition: 'dropped' })
+    }
+    // Without resource data nothing is claimed either way.
+    expect(rec(exportExceptions(g, 'csv', ctx), 'Resources')).toBeUndefined()
+  })
+
   it('fits an HTTP header', () => {
     const h = exceptionHeader(exportExceptions(g, 'csv', ctx))
     expect(h.length).toBeLessThanOrEqual(3500)

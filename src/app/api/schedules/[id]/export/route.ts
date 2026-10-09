@@ -80,7 +80,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   }
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
   // Resources and assignments from the stored file travel with the rebuilt XER and the MS Project XML.
-  const resources = format === 'xer' || format === 'xml' ? await loadScheduleResources(schedule, auth.orgId, data.activities).catch(() => null) : null
+  // (CSV and Excel do not write them; their export exception report says so.)
+  const resources = await loadScheduleResources(schedule, auth.orgId, data.activities).catch(() => null)
   const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits, { resources })
   // P6's progress option: written into the export when the scheduler changed it from the file's own.
   const mode = data.analysis.progressMode
