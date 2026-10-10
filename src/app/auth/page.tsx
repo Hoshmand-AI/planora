@@ -19,6 +19,8 @@ function AuthForm() {
   const [loading, setLoading] = useState(false)
   const invite = searchParams.get('invite')
   const [cuiWarning, setCuiWarning] = useState('')
+  // Invitation-only instances don't offer self sign-up to visitors without an invite link.
+  const [inviteOnly, setInviteOnly] = useState(false)
   const [invitation, setInvitation] = useState<{ email?: string; role?: string; orgName?: string; invalid?: boolean } | null>(null)
   // Second step when two-step verification is on
   const [challenge, setChallenge] = useState<string | null>(null)
@@ -45,6 +47,7 @@ function AuthForm() {
   useEffect(() => {
     fetch(invite ? `/api/auth?invite=${encodeURIComponent(invite)}` : '/api/auth').then(r => r.json()).then(d => {
       if (typeof d.service?.cuiWarning === 'string') setCuiWarning(d.service.cuiWarning)
+      if (!invite && d.service?.signup === 'invite_only') { setInviteOnly(true); setMode('signin') }
       if (!invite) return
       setInvitation(d.invitation ?? { invalid: true })
       if (d.invitation?.email) { setEmail(d.invitation.email); setMode('signup') }
@@ -232,7 +235,9 @@ function AuthForm() {
           )}
           {!challenge && !ssoMode && (
           <p className="text-center text-[13.5px] text-warm-500 mt-6">
-            {mode === 'signin' ? (
+            {mode === 'signin' && inviteOnly ? (
+              <>Planora is in an invite-only beta. New accounts need an invitation link from an organization admin.</>
+            ) : mode === 'signin' ? (
               <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button></>
             ) : (
               <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign in</button></>

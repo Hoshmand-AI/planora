@@ -152,7 +152,7 @@ export const GET = publicApi(async req => {
   const inviteInfo = invitation ? { email: invitation.email, role: invitation.role, orgName: invitation.orgName } : invite ? { invalid: true } : undefined
   // Where this instance runs, so sign-up can warn that CUI doesn't belong on the commercial cloud.
   const deployment = deploymentKind()
-  const service = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
+  const service = { deployment, signup: signupMode(), ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
   if (!ctx) return json({ user: null, service, ...(inviteInfo ? { invitation: inviteInfo } : {}) })
   return json({
     // Organization's subscription plan (from the session's organization row), not the legacy users.plan.
