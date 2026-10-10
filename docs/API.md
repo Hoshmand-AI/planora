@@ -142,6 +142,6 @@ The signing secret (`whsec_…`) is shown once when you add the endpoint.
 | `PLANORA_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
 | `PLANORA_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
 | `PLANORA_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
-| `PLANORA_SIGNUP=invite_only` | After the first account, sign-up needs an invitation (SSO into a verified domain still provisions members). Intended for on-premises instances |
+| `PLANORA_SIGNUP=invite_only` | After the first account, sign-up needs an invitation (SSO into a verified domain still provisions members). The default on Vercel (the hosted invite-only beta); set `PLANORA_SIGNUP=open` there to allow self sign-up. Elsewhere the default is `open` |
 
 Every other setting, including on-premises and air-gapped ones, is listed in [operations/ON-PREM-INSTALL.md](operations/ON-PREM-INSTALL.md).

@@ -1,12 +1,16 @@
-// Self sign-up policy. The hosted service lets anyone create an organization. An on-premises or
-// air-gapped instance usually must not: with PLANORA_SIGNUP=invite_only, new accounts come only from
-// invitations (or single sign-on into a verified domain), except for the very first account on an
-// empty instance, which becomes the first organization's owner.
+// Self sign-up policy. With PLANORA_SIGNUP=invite_only, new accounts come only from invitations (or
+// single sign-on into a verified domain), except for the very first account on an empty instance,
+// which becomes the first organization's owner. The hosted service on Vercel is in an invite-only
+// beta, so it defaults to invite_only there; PLANORA_SIGNUP=open reopens it. Elsewhere (local,
+// on-premises) the default stays open.
 
 export type SignupMode = 'open' | 'invite_only'
 
 export function signupMode(env: Record<string, string | undefined> = process.env): SignupMode {
-  return /^invite[-_]?only$/i.test((env.PLANORA_SIGNUP || '').trim()) ? 'invite_only' : 'open'
+  const setting = (env.PLANORA_SIGNUP || '').trim()
+  if (/^invite[-_]?only$/i.test(setting)) return 'invite_only'
+  if (/^open$/i.test(setting)) return 'open'
+  return env.VERCEL === '1' ? 'invite_only' : 'open'
 }
 
 /** Whether a sign-up WITHOUT an invitation may create a new organization. */
