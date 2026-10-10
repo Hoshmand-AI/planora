@@ -62,8 +62,23 @@ BASE_URL=… DATABASE_URL=… node scripts/e2e-scim.mjs        # SAML sign-in an
 BASE_URL=… node scripts/e2e-rag.mjs                         # project documents: isolation, injection, citations, deletion
 RAG_TEST_DATABASE_URL=… npx vitest run src/lib/rag/rag.db.test.ts   # retrieval SQL against a real Postgres
 BASE_URL=… node scripts/a11y-check.mjs                     # WCAG 2.2 AA (axe-core) on the main screens
+# The suites above create their own firms: run that server with PLANORA_SIGNUP=open. The private beta gate is
+# checked against a server in the default invite-only mode with PLANORA_PLATFORM_ADMINS=ops@beta.test:
+BASE_URL=… DATABASE_URL=… BETA_ADMIN_EMAIL=ops@beta.test node scripts/e2e-beta.mjs
 DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node scripts/restore-drill.mjs backups/*.dump
 ```
+
+### Private beta access
+
+Planora is in private beta: **sign-up and sign-in are by invitation** unless the instance re-opens self sign-up.
+
+| Variable | Purpose |
+|---|---|
+| `PLANORA_SIGNUP` | Unset (default) or `invite_only`: sign-up needs an organization invitation or a beta invitation (SSO/SCIM provisioning into an organization and the first account on an empty instance still work), and sign-in needs beta access. `open`: anyone may sign up and the sign-in gate is off. |
+| `PLANORA_PLATFORM_ADMINS` | Comma-separated platform operator emails (case-insensitive). Operators always pass the gate and use **Beta access** (`/dashboard/platform`, from the account menu) to invite a new firm (single-use, 14-day link; accepting it creates the firm's organization), revoke invitations, and revoke or restore a person's beta access. Everyone else gets 404 there. |
+| `PLANORA_ACCESS_REQUEST_EMAIL` | Address behind the "Request access" links on the landing and sign-in pages (hidden on sign-in when unset). |
+
+Accounts that existed before the gate shipped were grandfathered (migration 18). Organization admins keep inviting their own members as before. See `src/lib/server/signup-policy.ts` and `src/lib/server/beta.ts`.
 
 ### Integrations, email and alerts
 

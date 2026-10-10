@@ -4,12 +4,20 @@
 // from the keyboard to the main actions (focus is visible and lands on interactive elements).
 //   BASE_URL=http://localhost:3200 node scripts/a11y-check.mjs
 // Fails on any "serious" or "critical" violation. SCREENSHOTS=dir also saves a screenshot per page.
+// With BETA_BASE_URL (a server in the default invite-only mode) and BETA_ADMIN_EMAIL (one of its
+// PLANORA_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
+// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
+if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
+  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  process.exit(1)
+}
 const shots = process.env.SCREENSHOTS
 const axeSource = fs.readFileSync(path.join(process.cwd(), 'node_modules/axe-core/axe.min.js'), 'utf8')
 const executablePath = fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined
@@ -57,8 +65,9 @@ const PAGES = [
 ]
 
 let failed = 0
-for (const [name, url, prepare] of PAGES) {
-  await page.goto(BASE + url, { waitUntil: 'networkidle' })
+async function check(page, base, pages) {
+for (const [name, url, prepare] of pages) {
+  await page.goto(base + url, { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   if (prepare) await prepare()
   await page.addScriptTag({ content: axeSource })
@@ -81,6 +90,33 @@ for (const [name, url, prepare] of PAGES) {
   console.log(`${blocking.length || !kbOk ? '✗' : '✓'} ${name}: ${result.length} issue types (${blocking.length} serious/critical); keyboard focus ${kbOk ? `on ${focus.tag}${focus.outline ? ' (visible indicator)' : ''}` : 'NOT reachable'}`)
   for (const v of result) console.log(`    [${v.impact}] ${v.id}: ${v.help} (${v.count}) e.g. ${v.nodes[0]}`)
   if (blocking.length || !kbOk) failed++
+}
+}
+await check(page, BASE, PAGES)
+
+// Private beta screens on the invite-only server: as a visitor, then as the platform operator.
+if (process.env.BETA_BASE_URL) {
+  const betaBase = process.env.BETA_BASE_URL
+  const betaOrigin = new URL(betaBase).origin
+  const visitor = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await check(visitor, betaBase, [['Home (private beta)', '/'], ['Sign up (private beta)', '/auth?mode=signup']])
+  const admin = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const adminEmail = process.env.BETA_ADMIN_EMAIL || 'ops@beta.test'
+  const pw = 'correct horse battery staple'
+  const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'Planora Operations' }, headers: { origin: betaOrigin } })
+  if (res.status() === 409) await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signin', email: adminEmail, password: pw }, headers: { origin: betaOrigin } })
+  const me = await (await admin.request.get(`${betaBase}/api/auth`)).json()
+  if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.PLANORA_EMAIL_OUTBOX) {
+    const dir = process.env.PLANORA_EMAIL_OUTBOX
+    for (const f of fs.readdirSync(dir).sort().reverse()) {
+      const m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
+      const link = m.to === adminEmail && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
+      if (link) { await admin.request.get(link[0], { maxRedirects: 0 }); break }
+    }
+  }
+  // An invitation in the list, so the table and its actions are checked too.
+  await admin.request.post(`${betaBase}/api/platform/beta`, { data: { action: 'invite', email: `a11y-invitee${Date.now()}@example.com`, company: 'A11y Invitee Co' }, headers: { origin: betaOrigin } })
+  await check(admin, betaBase, [['Beta access (platform)', '/dashboard/platform', async () => { await admin.waitForSelector('text=Invite a firm') }]])
 }
 
 await browser.close()

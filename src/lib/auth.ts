@@ -13,6 +13,7 @@ import type { NextResponse } from 'next/server'
 import { initSchema, query } from '@/lib/db'
 import { normalizeSettings, type OrgSettings } from '@/lib/server/settings'
 import { currentRequest } from '@/lib/server/context'
+import { mayUsePlanora } from '@/lib/server/signup-policy'
 
 export const SESSION_COOKIE = 'planora-token'
 export const SESSION_MAX_DAYS = 7
@@ -144,11 +145,14 @@ export async function resolveSession(token: string): Promise<AuthContext | null>
   const sid = sessionIdFromToken(token)
   if (!sid) return null
   await initSchema()
-  const res = await query(`SELECT s.id AS sid, s.last_seen_at, s.method, u.id, u.email, u.name, u.role, u.org_id, u.mfa_enabled_at, u.disabled_at, u.email_verified_at, o.name AS org_name, o.settings, o.plan
+  const res = await query(`SELECT s.id AS sid, s.last_seen_at, s.method, u.id, u.email, u.name, u.role, u.org_id, u.mfa_enabled_at, u.disabled_at, u.email_verified_at, u.beta_access_at, u.beta_revoked_at, o.name AS org_name, o.settings, o.plan
     FROM sessions s JOIN users u ON u.id = s.user_id JOIN organizations o ON o.id = u.org_id
     WHERE s.id=$1 AND s.revoked_at IS NULL AND s.expires_at > NOW()`, [sid])
   const row = res.rows[0]
   if (!row || row.disabled_at) return null
+  // Private beta: a session ends as soon as the person's beta access is revoked (or the instance
+  // turns invite-only while they lack it). Platform operators always pass.
+  if (!mayUsePlanora({ email: row.email, betaAccessAt: row.beta_access_at ? String(row.beta_access_at) : null, betaRevokedAt: row.beta_revoked_at ? String(row.beta_revoked_at) : null })) return null
   const settings = normalizeSettings(row.settings)
   const lastSeen = new Date(row.last_seen_at).getTime()
   if (Date.now() - lastSeen > settings.sessionIdleHours * 3_600_000) {

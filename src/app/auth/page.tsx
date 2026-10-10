@@ -18,8 +18,14 @@ function AuthForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const invite = searchParams.get('invite')
+  const betaToken = searchParams.get('beta')
   const [cuiWarning, setCuiWarning] = useState('')
   const [invitation, setInvitation] = useState<{ email?: string; role?: string; orgName?: string; invalid?: boolean } | null>(null)
+  const [betaInvitation, setBetaInvitation] = useState<{ email?: string; company?: string | null; invalid?: boolean } | null>(null)
+  // Private beta: invite-only unless the instance re-opened self sign-up (PLANORA_SIGNUP=open).
+  const [inviteOnly, setInviteOnly] = useState(false)
+  const [requestEmail, setRequestEmail] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState('')
   // Second step when two-step verification is on
   const [challenge, setChallenge] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -43,13 +49,23 @@ function AuthForm() {
   }
 
   useEffect(() => {
-    fetch(invite ? `/api/auth?invite=${encodeURIComponent(invite)}` : '/api/auth').then(r => r.json()).then(d => {
+    const qs = invite ? `?invite=${encodeURIComponent(invite)}` : betaToken ? `?beta=${encodeURIComponent(betaToken)}` : ''
+    fetch(`/api/auth${qs}`).then(r => r.json()).then(d => {
       if (typeof d.service?.cuiWarning === 'string') setCuiWarning(d.service.cuiWarning)
-      if (!invite) return
-      setInvitation(d.invitation ?? { invalid: true })
-      if (d.invitation?.email) { setEmail(d.invitation.email); setMode('signup') }
+      setInviteOnly(d.signup?.mode === 'invite_only')
+      setRequestEmail(typeof d.signup?.accessRequestEmail === 'string' ? d.signup.accessRequestEmail : null)
+      if (invite) {
+        setInvitation(d.invitation ?? { invalid: true })
+        if (d.invitation?.email) { setEmail(d.invitation.email); setMode('signup') }
+      } else if (betaToken) {
+        setBetaInvitation(d.betaInvitation ?? { invalid: true })
+        if (d.betaInvitation?.email) { setEmail(d.betaInvitation.email); setCompany(d.betaInvitation.company || ''); setMode('signup') }
+      }
     }).catch(() => {})
-  }, [invite])
+  }, [invite, betaToken])
+
+  const requestHref = requestEmail ? `mailto:${requestEmail}?subject=${encodeURIComponent('Planora private beta: access request')}` : null
+  const betaInvited = !!betaInvitation?.email
 
   const post = async (body: Record<string, unknown>) => {
     const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -58,7 +74,7 @@ function AuthForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError(''); setErrorCode('')
     setLoading(true)
     try {
       const { ok, data } = await post({
@@ -67,8 +83,9 @@ function AuthForm() {
         name: mode === 'signup' ? name : undefined,
         company: mode === 'signup' && !invitation?.orgName ? company : undefined,
         invite: mode === 'signup' && invite ? invite : undefined,
+        betaInvite: mode === 'signup' && !invite && betaToken ? betaToken : undefined,
       })
-      if (!ok) { setError(data.error || 'Something went wrong.'); if (data.code === 'sso_required') setSsoMode(true); return }
+      if (!ok) { setError(data.error || 'Something went wrong.'); setErrorCode(data.code || ''); if (data.code === 'sso_required') setSsoMode(true); return }
       if (data.mfaRequired) { setChallenge(data.challenge); setCode(''); return }
       router.push('/dashboard')
     } catch {
@@ -85,6 +102,7 @@ function AuthForm() {
     try {
       const { ok, data } = await post({ action: 'mfa', challenge, code })
       if (!ok) {
+        setErrorCode(data.code || '')
         if (data.code === 'mfa_expired') { setChallenge(null); setPassword('') }
         setError(data.error || 'Something went wrong.')
         return
@@ -112,7 +130,7 @@ function AuthForm() {
           </Link>
 
           <h1 className="font-display text-[32px] text-navy-950 mb-2">
-            {challenge ? 'Two-step verification' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : 'Create your account'}
+            {challenge ? 'Two-step verification' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the Planora beta' : 'Create your account'}
           </h1>
           <p className="text-warm-500 text-[15px] mb-8">
             {challenge
@@ -121,8 +139,18 @@ function AuthForm() {
                 ? 'Sign in to access your schedule analysis.'
                 : invitation?.orgName
                   ? `You've been invited as ${invitation.role === 'admin' ? 'an' : 'a'} ${invitation.role}. Create your account with ${invitation.email}.`
-                  : 'Start analyzing construction schedules with Planora.'}
+                  : betaInvited
+                    ? `You're invited to the private beta. Create your firm's account with ${betaInvitation?.email}; you'll be its owner and can invite colleagues.`
+                    : 'Start analyzing construction schedules with Planora.'}
           </p>
+
+          {inviteOnly && !challenge && !ssoMode && !invitation?.orgName && !betaInvited && (
+            <div role="note" aria-label="Private beta" className="bg-warm-100 border border-warm-200 border-l-2 border-l-accent-500 text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
+              <strong className="font-semibold text-navy-950">Planora is in private beta</strong> — sign up with your invitation link.
+              {mode === 'signup' && ' No link yet? Ask your organization admin to invite you.'}
+              {requestHref && <> <a href={requestHref} className="text-accent-600 font-medium underline hover:text-navy-950">Request access</a></>}
+            </div>
+          )}
 
           {cuiWarning && mode === 'signup' && !challenge && (
             <div role="note" aria-label="Controlled information warning" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
@@ -136,9 +164,19 @@ function AuthForm() {
             </div>
           )}
 
+          {betaInvitation?.invalid && !challenge && (
+            <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
+              This beta invitation link has expired, was revoked or was already used. Ask for a new one.
+              {requestHref && <> <a href={requestHref} className="text-navy-950 font-medium underline">Request access</a></>}
+            </div>
+          )}
+
           {error && (
             <div role="alert" className="bg-status-at-risk-bg border border-status-at-risk/20 text-status-at-risk text-[13.5px] px-4 py-3 rounded-md mb-5 border-l-2 border-l-status-at-risk">
               {error}
+              {requestHref && (errorCode === 'invite_only' || errorCode === 'beta_access_required') && (
+                <> <a href={requestHref} className="font-semibold underline">Request access</a></>
+              )}
             </div>
           )}
 
@@ -197,7 +235,7 @@ function AuthForm() {
             <div>
               <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
               <input
-                id="email" autoComplete="email" readOnly={!!invitation?.email && mode === 'signup'}
+                id="email" autoComplete="email" readOnly={(!!invitation?.email || betaInvited) && mode === 'signup'}
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
                 placeholder="you@company.com"
                 className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
@@ -220,7 +258,7 @@ function AuthForm() {
             </div>
             <button type="submit" disabled={loading}
               className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : invitation?.orgName ? 'Join organization' : 'Create Account'}
+              {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create Account'}
             </button>
           </form>
           )}
@@ -232,7 +270,10 @@ function AuthForm() {
           )}
           {!challenge && !ssoMode && (
           <p className="text-center text-[13.5px] text-warm-500 mt-6">
-            {mode === 'signin' ? (
+            {mode === 'signin' && inviteOnly ? (
+              <>Have an invitation? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button>
+                {requestHref && <> · <a href={requestHref} className="text-accent-600 font-medium hover:underline">Request access</a></>}</>
+            ) : mode === 'signin' ? (
               <>Don&apos;t have an account? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button></>
             ) : (
               <>Already have an account? <button onClick={() => { setMode('signin'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign in</button></>

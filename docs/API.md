@@ -142,6 +142,8 @@ The signing secret (`whsec_…`) is shown once when you add the endpoint.
 | `PLANORA_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
 | `PLANORA_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
 | `PLANORA_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
-| `PLANORA_SIGNUP=invite_only` | After the first account, sign-up needs an invitation (SSO into a verified domain still provisions members). Intended for on-premises instances |
+| `PLANORA_SIGNUP` | **Private beta: invite-only by default.** Sign-up needs an organization invitation or a beta invitation (SSO/SCIM into an organization still provisions members; the first account on an empty instance bootstraps), and signing in needs beta access. `PLANORA_SIGNUP=open` re-opens self sign-up and turns the sign-in gate off |
+| `PLANORA_PLATFORM_ADMINS` | Comma-separated emails (case-insensitive) of platform operators: they always pass the beta gate and get **Beta access** (`/dashboard/platform`, `/api/platform/beta`) to invite new firms and revoke or restore a person's beta access. Everyone else gets 404 there |
+| `PLANORA_ACCESS_REQUEST_EMAIL` | Where "Request access" links on the landing and sign-in pages send email. Without it the sign-in page hides the link and the landing page's "Request access" opens the sign-in page |
 
 Every other setting, including on-premises and air-gapped ones, is listed in [operations/ON-PREM-INSTALL.md](operations/ON-PREM-INSTALL.md).

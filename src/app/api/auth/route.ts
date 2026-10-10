@@ -7,7 +7,7 @@ import {
 import { publicApi, json, body, ApiError } from '@/lib/server/api'
 import { hit, peek, reset, LIMITS } from '@/lib/server/rate-limit'
 import { passwordProblem } from '@/lib/server/password'
-import { audit, auditQuietly } from '@/lib/server/audit'
+import { appendAudit, audit, auditQuietly, SYSTEM_ORG } from '@/lib/server/audit'
 import { applyNewOrganizationDefaults, findInvitation, markInvitationAccepted } from '@/lib/server/org'
 import { currentRequest } from '@/lib/server/context'
 import { permissionsOf, isRole } from '@/lib/server/permissions'
@@ -16,7 +16,8 @@ import { ssoEnforced } from '@/lib/server/saml'
 import { markEmailVerified, sendVerificationEmail } from '@/lib/server/email-verification'
 import { emailConfigured, appOrigin } from '@/lib/server/email'
 import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
-import { INVITE_ONLY_MESSAGE, selfSignupAllowed, signupMode } from '@/lib/server/signup-policy'
+import { INVITE_ONLY_MESSAGE, accessRequestEmail, isPlatformAdmin, signupAccess, signupMode } from '@/lib/server/signup-policy'
+import { assertBetaAccess, findBetaInvite, markBetaInviteAccepted } from '@/lib/server/beta'
 
 const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.'
 
@@ -37,7 +38,7 @@ async function startSession(user: { id: string; email: string; name: string; rol
 }
 
 export const POST = publicApi(async req => {
-  const b = await body<{ action?: string; email?: string; password?: string; name?: string; company?: string; invite?: string; challenge?: string; code?: string }>(req)
+  const b = await body<{ action?: string; email?: string; password?: string; name?: string; company?: string; invite?: string; betaInvite?: string; challenge?: string; code?: string }>(req)
   const ip = currentRequest()?.ip || 'unknown'
 
   if (b.action === 'signout') {
@@ -63,6 +64,7 @@ export const POST = publicApi(async req => {
       throw new ApiError(401, "That code didn't work. Check your authenticator app and try again.", 'mfa_invalid')
     }
     await reset(`mfa:user:${userId}`)
+    await assertBetaAccess(user, 'password')
     return startSession(user, used === 'recovery' ? 'password+recovery_code' : 'password+totp')
   }
 
@@ -79,16 +81,26 @@ export const POST = publicApi(async req => {
     const invite = b.invite ? await findInvitation(String(b.invite)) : null
     if (b.invite && !invite) throw new ApiError(400, 'This invitation link is no longer valid. Ask your admin for a new one.', 'invite_invalid')
     if (invite && invite.email !== email) throw new ApiError(400, `This invitation is for ${invite.email}. Sign up with that email address.`, 'invite_email')
-    // On-prem instances can be invitation-only (PLANORA_SIGNUP=invite_only); the first account on an empty instance bootstraps the owner.
-    if (!invite && signupMode() === 'invite_only') {
-      const orgs = Number((await query('SELECT COUNT(*)::int AS n FROM organizations')).rows[0]?.n ?? 0)
-      if (!selfSignupAllowed('invite_only', orgs)) throw new ApiError(403, INVITE_ONLY_MESSAGE, 'invite_only')
-    }
+    // Beta invitation for a new firm (created by a platform operator): single use, for one address.
+    const beta = !invite && b.betaInvite ? await findBetaInvite(String(b.betaInvite)) : null
+    if (!invite && b.betaInvite && !beta) throw new ApiError(400, 'This beta invitation link is no longer valid. Ask for a new one.', 'beta_invite_invalid')
+    if (beta && beta.email !== email) throw new ApiError(400, `This invitation is for ${beta.email}. Sign up with that email address.`, 'invite_email')
+    // Private beta (PLANORA_SIGNUP, invite-only by default): without an invitation only a platform
+    // operator or the first account on an empty instance (the bootstrapping owner) may sign up.
+    // Checked before the "already exists" answer, so refused sign-ups learn nothing about accounts.
+    const mode = signupMode()
+    const platformAdmin = isPlatformAdmin(email)
+    const orgs = !invite && !beta && mode === 'invite_only' && !platformAdmin
+      ? Number((await query('SELECT COUNT(*)::int AS n FROM organizations')).rows[0]?.n ?? 0) : 1
+    const via = signupAccess({ mode, orgInvite: !!invite, betaInvite: !!beta, platformAdmin, existingOrganizations: orgs })
+    if (!via) throw new ApiError(403, INVITE_ONLY_MESSAGE, 'invite_only', { accessRequestEmail: accessRequestEmail() })
     if (await getUserByEmail(email)) throw new ApiError(409, 'An account with this email already exists. Please sign in.')
+    // The invitee may correct the firm name the operator typed.
+    const company = (typeof b.company === 'string' && b.company.trim() ? b.company.trim().slice(0, 160) : undefined) || beta?.company || undefined
     const user = await createUser({
       id: uuid(), email, name: (typeof b.name === 'string' && b.name.trim().slice(0, 120)) || email.split('@')[0],
-      passwordHash: await hashPassword(password), plan: 'free', createdAt: new Date().toISOString(),
-      ...(invite ? { orgId: invite.orgId, role: invite.role } : { orgName: typeof b.company === 'string' && b.company.trim() ? b.company.trim().slice(0, 160) : undefined }),
+      passwordHash: await hashPassword(password), plan: 'free', createdAt: new Date().toISOString(), betaAccess: via,
+      ...(invite ? { orgId: invite.orgId, role: invite.role } : { orgName: company }),
     })
     if (invite) {
       await markInvitationAccepted(invite.id)
@@ -97,10 +109,22 @@ export const POST = publicApi(async req => {
     } else {
       // New organization: cloud AI is opt-in (an admin turns it on under Organization → Policies).
       await applyNewOrganizationDefaults(user.orgId)
-      await sendVerificationEmail(user, appOrigin(req))
+      if (beta) {
+        await markBetaInviteAccepted(beta.id, user.id, user.orgId)
+        await markEmailVerified(user.id) // the beta invitation link was delivered to this address
+      } else {
+        await sendVerificationEmail(user, appOrigin(req))
+      }
     }
     Object.assign(currentRequest() || {}, { userId: user.id, email: user.email, orgId: user.orgId })
-    await audit({ orgId: user.orgId, action: invite ? 'member.joined' : 'org.created', targetType: 'user', targetId: user.id, detail: { role: user.role, ...(invite ? { invitationId: invite.id, invitedBy: invite.invitedBy } : {}) } })
+    await audit({ orgId: user.orgId, action: invite ? 'member.joined' : 'org.created', targetType: 'user', targetId: user.id, detail: { role: user.role, betaAccess: via, ...(invite ? { invitationId: invite.id, invitedBy: invite.invitedBy } : {}) } })
+    if (beta) {
+      // In the new firm's log and the operators' (system) log; never the token.
+      await appendAudit([
+        { orgId: user.orgId, action: 'beta.invite_accepted', targetType: 'beta_invite', targetId: beta.id, detail: { email, company: company ?? null, invitedBy: beta.createdByEmail } },
+        { orgId: SYSTEM_ORG, action: 'beta.invite_accepted', targetType: 'beta_invite', targetId: beta.id, detail: { email, orgId: user.orgId, company: company ?? null } },
+      ])
+    }
     return startSession(user, 'password')
   }
 
@@ -138,6 +162,8 @@ export const POST = publicApi(async req => {
       // (owners keep password sign-in as a break-glass account).
       if (await ssoEnforced(user.orgId)) throw new ApiError(403, 'Your organization requires single sign-on. Use “Sign in with SSO”.', 'sso_required')
     }
+    // Private beta: only after the password checked out, so the refusal reveals nothing to a guesser.
+    await assertBetaAccess(user, 'password')
     if (user.mfaEnabledAt) return json({ mfaRequired: true, challenge: createMfaChallenge(user.id) })
     return startSession(user, 'password')
   }
@@ -147,13 +173,19 @@ export const POST = publicApi(async req => {
 
 export const GET = publicApi(async req => {
   const ctx = await getAuthContext()
-  const invite = new URL(req.url).searchParams.get('invite')
+  const params = new URL(req.url).searchParams
+  const invite = params.get('invite')
   const invitation = invite ? await findInvitation(invite) : null
   const inviteInfo = invitation ? { email: invitation.email, role: invitation.role, orgName: invitation.orgName } : invite ? { invalid: true } : undefined
+  const betaToken = params.get('beta')
+  const betaInvite = betaToken ? await findBetaInvite(betaToken) : null
+  const betaInfo = betaInvite ? { email: betaInvite.email, company: betaInvite.company } : betaToken ? { invalid: true } : undefined
   // Where this instance runs, so sign-up can warn that CUI doesn't belong on the commercial cloud.
   const deployment = deploymentKind()
   const service = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
-  if (!ctx) return json({ user: null, service, ...(inviteInfo ? { invitation: inviteInfo } : {}) })
+  const signup = { mode: signupMode(), accessRequestEmail: accessRequestEmail() }
+  const links = { ...(inviteInfo ? { invitation: inviteInfo } : {}), ...(betaInfo ? { betaInvitation: betaInfo } : {}) }
+  if (!ctx) return json({ user: null, service, signup, ...links })
   return json({
     // Organization's subscription plan (from the session's organization row), not the legacy users.plan.
     user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: ctx.plan, role: ctx.role },
@@ -161,6 +193,8 @@ export const GET = publicApi(async req => {
     permissions: isRole(ctx.role) ? permissionsOf(ctx.role) : [],
     security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired, emailVerified: !!ctx.emailVerified, emailDelivery: emailConfigured() },
     service,
-    ...(inviteInfo ? { invitation: inviteInfo } : {}),
+    signup,
+    platformAdmin: isPlatformAdmin(ctx.email),
+    ...links,
   })
 })

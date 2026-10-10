@@ -321,11 +321,13 @@ export async function createScimUser(orgId: string, b: Row): Promise<{ row: Row;
   if (existing) {
     // Re-provisioning someone who was deleted through SCIM: same account, so their history stays linked.
     if (existing.role === 'owner') throw new ScimError(400, 'Owners are managed in Planora, not through SCIM.', 'mutability')
-    row = (await query(`UPDATE users SET name=$3, role=$4, scim_external_id=$5, disabled_at=${d.active === false ? 'NOW()' : 'NULL'}, scim_deleted_at=NULL, scim_modified_at=NOW(), failed_logins=0, locked_until=NULL
+    row = (await query(`UPDATE users SET name=$3, role=$4, scim_external_id=$5, disabled_at=${d.active === false ? 'NOW()' : 'NULL'}, scim_deleted_at=NULL, scim_modified_at=NOW(), failed_logins=0, locked_until=NULL,
+      beta_access_at=COALESCE(beta_access_at, NOW()), beta_access_via=COALESCE(beta_access_via, 'scim')
       WHERE id=$1 AND org_id=$2 RETURNING *`, [existing.id, orgId, name, role, d.externalId ?? null])).rows[0]
   } else {
-    row = (await query(`INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at, email_verified_at, scim_external_id, scim_modified_at, disabled_at)
-      VALUES ($1,$2,$3,$4,'free',NOW(),$5,$6,NOW(),NOW(),$7,NOW(),${d.active === false ? 'NOW()' : 'NULL'}) RETURNING *`,
+    // Provisioned by the organization's own identity provider: counts as invited for the private beta.
+    row = (await query(`INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at, email_verified_at, scim_external_id, scim_modified_at, disabled_at, beta_access_at, beta_access_via)
+      VALUES ($1,$2,$3,$4,'free',NOW(),$5,$6,NOW(),NOW(),$7,NOW(),${d.active === false ? 'NOW()' : 'NULL'},NOW(),'scim') RETURNING *`,
       [randomUUID(), email, name, await hashPassword(randomToken(32)), orgId, role, d.externalId ?? null])).rows[0]
   }
   await audit({ orgId, action: 'scim.user_created', targetType: 'user', targetId: String(row.id), detail: { email, role, active: !row.disabled_at, reprovisioned: !!existing } })

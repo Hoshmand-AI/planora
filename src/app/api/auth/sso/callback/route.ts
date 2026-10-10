@@ -9,6 +9,7 @@ import { audit, auditQuietly } from '@/lib/server/audit'
 import { currentRequest } from '@/lib/server/context'
 import { randomToken } from '@/lib/server/crypto'
 import { log } from '@/lib/server/log'
+import { assertBetaAccess } from '@/lib/server/beta'
 
 const SSO_COOKIE = 'planora-sso'
 
@@ -29,12 +30,15 @@ export const GET = publicApi(async req => {
     if (!user) {
       // Just-in-time provisioning with the organization's default role. The password is random and
       // unusable: these members sign in through the identity provider.
-      user = await createUser({ id: randomUUID(), email: id.email, name: id.name, passwordHash: await hashPassword(randomToken(32)), plan: 'free', createdAt: new Date().toISOString(), orgId: id.orgId, role: id.config.defaultRole })
+      user = await createUser({ id: randomUUID(), email: id.email, name: id.name, passwordHash: await hashPassword(randomToken(32)), plan: 'free', createdAt: new Date().toISOString(), betaAccess: 'sso', orgId: id.orgId, role: id.config.defaultRole })
       await markEmailVerified(user.id)
       if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
       await audit({ orgId: id.orgId, action: 'member.joined', targetType: 'user', targetId: user.id, detail: { via: 'sso', role: user.role, issuer: id.config.issuer } })
     }
     if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
+    // Private beta: members provisioned through the organization's identity provider count as
+    // invited (their admin configured it); an existing account still needs beta access.
+    await assertBetaAccess(user, 'sso')
     const { token, expiresAt, sessionId } = await createSession(user.id, 'sso')
     await audit({ orgId: id.orgId, action: 'auth.signin', targetType: 'user', targetId: user.id, detail: { method: 'sso', issuer: id.config.issuer, subject: id.subject, sessionId } })
     const res = NextResponse.redirect(new URL('/dashboard', url.origin), 303)

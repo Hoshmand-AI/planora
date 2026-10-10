@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard, MessageSquare, FileText, Clock,
-  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen,
+  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen, KeyRound,
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
@@ -114,6 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [permissions,      setPermissions]      = useState<string[]>([])
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
+  const [platformAdmin,    setPlatformAdmin]    = useState(false)
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
 
   /* ── Auth ── */
@@ -125,6 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setPermissions(data.permissions ?? [])
       setMfaSetupRequired(!!data.security?.mfaSetupRequired)
       setEmailUnconfirmed(!!data.security?.emailDelivery && !data.security?.emailVerified)
+      setPlatformAdmin(data.platformAdmin === true)
     })
   }, [router])
 
@@ -499,6 +501,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Building2 size={14} aria-hidden="true" /> Organization
                   </Link>
                 </div>
+                {platformAdmin && (
+                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                    <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
+                  </Link>
+                )}
                 {llm && (
                   <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
