@@ -182,7 +182,7 @@ export const GET = publicApi(async req => {
   const betaInfo = betaInvite ? { email: betaInvite.email, company: betaInvite.company } : betaToken ? { invalid: true } : undefined
   // Where this instance runs, so sign-up can warn that CUI doesn't belong on the commercial cloud.
   const deployment = deploymentKind()
-  const service = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
+  const service = { deployment, signup: signupMode(), ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
   const signup = { mode: signupMode(), accessRequestEmail: accessRequestEmail() }
   const links = { ...(inviteInfo ? { invitation: inviteInfo } : {}), ...(betaInfo ? { betaInvitation: betaInfo } : {}) }
   if (!ctx) return json({ user: null, service, signup, ...links })

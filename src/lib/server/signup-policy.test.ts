@@ -10,6 +10,11 @@ describe('sign-up mode (PLANORA_SIGNUP)', () => {
     expect(signupMode({ PLANORA_SIGNUP: '' })).toBe('invite_only')
     for (const v of ['invite_only', 'invite-only', 'INVITE_ONLY', ' inviteonly ']) expect(signupMode({ PLANORA_SIGNUP: v })).toBe('invite_only')
   })
+  it('the hosted service on Vercel defaults to invitation-only; PLANORA_SIGNUP=open reopens it', () => {
+    expect(signupMode({ VERCEL: '1' })).toBe('invite_only')
+    expect(signupMode({ VERCEL: '1', PLANORA_SIGNUP: 'open' })).toBe('open')
+    expect(signupMode({ VERCEL: '1', PLANORA_SIGNUP: 'invite_only' })).toBe('invite_only')
+  })
   it('PLANORA_SIGNUP=open re-opens self sign-up', () => {
     expect(signupMode({ PLANORA_SIGNUP: 'open' })).toBe('open')
     expect(signupMode({ PLANORA_SIGNUP: ' OPEN ' })).toBe('open')
