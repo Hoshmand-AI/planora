@@ -704,6 +704,38 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS document_ids TEXT[];
     `,
   },
+  {
+    id: 18, name: 'private_beta_access',
+    sql: `
+    -- Private beta (src/lib/server/signup-policy.ts, src/lib/server/beta.ts). Additive: older code
+    -- ignores the new columns and table.
+    -- Sign-in needs beta access while the instance is invite-only; revoking it signs the person out.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_revoked_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_via TEXT;
+    -- Grandfather every account that exists when this ships, so nobody already using Planora is locked out.
+    UPDATE users SET beta_access_at = NOW(), beta_access_via = 'grandfathered' WHERE beta_access_at IS NULL;
+
+    -- Beta invitations for NEW firms, created by platform operators (PLANORA_PLATFORM_ADMINS).
+    -- Operator data, not firm data: accepting one creates a new organization. Single-use, expiring,
+    -- and only the SHA-256 of the token is stored.
+    CREATE TABLE IF NOT EXISTS beta_invites (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      company TEXT,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      accepted_at TIMESTAMPTZ,
+      accepted_user_id TEXT,
+      accepted_org_id TEXT,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS beta_invites_email_idx ON beta_invites(LOWER(email));
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

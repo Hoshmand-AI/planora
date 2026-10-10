@@ -74,7 +74,7 @@ curl -s http://127.0.0.1:3000/api/health
 The first request creates the database schema (section 7). Then:
 
 1. Open `APP_URL` in a browser and sign up. On an empty instance the first account creates the
-   organization and becomes its **owner**. With `PLANORA_SIGNUP=invite_only` (the Compose default)
+   organization and becomes its **owner**. With `PLANORA_SIGNUP=invite_only` (the default)
    every later account needs an invitation from an admin, or single sign-on into a verified domain.
    Create the owner account before you open the instance to users.
 2. Under **Organization**: turn on **Require two-step verification**, set the session idle timeout,
@@ -135,7 +135,9 @@ network, whatever these settings say ([../security/CUI-HANDLING.md](../security/
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PLANORA_SIGNUP` | `open`; `invite_only` in Compose | `invite_only`: after the first account, sign-up requires an invitation (SSO into a verified domain still provisions members). |
+| `PLANORA_SIGNUP` | `invite_only` (private beta) | `invite_only`: after the first account, sign-up requires an invitation (SSO or SCIM into a verified domain still provisions members), and signing in requires beta access (accounts that existed when migration 18 ran keep it). `open`: anyone may create an organization and the sign-in gate is off. |
+| `PLANORA_PLATFORM_ADMINS` | — | Comma-separated operator emails. Operators always pass the beta gate and can invite new firms and revoke a person's beta access under **Beta access** (`/dashboard/platform`). |
+| `PLANORA_ACCESS_REQUEST_EMAIL` | — | Address for the "Request access" links on the landing and sign-in pages (hidden when unset). |
 | `PLANORA_DEFAULT_PLAN` | `free` | Plan for organizations created from now on (`free`, `pro`, `enterprise`); see `src/lib/server/entitlements.ts`. Change an existing organization with `scripts/set-plan.mjs`. |
 | `NODE_EXTRA_CA_CERTS` | — | Standard Node.js setting: a PEM bundle of private CAs to trust for an on-prem OpenID Connect provider or model host over HTTPS. |
 | `PLANORA_ALLOW_INSECURE_OIDC` | — | Tests only: allows `http://` identity providers and skips DNS domain verification. Never set in production. |

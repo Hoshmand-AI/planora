@@ -62,6 +62,9 @@ jobs:
       JWT_SECRET: ci-only-secret
       PLANORA_AI_MODE: offline
       PLANORA_DEFAULT_PLAN: pro
+      # The suites below create their own firms, so the main test server re-opens self sign-up. The
+      # private beta gate (the default, invite-only) is tested against a second server further down.
+      PLANORA_SIGNUP: open
       PLANORA_ALLOW_INSECURE_OIDC: '1'
       # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
       PLANORA_ALLOW_INSECURE_WEBHOOKS: '1'
@@ -104,13 +107,19 @@ jobs:
         run: node scripts/e2e-tenant-isolation.mjs
       - name: SAML single sign-on and SCIM provisioning checks
         run: node scripts/e2e-scim.mjs
+      - name: Private beta gate (second server in the default invite-only mode)
+        run: |
+          PLANORA_SIGNUP= PLANORA_PLATFORM_ADMINS=ops@beta.test nohup npx next start -p 3001 > app-beta.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3001/api/health && break; sleep 2; done
+          curl -sf http://localhost:3001/api/health
+          BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/e2e-beta.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium
-          node scripts/a11y-check.mjs
+          BETA_BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/a11y-check.mjs
       - name: App log
         if: failure()
-        run: tail -n 200 app.log; tail -n 50 oidc.log
+        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log || true
 
   # Static analysis for common vulnerability classes (OWASP Top 10) and committed secrets.
   sast:

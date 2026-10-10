@@ -152,6 +152,10 @@ export interface User {
   mfaLastStep: number | null
   mfaRecovery: string[]
   emailVerifiedAt: string | null
+  /** Private beta: when the account got access (null = none), when it was revoked, and how it got it */
+  betaAccessAt: string | null
+  betaRevokedAt: string | null
+  betaAccessVia: string | null
 }
 
 function rowToUser(row: Record<string, unknown>): User {
@@ -163,6 +167,7 @@ function rowToUser(row: Record<string, unknown>): User {
     mfaSecret: (row.mfa_secret as string) || null, mfaEnabledAt: ts(row.mfa_enabled_at),
     mfaLastStep: row.mfa_last_step != null ? Number(row.mfa_last_step) : null, mfaRecovery: (row.mfa_recovery as string[]) || [],
     emailVerifiedAt: ts(row.email_verified_at),
+    betaAccessAt: ts(row.beta_access_at), betaRevokedAt: ts(row.beta_revoked_at), betaAccessVia: (row.beta_access_via as string) || null,
   }
 }
 
@@ -179,7 +184,12 @@ export async function getUserById(id: string): Promise<User | undefined> {
 }
 
 /** Creates the user and, unless joining an existing org (invitation), a new private organization for their firm. */
-export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'passwordHash' | 'plan' | 'createdAt'> & { orgId?: string; orgName?: string; role?: string }): Promise<User> {
+/**
+ * Creates an account (and, without orgId, a new organization it owns). `betaAccess` records how the
+ * account got private-beta access (see signup-policy.ts); without it the account can't sign in
+ * while the instance is invite-only.
+ */
+export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'passwordHash' | 'plan' | 'createdAt'> & { orgId?: string; orgName?: string; role?: string; betaAccess?: string }): Promise<User> {
   await initSchema()
   const orgId = user.orgId || `org_${user.id}`
   const role = user.orgId ? (user.role || 'viewer') : 'owner'
@@ -188,8 +198,9 @@ export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'pas
       const { defaultPlan } = await import('@/lib/server/entitlements')
       await q('INSERT INTO organizations (id, name, plan) VALUES ($1,$2,$3) ON CONFLICT (id) DO NOTHING', [orgId, user.orgName || user.name, defaultPlan()])
     }
-    const res = await q('INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
-      [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId, role])
+    const res = await q(`INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at, beta_access_at, beta_access_via)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(), CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END, $9::text) RETURNING *`,
+      [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId, role, user.betaAccess ?? null])
     return rowToUser(res.rows[0])
   })
 }

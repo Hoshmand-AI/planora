@@ -14,6 +14,7 @@ import { currentRequest } from '@/lib/server/context'
 import { randomToken } from '@/lib/server/crypto'
 import { appOrigin } from '@/lib/server/email'
 import { log } from '@/lib/server/log'
+import { assertBetaAccess } from '@/lib/server/beta'
 
 const MAX_FORM_BYTES = 768 * 1024
 
@@ -71,7 +72,7 @@ export const POST = publicApi<{ connection: string }>(async (req, { params }) =>
       // Just-in-time provisioning into this organization only, with the mapped or default role. The
       // password is random and unusable: these members sign in through the identity provider.
       const role = id.groupRole || found.config.defaultRole
-      user = await createUser({ id: randomUUID(), email: id.email, name: id.name, passwordHash: await hashPassword(randomToken(32)), plan: 'free', createdAt: new Date().toISOString(), orgId: id.orgId, role })
+      user = await createUser({ id: randomUUID(), email: id.email, name: id.name, passwordHash: await hashPassword(randomToken(32)), plan: 'free', createdAt: new Date().toISOString(), betaAccess: 'saml', orgId: id.orgId, role })
       await markEmailVerified(user.id)
       if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
       await audit({ orgId: id.orgId, action: 'member.joined', targetType: 'user', targetId: user.id, detail: { via: 'saml', role: user.role, idp: found.config.idpEntityId } })
@@ -83,6 +84,9 @@ export const POST = publicApi<{ connection: string }>(async (req, { params }) =>
       user = { ...user, role: change.to }
     }
     if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
+    // Private beta: members provisioned through the organization's identity provider count as
+    // invited (their admin configured it); an existing account still needs beta access.
+    await assertBetaAccess(user, 'saml')
     const { token, expiresAt, sessionId } = await createSession(user.id, 'saml')
     await audit({ orgId: id.orgId, action: 'auth.signin', targetType: 'user', targetId: user.id, detail: { method: 'saml', idp: found.config.idpEntityId, assertionId: id.assertionId, sessionId } })
     const res = NextResponse.redirect(new URL('/dashboard', origin), 303)

@@ -10,6 +10,12 @@ import { createHmac } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
+// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
+if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
+  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  process.exit(1)
+}
 const ORIGIN = new URL(BASE).origin
 let passed = 0
 
