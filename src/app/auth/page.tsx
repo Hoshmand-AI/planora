@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
+import { Robot } from '@/components/Robot'
 
 function AuthForm() {
   const router = useRouter()
@@ -129,6 +130,10 @@ function AuthForm() {
             <ArrowLeft size={14} /> Back to home
           </Link>
 
+          {/* Nora greets you; the heading below says the same thing in words */}
+          <div className="mood-tile grain flex w-fit items-center border rounded-[24px] px-4 pt-3 pb-2 mb-5" data-mood={challenge ? 'waiting' : mode === 'signin' ? 'done' : 'working'}>
+            <Robot mood={challenge ? 'waiting' : mode === 'signin' ? 'done' : 'working'} size={64} />
+          </div>
           <h1 className="font-display text-[32px] text-navy-950 mb-2">
             {challenge ? 'Two-step verification' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the Planora beta' : 'Create your account'}
           </h1>

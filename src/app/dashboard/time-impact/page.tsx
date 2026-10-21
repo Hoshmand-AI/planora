@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, Timer } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useApp } from '../layout'
 import { fmtDate, fmtDateTime } from '@/lib/format'
 import { Alert, postJson } from '@/components/ui'
+import { EmptyState } from '@/components/EmptyState'
 import type { DelayEvent, Fragnet, FragnetActivity, FragnetLink, Responsibility, TiaResult, TiaRun } from '@/lib/analysis/tia'
 
 interface Pick { code: string; name: string; type: string; status: string; start: string | null; finish: string | null; totalFloat: number }
@@ -33,7 +34,7 @@ const secondary = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950
 const signed = (n: number | null | undefined) => (n == null ? '—' : n > 0 ? `+${n}` : String(n))
 
 export default function TimeImpactPage() {
-  const { selectedSchedule, can } = useApp()
+  const { selectedSchedule, can, openUpload } = useApp()
   const [data, setData] = useState<Overview | null>(null)
   const [err, setErr] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -64,7 +65,11 @@ export default function TimeImpactPage() {
     setSelected((r.data.event as DelayEvent).id)
   }
 
-  if (!selectedSchedule) return <div className="px-6 py-16 text-center text-[14px] text-warm-600"><Timer size={22} aria-hidden className="mx-auto mb-2 text-warm-500" />Upload or select a schedule update to run a time impact analysis.</div>
+  if (!selectedSchedule) return (
+    <EmptyState title="No schedule update yet" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
+      Upload or select a schedule update to run a time impact analysis.
+    </EmptyState>
+  )
   if (!data) return <div className="px-6 py-10 text-[14px] text-warm-600 flex items-center gap-2" role="status">{err || <><Loader2 size={14} className="animate-spin" aria-hidden /> Loading delay events…</>}</div>
   const event = data.events.find(e => e.id === selected) ?? null
 

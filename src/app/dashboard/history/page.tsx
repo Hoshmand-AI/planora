@@ -5,6 +5,8 @@ import { Loader2, Database, Lock } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import type { CategoryStats } from '@/lib/planning/history'
 import type { BacktestResult } from '@/lib/planning/evaluation'
+import { useApp } from '../layout'
+import { EmptyState } from '@/components/EmptyState'
 
 interface HistoryData {
   organization: { id: string; name: string } | null
@@ -19,6 +21,7 @@ interface HistoryData {
 const label = (c: string) => c.replace(/_/g, ' ').replace(/\b\w/g, m => m.toUpperCase())
 
 export default function HistoryPage() {
+  const { can, openUpload } = useApp()
   const [data, setData] = useState<HistoryData | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState<string | null>(null)
@@ -60,7 +63,9 @@ export default function HistoryPage() {
         <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Your schedules</div>
         <p className="text-[12px] text-warm-500 mb-3">Tag each with facility type, state and area so Planora can compare like with like. A new firm with no history starts from reference templates; accuracy improves as you add completed projects.</p>
         {data.schedules.length === 0 ? (
-          <p className="text-[13px] text-warm-500"><Database size={14} className="inline mr-1" />No schedules yet. Upload past P6 / MS Project / Excel schedules with actual dates.</p>
+          <EmptyState inline heading="h2" title="No schedules yet" action={can('schedule.write') ? { label: 'Upload a past schedule', onClick: openUpload } : undefined}>
+            <Database size={14} className="inline mr-1 -mt-0.5" aria-hidden="true" />Upload past P6 / MS Project / Excel schedules with actual dates.
+          </EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[12.5px] min-w-[640px]">
