@@ -97,6 +97,8 @@ jobs:
         run: |
           node scripts/e2e-rag.mjs
           RAG_TEST_DATABASE_URL="$DATABASE_URL" npx vitest run src/lib/rag/rag.db.test.ts
+      - name: Password reset tokens on Postgres
+        run: AUTH_TEST_DATABASE_URL="$DATABASE_URL" npx vitest run src/lib/server/password-reset.test.ts
       - name: Backup and restore drill
         run: |
           node scripts/backup.mjs backups

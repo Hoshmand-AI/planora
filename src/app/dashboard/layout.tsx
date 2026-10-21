@@ -199,6 +199,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
   const [platformAdmin,    setPlatformAdmin]    = useState(false)
   const [emailWhy,         setEmailWhy]         = useState(false)
+  const [resend,           setResend]           = useState<{ busy: boolean; note: string; ok: boolean }>({ busy: false, note: '', ok: false })
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
 
   /* ── Auth ── */
@@ -265,6 +266,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setUploadError('Upload failed. Please try again.')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    setResend({ busy: true, note: '', ok: false })
+    try {
+      const res = await fetch('/api/account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resend_verification' }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setResend({ busy: false, note: data.error || 'We could not send the email right now. Try again shortly.', ok: false }); return }
+      if (data.alreadyVerified) { setResend({ busy: false, note: '', ok: true }); setEmailUnconfirmed(false); return }
+      setResend({ busy: false, note: 'Sent — check your inbox (and spam).', ok: true })
+    } catch {
+      setResend({ busy: false, note: 'Network error. Please try again.', ok: false })
     }
   }
 
@@ -394,12 +408,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* pb-16 on mobile = space for bottom tab bar */}
         <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0 focus:outline-none">
           {emailUnconfirmed && pathname !== '/dashboard/account' && (
-            <div role="status" className="bg-warm-100 border-b border-warm-200 px-4 md:px-6 py-2 text-[13px] text-warm-700">
+            <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-6 py-2 text-[13px] text-warm-700">
               <div className="max-w-5xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
                 <MailCheck size={14} aria-hidden="true" className="text-accent-600 flex-shrink-0" />
                 <span>Please confirm your email. We sent you a link.</span>
-                <Link href="/dashboard/account" className="font-medium text-accent-600 hover:underline">Resend the link</Link>
+                <button type="button" disabled={resend.busy} onClick={resendConfirmation} className="font-medium text-accent-600 hover:underline disabled:opacity-60 disabled:cursor-wait">
+                  {resend.busy ? 'Sending…' : 'Resend the link'}
+                </button>
                 <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-navy-950">Why?</button>
+                <span role="status" aria-live="polite" className={resend.ok ? 'text-warm-700' : 'text-status-at-risk'}>{resend.note}</span>
                 <span id="email-why" hidden={!emailWhy} className="basis-full text-[12.5px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
               </div>
             </div>
