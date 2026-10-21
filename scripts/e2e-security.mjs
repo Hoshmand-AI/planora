@@ -120,6 +120,91 @@ async function main() {
     ok(r.data.security.emailVerified === true, 'Email now shows as confirmed')
   }
 
+  /* ── Forgot password (reset by emailed link) ── */
+  {
+    const resetter = new Client()
+    r = await resetter.post('/api/auth', { action: 'signup', email: email('resetter'), password: PW, name: 'Rhea Resetter', company: 'Reset Builders' })
+    ok(r.status === 200, 'A member signs up (password reset subject)')
+    const anon = new Client()
+    const known = await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+    const unknown = await anon.post('/api/auth', { action: 'request_password_reset', email: `nobody-reset${stamp}@example.com` })
+    const strip = d => JSON.stringify({ ...d, requestId: undefined })
+    ok(known.status === unknown.status && strip(known.data) === strip(unknown.data), 'Reset request answers the same for unknown and known emails (no account enumeration)', { known, unknown })
+    if (!OUTBOX) {
+      ok(known.status === 400 && known.data.code === 'email_unavailable', 'Without email delivery, reset says it is unavailable on this installation')
+    } else {
+      ok(known.status === 200 && /If an account exists/.test(known.data.message), 'Reset request gives the generic confirmation')
+      const resetRe = /https?:\/\/\S+\/auth\/reset\?token=[A-Za-z0-9_-]+/
+      const tokenOf = link => new URL(link).searchParams.get('token')
+      /** Waits for a reset link to this address other than the ones already seen. */
+      const nextResetToken = async (seen) => {
+        for (let i = 0; i < 50; i++) {
+          const t = tokenOf(await mailLink(email('resetter'), resetRe))
+          if (!seen.includes(t)) return t
+          await new Promise(res => setTimeout(res, 100))
+        }
+        throw new Error('no new reset email')
+      }
+      const token1 = await nextResetToken([])
+      ok(!!token1 && token1.length >= 40, 'The reset link is emailed to the account address')
+      {
+        const fs = await import('node:fs/promises')
+        const path = await import('node:path')
+        const mails = await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))
+        ok(!mails.some(m => m.to === `nobody-reset${stamp}@example.com`), 'Nothing is sent to an address without an account')
+        const mail = mails.find(m => m.to === email('resetter') && m.subject === 'Reset your Planora password')
+        ok(!!mail && /expires in 30 minutes/.test(mail.text) && /ignore this message/.test(mail.text), 'The reset email says it expires in 30 minutes and to ignore it if not requested')
+      }
+      await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+      let token = await nextResetToken([token1])
+      r = await anon.post('/api/auth', { action: 'reset_password', token: token1, password: 'superseded long passphrase' })
+      ok(r.status === 400 && r.data.code === 'reset_invalid', 'Requesting a new link makes the older one stop working')
+      r = await anon.post('/api/auth', { action: 'reset_password', token: 'garbage-token-that-was-never-issued-000000', password: 'another long passphrase' })
+      ok(r.status === 400 && r.data.error === 'This reset link is invalid or has expired. Request a new one.', 'A made-up reset token is refused')
+      if (process.env.DATABASE_URL) {
+        const { createHash } = await import('node:crypto')
+        const { default: pg } = await import('pg')
+        const db = new pg.Client({ connectionString: process.env.DATABASE_URL })
+        await db.connect()
+        await db.query(`UPDATE email_tokens SET expires_at = NOW() - INTERVAL '1 second' WHERE token_hash=$1`, [createHash('sha256').update(token).digest('hex')])
+        await db.end()
+        r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'expired link long passphrase' })
+        ok(r.status === 400 && r.data.code === 'reset_invalid', 'An expired reset link is refused')
+        await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+        token = await nextResetToken([token1, token])
+      }
+      const device2 = new Client()
+      r = await device2.post('/api/auth', { action: 'signin', email: email('resetter'), password: PW })
+      ok(r.status === 200, 'The member is also signed in on a second device')
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'short' })
+      ok(r.status === 400 && r.data.code === 'weak_password', 'A weak new password is refused (and the link still works)')
+      const NEW_PW = 'freshly chosen reset passphrase'
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: NEW_PW })
+      ok(r.status === 200 && r.data.success && !anon.cookie, 'The emailed link resets the password (no automatic sign-in)')
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'reused link long passphrase' })
+      ok(r.status === 400 && r.data.code === 'reset_invalid', 'A reset link works only once')
+      r = await device2.get('/api/plans')
+      const r2 = await resetter.get('/api/plans')
+      ok(r.status === 401 && r2.status === 401, 'Resetting the password signs the account out everywhere')
+      r = await new Client().post('/api/auth', { action: 'signin', email: email('resetter'), password: PW })
+      ok(r.status === 401, 'The old password no longer works')
+      const back = new Client()
+      r = await back.post('/api/auth', { action: 'signin', email: email('resetter'), password: NEW_PW })
+      ok(r.status === 200, 'The new password signs in')
+      r = await back.get('/api/audit?limit=100')
+      const resetEvents = r.data.events.filter(e => e.action === 'auth.password_reset_requested' || e.action === 'auth.password_reset')
+      ok(resetEvents.some(e => e.action === 'auth.password_reset') && resetEvents.some(e => e.action === 'auth.password_reset_requested'), 'Audit log records the reset request and the reset')
+      ok(!JSON.stringify(r.data.events).includes(token), 'The audit log never contains the reset token')
+      r = await back.get('/api/auth')
+      ok(r.data.security.emailVerified === true, 'Using the reset link also confirms the email address')
+    }
+    // Per-address limit, counted whether or not the account exists.
+    const flood = `flood-reset${stamp}@example.com`
+    const answers = []
+    for (let i = 0; i < 6; i++) answers.push((await anon.post('/api/auth', { action: 'request_password_reset', email: flood })).status)
+    ok(OUTBOX ? answers.slice(0, 5).every(s => s === 200) && answers[5] === 429 : answers.every(s => s === 400), `Reset requests are rate limited per email (${answers.join(',')})`)
+  }
+
   /* ── CSRF ── */
   r = await owner.post('/api/plans', { name: 'Evil' }, { origin: 'https://evil.example' })
   ok(r.status === 403 && r.data.code === 'csrf', 'Cross-site write is blocked')
@@ -407,6 +492,15 @@ async function main() {
       ok(r.status === 200 && r.data.sso.enforce, 'Admin enforces SSO')
       r = await new Client().post('/api/auth', { action: 'signin', email: `pw@${domain}`, password: PW })
       ok(r.status === 403 && r.data.code === 'sso_required', 'With SSO enforced, members cannot use a password', r)
+      if (OUTBOX) {
+        const fs = await import('node:fs/promises')
+        const path = await import('node:path')
+        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your Planora password').length
+        r = await new Client().post('/api/auth', { action: 'request_password_reset', email: `pw@${domain}` })
+        ok(r.status === 200 && /If an account exists/.test(r.data.message), 'A reset request for an SSO-enforced member gets the generic answer')
+        await new Promise(res => setTimeout(res, 1500))
+        ok(await resetMailsTo(`pw@${domain}`) === 0, '…but no reset link is sent (they sign in through the identity provider)')
+      }
       r = await new Client().post('/api/auth', { action: 'signin', email: email('owner'), password: PW })
       ok(r.status === 200, 'The owner keeps password sign-in as a break-glass account')
       r = await owner2.get('/api/audit?action=org.sso_changed')
