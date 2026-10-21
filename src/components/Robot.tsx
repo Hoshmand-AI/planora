@@ -26,7 +26,7 @@ export function Robot({ mood = 'working', size = 64, label, className = '', stil
   still?: boolean
 }) {
   const c = PALETTE[mood]
-  const gid = `nora-${mood}-${useId().replace(/:/g, '')}`
+  const gid = `nora-${mood}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const a11y = label ? { role: 'img' as const, 'aria-label': label } : { 'aria-hidden': true as const }
   return (
     <svg viewBox="0 0 100 84" width={size} height={size * 0.84} className={`nora ${still ? '' : 'nora-float'} ${className}`} data-mood={mood} {...a11y}>
