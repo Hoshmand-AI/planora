@@ -5,8 +5,11 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Lock, Play, Download, Send, ChevronDown, ChevronRight,
-  AlertTriangle, CheckCircle2, Trash2, Link2, X,
+  AlertTriangle, CheckCircle2, Trash2, Link2, X, RefreshCw,
 } from 'lucide-react'
+import { Robot, type RobotMood } from '@/components/Robot'
+import { MoreNumbers, type NumberRow } from '@/components/plan/MoreNumbers'
+import { RecoveryPanel } from '@/components/plan/RecoveryPanel'
 import type {
   Answer, ElicitationResult, GeneratedSchedule, PlanActivity, PlanLink, SourceRef,
 } from '@/lib/planning/types'
@@ -181,49 +184,95 @@ export default function PlanPage() {
   const lateDays = g?.mustFinishBy && g.cpm && g.cpm.projectFinish > g.mustFinishBy
     ? Math.round((Date.parse(g.cpm.projectFinish) - Date.parse(g.mustFinishBy)) / 86_400_000) : 0
   const failing = ev ? ev.dcma.checks.filter(c => c.result === 'fail').length : 0
+  const openDecisions = view.guidance.filter(x => !x.decision).length
   const fc = headline(ev, sra)
-  const goEvaluation = () => { setTab('evaluation'); window.scrollTo({ top: 0 }) }
+  const ad = view.adaptive
+  // Scroll so a section lands just below the frozen header (whatever its height on this screen).
+  const scrollToSection = (sid: string) => setTimeout(() => {
+    const el = document.getElementById(sid)
+    if (!el) return
+    const sticky = stickyRef.current && getComputedStyle(stickyRef.current).position === 'sticky' ? stickyRef.current.getBoundingClientRect().bottom : stickyTop
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - sticky - 12, behavior: 'smooth' })
+  }, 50)
+  const goTab = (t: Tab) => { setTab(t); window.scrollTo({ top: 0 }) }
+  const goEvaluation = () => goTab('evaluation')
+  const goRecovery = () => { setTab('schedule'); scrollToSection('recovery') }
+  const recoveryCount = view.recovery?.options.filter(o => o.id !== 'move_date' && o.daysSaved > 0).length ?? 0
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+  // One mood and one plain sentence for where this plan stands; the most urgent thing wins.
+  const status: { mood: RobotMood; text: React.ReactNode; onClick?: () => void } =
+    busy === 'generate' ? { mood: 'working', text: 'Building your schedule…' }
+    : !g ? (ad.enoughToBuild
+      ? { mood: 'waiting', text: 'Ready to build: nothing left would move your finish much', onClick: () => goTab('interview') }
+      : { mood: 'waiting', text: `${plural(ad.remainingThatMatter, 'question')} could still move your finish — answer what you can, then build`, onClick: () => goTab('interview') })
+    : lateDays > 0 ? { mood: 'worried', text: <>Finishing {lateDays} days late{g.mustFinishBy ? <>, after the required {fmtDate(g.mustFinishBy)}</> : null}{recoveryCount ? ` — ${plural(recoveryCount, 'way')} to recover` : ' — see your options'}</>, onClick: goRecovery }
+    : !ad.enoughToBuild && ad.remainingThatMatter > 0 ? { mood: 'waiting', text: `${plural(ad.remainingThatMatter, 'question')} could still move your finish`, onClick: () => goTab('interview') }
+    : openDecisions > 0 ? { mood: 'waiting', text: `On track — ${plural(openDecisions, 'quality check')} could use your decision`, onClick: goEvaluation }
+    : { mood: 'done', text: g.mustFinishBy ? <>On track for {fmtDate(g.cpm?.projectFinish)}, before the required {fmtDate(g.mustFinishBy)}</> : <>Schedule built — forecast finish {fmtDate(g.cpm?.projectFinish)}</> }
+
+  const aiLabel = llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'
+  const numbers: NumberRow[] = [
+    { key: 'questions', label: 'Questions that matter', value: ad.enoughToBuild ? 'none left' : String(ad.remainingThatMatter),
+      explain: `Open interview questions whose answer could still move the finish by ${ad.thresholdDays} days or more. Answer them, then rebuild; your overrides are kept.`, go: { label: 'Interview', onClick: () => goTab('interview') } },
+    ...(g?.cpm ? [{ key: 'finish', label: 'Finish', value: fmtDate(g.cpm.projectFinish),
+      explain: 'The critical-path finish if every activity takes its planned duration.', go: { label: 'Schedule', onClick: () => goTab('schedule') } }] : []),
+    ...(g?.mustFinishBy ? [{ key: 'required', label: 'Required finish', value: fmtDate(g.mustFinishBy), explain: 'The date the project must be complete by, from your interview answers.' }] : []),
+    ...(lateDays > 0 ? [{ key: 'late', label: 'Behind the required date', value: `${lateDays} days`, tone: 'bad' as const,
+      explain: 'Calendar days between the forecast finish and the required date.', go: { label: 'Ways to recover', onClick: goRecovery } }] : []),
+    ...(fc ? [{ key: 'p50p80', label: fc.method === 'monte_carlo' ? 'Monte Carlo P50/P80' : 'Rule-based P50/P80', value: `${fmtDate(fc.p50)} / ${fmtDate(fc.p80)}`,
+      explain: <>P50 is a coin-flip date: half the likely outcomes finish by then. P80 is the date you can commit to with 80% confidence.{fc.method === 'monte_carlo' ? ' From simulating the whole network many times.' : ' A quick rule-based estimate until the simulation has run.'}</>, go: { label: 'Risk analysis', onClick: goEvaluation } }] : []),
+    ...(ev ? [{ key: 'quality', label: 'Quality', value: `${ev.grade} · ${ev.score}`,
+      explain: 'Overall grade (0–100) from the DCMA checks, interview readiness, realism, coverage and expert review.', go: { label: 'Evaluation', onClick: goEvaluation } }] : []),
+    ...(ev ? [{ key: 'dcma', label: 'DCMA', value: `${ev.dcma.passed}/${ev.dcma.applicable}`, tone: failing ? 'warn' as const : undefined,
+      explain: 'The DCMA 14-point assessment, a standard schedule health check from the U.S. Defense Contract Management Agency: checks passing out of those that apply.', go: { label: failing ? `${failing} to fix` : 'Details', onClick: goEvaluation } }] : []),
+    { key: 'ai', label: 'AI', value: <span className="inline-flex items-center gap-1">{llm.airgapped && <Lock size={11} aria-label="Air-gapped" />}{aiLabel}</span>,
+      explain: llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : 'No AI model is used: questions, durations and logic come from Planora’s rules and your firm’s data.' },
+  ]
+
+  // One obvious next step; everything else is quieter.
+  const canPublish = !!g && can('plan.publish')
+  const primary: 'generate' | 'publish' | 'export' | null = !g ? (can('plan.write') ? 'generate' : null) : canPublish && !plan.scheduleId ? 'publish' : 'export'
+  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-navy-950 hover:bg-warm-200/70 disabled:opacity-50'
+  const loud = 'pressable inline-flex items-center gap-1.5 rounded-full bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 text-[13px] font-semibold disabled:opacity-50'
 
   return (
     <div className="px-4 md:px-6 pb-8">
-      {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling */}
-      <div ref={stickyRef} style={{ top: stickyTop }} className="sticky z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="min-w-0">
-            <Link href="/dashboard/plan" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} /> All plans</Link>
-            <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight truncate">{plan.name}</h1>
-          </div>
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
-            {can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className="pressable flex items-center gap-1.5 bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 rounded-full text-[13px] font-semibold disabled:opacity-50">
-              {busy === 'generate' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {g ? 'Regenerate' : 'Generate schedule'}
+      {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
+      <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
+        <Link href="/dashboard/plan" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> All plans</Link>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
+          <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight min-w-0 md:truncate">{plan.name}</h1>
+          <div className="flex flex-wrap items-center gap-1 flex-shrink-0">
+            {g && can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className={quiet}>
+              {busy === 'generate' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <RefreshCw size={13} aria-hidden />} Regenerate
             </button>}
-            {g && (
-              <>
-                {can('plan.publish') && <button onClick={publish} disabled={!!busy} className="pressable flex items-center gap-1.5 border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-4 py-2 rounded-full text-[13px] font-medium disabled:opacity-50">
-                  {busy === 'publish' ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Publish
-                </button>}
-                <ExportMenu id={plan.id} />
-              </>
-            )}
+            {canPublish && <button onClick={publish} disabled={!!busy} className={primary === 'publish' ? loud : quiet}>
+              {busy === 'publish' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Send size={13} aria-hidden />} {primary === 'publish' ? 'Publish' : 'Publish update'}
+            </button>}
+            {g && <ExportMenu id={plan.id} primary={primary === 'export'} />}
+            {primary === 'generate' && <button onClick={() => generate(false)} disabled={!!busy} className={loud}>
+              {busy === 'generate' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Play size={13} aria-hidden />} Generate schedule
+            </button>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-[13px] text-warm-600">
-          <HeaderStat label="Questions that matter" value={view.adaptive.enoughToBuild ? 'none left' : String(view.adaptive.remainingThatMatter)} onClick={() => setTab('interview')} />
-          {g?.cpm && <HeaderStat label="Finish" value={fmtDate(g.cpm.projectFinish)} onClick={() => setTab('schedule')} />}
-          {fc && <HeaderStat label={fc.method === 'monte_carlo' ? 'Monte Carlo P50/P80' : 'Rule-based P50/P80'} value={`${fmtDate(fc.p50)} / ${fmtDate(fc.p80)}`} onClick={goEvaluation} />}
-          {ev && <HeaderStat label="Quality" value={`${ev.grade} · ${ev.score}`} onClick={goEvaluation} />}
-          {ev && <HeaderStat label="DCMA" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} tone={failing ? 'warn' : undefined} onClick={goEvaluation} />}
-          {lateDays > 0 && (
-            <button onClick={() => { setTab('schedule'); setTimeout(() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }}
-              className="pressable rounded-full bg-status-at-risk-bg text-status-at-risk px-2.5 py-0.5 text-[12.5px] font-semibold">{lateDays} days late</button>
-          )}
-          <span className="text-[12px] text-warm-500 inline-flex items-center gap-1" title={llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : undefined}>{llm.airgapped && <Lock size={10} aria-hidden />}{llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'}</span>
+        <div data-mood={status.mood} className="mood-tile grain mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Robot mood={status.mood} size={40} className="flex-shrink-0" />
+          <div className="flex-1 min-w-[180px] text-[14px] font-medium text-navy-950 leading-snug py-1">
+            {status.onClick
+              ? <button onClick={status.onClick} className="text-left hover:underline underline-offset-2 decoration-warm-400">{status.text} <span aria-hidden className="text-warm-500">→</span></button>
+              : <span role="status">{status.text}</span>}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            {g?.cpm && <div className="text-[12.5px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-navy-950 tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
+            <MoreNumbers rows={numbers} />
+          </div>
         </div>
-        <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/70 p-1 gap-0.5">
+        <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/60 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
               className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(10,22,40,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
-              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? `Evaluation${failing ? ` · ${failing} to fix` : ''}` : 'Audit trail'}
+              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[11.5px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
         </div>
@@ -249,11 +298,11 @@ export default function PlanPage() {
         </Banner>
       )}
 
-      {g && tab !== 'interview' && tab !== 'audit' && view.adaptive.ask.length > 0 && (
-        <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2.5 rounded-md mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="flex-1 min-w-[240px]">{view.adaptive.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-navy-950">{view.adaptive.remainingThatMatter} open question{view.adaptive.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}</span>
-          <button onClick={() => setTab('interview')} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium">Answer remaining questions</button>
-        </div>
+      {g && tab !== 'interview' && tab !== 'audit' && ad.ask.length > 0 && !(lateDays <= 0 && !ad.enoughToBuild && ad.remainingThatMatter > 0) && (
+        <p className="text-[13px] text-warm-600 mb-4">
+          {ad.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-navy-950">{ad.remainingThatMatter} open question{ad.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}{' '}
+          <button onClick={() => goTab('interview')} className="font-medium text-accent-600 hover:underline">Answer remaining questions</button>
+        </p>
       )}
 
       {tab === 'interview' && (<>
@@ -293,14 +342,6 @@ function headline(ev: Evaluation | null, sra: Sra | null) {
   return { method: 'rule_based' as const, short: 'rule-based', label: 'Rule-based estimate', p50: ev.forecast.p50, p80: ev.forecast.p80, required: ev.forecast.requiredFinish, meets: ev.forecast.p80MeetsRequired }
 }
 
-function HeaderStat({ label, value, onClick, tone }: { label: string; value: string; onClick?: () => void; tone?: 'warn' }) {
-  return (
-    <button onClick={onClick} className="inline-flex items-baseline gap-1.5 hover:text-navy-950">
-      <span>{label}</span><span className={`font-semibold tabular-nums ${tone === 'warn' ? 'text-status-attention' : 'text-navy-950'}`}>{value}</span>
-    </button>
-  )
-}
-
 function Banner({ kind, children, onClose }: { kind: 'ok' | 'error' | 'warn'; children: React.ReactNode; onClose?: () => void }) {
   const style = kind === 'ok' ? 'border-status-on-track bg-status-on-track-bg' : kind === 'error' ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-status-attention bg-status-attention-bg'
   return (
@@ -323,7 +364,7 @@ function Sources({ sources }: { sources: SourceRef[] }) {
   )
 }
 
-function ExportMenu({ id }: { id: string }) {
+function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) {
   const [open, setOpen] = useState(false)
   const item = (format: string, label: string, sub: string) => (
     <a key={format} href={`/api/plans/${id}/export?format=${format}`} onClick={() => setOpen(false)} className="block px-3 py-2 hover:bg-warm-100">
@@ -333,12 +374,14 @@ function ExportMenu({ id }: { id: string }) {
   const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="pressable flex items-center gap-1.5 border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-4 py-2 rounded-full text-[13px] font-medium">
-        <Download size={13} /> Export <ChevronDown size={12} />
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
+        ? 'pressable flex items-center gap-1.5 rounded-full bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 text-[13px] font-semibold'
+        : 'pressable flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-navy-950 hover:bg-warm-200/70'}>
+        <Download size={13} aria-hidden /> Export <ChevronDown size={12} aria-hidden />
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
       {open && (
-        <div className="absolute right-0 mt-1 w-80 bg-warm-50 border border-warm-200 rounded-md shadow-lg z-20 py-1 text-[13px]">
+        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(10,22,40,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
           {group('Scheduling software')}
           {item('xer', 'Primavera P6 (.xer)', 'Native P6 file: WBS, calendars, logic, constraints')}
           {item('xml', 'MS Project (.xml)', 'Opens in MS Project; P6 can import it too')}
@@ -380,14 +423,14 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-5 rounded-2xl bg-white/70 border border-warm-200 px-5 py-4">
         {[['Start', fmtDate(g.projectStart)], ['Finish', fmtDate(g.cpm?.projectFinish)], ['Activities', `${g.activities.length} (${criticalCount} critical)`], ['Your overrides', String(overrides)]].map(([k, v]) => (
-          <div key={k} className="bg-warm-100 border border-warm-200 rounded-lg p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{k}</div>
-            <div className="text-[16px] font-semibold text-navy-950 tabular-nums mt-1">{v}</div>
+          <div key={k}>
+            <dt className="text-[12.5px] text-warm-500">{k}</dt>
+            <dd className="text-[17px] font-semibold text-navy-950 tabular-nums mt-0.5">{v}</dd>
           </div>
         ))}
-      </div>
+      </dl>
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
       {focusCodes && (
         <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
@@ -396,7 +439,13 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
         </div>
       )}
       {(g.cpm?.warnings?.length ?? 0) > 0 && <Banner kind="warn">{g.cpm!.warnings.slice(0, 3).join(' · ')}</Banner>}
-      {(g.notes || []).map((n, i) => <p key={i} className="text-[12px] text-warm-500 mb-2">{fmtDates(n)}</p>)}
+      {(g.notes?.length ?? 0) > 0 && (
+        <div className="mb-3">
+          <Disclosure title="Notes about how this schedule was built" meta={g.notes!.length}>
+            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12.5px] text-warm-600">{fmtDates(n)}</li>)}</ul>
+          </Disclosure>
+        </div>
+      )}
 
       <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />
 
@@ -410,12 +459,13 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
         <button onClick={() => { if (confirm('Rebuild from the interview and discard all overrides?')) onRegenerateFresh() }} disabled={!!busy} className="text-[12px] text-warm-500 hover:text-status-at-risk">Discard overrides & rebuild</button>
       </div>
 
-      <div className="bg-warm-100 border border-warm-200 rounded-lg overflow-x-auto">
+      <p className="text-[12.5px] text-warm-500 mb-2">Click any activity to see why it is there and how it is sequenced, or to override it.</p>
+      <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white/70 border border-warm-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-[12.5px] min-w-[760px]">
           <thead>
-            <tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-400 border-b border-warm-200">
-              <th className="px-3 py-2 w-6" /><th className="px-2 py-2">ID</th><th className="px-2 py-2">Activity</th><th className="px-2 py-2 text-right">Dur</th>
-              <th className="px-2 py-2">Start</th><th className="px-2 py-2">Finish</th><th className="px-2 py-2 text-right">TF</th><th className="px-2 py-2">Why</th><th className="px-3 py-2 w-[22%]">Timeline</th>
+            <tr className="text-left text-[12px] font-medium text-warm-500 border-b border-warm-200">
+              <th className="px-3 py-2.5 w-6"><span className="sr-only">Open</span></th><th className="px-2 py-2.5 font-medium">ID</th><th className="px-2 py-2.5 font-medium">Activity</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Duration in work days (cd = calendar days)" className="no-underline">Days</abbr></th>
+              <th className="px-2 py-2.5 font-medium">Start</th><th className="px-2 py-2.5 font-medium">Finish</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Total float: work days this activity can slip before it delays the finish" className="no-underline">Float</abbr></th><th className="px-2 py-2.5 font-medium">Confidence</th><th className="px-3 py-2.5 font-medium w-[22%]">Timeline</th>
             </tr>
           </thead>
           <tbody>
@@ -437,61 +487,6 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
           <div className="font-semibold text-warm-600 mb-1">Removed by scheduler</div>
           {g.removed!.map(r => <div key={r.id}>· {r.name} — {r.override.reason} ({r.override.by})</div>)}
         </div>
-      )}
-    </div>
-  )
-}
-
-const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
-
-function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: RecoveryPlan; busy: string | null; onRecover: (id: string) => void; onInterview: () => void }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <div id="recovery" className="border border-status-at-risk/40 bg-status-at-risk-bg rounded-lg p-5 mb-4 scroll-mt-64">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-start justify-between gap-3 text-left">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-status-at-risk">Finish is {r.gapDays} days after the required date</div>
-          <div className="text-[15px] font-semibold text-navy-950 mt-0.5">Forecast {fmtDate(r.finish)} vs required {fmtDate(r.required)} — here is what it means and how to recover</div>
-        </div>
-        {open ? <ChevronDown size={16} className="text-warm-500 mt-1" /> : <ChevronRight size={16} className="text-warm-500 mt-1" />}
-      </button>
-      {open && (
-        <>
-          <div className="mt-3 space-y-1.5">{r.explanation.map((e, i) => <p key={i} className="text-[13px] text-warm-700">{fmtDates(e)}</p>)}</div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mt-4 mb-2">Your options (each re-scheduled on the real network)</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {r.options.map(o => (
-              <div key={o.id} className="bg-warm-50 border border-warm-200 rounded-lg p-4 flex flex-col">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-[13.5px] font-semibold text-navy-950">{o.title}</div>
-                  {o.id !== 'move_date' && <span className={`text-[11px] font-semibold uppercase whitespace-nowrap ${o.meetsDate ? 'text-status-on-track' : o.daysSaved > 0 ? 'text-status-attention' : 'text-warm-400'}`}>{o.meetsDate ? 'Meets date' : o.daysSaved > 0 ? `Saves ${o.daysSaved}d` : 'No gain'}</span>}
-                </div>
-                <p className="text-[12.5px] text-warm-600 mt-1">{o.description}</p>
-                <p className="text-[12px] text-warm-500 mt-1"><span className="font-medium">Trade-off:</span> {o.tradeoff}</p>
-                {o.impact && (
-                  <dl className="text-[12px] text-warm-600 mt-2 border-t border-warm-200 pt-2 space-y-1">
-                    <div><dt className="inline font-medium text-warm-700">Resources: </dt><dd className="inline">{o.impact.resources}</dd></div>
-                    <div>
-                      <dt className="inline font-medium text-warm-700">Added cost: </dt>
-                      <dd className="inline">
-                        {o.impact.cost ? <span className="font-semibold text-navy-950 tabular-nums">{o.impact.cost.high === 0 ? '$0' : `${usd(o.impact.cost.low)}–${usd(o.impact.cost.high)}`}</span> : 'not priced'}
-                        <span className="text-warm-500"> · {o.impact.costBasis}</span>
-                      </dd>
-                    </div>
-                    {o.impact.delaySavings != null && <div><dt className="inline font-medium text-warm-700">Delay cost avoided: </dt><dd className="inline font-semibold text-status-on-track tabular-nums">{usd(o.impact.delaySavings)}</dd></div>}
-                  </dl>
-                )}
-                <div className="flex items-center justify-between mt-auto pt-3">
-                  <span className="text-[12px] text-warm-500">New finish <span className="font-semibold text-navy-950 tabular-nums">{fmtDate(o.newFinish)}</span></span>
-                  {o.apply.type === 'navigate'
-                    ? <button onClick={onInterview} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium">Answer questions</button>
-                    : <button disabled={!!busy} onClick={() => { if (confirm(`Apply “${o.title}”? You can override or undo any change afterwards.`)) onRecover(o.id) }} className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">{busy === 'recover' ? <Loader2 size={12} className="animate-spin" /> : 'Apply'}</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-          {r.combined && <p className="text-[12.5px] text-warm-600 mt-3">Combining the modeled levers would finish <span className="font-semibold text-navy-950">{fmtDate(r.combined.newFinish)}</span> — {r.combined.meetsDate ? 'enough to meet the date.' : 'still after the required date.'} Apply them one at a time to see each effect.</p>}
-        </>
       )}
     </div>
   )
@@ -663,39 +658,45 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
   const resultStyle = (r: string) => r === 'pass' ? 'text-status-on-track' : r === 'fail' ? 'text-status-at-risk' : r === 'warn' ? 'text-status-attention' : 'text-warm-400'
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Overall" value={`${ev.grade} · ${ev.score}`} sub="DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%" />
-        <Stat label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} sub="applicable checks passing" />
-        <Stat label={`P50 · ${fc.label}`} value={fmtDate(fc.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
-        <Stat label={`P80 · ${fc.label}`} value={fmtDate(fc.p80)} sub={fc.required ? `required ${fmtDate(fc.required)}${fc.meets ? ' ✓' : ' ✗'}` : 'risk-adjusted'} />
+    <div className="space-y-6">
+      <div>
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 rounded-2xl bg-white/70 border border-warm-200 px-5 py-4">
+          <Stat label="Overall quality" value={`${ev.grade} · ${ev.score}`} sub="out of 100" />
+          <Stat label="DCMA 14-point" value={`${ev.dcma.passed}/${ev.dcma.applicable}`} sub="applicable checks passing" />
+          <Stat label={`P50 · ${fc.label}`} value={fmtDate(fc.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
+          <Stat label={`P80 · ${fc.label}`} value={fmtDate(fc.p80)} sub={fc.required ? `required ${fmtDate(fc.required)}${fc.meets ? ' ✓ meets it' : ' ✗ misses it'}` : 'risk-adjusted'} />
+        </dl>
+        <div className="mt-2">
+          <Disclosure title="What these numbers mean">
+            <ul className="text-[13px] text-warm-600 space-y-1.5">
+              <li><span className="font-medium text-navy-950">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
+              <li><span className="font-medium text-navy-950">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
+              <li><span className="font-medium text-navy-950">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-navy-950">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-navy-950">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
+              <li>{fc.method === 'monte_carlo'
+                ? 'P50 and P80 come from the Monte Carlo simulation below.'
+                : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis below has run. Basis: {ev.forecast.basis}</>}</li>
+            </ul>
+          </Disclosure>
+        </div>
       </div>
-      <p className="text-[12px] text-warm-500 -mt-2">
-        {fc.method === 'monte_carlo'
-          ? 'P50 and P80 come from the Monte Carlo simulation below.'
-          : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis below has run. Basis: {ev.forecast.basis}</>}
-      </p>
 
-      <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
-
-      <Disclosure id="resources" tone="card" title="Resources: loading, over-allocation and leveling" meta={plan.generated?.resources?.assignments.length ? `${plan.generated.resources.assignments.length} assignments` : 'no resource data'}>
-        <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
-      </Disclosure>
+      {guidance.length > 0 && (
+        <section aria-labelledby="decisions-title">
+          <h3 id="decisions-title" className="text-[15px] font-semibold text-navy-950 mb-1">What needs your decision</h3>
+          <p className="text-[13px] text-warm-500 mb-3">{guidance.filter(g => !g.decision).length} of {guidance.length} open. Fix each one, or accept it with a short reason.</p>
+          <div className="space-y-2.5">
+            {guidance.map((g, i) => <GuideCard key={g.id} g={g} startOpen={!g.decision && guidance.findIndex(x => !x.decision) === i} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} />)}
+          </div>
+        </section>
+      )}
 
       {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
 
-      {guidance.length > 0 && (
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What needs your decision — {guidance.filter(g => !g.decision).length} of {guidance.length} open</div>
-          <div className="space-y-3">
-            {guidance.map(g => <GuideCard key={g.id} g={g} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} />)}
-          </div>
-        </div>
-      )}
+      <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
 
       {ev.dateChecks.length > 0 && (
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Your dates vs. what the logic can achieve</div>
+        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
+          <h3 className="text-[14px] font-semibold text-navy-950 mb-2">Your dates vs. what the logic can achieve</h3>
           <ul className="space-y-1.5">
             {ev.dateChecks.map((c, i) => (
               <li key={i} className="text-[13px] text-warm-700 flex gap-2">
@@ -708,68 +709,74 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       )}
 
       {ev.findings.length > 0 && (
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Findings</div>
-          <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
+        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
+          <h3 className="text-[14px] font-semibold text-navy-950 mb-2">Findings</h3>
+          <ul className="space-y-1.5">{ev.findings.slice(0, 3).map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
+          {ev.findings.length > 3 && (
+            <div className="mt-2">
+              <Disclosure title={`${ev.findings.length - 3} more finding${ev.findings.length - 3 === 1 ? '' : 's'}`}>
+                <ul className="space-y-1.5">{ev.findings.slice(3).map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
+              </Disclosure>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">DCMA 14-point assessment</div>
+      <div>
+        <h3 className="text-[14px] font-semibold text-navy-950 mb-1">The detail behind the grade</h3>
+        <Disclosure title="DCMA 14-point assessment" meta={`${ev.dcma.passed}/${ev.dcma.applicable} passing`}>
           <table className="w-full text-[12.5px]">
+            <caption className="sr-only">DCMA 14-point checks with metric, threshold and result</caption>
             <tbody>
               {ev.dcma.checks.map(c => (
                 <tr key={c.id} className="border-b border-warm-200 last:border-0" title={c.explanation}>
-                  <td className="py-1.5 pr-2 text-warm-400 tabular-nums">{c.id}</td>
+                  <td className="py-1.5 pr-2 text-warm-500 tabular-nums">{c.id}</td>
                   <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
                   <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
-                  <td className="py-1.5 pr-2 text-warm-400">{c.threshold}</td>
+                  <td className="py-1.5 pr-2 text-warm-500">{c.threshold}</td>
                   <td className={`py-1.5 font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="space-y-5">
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Against how your projects actually went</div>
-            <p className="text-[12px] text-warm-500 mb-2">{ev.benchmark.basis}</p>
-            {ev.benchmark.rows.length === 0 ? <p className="text-[13px] text-warm-500">No comparable activities yet.</p> : (
-              <table className="w-full text-[12.5px]">
-                <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-400"><th className="py-1">Activity</th><th className="py-1 text-right">Plan</th><th className="py-1 text-right">Firm P20–P80</th><th className="py-1 pl-2">Verdict</th></tr></thead>
-                <tbody>
-                  {ev.benchmark.rows.map(r => (
-                    <tr key={r.activityId} className="border-t border-warm-200">
-                      <td className="py-1.5 text-navy-950">{r.code} {r.name}</td>
-                      <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
-                      <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
-                      <td className={`py-1.5 pl-2 text-[11px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Coverage of grounded requirements</div>
-            {ev.coverage.length === 0 && <p className="text-[13px] text-warm-500">No permits or long-lead items apply yet — answer facility type and state.</p>}
-            <ul className="space-y-1">
-              {ev.coverage.map((c, i) => (
-                <li key={i} className="text-[12.5px] flex gap-2">
-                  <span className={`font-semibold uppercase text-[10.5px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
-                  <span className="text-navy-950">{c.item}</span><span className="text-warm-400">— {c.detail}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        </Disclosure>
+        <Disclosure title="Against how your projects actually went" meta={ev.benchmark.rows.length ? `${ev.benchmark.rows.length} activities${ev.benchmark.rows.some(r => r.verdict === 'optimistic') ? ` · ${ev.benchmark.rows.filter(r => r.verdict === 'optimistic').length} optimistic` : ''}` : 'no comparables yet'}>
+          <p className="text-[12.5px] text-warm-500 mb-2">{ev.benchmark.basis}</p>
+          {ev.benchmark.rows.length === 0 ? <p className="text-[13px] text-warm-500">No comparable activities yet.</p> : (
+            <table className="w-full text-[12.5px]">
+              <thead><tr className="text-left text-[12px] text-warm-500"><th className="py-1 font-medium">Activity</th><th className="py-1 font-medium text-right">Plan</th><th className="py-1 font-medium text-right">Firm P20–P80</th><th className="py-1 pl-2 font-medium">Verdict</th></tr></thead>
+              <tbody>
+                {ev.benchmark.rows.map(r => (
+                  <tr key={r.activityId} className="border-t border-warm-200">
+                    <td className="py-1.5 text-navy-950">{r.code} {r.name}</td>
+                    <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
+                    <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
+                    <td className={`py-1.5 pl-2 text-[11px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Disclosure>
+        <Disclosure title="Coverage of grounded requirements" meta={ev.coverage.length ? `${ev.coverage.length} items${ev.coverage.some(c => c.status === 'missing') ? ` · ${ev.coverage.filter(c => c.status === 'missing').length} missing` : ''}` : 'none yet'}>
+          {ev.coverage.length === 0 && <p className="text-[13px] text-warm-500">No permits or long-lead items apply yet — answer facility type and state.</p>}
+          <ul className="space-y-1">
+            {ev.coverage.map((c, i) => (
+              <li key={i} className="text-[12.5px] flex gap-2">
+                <span className={`font-semibold uppercase text-[10.5px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
+                <span><span className="text-navy-950">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+        <Disclosure id="resources" title="Resources: loading, over-allocation and leveling" meta={plan.generated?.resources?.assignments.length ? `${plan.generated.resources.assignments.length} assignments` : 'no resource data'}>
+          <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
+        </Disclosure>
       </div>
 
-      <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Expert review {ev.review.status !== 'none' && <span className="normal-case tracking-normal font-normal">— {ev.review.status.replace('_', ' ')}</span>}</div>
+      <section aria-labelledby="review-title" className="bg-white/70 border border-warm-200 rounded-2xl p-5">
+        <h3 id="review-title" className="text-[14px] font-semibold text-navy-950">Expert review {ev.review.status !== 'none' && <span className="font-normal text-warm-500">— {ev.review.status.replace('_', ' ')}</span>}</h3>
+        <p className="text-[12.5px] text-warm-500 mt-0.5 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
             <span className="font-semibold text-navy-950">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[11px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
@@ -777,38 +784,40 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           </div>
         ))}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-          <select value={verdict} onChange={e => setVerdict(e.target.value)} className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]">
+          <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]">
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
           </select>
-          <input value={reviewer} onChange={e => setReviewer(e.target.value)} placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]" />
-          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="bg-navy-900 text-white rounded-md text-[13px] font-medium py-2 disabled:opacity-50">Record review</button>
-          <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]" />
+          <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
+          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-navy-950 hover:bg-navy-900 text-white rounded-full text-[13px] font-semibold py-2 disabled:opacity-50">Record review</button>
+          <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
         </div>
-      </div>
+      </section>
     </div>
   )
 }
 
-function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview }: {
+function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOpen }: {
   g: Guide; check: Evaluation['dcma']['checks'][number]; busy: string | null
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
   onShowCodes: (codes: string[]) => void; onInterview: () => void
+  /** Only the first open decision starts expanded, so the list reads as a short to-do list */
+  startOpen: boolean
 }) {
-  const [open, setOpen] = useState(!g.decision)
+  const [open, setOpen] = useState(startOpen)
   const accept = g.actions.find(a => a.kind === 'accept') as Extract<Guide['actions'][number], { kind: 'accept' }> | undefined
   const [note, setNote] = useState(accept?.suggestedNote || '')
   const [accepting, setAccepting] = useState(false)
   const key = `dcma:${g.id}`
   return (
-    <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <span className={`text-[10.5px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
+    <div className={`border rounded-2xl ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-white border-status-attention/40'}`}>
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
         {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
-        <div className="px-5 pb-4 space-y-2.5">
+        <div className="px-4 md:px-5 pb-4 space-y-2.5">
           <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">What it means: </span>{g.meaning}</p>
           {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && (
@@ -826,16 +835,16 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview }: {
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             {g.actions.map((a, i) => a.kind === 'filter'
-              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
+              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
               : a.kind === 'recovery'
-                ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">{a.label}</button>
+                ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-full bg-navy-950 text-white text-[12.5px] font-medium">{a.label}</button>
                 : a.kind === 'interview'
-                  ? <button key={i} onClick={onInterview} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
-                  : !g.decision && <button key={i} onClick={() => setAccepting(x => !x)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}…</button>)}
+                  ? <button key={i} onClick={onInterview} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
+                  : !g.decision && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}…</button>)}
             {!g.decision && !accept && (
-              <button onClick={() => setAccepting(x => !x)} className="px-3 py-1.5 rounded-md border border-dashed border-warm-400 text-[12.5px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
+              <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-dashed border-warm-400 text-[12.5px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
             )}
-            {!g.decision && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 hover:border-navy-900">I&apos;ll fix it</button>}
+            {!g.decision && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">I&apos;ll fix it</button>}
           </div>
           {accepting && !g.decision && (
             <div className="flex flex-col gap-2">
@@ -851,10 +860,10 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview }: {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
-      <div className="text-[18px] font-semibold text-navy-950 tabular-nums mt-1">{value}</div>
-      {sub && <div className="text-[11px] text-warm-400 mt-0.5">{sub}</div>}
+    <div>
+      <dt className="text-[12.5px] text-warm-500">{label}</dt>
+      <dd className="text-[18px] font-semibold text-navy-950 tabular-nums mt-0.5">{value}</dd>
+      {sub && <dd className="text-[12px] text-warm-500 mt-0.5">{sub}</dd>}
     </div>
   )
 }
@@ -878,10 +887,10 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
   const max = r ? Math.max(...r.histogram.map(h => h.count)) : 1
   const pct = (x: number) => `${Math.round(x * 100)}%`
   return (
-    <section aria-labelledby="sra-title" className="border border-warm-200 rounded-lg p-4 bg-warm-50">
+    <section aria-labelledby="sra-title" className="border border-warm-200 rounded-2xl p-5 bg-white/70">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <h3 id="sra-title" className="text-[14px] font-semibold text-navy-950">Schedule risk analysis (Monte Carlo)</h3>
-        <button onClick={run} disabled={state === 'running'} className="flex items-center gap-1.5 bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-50">
+        <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-full border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50">
           {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
         </button>
       </div>
@@ -889,23 +898,23 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
       {state === 'error' && <p role="alert" className="text-[12.5px] text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {([['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90], ['Deterministic', r.deterministic]] as const).map(([l, d]) => (
-              <div key={l} className="bg-warm-100 border border-warm-200 rounded-md px-3 py-2">
-                <div className="text-[10.5px] uppercase tracking-wider text-warm-500 font-semibold">{l}</div>
-                <div className="text-[15px] font-semibold text-navy-950 tabular-nums">{fmtDate(d)}</div>
-              </div>
-            ))}
-          </div>
-          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12.5px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
           {r.required && (
-            <p className="text-[13px] text-warm-700">
-              Chance of finishing by the required {fmtDate(r.required.date)}: <span className={`font-semibold ${r.required.probability >= 0.8 ? 'text-status-on-track' : r.required.probability >= 0.5 ? 'text-status-attention' : 'text-status-at-risk'}`}>{pct(r.required.probability)}</span>
+            <p className="text-[14px] text-warm-700">
+              Chance of finishing by the required {fmtDate(r.required.date)}: <span className={`text-[16px] font-semibold ${r.required.probability >= 0.8 ? 'text-status-on-track' : r.required.probability >= 0.5 ? 'text-status-attention' : 'text-status-at-risk'}`}>{pct(r.required.probability)}</span>
               {r.required.probability < 0.8 && ' — below the usual 80% confidence target; see the recovery options and the drivers below.'}
             </p>
           )}
+          <dl className="grid grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-3">
+            {([['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90], ['Deterministic', r.deterministic]] as const).map(([l, d]) => (
+              <div key={l}>
+                <dt className="text-[12px] text-warm-500">{l}</dt>
+                <dd className="text-[15px] font-semibold text-navy-950 tabular-nums">{fmtDate(d)}</dd>
+              </div>
+            ))}
+          </dl>
+          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12.5px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
+            <div className="text-[12.5px] text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
             <div className="flex items-end gap-0.5 h-24" role="img" aria-label={`Histogram of simulated finish dates from ${fmtDate(r.histogram[0]?.from)} to ${fmtDate(r.histogram[r.histogram.length - 1]?.to)}; median ${fmtDate(r.percentiles.p50)}.`}>
               {r.histogram.map((h, i) => (
                 <div key={i} title={`${fmtDate(h.from)}–${fmtDate(h.to)}: ${h.count} runs`} className={`flex-1 rounded-t ${r.required && h.to <= r.required.date ? 'bg-status-on-track/70' : 'bg-accent-500/70'}`} style={{ height: `${Math.max(2, (h.count / max) * 100)}%` }} />
@@ -913,12 +922,12 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
             </div>
             <div className="flex justify-between text-[11px] text-warm-500 mt-1"><span>{fmtDate(r.histogram[0]?.from)}</span><span>{fmtDate(r.histogram[r.histogram.length - 1]?.to)}</span></div>
           </div>
+          <div>
           {r.sensitivity.length > 0 && (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">What drives the risk</div>
+            <Disclosure title="What drives the risk" meta={`${r.sensitivity.length} activities`}>
               <table className="w-full text-[12.5px]">
                 <caption className="sr-only">Activities whose uncertainty moves the finish date most</caption>
-                <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-500"><th scope="col" className="py-1">Activity</th><th scope="col" className="py-1 text-right">Sensitivity</th><th scope="col" className="py-1 text-right">Critical in</th><th scope="col" className="py-1 pl-3 hidden md:table-cell">Range used</th></tr></thead>
+                <thead><tr className="text-left text-[12px] text-warm-500"><th scope="col" className="py-1 font-medium">Activity</th><th scope="col" className="py-1 font-medium text-right">Sensitivity</th><th scope="col" className="py-1 font-medium text-right">Critical in</th><th scope="col" className="py-1 pl-3 font-medium hidden md:table-cell">Range used</th></tr></thead>
                 <tbody>
                   {r.sensitivity.map(s => (
                     <tr key={s.id} className="border-t border-warm-200">
@@ -930,14 +939,16 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
                   ))}
                 </tbody>
               </table>
-              <p className="text-[11.5px] text-warm-500 mt-1">Sensitivity is the rank correlation between the activity&apos;s duration and the finish date across runs (1.00 = moves the finish one-for-one). &quot;Critical in&quot; is the share of runs in which the activity was on the critical path.</p>
-            </div>
+              <p className="text-[12px] text-warm-500 mt-1">Sensitivity is the rank correlation between the activity&apos;s duration and the finish date across runs (1.00 = moves the finish one-for-one). &quot;Critical in&quot; is the share of runs in which the activity was on the critical path.</p>
+            </Disclosure>
           )}
-          <details className="text-[12px] text-warm-600">
-            <summary className="cursor-pointer text-warm-700 font-medium">Method and assumptions</summary>
-            <p className="mt-1.5">{r.method}</p>
-            <ul className="list-disc ml-5 mt-1 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
-          </details>
+          <Disclosure title="Method and assumptions">
+            <div className="text-[12.5px] text-warm-600">
+              <p>{r.method}</p>
+              <ul className="list-disc ml-5 mt-1 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
+            </div>
+          </Disclosure>
+          </div>
         </div>
       )}
     </section>

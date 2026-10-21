@@ -7,11 +7,12 @@
 // project under each answer (src/lib/planning/adaptive.ts).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Check, Loader2, Lock, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import type { Answer, Assumption, ElicitationResult, Question, SourceRef } from '@/lib/planning/types'
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates } from '@/lib/format'
+import { MoodTile, Robot } from '@/components/Robot'
 
 export const SECTION_LABEL: Record<string, string> = {
   project: 'Project', design: 'Design', permits: 'Permits', procurement: 'Long-lead', site: 'Site', milestones: 'Milestone targets',
@@ -76,11 +77,13 @@ export function SmartInterview(p: SmartInterviewProps) {
 
       <div className="mt-5">
         {!current ? (
-          <div className="rise-in rounded-3xl bg-white border border-warm-200 px-6 py-8 text-center">
-            <div className="mx-auto w-10 h-10 rounded-full bg-status-on-track-bg flex items-center justify-center mb-3"><Check size={18} className="text-status-on-track" aria-hidden /></div>
+          <MoodTile mood="done" className="rise-in !rounded-3xl !px-6 !py-8 text-center">
+            <Robot mood="done" size={84} className="mx-auto mb-2" />
             <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em]">Nothing left that changes your finish date</div>
-            <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">Optional details below refine the basis of schedule. They&apos;re there when you have them.</p>
-          </div>
+            <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">
+              {p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything Planora needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
+            </p>
+          </MoodTile>
         ) : group ? (
           <GroupCard key={group.id} group={group} questions={ad.ask.filter(q => group.questionIds.includes(q.id))} busy={!!p.busy} disabled={!p.canWrite} onSave={p.onAnswerMany} />
         ) : (
@@ -192,6 +195,18 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
 
 /* ─── The one question in focus ──────────────────────── */
 
+/** Nora as the interviewer: a small waiting face beside a speech bubble that carries the text. */
+function Interviewer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Robot mood="waiting" size={46} className="flex-shrink-0 -ml-1" />
+      <div className="relative min-w-0 rounded-2xl rounded-bl-md bg-warm-100 px-3.5 py-2">
+        <span className="sr-only">Nora: </span>{children}
+      </div>
+    </div>
+  )
+}
+
 function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insight?: { swingDays: number | null; reason: string }; busy: boolean; disabled: boolean; onAnswer: SmartInterviewProps['onAnswer'] }) {
   const [value, setValue] = useState('')
   const [note, setNote] = useState('')
@@ -216,12 +231,15 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
 
   return (
     <div ref={ref} className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(10,22,40,0.04),0_8px_24px_-12px_rgba(10,22,40,0.12)] px-6 py-6 md:px-8 md:py-7">
-      <div className="flex items-center gap-2 text-[12.5px] text-warm-500">
-        <span>{SECTION_LABEL[q.section] || q.section}</span>
-        {insight?.swingDays ? <><span aria-hidden>·</span><span>moves the finish up to <span className="font-semibold text-navy-950 tabular-nums">{insight.swingDays} days</span></span></> : null}
-        {q.id.startsWith('ai.') && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Sparkles size={11} aria-hidden /> AI follow-up</span></>}
-      </div>
-      <h2 className="text-[21px] md:text-[23px] leading-[1.25] font-semibold text-navy-950 tracking-[-0.015em] mt-2">{q.prompt}</h2>
+      <Interviewer>
+        <div className="text-[13.5px] text-navy-950">{insight?.swingDays ? 'This one matters: it can move your finish.' : 'Next question — quick one.'}</div>
+        <div className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-warm-500 mt-0.5">
+          <span>{SECTION_LABEL[q.section] || q.section}</span>
+          {insight?.swingDays ? <><span aria-hidden>·</span><span>moves the finish up to <span className="font-semibold text-navy-950 tabular-nums">{insight.swingDays} days</span></span></> : null}
+          {q.id.startsWith('ai.') && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Sparkles size={11} aria-hidden /> AI follow-up</span></>}
+        </div>
+      </Interviewer>
+      <h2 className="text-[21px] md:text-[23px] leading-[1.25] font-semibold text-navy-950 tracking-[-0.015em] mt-4">{q.prompt}</h2>
 
       <div className="mt-5">
         {choices && (
@@ -316,8 +334,11 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
   }
   return (
     <div className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(10,22,40,0.04),0_8px_24px_-12px_rgba(10,22,40,0.12)] px-6 py-6 md:px-8 md:py-7">
-      <div className="text-[12.5px] text-warm-500">{group.label} · together they move the finish up to <span className="font-semibold text-navy-950 tabular-nums">{group.swingDays} days</span></div>
-      <h2 className="text-[21px] md:text-[23px] leading-[1.25] font-semibold text-navy-950 tracking-[-0.015em] mt-2">
+      <Interviewer>
+        <div className="text-[13.5px] text-navy-950">A few that go together — answer the ones you know.</div>
+        <div className="text-[12.5px] text-warm-500 mt-0.5">{group.label} · together they move the finish up to <span className="font-semibold text-navy-950 tabular-nums">{group.swingDays} days</span></div>
+      </Interviewer>
+      <h2 className="text-[21px] md:text-[23px] leading-[1.25] font-semibold text-navy-950 tracking-[-0.015em] mt-4">
         {group.id === 'procurement' ? 'Where does each of these stand?' : group.id === 'permits' ? 'Where is each approval?' : 'Do these apply?'}
       </h2>
       <p className="text-[13.5px] text-warm-600 mt-1.5">Answer the ones you know. Any you leave are planned with typical lead times and a buffer.</p>
