@@ -33,7 +33,7 @@ const SEV_STYLE = { error: 'border-status-at-risk', warning: 'border-status-atte
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function QualityPage() {
-  const { selectedSchedule, setSelectedSchedule, schedules, can } = useApp()
+  const { selectedSchedule, setSelectedSchedule, schedules, can, openUpload } = useApp()
   const [data, setData] = useState<Quality | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -79,7 +79,7 @@ export default function QualityPage() {
   }, [])
 
   if (!selectedSchedule) {
-    return <EmptyState schedules={schedules} onPick={setSelectedSchedule} canUpload={can('schedule.write')} />
+    return <EmptyState schedules={schedules} onPick={setSelectedSchedule} canUpload={can('schedule.write')} onUpload={openUpload} />
   }
   if (tab === 'standards') {
     return (
@@ -283,10 +283,8 @@ function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; ti
 }
 
 /** No schedule yet: an idle Nora and one clear next step. */
-function EmptyState<S extends { id: string; name: string }>({ schedules, onPick, canUpload }: { schedules: S[]; onPick: (s: S) => void; canUpload: boolean }) {
+function EmptyState<S extends { id: string; name: string }>({ schedules, onPick, canUpload, onUpload }: { schedules: S[]; onPick: (s: S) => void; canUpload: boolean; onUpload: () => void }) {
   const latest = schedules[0]
-  // The upload dialog lives in the dashboard header; this opens it.
-  const openUpload = () => (Array.from(document.querySelectorAll('header button')).find(b => /upload/i.test(b.textContent || '')) as HTMLButtonElement | undefined)?.click()
   return (
     <div className="px-4 md:px-6 py-12 flex justify-center">
       <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
@@ -298,7 +296,7 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
           {latest ? (
             <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
           ) : canUpload ? (
-            <button type="button" onClick={openUpload} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Upload a schedule</button>
+            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Upload a schedule</button>
           ) : (
             <p className="text-[12.5px] text-warm-600">Ask a scheduler on your team to upload one.</p>
           )}
