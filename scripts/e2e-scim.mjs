@@ -10,7 +10,9 @@
 import { execFileSync } from 'node:child_process'
 import { inflateRawSync } from 'node:zlib'
 import { randomUUID } from 'node:crypto'
-import forge from 'node-forge'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { SignedXml } from 'xml-crypto'
 import pg from 'pg'
 
@@ -57,17 +59,16 @@ const scim = (token) => async (method, path, body) => {
   return { status: res.status, type: res.headers.get('content-type') || '', data: text ? JSON.parse(text) : null }
 }
 
+// A self-signed RSA-2048 / SHA-256 certificate, made with the system openssl (no extra dependency).
 function makeIdp() {
-  const keys = forge.pki.rsa.generateKeyPair(2048)
-  const cert = forge.pki.createCertificate()
-  cert.publicKey = keys.publicKey
-  cert.serialNumber = '01'
-  cert.validity.notBefore = new Date(Date.now() - 86_400_000)
-  cert.validity.notAfter = new Date(Date.now() + 365 * 86_400_000)
-  const attrs = [{ name: 'commonName', value: 'Planora e2e IdP' }]
-  cert.setSubject(attrs); cert.setIssuer(attrs)
-  cert.sign(keys.privateKey, forge.md.sha256.create())
-  return { key: forge.pki.privateKeyToPem(keys.privateKey), cert: forge.pki.certificateToPem(cert) }
+  const dir = mkdtempSync(join(tmpdir(), 'planora-idp-'))
+  try {
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=Planora e2e IdP',
+      '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' })
+    return { key: readFileSync(join(dir, 'key.pem'), 'utf8'), cert: readFileSync(join(dir, 'cert.pem'), 'utf8') }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 const iso = (ms = 0) => new Date(Date.now() + ms).toISOString()
