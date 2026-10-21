@@ -4,8 +4,9 @@ import { useState, useEffect, createContext, useContext, useCallback, useRef, Su
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
-  LayoutDashboard, MessageSquare, FileText, Clock,
+  Home, MessageSquare, FileText, Clock,
   Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen, KeyRound,
+  MoreHorizontal, Timer, MailCheck,
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
@@ -40,31 +41,113 @@ interface AppContextType {
   org: { id: string; name: string } | null
   /** What the user's role allows (read, plan.write, schedule.write, plan.review, …) */
   can: (permission: string) => boolean
+  /** Opens the upload dialog (empty states use it as their one action); without upload rights it opens Build */
+  openUpload: () => void
 }
 
 const AppContext = createContext<AppContextType>({
   user: null, schedules: [], selectedSchedule: null, setSelectedSchedule: () => {},
   refreshSchedules: async () => {}, metrics: null, refreshMetrics: async () => {},
-  org: null, can: () => false,
+  org: null, can: () => false, openUpload: () => {},
 })
 
 export const useApp = () => useContext(AppContext)
 
 /* ─── Tabs ───────────────────────────────────────────── */
-// Build → Analyze → Monitor, plus the firm's private knowledge base.
+// Four everyday places up front; everything else is one click away under "More" (nothing removed).
 const TABS = [
+  { href: '/dashboard',          icon: Home,            label: 'Home'     },
   { href: '/dashboard/plan',     icon: ClipboardList,   label: 'Build'    },
-  { href: '/dashboard',          icon: LayoutDashboard, label: 'Overview' },
   { href: '/dashboard/quality',  icon: ShieldCheck,     label: 'Quality'  },
   { href: '/dashboard/ask',      icon: MessageSquare,   label: 'Ask AI'   },
-  { href: '/dashboard/reports',  icon: FileText,        label: 'Reports'  },
-  { href: '/dashboard/documents', icon: FolderOpen,     label: 'Documents' },
-  { href: '/dashboard/timeline', icon: Clock,           label: 'Timeline' },
-  { href: '/dashboard/resources', icon: Users,          label: 'Resources' },
-  { href: '/dashboard/history',  icon: Database,        label: 'Firm data' },
+]
+const MORE_TABS = [
+  { href: '/dashboard/reports',     icon: FileText,   label: 'Reports',     hint: 'Narrative reports and exports' },
+  { href: '/dashboard/documents',   icon: FolderOpen, label: 'Documents',   hint: 'Contracts and specifications' },
+  { href: '/dashboard/timeline',    icon: Clock,      label: 'Timeline',    hint: 'Phases and Gantt chart' },
+  { href: '/dashboard/resources',   icon: Users,      label: 'Resources',   hint: 'Loading, histograms, leveling' },
+  { href: '/dashboard/time-impact', icon: Timer,      label: 'Time impact', hint: 'Delay events and fragnets' },
+  { href: '/dashboard/history',     icon: Database,   label: 'Firm data',   hint: 'What your past projects teach' },
 ]
 
 const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href || pathname.startsWith('/dashboard/portfolio') : pathname.startsWith(href)
+
+/**
+ * "More" navigation menu: a disclosure button (aria-expanded) over a list of links. Arrow keys move
+ * between the links, Escape closes and returns focus to the button, a click outside closes it. The
+ * button is highlighted while the current page is one of its links.
+ */
+function MoreMenu({ pathname, variant }: { pathname: string; variant: 'desktop' | 'mobile' }) {
+  const [open, setOpen] = useState(false)
+  const btn = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  const active = MORE_TABS.some(t => isActive(pathname, t.href))
+  const menuId = `more-menu-${variant}`
+  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!panel.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+  const links = () => Array.from(panel.current?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && open) { e.preventDefault(); setOpen(false); btn.current?.focus(); return }
+    if (!open || !panel.current?.contains(document.activeElement)) return
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
+    const list = links()
+    if (!list.length) return
+    e.preventDefault()
+    const i = list.indexOf(document.activeElement as HTMLAnchorElement)
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : e.key === 'ArrowDown' ? (i + 1) % list.length : (i - 1 + list.length) % list.length
+    list[next].focus()
+  }
+  const onButtonKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    const last = e.key === 'ArrowUp'
+    setOpen(true)
+    requestAnimationFrame(() => { const l = links(); l[last ? l.length - 1 : 0]?.focus() })
+  }
+  const desktop = variant === 'desktop'
+  return (
+    <div className={desktop ? 'relative' : 'flex-1 min-w-0'} onKeyDown={onKey}>
+      <button ref={btn} type="button" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(o => !o)} onKeyDown={onButtonKey}
+        className={desktop
+          ? `flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${active ? 'text-white border-accent-500' : 'text-white/70 border-transparent hover:text-white'}`
+          : `w-full flex flex-col items-center gap-1 py-2.5 transition-colors ${active || open ? 'text-accent-400' : 'text-white/70'}`}>
+        <MoreHorizontal size={desktop ? 13 : 18} aria-hidden="true" />
+        <span className={desktop ? '' : 'text-[10px] font-medium'}>More</span>
+        {desktop && <ChevronDown size={11} aria-hidden="true" className={`transition-transform ${open ? 'rotate-180' : ''}`} />}
+        {active && <span className="sr-only"> (current section)</span>}
+      </button>
+      <div ref={panel} id={menuId} hidden={!open}
+        className={desktop
+          ? 'absolute left-0 top-full mt-1 w-[290px] bg-warm-50 border border-warm-200 rounded-xl shadow-xl p-1.5 z-50 rise-in'
+          : 'fixed left-3 right-3 bottom-[72px] bg-warm-50 border border-warm-200 rounded-2xl shadow-2xl p-2 z-50 rise-in'}>
+        <ul className={desktop ? '' : 'grid grid-cols-2 gap-1'}>
+          {MORE_TABS.map(t => {
+            const here = isActive(pathname, t.href)
+            return (
+              <li key={t.href}>
+                <Link href={t.href} aria-current={here ? 'page' : undefined} onClick={() => setOpen(false)}
+                  className={`flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-colors ${here ? 'bg-accent-100' : 'hover:bg-warm-100'}`}>
+                  <t.icon size={15} aria-hidden="true" className={`mt-0.5 flex-shrink-0 ${here ? 'text-accent-600' : 'text-warm-500'}`} />
+                  <span className="min-w-0">
+                    <span className="block text-[13.5px] font-medium text-navy-950">{t.label}</span>
+                    <span className="block text-[11.5px] text-warm-500 leading-snug">{t.hint}</span>
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </div>
+  )
+}
 
 interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; provider?: ProviderName | null; model: string | null; certified?: boolean; host: string | null; error?: string }
 /** "claude-opus-5-5 (Anthropic (Claude))", plus a note when the model is an approved alternate rather than certified. */
@@ -115,6 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
   const [platformAdmin,    setPlatformAdmin]    = useState(false)
+  const [emailWhy,         setEmailWhy]         = useState(false)
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
 
   /* ── Auth ── */
@@ -197,10 +281,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
+  const openUpload = () => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }
   const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Planora' } as Record<string, string>)[t] || t
 
   return (
-    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can }}>
+    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
       <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} select={setSelectedSchedule} /></Suspense>
       {/*
        * LAYOUT STRATEGY
@@ -254,14 +339,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
 
               {llm && (
-                <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only')}
-                  className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-white/65 border border-white/10 rounded-md px-2 py-1">
-                  {llm.airgapped && <Lock size={10} />}{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
+                <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only: scheduling, CPM, quality checks and reports still work')}
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-white/70 px-1.5 py-1">
+                  {llm.airgapped ? <Lock size={10} aria-hidden="true" /> : <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${llm.mode === 'offline' ? 'bg-warm-300' : 'bg-emerald-400'}`} />}
+                  {aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
                 </span>
               )}
               {can('schedule.write') && (
               <button
-                onClick={() => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }}
+                onClick={openUpload}
                 className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
               >
                 <Upload size={12} aria-hidden="true" />
@@ -292,7 +378,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
                     active
                       ? 'text-white border-accent-500'
-                      : 'text-white/60 border-transparent hover:text-white/85'
+                      : 'text-white/70 border-transparent hover:text-white'
                   }`}
                 >
                   <tab.icon size={13} aria-hidden="true" />
@@ -300,6 +386,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               )
             })}
+            <MoreMenu pathname={pathname} variant="desktop" />
           </nav>
         </header>
 
@@ -307,8 +394,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* pb-16 on mobile = space for bottom tab bar */}
         <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0 focus:outline-none">
           {emailUnconfirmed && pathname !== '/dashboard/account' && (
-            <div role="status" className="bg-status-attention-bg border-b border-status-attention/40 px-4 md:px-6 py-2 text-[13px] text-warm-700">
-              Confirm your email address with the link we sent you. Until then, inviting people, API keys and data export are paused. <Link href="/dashboard/account" className="font-medium text-accent-600 hover:underline">Resend the link</Link>
+            <div role="status" className="bg-warm-100 border-b border-warm-200 px-4 md:px-6 py-2 text-[13px] text-warm-700">
+              <div className="max-w-5xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                <MailCheck size={14} aria-hidden="true" className="text-accent-600 flex-shrink-0" />
+                <span>Please confirm your email. We sent you a link.</span>
+                <Link href="/dashboard/account" className="font-medium text-accent-600 hover:underline">Resend the link</Link>
+                <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-navy-950">Why?</button>
+                <span id="email-why" hidden={!emailWhy} className="basis-full text-[12.5px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
+              </div>
             </div>
           )}
           <div className="max-w-5xl mx-auto">
@@ -318,22 +411,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Mobile bottom tab bar ────────────────────────────── */}
         <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900 border-t border-white/8 safe-area-bottom">
-          <div className="flex overflow-x-auto">
+          <div className="flex">
             {TABS.map(tab => {
               const active = isActive(pathname, tab.href)
               return (
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className={`flex-1 min-w-[64px] flex flex-col items-center gap-1 py-2.5 transition-colors ${
-                    active ? 'text-accent-400' : 'text-white/60'
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 transition-colors ${
+                    active ? 'text-accent-400' : 'text-white/70'
                   }`}
                 >
-                  <tab.icon size={18} strokeWidth={active ? 2 : 1.5} />
+                  <tab.icon size={18} strokeWidth={active ? 2 : 1.5} aria-hidden="true" />
                   <span className="text-[10px] font-medium">{tab.label}</span>
                 </Link>
               )
             })}
+            <MoreMenu pathname={pathname} variant="mobile" />
           </div>
         </nav>
 

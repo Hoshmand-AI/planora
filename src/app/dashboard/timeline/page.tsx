@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApp } from '../layout'
-import { Upload } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { fmtDate } from '@/lib/format'
 
 interface ActivityData {
@@ -29,7 +29,7 @@ function phaseProgress(acts: Pick<ActivityData, 'actualStart' | 'actualFinish'>[
 }
 
 export default function TimelinePage() {
-  const { selectedSchedule } = useApp()
+  const { selectedSchedule, openUpload, can } = useApp()
   const [view, setView]           = useState<'phases' | 'gantt'>('phases')
   const [activities, setActivities] = useState<ActivityData[]>([])
 
@@ -42,13 +42,9 @@ export default function TimelinePage() {
 
   if (!selectedSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-        <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
-          <Upload size={20} className="text-warm-400" />
-        </div>
-        <div className="text-[17px] font-semibold text-navy-950 mb-2">Upload a schedule to see the timeline</div>
-        <p className="text-[14px] text-warm-500 max-w-[340px]">View phases and Gantt chart from your schedule data.</p>
-      </div>
+      <EmptyState title="Upload a schedule to see the timeline" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
+        View phases and Gantt chart from your schedule data.
+      </EmptyState>
     )
   }
 

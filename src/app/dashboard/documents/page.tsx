@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useId, useState } from 'react'
-import { FolderOpen, Loader2, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
+import { Loader2, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
 import { fmtDay } from '@/lib/format'
@@ -27,7 +28,7 @@ const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   : <span className={`${badge} bg-status-attention-bg border-status-attention/40 text-status-attention`}>Unreviewed</span>
 
 export default function DocumentsPage() {
-  const { selectedSchedule, can } = useApp()
+  const { selectedSchedule, can, openUpload } = useApp()
   const [data, setData] = useState<Listing | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null)
@@ -50,13 +51,9 @@ export default function DocumentsPage() {
 
   if (!selectedSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-        <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
-          <FolderOpen size={20} className="text-warm-500" aria-hidden="true" />
-        </div>
-        <h1 className="text-[17px] font-semibold text-navy-950 mb-2">Select a project to see its documents</h1>
-        <p className="text-[14px] text-warm-500 max-w-[380px]">Contracts, scheduling specifications and owner requirements are kept with each project.</p>
-      </div>
+      <EmptyState title="Select a project to see its documents" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
+        Contracts, scheduling specifications and owner requirements are kept with each project.
+      </EmptyState>
     )
   }
 
