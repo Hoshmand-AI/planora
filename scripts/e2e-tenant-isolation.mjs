@@ -363,6 +363,7 @@ async function main() {
   await b('recategorize activity', i => ['PATCH', `/api/schedules/${i.SA2}/activities/${encodeURIComponent(i.ACT)}`, { category: 'foundations' }])
   await b('quality / DCMA', i => ['GET', `/api/schedules/${i.SA2}/quality`])
   await b('quality scenario', i => ['GET', `/api/schedules/${i.SA2}/quality?basis=scenario`])
+  await b('logic suggestions', i => ['GET', `/api/schedules/${i.SA2}/logic-suggestions`])
   await b('answer data question', i => ['POST', `/api/schedules/${i.SA2}/quality`, { questionId, response: 'will_fix', note: 'cross-tenant' }])
   await b('read scenario edits', i => ['GET', `/api/schedules/${i.SA2}/edits`])
   await b('add scenario edit', i => ['POST', `/api/schedules/${i.SA2}/edits`, { change: { kind: 'duration', activityId: i.ACT, remaining: 1 }, reason: 'cross-tenant edit attempt' }])

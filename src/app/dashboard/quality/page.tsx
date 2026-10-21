@@ -9,7 +9,10 @@ import { fmtDate, fmtDates } from '@/lib/format'
 import { FINDING_DISPOSITIONS, FINDING_LABELS, SUBMISSION_DISPOSITIONS, SUBMISSION_LABELS, type FindingDisposition, type ItemDisposition, type ReviewState, type SubmissionDisposition } from '@/lib/analysis/review'
 import Link from 'next/link'
 import { StandardsPanel } from './standards-panel'
+import { NoraLogicPanel } from './nora-logic'
 import { ImportExceptions } from '@/components/ImportExceptions'
+import { Disclosure } from '@/components/Disclosure'
+import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
 import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
 interface QuestionRow extends DataQuestion { response: { response: string; note: string | null } | null }
@@ -30,7 +33,7 @@ const SEV_STYLE = { error: 'border-status-at-risk', warning: 'border-status-atte
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function QualityPage() {
-  const { selectedSchedule, can } = useApp()
+  const { selectedSchedule, setSelectedSchedule, schedules, can } = useApp()
   const [data, setData] = useState<Quality | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -76,7 +79,7 @@ export default function QualityPage() {
   }, [])
 
   if (!selectedSchedule) {
-    return <div className="px-6 py-16 text-center text-[14px] text-warm-500"><ShieldCheck size={22} className="mx-auto mb-2 text-warm-400" />Upload or select a schedule to run quality checks.</div>
+    return <EmptyState schedules={schedules} onPick={setSelectedSchedule} canUpload={can('schedule.write')} />
   }
   if (tab === 'standards') {
     return (
@@ -93,7 +96,14 @@ export default function QualityPage() {
     )
   }
   if (loading || !data) {
-    return <div className="px-6 py-10 text-[14px] text-warm-400 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Checking logic, calendars and dates…</>}</div>
+    return (
+      <div className="px-4 md:px-6 py-8 max-w-5xl">
+        <MoodTile mood={error ? 'worried' : 'working'} className="flex items-center gap-3">
+          <Robot mood={error ? 'worried' : 'working'} size={48} />
+          <p role={error ? 'alert' : undefined} className="text-[14px] text-warm-700 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" aria-hidden /> Checking logic, calendars and dates…</>}</p>
+        </MoodTile>
+      </div>
+    )
   }
 
   const open = data.dataQuestions.filter(q => !q.response)
@@ -104,48 +114,70 @@ export default function QualityPage() {
   const reviewer = can('plan.review') && data.schedule.sourceType !== 'generated'
   const review = data.review ?? { items: [], submission: null }
   const dispositionOf = (id: string) => review.items.find(x => x.itemId === id) ?? null
+  const resultOf = (id: number) => data.dcma.checks.find(c => c.id === id)?.result
+  // Failing checks first, then warnings; within each, the ones still waiting for a decision first.
+  const guidance = [...data.guidance].sort((a, b) =>
+    (resultOf(a.id) === 'fail' ? 0 : 1) - (resultOf(b.id) === 'fail' ? 0 : 1) || Number(!!a.decision) - Number(!!b.decision) || a.id - b.id)
+  const flagged = data.dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn')
+    .sort((a, b) => (a.result === 'fail' ? 0 : 1) - (b.result === 'fail' ? 0 : 1) || a.id - b.id)
+  const clean = data.dcma.checks.filter(c => c.result !== 'fail' && c.result !== 'warn')
+  const grade = gradeOf(data.dcma, open.length)
+  const importNotes = data.schedule.warnings.length + (data.schedule.importExceptions ? 1 : 0)
   return (
-    <div id="quality-panel-checks" className="px-4 md:px-6 pb-8 space-y-5">
-      {/* Frozen summary: the schedule and its key quality numbers stay visible while scrolling */}
+    <div id="quality-panel-checks" className="px-4 md:px-6 pb-8">
+      {/* Frozen header: the schedule and the views stay visible while scrolling */}
       <div style={{ top: stickyTop }} className="sticky z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
-            <p className="text-[12.5px] text-warm-500 truncate">{data.schedule.name} · {data.schedule.version}</p>
-            <QualityTabs tab={tab} onChange={setTab} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-          <Card label="DCMA 14-point" value={`${data.dcma.passed}/${data.dcma.applicable}`} sub={failing ? `${failing} to fix — see below` : 'all applicable checks pass'} />
-          <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
-          <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
-          <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+        <div className="min-w-0">
+          <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
+          <p className="text-[12.5px] text-warm-500 truncate">{data.schedule.name} · {data.schedule.version}</p>
+          <QualityTabs tab={tab} onChange={setTab} />
         </div>
       </div>
 
-      {data.brief && (
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">About this project</div>
-          <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
-        </div>
-      )}
-
-      <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
-
-      {data.guidance.length > 0 && (
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What to fix — {data.guidance.filter(g => !g.decision).length} of {data.guidance.length} open. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in Planora (with a reason) from the schedule dashboard.</div>
-          <div className="space-y-3">
-            {data.guidance.map(g => <QualityGuide key={g.id} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
+      <div className="max-w-5xl space-y-6 mt-5">
+        {/* Nora sums up the grade in one sentence; the key numbers sit underneath */}
+        <MoodTile mood={grade.mood} as="section" className="space-y-3">
+          <div className="flex items-start gap-3.5">
+            <Robot mood={grade.mood} size={64} className="flex-shrink-0 -mt-1" />
+            <div className="min-w-0">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">How this schedule looks</h2>
+              <p className="text-[16px] md:text-[17px] font-medium text-navy-950 leading-snug mt-0.5">{grade.title}</p>
+              <p className="text-[13px] text-warm-600 mt-0.5">{grade.sub}</p>
+            </div>
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <Card label="DCMA 14-point" value={`${data.dcma.passed}/${data.dcma.applicable}`} sub={failing ? `${failing} to fix — see below` : 'all applicable checks pass'} />
+            <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
+            <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
+            <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+          </div>
+        </MoodTile>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">Planora&apos;s questions about this file</div>
-            <label className="text-[12px] text-warm-500 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
+        {data.brief && (
+          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">About this project</div>
+            <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
+          </div>
+        )}
+
+        <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
+
+        {guidance.length > 0 && (
+          <section aria-labelledby="what-to-fix-h">
+            <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
+            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in Planora (with a reason) from the schedule dashboard.</p>
+            <div className="space-y-3">
+              {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
+            </div>
+          </section>
+        )}
+
+        <NoraLogicPanel key={data.schedule.id} scheduleId={data.schedule.id} canEdit={can('schedule.write')} />
+
+        <section aria-labelledby="data-questions-h" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="data-questions-h" className="text-[15px] font-semibold text-navy-950">Planora&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
+            <label className="text-[12px] text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
           </div>
           {shown.length === 0 && <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[13.5px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
           {shown.map(q => {
@@ -172,59 +204,117 @@ export default function QualityPage() {
               </div>
             )
           })}
-        </div>
+        </section>
 
-        <div className="lg:col-span-2 space-y-5">
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">DCMA 14-point</div>
-            <table className="w-full text-[12.5px]">
-              <tbody>
-                {data.dcma.checks.map(c => (
-                  <tr key={c.id} className="border-b border-warm-200 last:border-0" title={`${c.explanation}${c.offenders.length ? ' e.g. ' + c.offenders.slice(0, 6).join(', ') : ''}`}>
-                    <td className="py-1.5 pr-2 text-warm-400 tabular-nums">{c.id}</td>
-                    <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
-                    <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
-                    <td className={`py-1.5 font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Calendars — as labeled vs. as understood</div>
-            {data.schedule.calendars.length === 0 && <p className="text-[12.5px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
-            <ul className="space-y-2">
-              {data.schedule.calendars.map(c => (
-                <li key={c.id} className="text-[12.5px]">
-                  <div className="text-navy-950 font-medium">“{c.sourceName || c.name}”</div>
-                  <div className="text-warm-500">{c.canonical || `${c.workDays.map(d => DAYS[d]).join(', ')} × ${c.hoursPerDay}h`} · {c.holidays.length} holidays</div>
+        <section aria-labelledby="dcma-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+          <h2 id="dcma-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">DCMA 14-point</h2>
+          {flagged.length > 0 ? (
+            <ul className="divide-y divide-warm-200">
+              {flagged.map(c => (
+                <li key={c.id} className="py-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                    <span className={`font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</span>
+                    <span className="text-warm-500 tabular-nums">#{c.id}</span>
+                    <span className="text-navy-950 font-medium">{c.name}</span>
+                    <span className="text-warm-600 tabular-nums">{c.metric} <span className="text-warm-500">(target {c.threshold})</span></span>
+                  </div>
+                  <p className="text-[12.5px] text-warm-700 mt-0.5">{c.explanation}{c.offenders.length ? <span className="text-warm-500"> e.g. <span className="font-mono">{c.offenders.slice(0, 6).join(', ')}</span></span> : null}</p>
                 </li>
               ))}
             </ul>
-            {data.schedule.warnings.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-warm-200 space-y-1">
-                {data.schedule.warnings.slice(0, 8).map((w, i) => <p key={i} className="text-[12px] text-warm-500">· {w}</p>)}
-              </div>
-            )}
-            {data.schedule.importExceptions && (
-              <div className="mt-3 pt-3 border-t border-warm-200">
-                <ImportExceptions report={data.schedule.importExceptions} />
-              </div>
-            )}
-          </div>
-        </div>
+          ) : <p className="text-[13px] text-warm-700"><CheckCircle2 size={14} className="inline mr-1.5 -mt-0.5 text-status-on-track" />Every applicable check passes.</p>}
+          {clean.length > 0 && (
+            <div className="mt-2">
+              <Disclosure title={`${clean.length} check${clean.length === 1 ? '' : 's'} pass or do not apply`} meta={`${data.dcma.passed} pass`}>
+                <table className="w-full text-[12.5px]">
+                  <tbody>
+                    {clean.map(c => (
+                      <tr key={c.id} className="border-b border-warm-200 last:border-0" title={`${c.explanation}${c.offenders.length ? ' e.g. ' + c.offenders.slice(0, 6).join(', ') : ''}`}>
+                        <td className="py-1.5 pr-2 text-warm-500 tabular-nums">{c.id}</td>
+                        <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
+                        <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
+                        <td className={`py-1.5 font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Disclosure>
+            </div>
+          )}
+        </section>
+
+        <Disclosure tone="card" title="Calendars — as labeled vs. as understood" meta={`${data.schedule.calendars.length} calendar${data.schedule.calendars.length === 1 ? '' : 's'}${importNotes ? ` · ${importNotes} import note${importNotes === 1 ? '' : 's'}` : ''}`}>
+          {data.schedule.calendars.length === 0 && <p className="text-[12.5px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
+          <ul className="space-y-2">
+            {data.schedule.calendars.map(c => (
+              <li key={c.id} className="text-[12.5px]">
+                <div className="text-navy-950 font-medium">“{c.sourceName || c.name}”</div>
+                <div className="text-warm-500">{c.canonical || `${c.workDays.map(d => DAYS[d]).join(', ')} × ${c.hoursPerDay}h`} · {c.holidays.length} holidays</div>
+              </li>
+            ))}
+          </ul>
+          {data.schedule.warnings.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-warm-200 space-y-1">
+              {data.schedule.warnings.slice(0, 8).map((w, i) => <p key={i} className="text-[12px] text-warm-500">· {w}</p>)}
+            </div>
+          )}
+          {data.schedule.importExceptions && (
+            <div className="mt-3 pt-3 border-t border-warm-200">
+              <ImportExceptions report={data.schedule.importExceptions} />
+            </div>
+          )}
+        </Disclosure>
       </div>
     </div>
   )
 }
 
-function QualityGuide({ g, check, onDecide, disposition, reviewer, onDispose }: { g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
-  const [open, setOpen] = useState(!g.decision)
+/** Nora's one-sentence read of the DCMA grade: all good, a few things to fix, or needs work. */
+function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; title: string; sub: string } {
+  const fail = dcma.checks.filter(c => c.result === 'fail').length
+  const warn = dcma.checks.filter(c => c.result === 'warn').length
+  const questions = openQuestions ? `${openQuestions} question${openQuestions === 1 ? '' : 's'} about the data ${openQuestions === 1 ? 'is' : 'are'} waiting for you.` : 'No open questions about the data.'
+  if (fail === 0 && warn === 0) return { mood: 'done', title: `In good shape: all ${dcma.applicable} applicable DCMA checks pass.`, sub: questions }
+  if (fail <= 3 && dcma.passed >= 0.7 * dcma.applicable) {
+    const n = fail + warn
+    return { mood: 'waiting', title: `A few things to fix: ${n} of ${dcma.applicable} checks need${n === 1 ? 's' : ''} attention.`, sub: `Start with the first item under “What to fix”. ${questions}` }
+  }
+  return { mood: 'worried', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with the first item under “What to fix”; each says what it means and how to fix it. ${questions}` }
+}
+
+/** No schedule yet: an idle Nora and one clear next step. */
+function EmptyState<S extends { id: string; name: string }>({ schedules, onPick, canUpload }: { schedules: S[]; onPick: (s: S) => void; canUpload: boolean }) {
+  const latest = schedules[0]
+  // The upload dialog lives in the dashboard header; this opens it.
+  const openUpload = () => (Array.from(document.querySelectorAll('header button')).find(b => /upload/i.test(b.textContent || '')) as HTMLButtonElement | undefined)?.click()
+  return (
+    <div className="px-4 md:px-6 py-12 flex justify-center">
+      <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
+        <Robot mood="idle" size={80} className="mx-auto" />
+        <h1 className="font-display text-[22px] text-navy-950 mt-3">Schedule quality</h1>
+        <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
+        <p className="text-[12.5px] text-warm-600 mt-1">Nora checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
+        <div className="mt-5">
+          {latest ? (
+            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
+          ) : canUpload ? (
+            <button type="button" onClick={openUpload} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Upload a schedule</button>
+          ) : (
+            <p className="text-[12.5px] text-warm-600">Ask a scheduler on your team to upload one.</p>
+          )}
+        </div>
+      </MoodTile>
+    </div>
+  )
+}
+
+function QualityGuide({ g, check, onDecide, disposition, reviewer, onDispose, startOpen }: { startOpen: boolean; g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
+  // Only the first open item starts expanded, so the list reads as a short to-do list.
+  const [open, setOpen] = useState(startOpen)
   const [note, setNote] = useState('')
   return (
     <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
         <span className={`text-[10.5px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
         {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
