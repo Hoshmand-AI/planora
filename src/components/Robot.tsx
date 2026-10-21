@@ -73,7 +73,7 @@ export function Robot({ mood = 'working', size = 64, label, className = '', stil
       </g>
       {/* mouth / brows */}
       {mood === 'worried' && <g fill="none" stroke={c.eye} strokeWidth="2.4" strokeLinecap="round">
-        <path d="M33 31 l9 3" /><path d="M67 31 l-9 3" />
+        <path d="M33 33 l9 -3" /><path d="M67 33 l-9 -3" />
         <path d="M44 61 q6 -4 12 0" />
       </g>}
       {mood === 'done' && <path d="M44 56 q6 5 12 0" fill="none" stroke={c.eye} strokeWidth="2.4" strokeLinecap="round" />}
