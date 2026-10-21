@@ -4,6 +4,8 @@
 // Motion is CSS-only (float, blink, look around) and stops under prefers-reduced-motion.
 // The face is decorative: always pair it with a text status (or pass `label`).
 
+import { useId } from 'react'
+
 export type RobotMood = 'working' | 'waiting' | 'done' | 'worried' | 'idle'
 
 const PALETTE: Record<RobotMood, { body: string; shade: string; glow: string; eye: string; badge?: string }> = {
@@ -24,7 +26,7 @@ export function Robot({ mood = 'working', size = 64, label, className = '', stil
   still?: boolean
 }) {
   const c = PALETTE[mood]
-  const gid = `nora-${mood}`
+  const gid = `nora-${mood}-${useId().replace(/:/g, '')}`
   const a11y = label ? { role: 'img' as const, 'aria-label': label } : { 'aria-hidden': true as const }
   return (
     <svg viewBox="0 0 100 84" width={size} height={size * 0.84} className={`nora ${still ? '' : 'nora-float'} ${className}`} data-mood={mood} {...a11y}>
