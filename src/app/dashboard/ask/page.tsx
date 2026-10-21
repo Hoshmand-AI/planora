@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useId } from 'react'
 import { useApp } from '../layout'
-import { Send, Upload } from 'lucide-react'
+import { Send } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { fmtDates } from '@/lib/format'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: string }
@@ -15,7 +16,7 @@ const SUGGESTED = [
 ]
 
 export default function AskPage() {
-  const { selectedSchedule } = useApp()
+  const { selectedSchedule, openUpload, can } = useApp()
   const [messages, setMessages] = useState<Message[]>([])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
@@ -71,13 +72,9 @@ export default function AskPage() {
 
   if (!selectedSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-        <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
-          <Upload size={20} className="text-warm-400" />
-        </div>
-        <div className="text-[17px] font-semibold text-navy-950 mb-2">Upload a schedule to ask questions</div>
-        <p className="text-[14px] text-warm-500 max-w-[340px]">AI-powered Q&A works with your actual schedule data.</p>
-      </div>
+      <EmptyState title="Upload a schedule to ask questions" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
+        AI-powered Q&amp;A works with your actual schedule data.
+      </EmptyState>
     )
   }
 

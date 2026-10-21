@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FileText, MessageSquare, BarChart3, Activity, CheckCircle, Shield, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/Logo'
+import { MoodTile, Robot } from '@/components/Robot'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
 function Cta({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
@@ -41,7 +42,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <Cta href={primaryHref} className="bg-accent-500 text-navy-950 px-4 py-2 rounded-md text-[13px] font-semibold hover:bg-accent-400 transition-colors">{inviteOnly ? 'Request access' : 'Get Started'}</Cta>
           </div>
 
-          <button className="md:hidden text-white" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="md:hidden text-white" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -58,34 +59,59 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero */}
-      <section className="px-6 pt-20 pb-16 text-center">
-        <div className="inline-block text-[11px] font-semibold uppercase tracking-widest text-accent-600 bg-accent-100 px-3 py-1 rounded-md mb-6">
-          Construction scheduling, explained
-        </div>
-        <h1 className="font-display text-[40px] md:text-[50px] text-navy-950 max-w-[760px] mx-auto leading-[1.1] mb-5">
-          Build and check construction schedules. Every number explained.
-        </h1>
-        <p className="text-[17px] text-warm-500 max-w-[600px] mx-auto mb-9 leading-relaxed">
-          Planora interviews you like a senior scheduler, builds a CPM schedule with a written basis for every duration and link,
-          runs the DCMA 14-Point Assessment, and exports native Primavera P6 and MS Project files. Already have a schedule? Upload it to check it.
-        </p>
-        <div className="flex gap-3 justify-center flex-wrap">
-          <Cta href={primaryHref} className="bg-accent-500 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
-            {inviteOnly ? 'Request access' : 'Start Free'}
-          </Cta>
-          {inviteOnly ? (
-            <Link href="/auth" className="border border-warm-300 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-medium hover:bg-warm-100 transition-colors">
-              Sign in
-            </Link>
-          ) : (
-            <a href="#how-it-works" className="border border-warm-300 text-navy-950 px-8 py-3.5 rounded-md text-[15px] font-medium hover:bg-warm-100 transition-colors">
-              See How It Works
-            </a>
-          )}
+      <section className="px-6 pt-14 md:pt-20 pb-16">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-[1.15fr_1fr] gap-10 md:gap-14 items-center">
+          <div className="text-center md:text-left">
+            <div className="inline-block text-[11px] font-semibold uppercase tracking-widest text-accent-600 bg-accent-100 px-3 py-1 rounded-full mb-6">
+              Construction scheduling, explained
+            </div>
+            <h1 className="font-display text-[38px] md:text-[50px] text-navy-950 leading-[1.08] mb-5">
+              Build and check construction schedules. Every number explained.
+            </h1>
+            <p className="text-[17px] text-warm-600 max-w-[520px] mx-auto md:mx-0 mb-8 leading-relaxed">
+              Answer a few questions and Planora builds the schedule with you. Already have one? Upload it and Planora checks it.
+            </p>
+            <div className="flex gap-3 justify-center md:justify-start flex-wrap">
+              <Cta href={primaryHref} className="pressable bg-accent-500 text-navy-950 px-8 py-3.5 rounded-full text-[15px] font-semibold hover:bg-accent-400 transition-colors">
+                {inviteOnly ? 'Request access' : 'Start Free'}
+              </Cta>
+              {inviteOnly ? (
+                <Link href="/auth" className="pressable border border-warm-300 text-navy-950 px-8 py-3.5 rounded-full text-[15px] font-medium hover:bg-warm-100 transition-colors">
+                  Sign in
+                </Link>
+              ) : (
+                <a href="#how-it-works" className="pressable border border-warm-300 text-navy-950 px-8 py-3.5 rounded-full text-[15px] font-medium hover:bg-warm-100 transition-colors">
+                  See How It Works
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Meet Nora: an illustration of how Planora shows status (moods, not made-up numbers) */}
+          <figure className="relative max-w-[420px] w-full mx-auto">
+            <MoodTile mood="working" className="flex items-center gap-4 !p-5">
+              <Robot mood="working" size={96} />
+              <div>
+                <div className="text-[13px] font-semibold text-accent-600">Meet Nora</div>
+                <div className="text-[17px] font-semibold text-navy-950 leading-snug mt-0.5">Your schedule&apos;s mood, at a glance.</div>
+              </div>
+            </MoodTile>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <MoodTile mood="waiting" className="flex items-center gap-3">
+                <Robot mood="waiting" size={44} still />
+                <div className="text-[13px] text-warm-700 leading-snug"><span className="block font-semibold text-navy-950">Needs you</span>A question or a review</div>
+              </MoodTile>
+              <MoodTile mood="done" className="flex items-center gap-3">
+                <Robot mood="done" size={44} still />
+                <div className="text-[13px] text-warm-700 leading-snug"><span className="block font-semibold text-navy-950">All good</span>On track, nothing waiting</div>
+              </MoodTile>
+            </div>
+            <figcaption className="text-[12.5px] text-warm-600 mt-3 text-center">Blue is working, amber needs you, green is all good.</figcaption>
+          </figure>
         </div>
 
         {/* Facts row: each figure is backed by an automated test or the product's own limits (see "Where these numbers come from") */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mt-14 pt-10 border-t border-warm-200 max-w-[820px] mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mt-14 pt-10 border-t border-warm-200 max-w-[820px] mx-auto text-center">
           {[
             ['14 of 14', 'DCMA 14-Point checks, run automatically'],
             ['100,000', 'activities scheduled by our CPM engine in automated tests'],
@@ -98,7 +124,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </div>
           ))}
         </div>
-        <a href="#evidence" className="inline-block mt-6 text-[12.5px] text-accent-600 hover:underline">Where these numbers come from</a>
+        <div className="text-center"><a href="#evidence" className="inline-block mt-6 text-[12.5px] text-accent-600 hover:underline">Where these numbers come from</a></div>
       </section>
 
       {/* Proof Bar */}
@@ -143,7 +169,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-6 pb-20">
-        <h2 className="font-display text-[30px] text-navy-950 mb-10">Built by a scheduler, for everyone on the project</h2>
+        <h2 className="font-display text-[30px] text-navy-950 mb-3">Built by a scheduler, for everyone on the project</h2>
+        <p className="text-[15px] text-warm-600 max-w-[680px] mb-10 leading-relaxed">
+          Planora interviews you like a senior scheduler, builds a CPM schedule with a written basis for every duration and link,
+          runs the DCMA 14-Point Assessment, and exports native Primavera P6 and MS Project files. Already have a schedule? Upload it to check it.
+        </p>
         <div className="grid md:grid-cols-2 gap-8 gap-x-14">
           {[
             { icon: FileText,      title: 'Native P6 and MS Project files', desc: 'Import .xer and .xml with activities, logic, lags, constraints and calendars, and export the same formats. Excel and PDF imports read activities and dates; a PDF carries no logic.' },

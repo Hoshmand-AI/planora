@@ -3,6 +3,9 @@
 import { useApp } from './layout'
 import { StickyBar } from '@/components/StickyBar'
 import { Upload } from 'lucide-react'
+import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
+import { RingTile, CounterTile } from '@/components/Glance'
+import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates, fmtDay } from '@/lib/format'
 import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
 import Link from 'next/link'
@@ -12,25 +15,31 @@ import { EarnedValue } from '@/components/EarnedValue'
 import { useEffect, useState } from 'react'
 
 export default function DashboardPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, user, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
   useEffect(() => { setTab(typeof window !== 'undefined' && window.location.hash === '#earned-value' ? 'evm' : 'overview') }, [selectedSchedule?.id])
 
   if (!selectedSchedule) {
     return (
-      <div className="p-5 md:p-6 space-y-6">
+      <div className="px-5 md:px-6 py-6 md:py-8 space-y-6">
         <section aria-labelledby="portfolio-h">
-          <h1 id="portfolio-h" className="text-[17px] font-semibold text-navy-950 mb-3">Portfolio</h1>
+          <h1 id="portfolio-h" className="font-display text-[28px] md:text-[32px] text-navy-950 leading-tight">{greeting(user?.name)}</h1>
+          <p className="text-[14px] text-warm-600 mt-1 mb-5">Here is how your portfolio is doing today.</p>
           <Portfolio compact />
         </section>
-      <div className="flex flex-col items-center justify-center py-12 text-center px-6">
-        <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
-          <Upload size={20} className="text-warm-400" />
-        </div>
-        <div className="text-[17px] font-semibold text-navy-950 mb-2">Upload a schedule to get started</div>
-        <p className="text-[14px] text-warm-500 max-w-[360px]">Upload a Primavera P6 (.xer), MS Project (.xml), or PDF file to see your project dashboard.</p>
-      </div>
+        <section aria-labelledby="upload-h" className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white/70 border border-warm-200 rounded-2xl p-5">
+          <div className="w-11 h-11 bg-accent-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Upload size={19} className="text-accent-600" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 id="upload-h" className="text-[15px] font-semibold text-navy-950">Upload a schedule to get started</h2>
+            <p className="text-[13.5px] text-warm-600 mt-0.5">Upload a Primavera P6 (.xer), MS Project (.xml), or PDF file to see your project dashboard.</p>
+          </div>
+          <button type="button" onClick={openUpload} className="pressable self-start sm:self-center border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-4 py-2 rounded-full text-[13.5px] font-semibold">
+            {can('schedule.write') ? 'Upload a schedule' : 'Build a schedule'}
+          </button>
+        </section>
       </div>
     )
   }
@@ -52,7 +61,7 @@ export default function DashboardPage() {
   const logicFinish = (mx.logicFinish as string) || null
   const twoFinishes = mx.forecastBasis === 'logic' && !!scheduledFinish && !!logicFinish && scheduledFinish !== logicFinish
   const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete' } as const
-  const STATUS_TONE = { on_track: 'on-track', attention: 'attention', at_risk: 'at-risk', complete: 'on-track' } as const
+
   const criticalCount = Number(m?.criticalCount ?? 0)
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
@@ -63,6 +72,19 @@ export default function DashboardPage() {
   const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
+
+  // Nora's one-sentence read of the schedule's health (same status and variance as the badge).
+  const MOOD: Record<typeof status, RobotMood> = { on_track: 'done', complete: 'done', attention: 'waiting', at_risk: 'worried' }
+  const mood: RobotMood = m ? MOOD[status] : 'working'
+  const behind = varianceDays != null && varianceDays > 0 ? ` ${varianceDays} ${varianceDays === 1 ? 'day' : 'days'} behind the baseline.` : ''
+  const finishNote = forecastFinish ? ` Forecast finish ${fmtDate(forecastFinish)}.` : ''
+  const healthLine = !m ? 'Nora is reading this schedule…'
+    : status === 'complete' ? 'This project is complete.'
+    : status === 'on_track' ? `On track.${finishNote}`
+    : status === 'attention' ? `Needs a look.${behind || finishNote}`
+    : `At risk.${behind || finishNote}`
+  const hasWhy = statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish) || !!baselineHeader || !!varianceBasis
+  const varianceTone: RobotMood = varianceDays == null ? 'idle' : varianceDays > 14 ? 'worried' : varianceDays > 0 ? 'waiting' : 'done'
 
   return (
     <div className="p-5 md:p-6 space-y-6">
@@ -77,12 +99,12 @@ export default function DashboardPage() {
             {selectedSchedule.dataDate && ` · data date ${fmtDate(selectedSchedule.dataDate)}`}
           </div>
         </div>
-        <span title={statusReasons.join(' ')} className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border-l-2 ${
+        <span title={statusReasons.join(' ')} className={`text-[12px] font-semibold px-3 py-1 rounded-full whitespace-nowrap ${
           status === 'at_risk'
-            ? 'text-status-at-risk bg-status-at-risk-bg border-status-at-risk'
+            ? 'text-status-at-risk bg-status-at-risk-bg'
             : status === 'attention'
-            ? 'text-status-attention bg-status-attention-bg border-status-attention'
-            : 'text-status-on-track bg-status-on-track-bg border-status-on-track'
+            ? 'text-status-attention bg-status-attention-bg'
+            : 'text-status-on-track bg-status-on-track-bg'
         }`}>
           {STATUS_LABEL[status]}
         </span>
@@ -97,22 +119,48 @@ export default function DashboardPage() {
       <div role={selectedSchedule.sourceType !== 'generated' ? 'tabpanel' : undefined} id="tabpanel-overview" aria-labelledby={selectedSchedule.sourceType !== 'generated' ? 'tab-overview' : undefined}
         hidden={tab !== 'overview' && selectedSchedule.sourceType !== 'generated'} className="space-y-6">
 
-      {(statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish)) && (
-        <div className={`border-l-2 pl-3 py-1 text-[13px] text-warm-700 space-y-1 ${status === 'at_risk' ? 'border-status-at-risk' : status === 'attention' ? 'border-status-attention' : 'border-status-info'}`}>
-          {statusReasons.map((r, i) => <p key={i}>{r}</p>)}
-          {twoFinishes && (
-            <p className="text-warm-700">Forecast (as scheduled, constraints honoured): <span className="tabular-nums font-medium">{fmtDate(scheduledFinish)}</span> · Logic-driven (mandatory constraints relaxed): <span className="tabular-nums font-medium">{fmtDate(logicFinish)}</span></p>
-          )}
-          {reportedFinish && forecastFinish && reportedFinish !== forecastFinish && (
-            <p className="text-warm-500">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
-          )}
+      {/* Glance: Nora's one-line read, then four big numbers */}
+      <section aria-label="Schedule health" className="space-y-3">
+        <MoodTile mood={mood} className="flex items-center gap-4">
+          <Robot mood={mood} size={72} />
+          <div className="min-w-0">
+            <div role="status" className="text-[18px] font-semibold text-navy-950 leading-snug tracking-[-0.01em]">{healthLine}</div>
+            {statusReasons[0] && <p className="text-[13px] text-warm-600 mt-1">{fmtDates(statusReasons[0])}{statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : ''}</p>}
+          </div>
+        </MoodTile>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress" />
+          <CounterTile mood={varianceTone}
+            value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
+            label="Schedule variance"
+            sub={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
+          <CounterTile mood="idle" value={String(nearTerm?.startingCount ?? 0)} label="Near-term starts"
+            sub={nearTerm ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'} />
+          <CounterTile mood="idle" value={String(criticalCount)} label="Critical activities"
+            sub={totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
         </div>
-      )}
+        {hasWhy && (
+          <Disclosure tone="card" title="Why this status" meta={statusReasons.length ? `${statusReasons.length} ${statusReasons.length === 1 ? 'reason' : 'reasons'}` : undefined}>
+            <div className="text-[13px] text-warm-700 space-y-1.5">
+              {statusReasons.map((r, i) => <p key={i}>{fmtDates(r)}</p>)}
+              {twoFinishes && (
+                <p className="text-warm-700">Forecast (as scheduled, constraints honoured): <span className="tabular-nums font-medium">{fmtDate(scheduledFinish)}</span> · Logic-driven (mandatory constraints relaxed): <span className="tabular-nums font-medium">{fmtDate(logicFinish)}</span></p>
+              )}
+              {reportedFinish && forecastFinish && reportedFinish !== forecastFinish && (
+                <p className="text-warm-600">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
+              )}
+              {(baselineHeader || varianceBasis) && (
+                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{[baselineHeader && `${baselineHeader}.`, varianceBasis].filter(Boolean).join(' ')}</p>
+              )}
+            </div>
+          </Disclosure>
+        )}
+      </section>
 
       {/* About this project — what, where, when, what must be achieved */}
       {brief && (
-        <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">About this project</div>
+        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
+          <h2 className="text-[15px] font-semibold text-navy-950 mb-1.5">About this project</h2>
           <p className="text-[14px] text-warm-700 leading-relaxed">{brief.summary}</p>
           <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
             {brief.facts.map(f => (
@@ -125,37 +173,17 @@ export default function DashboardPage() {
               {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.basis === 'logic' ? <span className="text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}> (logic-driven; {ms.scheduled} as scheduled)</span> : null}{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
             </div>
           )}
-          {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-2 text-[12px] text-warm-500 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
+          {warnings.length > 0 && (
+            <div className="mt-3">
+              <Disclosure title="Calculation notes" meta={String(Math.min(warnings.length, 2))}>
+                {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-1.5 first:mt-0 text-[12px] text-warm-600 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
+              </Disclosure>
+            </div>
+          )}
         </div>
       )}
 
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricCard
-          label="Schedule Variance"
-          value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
-          context={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'}
-          title={[baselineHeader && `${baselineHeader}.`, varianceBasis].filter(Boolean).join(' ')}
-          color={varianceDays == null ? undefined : STATUS_TONE[varianceDays > 14 ? 'at_risk' : varianceDays > 0 ? 'attention' : 'on_track']}
-        />
-        <MetricCard
-          label="Critical Activities"
-          value={String(criticalCount)}
-          context={totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'}
-        />
-        <MetricCard
-          label="Near-Term Starts"
-          value={String(nearTerm?.startingCount ?? 0)}
-          context={nearTerm ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'}
-        />
-        <MetricCard
-          label="Progress"
-          value={`${percentComplete}%`}
-          context="complete"
-          color={percentComplete > 50 ? 'on-track' : undefined}
-        />
-      </div>
 
       {/* Two-column data section */}
       <div className="grid md:grid-cols-2 gap-5">
@@ -307,30 +335,8 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
   )
 }
 
-/* ─── Metric Card ────────────────────────────────── */
-function MetricCard({
-  label, value, context,
-  color, title,
-}: {
-  label: string
-  value: string
-  context: string
-  color?: 'at-risk' | 'attention' | 'on-track'
-  /** Explains how the value was measured */
-  title?: string
-}) {
-  const valueColor =
-    color === 'at-risk'   ? 'text-status-at-risk'   :
-    color === 'attention' ? 'text-status-attention'  :
-    color === 'on-track'  ? 'text-status-on-track'   :
-    'text-navy-950'
-
-  return (
-    <div className="bg-warm-50 border border-warm-200 rounded-lg p-4" title={title}>
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">{label}</div>
-      <div className={`text-[26px] font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
-      <div className="text-[11px] text-warm-400 mt-1.5">{context}</div>
-      {title && <div className="text-[11px] text-warm-500 mt-1 leading-snug">{title}</div>}
-    </div>
-  )
+/* ─── Greeting ───────────────────────────────────── */
+function greeting(name?: string | null) {
+  const first = (name || '').trim().split(/\s+/)[0]
+  return first ? `Hi ${first}, welcome back` : 'Welcome back'
 }
