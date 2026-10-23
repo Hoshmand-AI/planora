@@ -158,7 +158,8 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
     fetch(`/api/schedules/${scheduleId}/recovery${basis === 'scenario' ? '?basis=scenario' : ''}`).then(async r => {
       const d = await r.json().catch(() => ({}))
       if (!live) return
-      if (r.ok) setData(d); else setMsg(d.error || 'No options for this schedule.')
+      if (r.ok && d.available !== false) setData(d)
+      else setMsg((r.ok ? d.reason : d.error) || 'No options for this schedule.')
     }).catch(() => live && setMsg('Could not load the options.'))
     return () => { live = false }
   }, [scheduleId, refreshKey, basis])

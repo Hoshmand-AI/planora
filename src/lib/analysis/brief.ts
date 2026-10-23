@@ -25,6 +25,16 @@ function monthsBetween(a: string, b: string) {
   return Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / (30.44 * 86_400_000)))
 }
 
+/** "14 months", "1 month", or weeks/days for short projects (never "0 months" or "1 months"). */
+function durationText(a: string, b: string) {
+  const days = Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)) + 1
+  const months = monthsBetween(a, b)
+  if (months >= 2) return `${months} months`
+  if (days >= 45) return '1 month'
+  if (days >= 14) return `${Math.round(days / 7)} weeks`
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
 export function projectBrief(s: Schedule, activities: Activity[], extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null; valueMusd?: number | null } = {}): ProjectBrief {
   // Only a type the user set (upload or interview) is shown; guessing from names mislabeled bridges as
   // retail and barracks as hospitals in client-facing text.
@@ -82,15 +92,16 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
     ...(twoFinishes
       ? [{ label: FINISH_LABELS.scheduled, value: fmtDate(an!.scheduledFinish) }, { label: FINISH_LABELS.logic, value: fmtDate(an!.logicFinish) }]
       : [finish && { label: 'Forecast finish', value: fmtDate(finish) }]),
-    start && finish && { label: 'Duration', value: `${monthsBetween(start, finish)} months` },
+    start && finish && { label: 'Duration', value: durationText(start, finish) },
     dataDate && { label: 'Data date', value: fmtDate(dataDate) },
     { label: 'Progress', value: `${pct}% of ${work.length} activities complete` },
   ].filter(Boolean) as { label: string; value: string }[]
 
   const sentences = [
-    `${s.name} is ${typeLabel ? `a ${typeLabel.toLowerCase()} project` : 'a construction project'}${where ? ` in ${where}` : ''}${sqft ? ` of about ${Math.round(sqft).toLocaleString()} sf` : value ? ` of about $${value.toLocaleString()}M` : ''}${start && finish ? `, scheduled from ${fmtDate(start)} to ${fmtDate(finish)} (${monthsBetween(start, finish)} months)` : ''}.`,
+    `${s.name} is ${typeLabel ? `a ${typeLabel.toLowerCase()} project` : 'a construction project'}${where ? ` in ${where}` : ''}${sqft ? ` of about ${Math.round(sqft).toLocaleString()} sf` : value ? ` of about $${value.toLocaleString()}M` : ''}${start && finish ? `, scheduled from ${fmtDate(start)} to ${fmtDate(finish)} (${durationText(start, finish)})` : ''}.`,
     scope.length ? `The work runs through ${scope.map(x => x.replace(/ \(\d+\)$/, '').toLowerCase()).join(', ')}.` : '',
-    finishMs ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name} by ${fmtDate(dateOf(finishMs))}${logic[finishMs.id] ? ` (logic-driven; ${fmtDate(finishMs.earlyFinish || finishMs.earlyStart)} as scheduled, held by a mandatory constraint)` : ''}${nextMilestones[0] && nextMilestones[0].name !== finishMs.name ? `; the next milestone is ${nextMilestones[0].name} on ${nextMilestones[0].date}${nextMilestones[0].basis === 'logic' ? ' (logic-driven)' : ''}` : ''}.` : '',
+    finishMs && !dateOf(finishMs) ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name}; its date cannot be forecast because the file has no dates or logic to calculate it from.` : '',
+    finishMs && dateOf(finishMs) ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name} by ${fmtDate(dateOf(finishMs))}${logic[finishMs.id] ? ` (logic-driven; ${fmtDate(finishMs.earlyFinish || finishMs.earlyStart)} as scheduled, held by a mandatory constraint)` : ''}${nextMilestones[0] && nextMilestones[0].name !== finishMs.name ? `; the next milestone is ${nextMilestones[0].name} on ${nextMilestones[0].date}${nextMilestones[0].basis === 'logic' ? ' (logic-driven)' : ''}` : ''}.` : '',
     twoFinishes ? `${FINISH_LABELS.scheduled}: ${fmtDate(an!.scheduledFinish)}; ${FINISH_LABELS.logic.charAt(0).toLowerCase() + FINISH_LABELS.logic.slice(1)}: ${fmtDate(an!.logicFinish)}.` : '',
     `${pct}% of activities are complete${dataDate ? ` as of ${fmtDate(dataDate)}` : ''}.`,
   ].filter(Boolean)

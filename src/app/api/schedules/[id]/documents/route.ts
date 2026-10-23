@@ -8,6 +8,7 @@ import { projectClassification, projectScope } from '@/lib/rag/scope'
 import { ingestDocument, listDocuments } from '@/lib/rag/store'
 import { DocumentRejected, MAX_DOCUMENT_BYTES } from '@/lib/rag/extract'
 import { DOC_TYPES, DOC_TYPE_LABELS, isDocType } from '@/lib/rag/types'
+import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { auditTarget } from '@/lib/rag/scope'
 
 // Project documents (contracts, scheduling specifications, owner requirements) used to ground Ask AI
@@ -22,7 +23,7 @@ export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { pa
     project: { scheduleId: schedule.id, name: schedule.name, projectKey: schedule.projectKey ?? null },
     documents,
     docTypes: DOC_TYPES.map(id => ({ id, label: DOC_TYPE_LABELS[id] })),
-    limits: { maxBytes: MAX_DOCUMENT_BYTES, formats: ['pdf', 'docx', 'txt', 'md'] },
+    limits: { maxBytes: effectiveUploadLimit(MAX_DOCUMENT_BYTES), formats: ['pdf', 'docx', 'txt', 'md'] },
     classification: await projectClassification(schedule.id, auth.orgId),
     ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}),
   })
@@ -41,7 +42,8 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
   try { form = await req.formData() } catch { throw new ApiError(400, 'Send the document as multipart form data with a "file" field.') }
   const file = form.get('file')
   if (!file || typeof file === 'string') throw new ApiError(400, 'Choose a file to upload.')
-  if (file.size > MAX_DOCUMENT_BYTES) throw new ApiError(413, `The file is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MB. Split it (for example by specification section) and upload the parts.`, 'too_large')
+  const maxBytes = effectiveUploadLimit(MAX_DOCUMENT_BYTES)
+  if (file.size > maxBytes) throw new ApiError(413, tooLargeMessage('document', maxBytes), 'too_large')
   const docType = form.get('docType')
   if (!isDocType(docType)) throw new ApiError(400, `Pick a document type: ${DOC_TYPES.join(', ')}.`)
   const scope = form.get('scope') === 'org' ? 'org' : 'project'

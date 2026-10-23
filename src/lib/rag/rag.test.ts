@@ -333,6 +333,7 @@ describe('scheduling requirement extraction', () => {
   it('finds the common requirements with values', () => {
     expect(kinds('No activity shall have an original duration that exceeds a maximum of 20 working days, except procurement.')).toMatchObject({ max_activity_duration: '20 working days' })
     expect(kinds('Activity durations shall not exceed twenty (20) work days.')).toMatchObject({ max_activity_duration: '20 working days' })
+    expect(kinds('No activity duration shall exceed 20 working days, except procurement and fabrication activities.')).toMatchObject({ max_activity_duration: '20 working days' })
     expect(kinds('The Contractor shall update the progress schedule monthly.')).toMatchObject({ update_frequency: 'monthly' })
     expect(kinds('Float shall not be sequestered by the Contractor through preferential logic.')).toMatchObject({ float_ownership: 'float shall not be sequestered' })
     expect(kinds('Total float is a shared project resource available to both parties.')).toMatchObject({ float_ownership: 'float is a shared project resource' })

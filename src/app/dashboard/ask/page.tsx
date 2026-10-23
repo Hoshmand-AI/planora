@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useId } from 'react'
 import { useApp } from '../layout'
+import { Markdown } from '@/components/Markdown'
 import { Send } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { fmtDates } from '@/lib/format'
@@ -26,6 +27,9 @@ export default function AskPage() {
   const docsId = useId()
   const unrevId = useId()
   const bottomRef = useRef<HTMLDivElement>(null)
+  // Without an AI model, answers are a readout of the schedule facts: say so before anyone asks.
+  const [aiOff, setAiOff] = useState(false)
+  useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
 
   useEffect(() => {
     if (!selectedSchedule) return
@@ -82,13 +86,14 @@ export default function AskPage() {
     <div className="flex flex-col" style={{ height: 'calc(100dvh - 104px)' }} /* desktop: 48px header + 40px tab row = 88px; mobile: 48px header + 64px bottom bar = 112px, dvh handles notch */>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-auto p-5 md:p-6">
+      <div className="flex-1 overflow-auto p-5 md:p-6" tabIndex={0} role="region" aria-label="Conversation">
 
         {messages.length === 0 && (
           <div className="max-w-[560px] mx-auto">
             <div className="mb-6">
               <h2 className="font-display text-[22px] text-navy-950 mb-1">Ask about your schedule</h2>
               <p className="text-[13.5px] text-warm-500">Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</p>
+              {aiOff && <p className="text-[13px] text-warm-600 mt-2 border-l-2 border-warm-300 pl-3">AI is turned off, so answers are a readout of the schedule facts (status, critical path, what starts next) rather than a written reply to your question.</p>}
             </div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
@@ -110,7 +115,7 @@ export default function AskPage() {
                   ? 'bg-navy-900 text-white'
                   : 'bg-warm-100 border border-warm-200 text-warm-700'
               }`}>
-                <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div>
+                {msg.role === 'user' ? <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div> : <Markdown text={msg.content} />}
               </div>
               <div className="text-[10px] text-warm-400 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

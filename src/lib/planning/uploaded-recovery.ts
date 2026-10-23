@@ -265,3 +265,17 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
     required, requiredSource, gapDays, minFloat: base.minFloat, explanation, drivers, excluded, options: useful,
   }
 }
+
+/**
+ * Why a schedule has no recovery options. "No options" is a normal state of a schedule (a list
+ * without logic, a network the CPM could not run, all remaining work complete), not a bad request,
+ * so the API answers 200 with `available: false` and this reason instead of a 4xx.
+ */
+export function recoveryUnavailableReason(s: { hasCpm: boolean; relationshipCount: number }): string {
+  if (!s.hasCpm) {
+    return s.relationshipCount === 0
+      ? 'This schedule has no activity relationships, so there is no driving path to recover on. Add logic in P6 or MS Project and upload it again.'
+      : 'Planora could not recalculate this network (see the quality checks for logic loops or invalid dates), so no recovery options can be modeled.'
+  }
+  return 'No open driving path was found (the remaining work may be complete).'
+}

@@ -4,7 +4,8 @@ import { useEffect, useId, useState } from 'react'
 import { useApp } from '../layout'
 import { BarChart3, Activity, FileText, CheckCircle, Download, X, Loader2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
-import { fmtDates, fmtDateTime } from '@/lib/format'
+import { fmtDateTime } from '@/lib/format'
+import { Markdown } from '@/components/Markdown'
 
 const REPORT_TYPES = [
   { id: 'executive_summary', icon: BarChart3,   title: 'Executive Schedule Summary',    desc: 'High-level narrative with status, variance, key findings, and recommendations.' },
@@ -59,11 +60,11 @@ export default function ReportsPage() {
 
   const handleExport = () => {
     if (!report) return
-    const blob = new Blob([report.content], { type: 'text/plain' })
+    const blob = new Blob([report.content], { type: 'text/markdown' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `${report.scheduleName || 'report'}-${report.type}.txt`
+    a.download = `${report.scheduleName || 'report'}-${report.type}.md`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -84,11 +85,11 @@ export default function ReportsPage() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
-              <Icon size={14} className="text-accent-600" />
+              <Icon size={14} className="text-accent-400" aria-hidden />
             </div>
             <h2 className="font-display text-[20px] text-navy-950">{rt?.title}</h2>
           </div>
-          <button onClick={() => setReport(null)} className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+          <button onClick={() => setReport(null)} aria-label="Close report" className="text-warm-500 hover:text-warm-700"><X size={18} aria-hidden /></button>
         </div>
 
         <div className="bg-warm-100 border border-warm-200 rounded-md p-3 mb-4 flex items-center justify-between">
@@ -96,12 +97,12 @@ export default function ReportsPage() {
             {report.scheduleName} · Generated {report.generatedAt ? fmtDateTime(report.generatedAt) : ''}
           </div>
           <button onClick={handleExport} className="flex items-center gap-1.5 text-accent-600 text-[12px] font-medium hover:underline">
-            <Download size={13} /> Export
+            <Download size={13} aria-hidden /> Download (.md)
           </button>
         </div>
 
         <div className="bg-warm-50 border border-warm-200 rounded-lg p-6 md:p-8">
-          <div className="text-[14px] text-warm-700 leading-relaxed whitespace-pre-wrap">{fmtDates(report.content)}</div>
+          <Markdown text={report.content} className="text-[14px] text-warm-700 leading-relaxed" />
         </div>
       </div>
     )
@@ -133,8 +134,8 @@ export default function ReportsPage() {
           >
             <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0">
               {generating === rt.id
-                ? <Loader2 size={15} className="text-accent-600 animate-spin" />
-                : <rt.icon size={15} className="text-accent-600" />
+                ? <Loader2 size={15} className="text-accent-400 animate-spin" aria-hidden />
+                : <rt.icon size={15} className="text-accent-400" aria-hidden />
               }
             </div>
             <div>

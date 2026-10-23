@@ -39,7 +39,7 @@ export function Integrations() {
 
   if (!data) return null
   return (
-    <Section title="Integrations: API and webhooks" description="Connect Planora to BI dashboards, a data warehouse or your own tools. API keys act with a limited role and can be revoked at any time; webhooks send signed notifications when things happen. Everything here is in the audit log. Developer guide: docs/API.md.">
+    <Section title="Integrations: API and webhooks" description="Connect Planora to BI dashboards, a data warehouse or your own tools. API keys act with a limited role and can be revoked at any time; webhooks send signed notifications when things happen. Everything here is in the audit log. The developer guide (endpoints, webhook signatures) is available from support@hoshmand.ai.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
       {!data.available && <div className="mb-3"><Alert tone="info">API keys and webhooks are included in the Pro and Enterprise plans.</Alert></div>}
       {secret && (

@@ -6,7 +6,7 @@ import { parseXER, readXerTables } from '@/lib/parsers/xer-parser'
 import { completeSchedule } from './complete-schedule'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit, type ScheduleEditChange } from './uploaded-edits'
-import { evaluateNetwork, uploadedRecoveryOptions, type NetworkInput } from './uploaded-recovery'
+import { evaluateNetwork, recoveryUnavailableReason, uploadedRecoveryOptions, type NetworkInput } from './uploaded-recovery'
 import { uploadedToGenerated } from './uploaded'
 import { runSra, distributionFor } from './sra'
 import { workKind } from './work-kind'
@@ -184,6 +184,17 @@ describe('what-if and recovery options on an uploaded network', () => {
     expect(late.minFloat!).toBeLessThan(0)
     expect(late.options.every(o => typeof o.meetsDate === 'boolean')).toBe(true)
     expect(late.explanation[0]).toMatch(/after the required 04\/20\/2026/)
+  })
+
+  it('all work complete: no options, with a reason that says why (reported as a state, not an error)', () => {
+    const doneActs = net.activities.map(a => ({ ...a, status: 'complete' as const, percentComplete: 100, remainingDuration: 0, actualStart: a.earlyStart ?? net.projectStart, actualFinish: a.earlyFinish ?? a.earlyStart ?? net.projectStart }))
+    expect(uploadedRecoveryOptions({ ...net, activities: doneActs })).toBeNull()
+    expect(recoveryUnavailableReason({ hasCpm: true, relationshipCount: net.relationships.length })).toMatch(/No open driving path/)
+  })
+
+  it('without a CPM the reason tells a list without logic apart from a network that could not be recalculated', () => {
+    expect(recoveryUnavailableReason({ hasCpm: false, relationshipCount: 0 })).toMatch(/no activity relationships/)
+    expect(recoveryUnavailableReason({ hasCpm: false, relationshipCount: 12 })).toMatch(/could not recalculate/)
   })
 })
 

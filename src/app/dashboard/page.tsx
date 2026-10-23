@@ -8,6 +8,7 @@ import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates, fmtDay } from '@/lib/format'
 import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
+import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
 import { Portfolio } from '@/components/Portfolio'
 import { ScheduleTools } from '@/components/ScheduleTools'
@@ -18,7 +19,13 @@ export default function DashboardPage() {
   const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, user, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
-  useEffect(() => { setTab(typeof window !== 'undefined' && window.location.hash === '#earned-value' ? 'evm' : 'overview') }, [selectedSchedule?.id])
+  useEffect(() => {
+    const sync = () => setTab(window.location.hash === '#earned-value' ? 'evm' : 'overview')
+    sync()
+    // Links to #earned-value from elsewhere on this page (or the browser's back button) switch the tab too.
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [selectedSchedule?.id])
 
   if (!selectedSchedule) {
     return (
@@ -34,7 +41,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 id="upload-h" className="text-[15px] font-semibold text-navy-950">Upload a schedule to get started</h2>
-            <p className="text-[13.5px] text-warm-600 mt-0.5">Upload a Primavera P6 (.xer), MS Project (.xml), or PDF file to see your project dashboard.</p>
+            <p className="text-[13.5px] text-warm-600 mt-0.5">Upload a Primavera P6 (.xer or .xml), MS Project (.xml), Excel/CSV or PDF schedule to see your project dashboard.</p>
           </div>
           <button type="button" onClick={openUpload} className="pressable self-start sm:self-center border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-4 py-2 rounded-full text-[13.5px] font-semibold">
             {can('schedule.write') ? 'Upload a schedule' : 'Build a schedule'}
@@ -52,7 +59,7 @@ export default function DashboardPage() {
   const varianceBasis = (mx.varianceBasis as string) || ''
   // The one baseline variance, BEI, missed tasks and reports measure against (src/lib/analysis/baseline.ts)
   const baselineHeader = (mx.baseline as string) || ''
-  const status = (mx.status as 'on_track' | 'attention' | 'at_risk' | 'complete' | undefined) ?? (varianceDays != null && varianceDays > 14 ? 'at_risk' : varianceDays != null && varianceDays > 0 ? 'attention' : 'on_track')
+  const status = (mx.status as 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline' | undefined) ?? (varianceDays != null && varianceDays > 14 ? 'at_risk' : varianceDays != null && varianceDays > 0 ? 'attention' : varianceDays == null ? 'no_baseline' : 'on_track')
   const statusReasons = (mx.statusReasons as string[]) ?? []
   const forecastFinish = (mx.forecastFinish as string) || null
   const reportedFinish = (mx.reportedFinish as string) || null
@@ -60,9 +67,11 @@ export default function DashboardPage() {
   const scheduledFinish = (mx.scheduledFinish as string) || null
   const logicFinish = (mx.logicFinish as string) || null
   const twoFinishes = mx.forecastBasis === 'logic' && !!scheduledFinish && !!logicFinish && scheduledFinish !== logicFinish
-  const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete' } as const
+  const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete', no_baseline: 'No Baseline Yet' } as const
 
   const criticalCount = Number(m?.criticalCount ?? 0)
+  // Whether a critical path exists at all (src/lib/analysis/critical-status.ts): never a confident 0 without logic.
+  const criticalPath = (mx.criticalPath as CriticalPathStatus | undefined) ?? null
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
   const nearTerm = (mx.nearTerm as NearTermOutlook | undefined) ?? null
@@ -74,13 +83,14 @@ export default function DashboardPage() {
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
   // Nora's one-sentence read of the schedule's health (same status and variance as the badge).
-  const MOOD: Record<typeof status, RobotMood> = { on_track: 'done', complete: 'done', attention: 'waiting', at_risk: 'worried' }
+  const MOOD: Record<typeof status, RobotMood> = { on_track: 'done', complete: 'done', attention: 'waiting', at_risk: 'worried', no_baseline: 'idle' }
   const mood: RobotMood = m ? MOOD[status] : 'working'
   const behind = varianceDays != null && varianceDays > 0 ? ` ${varianceDays} ${varianceDays === 1 ? 'day' : 'days'} behind the baseline.` : ''
   const finishNote = forecastFinish ? ` Forecast finish ${fmtDate(forecastFinish)}.` : ''
   const healthLine = !m ? 'Nora is reading this schedule…'
     : status === 'complete' ? 'This project is complete.'
     : status === 'on_track' ? `On track.${finishNote}`
+    : status === 'no_baseline' ? `No baseline yet.${finishNote}`
     : status === 'attention' ? `Needs a look.${behind || finishNote}`
     : `At risk.${behind || finishNote}`
   const hasWhy = statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish) || !!baselineHeader || !!varianceBasis
@@ -104,6 +114,8 @@ export default function DashboardPage() {
             ? 'text-status-at-risk bg-status-at-risk-bg'
             : status === 'attention'
             ? 'text-status-attention bg-status-attention-bg'
+            : status === 'no_baseline'
+            ? 'text-warm-700 bg-warm-100'
             : 'text-status-on-track bg-status-on-track-bg'
         }`}>
           {STATUS_LABEL[status]}
@@ -126,19 +138,26 @@ export default function DashboardPage() {
           <div className="min-w-0">
             <div role="status" className="text-[18px] font-semibold text-navy-950 leading-snug tracking-[-0.01em]">{healthLine}</div>
             {statusReasons[0] && <p className="text-[13px] text-warm-600 mt-1">{fmtDates(statusReasons[0])}{statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : ''}</p>}
+            {!statusReasons[0] && status === 'no_baseline' && <p className="text-[13px] text-warm-600 mt-1">There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.</p>}
           </div>
         </MoodTile>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress" />
+          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
           <CounterTile mood={varianceTone}
             value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Schedule variance"
             sub={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
           <CounterTile mood="idle" value={String(nearTerm?.startingCount ?? 0)} label="Near-term starts"
-            sub={nearTerm ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'} />
-          <CounterTile mood="idle" value={String(criticalCount)} label="Critical activities"
-            sub={totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
+            sub={nearTerm && mx.hasForecastDates !== false ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'} />
+          <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
+            value={criticalPath && !criticalPath.determined ? '—' : String(criticalCount)} label="Critical activities"
+            sub={criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
         </div>
+        {criticalPath?.detail && (
+          <p role="note" className="text-[13px] text-warm-700 bg-white/70 border border-warm-200 rounded-xl px-4 py-2.5">
+            <span className="font-semibold text-navy-950">Critical path: </span>{fmtDates(criticalPath.detail)}
+          </p>
+        )}
         {hasWhy && (
           <Disclosure tone="card" title="Why this status" meta={statusReasons.length ? `${statusReasons.length} ${statusReasons.length === 1 ? 'reason' : 'reasons'}` : undefined}>
             <div className="text-[13px] text-warm-700 space-y-1.5">
@@ -150,7 +169,7 @@ export default function DashboardPage() {
                 <p className="text-warm-600">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
               )}
               {(baselineHeader || varianceBasis) && (
-                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{[baselineHeader && `${baselineHeader}.`, varianceBasis].filter(Boolean).join(' ')}</p>
+                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{varianceNote(baselineHeader, varianceBasis)}</p>
               )}
             </div>
           </Disclosure>
@@ -335,8 +354,16 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
   )
 }
 
+/** The baseline header and the variance basis, without repeating the reason both carry or doubling a period. */
+function varianceNote(header: string, basis: string) {
+  const h = header ? header.replace(/\.?$/, '.') : ''
+  const reason = header.replace(/^Baseline:[^.]*\.\s*/, '').trim()
+  const b = reason && basis.startsWith(reason) ? basis.slice(reason.length).trim() : basis
+  return [h, b].filter(Boolean).join(' ')
+}
+
 /* ─── Greeting ───────────────────────────────────── */
 function greeting(name?: string | null) {
   const first = (name || '').trim().split(/\s+/)[0]
-  return first ? `Hi ${first}, welcome back` : 'Welcome back'
+  return first ? `Hi ${first}` : 'Welcome'
 }

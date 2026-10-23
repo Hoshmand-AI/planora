@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
 import { fmtDay } from '@/lib/format'
+import { formatMb, tooLargeMessage } from '@/lib/upload-limit'
 
 interface Doc {
   id: string; scope: 'project' | 'org'; title: string; fileName: string; format: string; docType: string; trust: 'approved' | 'unreviewed'
@@ -156,7 +157,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
     try {
       const res = await fetch(base, { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) onDone({ tone: 'error', text: d.error || 'Upload failed.' })
+      if (!res.ok) onDone({ tone: 'error', text: d.error || (res.status === 413 ? tooLargeMessage('document', data.limits.maxBytes) : 'Upload failed.') })
       else {
         onDone(d.warning ? { tone: 'warning', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). ${d.warning}` } : { tone: 'success', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). It is unreviewed until an admin or reviewer approves it.` })
         setFile(null); setTitle(''); setOrgStandard(false); setFormKey(k => k + 1)
@@ -166,7 +167,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   }
 
   return (
-    <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, up to ${Math.round(data.limits.maxBytes / 1024 / 1024)} MB. Scanned PDFs need OCR first.`}>
+    <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
       <form key={formKey} onSubmit={submit} className="grid md:grid-cols-2 gap-3">
         <Field label="File">{p => <input {...p} type="file" required accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" onChange={e => setFile(e.target.files?.[0] ?? null)} className="text-[13px] text-warm-700 file:mr-3 file:rounded-md file:border file:border-warm-300 file:bg-warm-50 file:px-3 file:py-1.5 file:text-[13px] file:text-navy-950" />}</Field>
         <Field label="Title" hint="Defaults to the file name.">{p => <input {...p} value={title} maxLength={160} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. Section 01 32 16 Construction Progress Schedule" />}</Field>

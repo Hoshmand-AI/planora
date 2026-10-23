@@ -55,6 +55,7 @@ export default function PlanPage() {
   const router = useRouter()
   const [view, setView] = useState<View | null>(null)
   const [tab, setTab] = useState<Tab>('interview')
+  const opened = useRef(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -75,6 +76,8 @@ export default function PlanPage() {
     setSraState('running')
     try {
       const res = await fetch(`/api/plans/${id}/risk`)
+      // Not in the organization's plan (402): say so instead of "could not run, try again".
+      if (res.status === 402) { setSraState('locked'); return }
       if (!res.ok) throw new Error()
       const data = await res.json()
       // A result for an older version must never be shown as this version's forecast.
@@ -102,6 +105,8 @@ export default function PlanPage() {
     const res = await fetch(`/api/plans/${id}`)
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Could not load plan.'); return }
+    // A plan that already has a schedule opens on it; a new one opens on the interview.
+    if (!opened.current) { opened.current = true; if (data.plan?.generated) setTab('schedule') }
     setView(data)
   }, [id])
   useEffect(() => { load() }, [load])
@@ -880,7 +885,7 @@ interface Sra {
   assumptions: string[]
   warnings?: string[]
 }
-type SraState = 'idle' | 'running' | 'error'
+type SraState = 'idle' | 'running' | 'error' | 'locked'
 
 /** The simulation is run by the page for each plan version (see PlanPage); this panel shows it. */
 function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; onRun: () => void }) {
@@ -890,11 +895,12 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
     <section aria-labelledby="sra-title" className="border border-warm-200 rounded-2xl p-5 bg-white/70">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <h3 id="sra-title" className="text-[14px] font-semibold text-navy-950">Schedule risk analysis (Monte Carlo)</h3>
-        <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-full border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50">
+        {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-full border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50">
           {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
-        </button>
+        </button>}
       </div>
-      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-500">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {state === 'locked' && <p role="status" className="text-[12.5px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
       {state === 'error' && <p role="alert" className="text-[12.5px] text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">
