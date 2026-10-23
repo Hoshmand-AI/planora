@@ -321,12 +321,26 @@ function detectHeader(grid: Cell[][]): HeaderInfo | null {
   return best
 }
 
+/**
+ * Units of a duration/lag column: a title such as "Original Duration(d)" or "Lag (h)" on the header
+ * row or the row next to it (P6 puts field names and titles on two rows) wins; else a P6 field name
+ * ending in _hr_cnt means hours; null = days.
+ */
+function unitNear(grid: Cell[][], row: number, col: number): 'd' | 'h' | null {
+  const texts = [row, row + 1, row - 1].map(r => (r >= 0 && grid[r] ? cellText(grid[r][col] ?? null) : ''))
+  for (const t of texts) {
+    if (/\(\s*(d|days?)\s*\)/i.test(t)) return 'd'
+    if (/\(\s*(h|hrs?|hours?)\s*\)/i.test(t)) return 'h'
+  }
+  return /hrcnt$/.test(normHeader(texts[0])) ? 'h' : null
+}
+
 /* ─── relationship sheets (P6 TASKPRED) ─────────────────── */
 
 type RelField = 'pred' | 'succ' | 'relType' | 'lag' | 'deleteFlag'
 const REL_SYNONYMS: Record<RelField, string[]> = {
   pred: ['predecessor', 'predtaskid', 'predecessorid', 'predecessoractivityid', 'predactivityid', 'predecessoractivity', 'predid', 'fromactivity', 'fromactivityid'],
-  succ: ['successor', 'taskid', 'successorid', 'successoractivityid', 'succactivityid', 'successoractivity', 'succtaskid', 'succid', 'toactivity', 'toactivityid'],
+  succ: ['successor', 'taskid', 'activityid', 'successorid', 'successoractivityid', 'succactivityid', 'successoractivity', 'succtaskid', 'succid', 'toactivity', 'toactivityid'],
   relType: ['relationshiptype', 'predtype', 'reltype', 'linktype', 'relationship', 'type', 'dependencytype'],
   lag: ['lag', 'laghrcnt', 'lagdays'],
   deleteFlag: ['deletethisrow', 'deleterecordflag'],
@@ -346,7 +360,7 @@ export function detectRelationshipHeader(grid: Cell[][]): { row: number; fields:
     grid[r].forEach((c, i) => { const f = matchRelHeader(cellText(c)); if (f && !fields.has(f)) fields.set(f, i) })
     if (!fields.has('pred') || !fields.has('succ')) continue
     if (!best || fields.size > best.fields.size || (r === best.row + 1 && fields.size === best.fields.size)) {
-      const lagHours: boolean = fields.has('lag') && /hrcnt$/.test(normHeader(cellText(grid[r][fields.get('lag')!])))
+      const lagHours: boolean = fields.has('lag') && unitNear(grid, r, fields.get('lag')!) === 'h'
       best = { row: r, fields, lagHours }
     }
   }
@@ -395,18 +409,27 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const warnings: string[] = []
   const ex = new ExceptionCollector('import', isCsv ? 'csv' : 'excel')
 
-  let sheet: { name: string; grid: Cell[][] } | null = null
-  let header: HeaderInfo | null = null
-  for (const s of sheets) {
-    const h = detectHeader(s.grid)
-    if (h) { sheet = s; header = h; break }
-  }
-  if (!sheet || !header) {
-    throw new Error('No schedule table found: expected a header row (within the first 15 rows) with columns such as "Activity ID", "Activity Name", "Duration", "Start", "Finish"')
-  }
   // Logic kept on its own sheet (P6 Excel import/export: TASKPRED with Predecessor, Successor,
   // Relationship Type and Lag columns). Reading only the activity sheet dropped every relationship.
-  const relSheets = isCsv ? [] : sheets.filter(x => x !== sheet).map(x => ({ x, rows: readRelationshipSheet(x) })).filter((r): r is { x: typeof sheet & {}; rows: RelRow[] } => !!r.rows)
+  const relAll = isCsv ? [] : sheets.map(x => ({ x, rows: readRelationshipSheet(x) })).filter((r): r is { x: { name: string; grid: Cell[][] }; rows: RelRow[] } => !!r.rows && r.rows.length > 0)
+  const candidates = sheets.map(x => ({ x, h: detectHeader(x.grid) })).filter((c): c is { x: { name: string; grid: Cell[][] }; h: HeaderInfo } => !!c.h && !relAll.some(r => r.x === c.x))
+  // With a relationship sheet, the activity sheet is the one whose activity IDs it refers to (a
+  // workbook can also carry an MS Project sheet numbered by row, as Planora's own export does).
+  let pick = candidates[0]
+  if (relAll.length && candidates.length > 1) {
+    const refs = new Set(relAll.flatMap(r => r.rows.flatMap(x => [x.pred.toLowerCase(), x.succ.toLowerCase()])))
+    const cover = (c: { x: { grid: Cell[][] }; h: HeaderInfo }) => {
+      const col = c.h.fields.get('code')
+      return col === undefined ? 0 : c.x.grid.slice(c.h.row + 1).filter(r => refs.has(cellText(r[col] ?? null).toLowerCase())).length
+    }
+    for (const c of candidates) if (cover(c) > cover(pick)) pick = c
+  }
+  if (!pick) {
+    throw new Error('No schedule table found: expected a header row (within the first 15 rows) with columns such as "Activity ID", "Activity Name", "Duration", "Start", "Finish"')
+  }
+  const sheet = pick.x
+  const header = pick.h
+  const relSheets = relAll.filter(r => r.x !== sheet)
   if (!isCsv && sheets.length > 1) {
     const read = [sheet.name, ...relSheets.map(r => r.x.name)]
     warnings.push(`Read worksheet${read.length > 1 ? 's' : ''} ${read.map(n => `"${n}"`).join(' and ')} (workbook has ${sheets.length} sheets)`)
@@ -453,7 +476,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
 
   const headerTexts = new Set(sheet.grid[header.row].map(c => normHeader(cellText(c))))
   // A header that is a P6 field name ending in _hr_cnt (no title row above the data) holds hours.
-  const hourField = (f: Field) => F.has(f) && /hrcnt$/.test(normHeader(cellText(sheet!.grid[header!.row][F.get(f)!])))
+  const hourField = (f: Field) => F.has(f) && unitNear(sheet.grid, header.row, F.get(f)!) === 'h'
   const days = (v: Cell, f: Field, hpd: number): number | null => {
     const d = parseDurationDays(v)
     // A bare number under an hours header is hours; a value with its own unit ("80h", "10d") keeps it.

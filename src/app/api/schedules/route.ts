@@ -14,6 +14,7 @@ import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
 import { criticalPathStatus } from '@/lib/analysis/critical-status'
+import { schedulePercentComplete } from '@/lib/analysis/progress'
 import { analyzableFromDb, basisFrom, basisLabel, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
@@ -67,9 +68,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
     const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
-    const percentComplete = activities.length > 0
-      ? Math.round((completedCount / activities.length) * 100)
-      : 0
+    // Duration-weighted physical % complete of the work (src/lib/analysis/progress.ts)
+    const percentComplete = schedulePercentComplete(activities)
 
     return NextResponse.json({
       schedule, activities, relationships, brief, analysis, edits, editedActivityIds,
@@ -258,9 +258,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
-    const percentComplete = parsed.activities.length > 0
-      ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
-      : 0
+    const percentComplete = schedulePercentComplete(parsed.activities)
     // Firm history: own as-built projects by default; never a Planora re-import or a third-party schedule.
     const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
     const history = decideHistory({

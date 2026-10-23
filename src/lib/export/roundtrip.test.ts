@@ -81,8 +81,13 @@ describe.each(CORPUS)('round trip: $name', ({ answers }) => {
     const p = await parseSpreadsheet(await exportImportXlsx(g, 'Round trip'), 'rt.xlsx', 'rt')
     expect(p.activities.length).toBe(g.activities.length)
     expect(p.relationships.length).toBe(g.links.length)
-    // The MS Project sheet numbers rows (ID); match activities by name and duration instead.
-    const key = (name: string, d: number) => `${name}|${Math.round(d * 1000) / 1000}`
-    expect(p.activities.map(a => key(a.name, a.duration)).sort()).toEqual(g.activities.map(a => key(a.name, a.duration)).sort())
+    // The P6 TASK sheet (activity IDs) and its TASKPRED sheet are read, not the row-numbered MS Project sheet.
+    const key = (code: string, name: string, d: number) => `${code}|${name}|${Math.round(d * 1000) / 1000}`
+    expect(p.activities.map(a => key(a.activityId, a.name, a.duration)).sort()).toEqual(g.activities.map(a => key(a.code, a.name, a.duration)).sort())
+    const pc = new Map(p.activities.map(a => [a.id, a.activityId]))
+    const gc = new Map(g.activities.map(a => [a.id, a.code]))
+    expect(p.relationships.map(r => `${pc.get(r.predecessorId)} ${r.type} ${r.lag} ${pc.get(r.successorId)}`).sort())
+      .toEqual(g.links.map(l => `${gc.get(l.from)} ${l.type} ${l.lag} ${gc.get(l.to)}`).sort())
+    expect(p.warnings.join(' ')).not.toMatch(/Unresolved logic/)
   })
 })

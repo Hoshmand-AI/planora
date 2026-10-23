@@ -136,7 +136,7 @@ export default function DashboardPage() {
           </div>
         </MoodTile>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress" />
+          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
           <CounterTile mood={varianceTone}
             value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Schedule variance"
@@ -147,7 +147,7 @@ export default function DashboardPage() {
             value={criticalPath && !criticalPath.determined ? '—' : String(criticalCount)} label="Critical activities"
             sub={criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
         </div>
-        {criticalPath?.detail && (!criticalPath.determined || criticalCount === 0) && (
+        {criticalPath?.detail && (
           <p role="note" className="text-[13px] text-warm-700 bg-white/70 border border-warm-200 rounded-xl px-4 py-2.5">
             <span className="font-semibold text-navy-950">Critical path: </span>{fmtDates(criticalPath.detail)}
           </p>
