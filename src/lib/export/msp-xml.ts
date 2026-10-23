@@ -226,8 +226,11 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string, opts: { 
   const lastOnPath = s.cpm?.longestPath?.[s.cpm.longestPath.length - 1]
   const projectFinishId = (lastOnPath && pool.some(a => a.id === lastOnPath) ? lastOnPath : null)
     ?? [...pool].sort((a, b) => finishOf(b).localeCompare(finishOf(a)))[0]?.id
+  // The finish activity's Deadline IS the required finish (the importer reads an end task's Deadline as
+  // Must Finish By): without one it gets none. Writing its own FNLT/FO date there turned a constraint
+  // into a project required finish on re-import, which gave every activity float (0 critical).
   const deadlineOf = (a: PlanActivity, isMs: boolean): string | null => {
-    if (s.mustFinishBy && a.id === projectFinishId) return s.mustFinishBy
+    if (a.id === projectFinishId) return s.mustFinishBy ?? null
     return isMs && a.constraint && DEADLINE_TYPES.has(a.constraint.type) ? a.constraint.date : null
   }
 

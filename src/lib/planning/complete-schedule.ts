@@ -8,6 +8,7 @@ import type { Activity, Relationship } from '@/lib/db'
 import { CONSTRAINT_TYPES, type ConstraintType, type CpmActivity, type CpmResult, type ProgressMode, type WorkCalendar } from './types'
 import { runCpm } from './cpm'
 import { defaultCalendar } from './calendar'
+import { fmtDate } from '@/lib/format'
 
 export interface CompletionResult {
   activities: Activity[]
@@ -86,6 +87,9 @@ export function completeSchedule(input: {
     }
   }
 
+  // A file built for import (P6 Excel template) can carry logic but no dates at all: it is then
+  // scheduled from today, and the note says so (the dates are not the contractor's).
+  const undated = !input.projectStart && !earliest && !input.dataDate
   const projectStart = input.projectStart || earliest || input.dataDate || new Date().toISOString().slice(0, 10)
   const cals = calendars.length ? calendars : [defaultCalendar()]
   const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
@@ -131,5 +135,6 @@ export function completeSchedule(input: {
   const note = fileHadResults
     ? `Planora recalculated all ${filled} activities from their durations, logic, calendars and constraints (${mode}) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.`
     : `The file did not include calculated dates or float, so Planora scheduled ${filled} activities from their durations, logic and calendars (${mode}; critical path and float are Planora's calculation).`
+      + (undated ? ` It has no project start, data date or activity dates either, so the network was scheduled from ${fmtDate(projectStart)}, the day it was first calculated: the durations, logic and float are the file's, the calendar dates are not.` : '')
   return { activities, projectStart, projectFinish: res.logicFinish, hasLogic, cpm: res, fileValues, note }
 }

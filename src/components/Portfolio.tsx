@@ -21,6 +21,8 @@ const STATUS: Record<PortfolioRow['status'], { label: string; cls: string }> = {
   at_risk: { label: 'At risk', cls: 'text-status-at-risk bg-status-at-risk-bg' },
   attention: { label: 'Attention', cls: 'text-status-attention bg-status-attention-bg' },
   on_track: { label: 'On track', cls: 'text-status-on-track bg-status-on-track-bg' },
+  // Nothing to be on track against (no baseline, no required finish): neutral, never green.
+  no_baseline: { label: 'No baseline yet', cls: 'text-warm-700 bg-warm-100' },
   not_started: { label: 'In interview', cls: 'text-warm-600 bg-warm-100' },
   complete: { label: 'Complete', cls: 'text-status-on-track bg-status-on-track-bg' },
 }
@@ -95,7 +97,8 @@ export function Portfolio({ compact = false }: { compact?: boolean }) {
     : 'All calm'
   const subline = mood === 'worried' ? `${plural(waitingAll, 'project needs', 'projects need')} you. The most urgent is at the top.`
     : mood === 'waiting' ? 'Nothing is on fire. Start at the top.'
-    : data.rows.some(r => r.alerts.length) ? 'Nothing urgent. A few next steps are below.' : 'Every project is on track.'
+    : data.rows.some(r => r.alerts.length) ? 'Nothing urgent. A few next steps are below.'
+    : data.rows.some(r => r.status === 'no_baseline') ? 'Nothing urgent. Projects without a baseline or required finish show "No baseline yet".' : 'Every project is on track.'
 
   return (
     <div className="space-y-6">

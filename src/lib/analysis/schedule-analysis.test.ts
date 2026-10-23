@@ -144,6 +144,7 @@ describe('analyzeSchedule: pilot findings (finish milestone, variance basis, sta
     expect(analysis.varianceDays).toBeNull()
     expect(analysis.finishMilestone?.varianceDays).toBeNull()
     expect(analysis.varianceBasis).toMatch(/^No work has started, so the file's baseline \(target\) dates are planned dates.*no slip is reported\. M9000 Substantial Completion: forecast \d\d\/\d\d\/2026 vs baseline 03\/31\/2026 \(calendar days\): \d+ calendar days later/)
-    expect(analysis.status).toBe('on_track')
+    // No statused baseline and no required finish: nothing to be on track against (never a green "On track").
+    expect(analysis.status).toBe('no_baseline')
   })
 })

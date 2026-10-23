@@ -14,6 +14,8 @@ import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
+import { criticalPathStatus } from '@/lib/analysis/critical-status'
+import { schedulePercentComplete } from '@/lib/analysis/progress'
 import { analyzableFromDb, basisFrom, basisLabel, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
@@ -67,9 +69,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
     const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
-    const percentComplete = activities.length > 0
-      ? Math.round((completedCount / activities.length) * 100)
-      : 0
+    // Duration-weighted physical % complete of the work (src/lib/analysis/progress.ts)
+    const percentComplete = schedulePercentComplete(activities)
 
     return NextResponse.json({
       schedule, activities, relationships, brief, analysis, edits, editedActivityIds,
@@ -77,6 +78,11 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
+        // Whether the critical path could be determined at all, and why not (no logic, not calculated)
+        criticalPath: criticalPathStatus({
+          activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), calculated: !!data.cpm,
+          mustFinishBy: analysis.mustFinishBy, minFloat: analysis.minFloat,
+        }),
         completedCount,
         inProgressCount: activities.filter(a => a.status === 'in_progress').length,
         notStartedCount: activities.filter(a => a.status === 'not_started').length,
@@ -93,6 +99,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,
         nearTerm,
+        // False when no open activity has a forecast start (an undated file without logic)
+        hasForecastDates: activities.some(a => a.status !== 'complete' && !!(a.earlyStart || a.actualStart)),
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
         // Edits made in Planora (override layer on the uploaded file)
         editedActivityIds,
@@ -169,7 +177,12 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // The same bytes uploaded again are not a new update: point at the existing one instead of adding a
     // duplicate to the series (send allowDuplicate=true to store it anyway).
     const same = allowDuplicate ? [] : await findScheduleFilesBySha(ctx.orgId, sha256, series.map(s => s.id))
-    const existing = same.length ? series.find(s => s.id === same[0]) : undefined
+    const prior = same.length ? series.find(s => s.id === same[0]) : undefined
+    // The same bytes read differently now (an importer fix found logic or activities the earlier upload
+    // missed, e.g. a P6 Excel TASKPRED sheet): import it again instead of pointing at the stale upload.
+    const readsDifferently = !!prior && (prior.relationshipCount !== parsed.relationships.length || prior.activityCount !== parsed.activities.length)
+    const existing = readsDifferently ? undefined : prior
+    if (readsDifferently && prior) parsed.warnings.unshift(`This file is identical to ${prior.version} uploaded ${fmtDay(prior.uploadedAt)}, but Planora now reads ${parsed.activities.length} activities and ${parsed.relationships.length} relationships from it (${prior.activityCount} and ${prior.relationshipCount} then), so it was imported again. Delete the earlier upload if it is no longer needed.`)
     if (existing) {
       const warning = `This file is identical to ${existing.version} uploaded ${fmtDay(existing.uploadedAt)} (same SHA-256); no new update was created.`
       await audit({ action: 'schedule.upload_duplicate', targetType: 'schedule', targetId: existing.id, detail: { name: existing.name, version: existing.version, fileName: file.name, sha256 } })
@@ -247,9 +260,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
-    const percentComplete = parsed.activities.length > 0
-      ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
-      : 0
+    const percentComplete = schedulePercentComplete(parsed.activities)
     // Firm history: own as-built projects by default; never a Planora re-import or a third-party schedule.
     const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
     const history = decideHistory({
