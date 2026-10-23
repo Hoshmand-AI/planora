@@ -8,6 +8,7 @@ import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getAc
 import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
+import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { emptyReport, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
@@ -148,7 +149,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
+    const maxBytes = effectiveUploadLimit(MAX_UPLOAD_BYTES)
+    if (file.size > maxBytes) return NextResponse.json({ error: tooLargeMessage('schedule', maxBytes), code: 'too_large' }, { status: 413 })
 
     const scheduleId = uuid()
     let parsed

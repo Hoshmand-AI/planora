@@ -13,6 +13,7 @@ import { Logo } from '@/components/Logo'
 import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 import { ImportExceptions } from '@/components/ImportExceptions'
+import { tooLargeMessage } from '@/lib/upload-limit'
 import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
 /* ─── Types ─────────────────────────────────────────── */
@@ -257,6 +258,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const form = new FormData(e.currentTarget)
     try {
       const res  = await fetch('/api/schedules', { method: 'POST', body: form })
+      // The hosting platform refuses an oversized body with its own non-JSON 413 page.
+      if (res.status === 413 && !res.headers.get('content-type')?.includes('application/json')) { setUploadError(tooLargeMessage('schedule')); return }
       const data = await res.json()
       if (!res.ok) { setUploadError(data.error); return }
       await refreshSchedules()

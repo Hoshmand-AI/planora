@@ -17,8 +17,9 @@ function Cta({ href, className, children }: { href: string; className: string; c
  */
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  // Request access: email the beta team when an address is configured, else the sign-in page (which explains the beta).
-  const requestHref = accessRequestEmail ? `mailto:${accessRequestEmail}?subject=${encodeURIComponent('Planora private beta: access request')}` : '/auth?mode=signup'
+  // Request access: email the beta team (PLANORA_ACCESS_REQUEST_EMAIL, else the support address this page
+  // already lists). Never the sign-up page: without an invitation it is a dead end for a prospect.
+  const requestHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('Planora private beta: access request')}`
   const primaryHref = inviteOnly ? requestHref : '/auth?mode=signup'
 
   return (
@@ -115,7 +116,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             ['14 of 14', 'DCMA 14-Point checks, run automatically'],
             ['100,000', 'activities scheduled by our CPM engine in automated tests'],
-            ['0 days', 'difference in dates and float after a P6 or MS Project round trip, in our test set'],
+            ['0 days', 'difference in dates and float when our P6 and MS Project exports are re-imported, in our test set'],
             inviteOnly ? ['Beta', 'Private beta · by invitation'] : ['$0', 'to start. No credit card'],
           ].map(([value, label]) => (
             <div key={label} className="text-center">
@@ -181,7 +182,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             { icon: CheckCircle,   title: 'DCMA 14-Point Assessment', desc: 'All 14 checks, with the published thresholds by default or your organization’s own. Each failing check lists the activities involved and a suggested fix.' },
             { icon: Activity,      title: 'Critical path and float', desc: 'Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float for every activity.' },
             { icon: BarChart3,     title: 'Schedule risk and recovery', desc: 'Monte Carlo risk analysis (200 to 1,000 iterations of the full network) gives P50 and P80 finish dates. When a date is missed, recovery options are modeled on the network and priced from your labor cost.' },
-            { icon: Shield,        title: 'Ask AI, with limits', desc: 'Ask questions in plain English and draft narrative reports with a version-pinned OpenAI model (GPT-4o by default). Calculated figures such as DCMA results come from the engine, not the model. AI can be switched off.' },
+            { icon: Shield,        title: 'Ask AI, with limits', desc: 'Ask questions in plain English and draft narrative reports with a version-pinned cloud model (Anthropic Claude by default, OpenAI as an approved alternate), or a model in your own network on-premises. Calculated figures such as DCMA results come from the engine, not the model. AI can be switched off.' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex gap-4">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">

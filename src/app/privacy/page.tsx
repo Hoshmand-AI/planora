@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       <h2>3. AI processing</h2>
       <ul>
         <li>Your organization controls AI. An admin can switch AI off completely, in which case nothing is sent to any model and Planora runs on its built-in rules.</li>
-        <li>In <strong>cloud AI</strong> mode, the parts of a schedule needed to answer a request are sent to OpenAI&apos;s API. Under OpenAI&apos;s API terms, API data is not used to train their models by default.</li>
+        <li>In <strong>cloud AI</strong> mode, the parts of a schedule needed to answer a request are sent to one cloud AI provider&apos;s API: Anthropic (Claude) by default, or OpenAI where a deployment selects it. Only one provider is active at a time. Projects marked CUI or classified are never sent to a cloud model.</li>
         <li>In <strong>on-premises / air-gapped</strong> deployments, requests go only to a model inside your own network.</li>
         <li>Interview answers marked &quot;Can&apos;t share&quot; are never sent to any model.</li>
         <li>Each AI request is logged with the model, purpose, size and a fingerprint (hash) of the request, but not its content, so your organization can audit AI use.</li>
@@ -35,7 +35,10 @@ export default function PrivacyPage() {
         <tbody>
           <tr><td>Vercel Inc.</td><td>Application hosting and request logs</td><td>All application traffic</td></tr>
           <tr><td>Neon Inc.</td><td>Managed PostgreSQL database and backups</td><td>Account, project and audit data</td></tr>
-          <tr><td>OpenAI, L.L.C.</td><td>AI features, only when cloud AI is enabled for your organization</td><td>Request content described in section 3</td></tr>
+          <tr><td>Anthropic, PBC</td><td>AI features (default cloud AI provider), only when cloud AI is enabled for your organization</td><td>Request content described in section 3</td></tr>
+          <tr><td>OpenAI, L.L.C.</td><td>AI features (alternate cloud AI provider), only where a deployment selects it and cloud AI is enabled for your organization</td><td>Request content described in section 3</td></tr>
+          <tr><td>Resend, Inc.</td><td>Transactional email (confirmation links, password resets, invitations)</td><td>Recipient email address and message text</td></tr>
+          <tr><td>GitHub, Inc.</td><td>Encrypted off-site copies of database backups, when that backup is enabled</td><td>Encrypted database backups</td></tr>
         </tbody>
       </table>
       <p>On-premises deployments use none of these providers. We will update this list before adding a new provider that processes customer data.</p>

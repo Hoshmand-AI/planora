@@ -10,7 +10,7 @@ Measured 10/04/2026 on a CI-class Linux container (Node.js 22). Budgets are enfo
 | Monte Carlo risk analysis, ~100-activity plan, 1,000 iterations | 0.7 s | 20 s (unit test) |
 
 **Supported limits:**
-- Uploaded files: 25 MB.
+- Uploaded files: 25 MB self-hosted / on-prem (project documents: 15 MB). On Vercel every request body is capped at 4.5 MB by the platform, so the hosted service accepts files up to about 4.4 MB (`src/lib/upload-limit.ts`); larger P6 exports must be trimmed to one project or handled on a self-hosted deployment.
 - Schedules: up to 100,000 activities per schedule.
 - Monte Carlo iterations: reduced automatically for large networks, with a minimum of 200.
 
