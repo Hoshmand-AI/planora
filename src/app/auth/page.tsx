@@ -68,7 +68,8 @@ function AuthForm() {
     }).catch(() => {})
   }, [invite, betaToken])
 
-  const requestHref = requestEmail ? `mailto:${requestEmail}?subject=${encodeURIComponent('Planora private beta: access request')}` : null
+  // Same fallback as the landing page, so "Request access" is never a dead end.
+  const requestHref = `mailto:${requestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('Planora private beta: access request')}`
   const betaInvited = !!betaInvitation?.email
 
   const post = async (body: Record<string, unknown>) => {
