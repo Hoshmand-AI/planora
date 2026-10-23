@@ -77,19 +77,23 @@ export default function TimelinePage() {
   }).slice(0, 20)
 
   // Gantt data
-  const ganttActivities = activities
+  const ganttAll = activities
     .filter(a => a.activityType === 'task' && a.earlyStart && a.duration > 0)
     .sort((a, b) => (a.earlyStart || '').localeCompare(b.earlyStart || ''))
-    .slice(0, 30)
+  const ganttActivities = ganttAll.slice(0, 30)
 
   const allStarts   = ganttActivities.map(a => new Date(a.earlyStart!).getTime())
-  const allFinishes = ganttActivities.map(a => new Date(a.earlyStart!).getTime() + a.duration * 86400000)
+  // Bars end on the early finish (inclusive): durations are work days, so start + duration would be wrong.
+  const barEnd = (a: ActivityData) => a.earlyFinish ? new Date(a.earlyFinish).getTime() + 86400000 : new Date(a.earlyStart!).getTime() + a.duration * 86400000
+  const allFinishes = ganttActivities.map(barEnd)
   const ganttStart  = allStarts.length   > 0 ? Math.min(...allStarts)   : Date.now()
   const ganttEnd    = allFinishes.length > 0 ? Math.max(...allFinishes) : Date.now() + 180 * 86400000
   const ganttRange  = ganttEnd - ganttStart || 1
 
   return (
     <div className="p-5 md:p-6">
+      <h1 className="text-[17px] font-semibold text-navy-950">Timeline</h1>
+      <p className="text-[13px] text-warm-600 mb-4">{selectedSchedule.name}{selectedSchedule.version ? ` · ${selectedSchedule.version}` : ''}</p>
       {/* View toggle */}
       <div className="flex gap-2 mb-5">
         {(['phases', 'gantt'] as const).map(v => (
@@ -125,7 +129,7 @@ export default function TimelinePage() {
                 </div>
               </div>
               <div className="text-[12px] text-warm-400 mb-3">
-                {phase.activityCount} activities
+                {phase.activityCount} {phase.activityCount === 1 ? 'activity' : 'activities'}
                 {phase.start  && ` · ${fmtDate(phase.start)}`}
                 {phase.finish && ` — ${fmtDate(phase.finish)}`}
               </div>
@@ -155,7 +159,7 @@ export default function TimelinePage() {
             <div className="border border-warm-200 border-t-0 rounded-b-md overflow-hidden">
               {ganttActivities.map((act, i) => {
                 const actStart  = new Date(act.earlyStart!).getTime()
-                const actEnd    = actStart + act.duration * 86400000
+                const actEnd    = barEnd(act)
                 const left      = ((actStart - ganttStart) / ganttRange) * 100
                 const width     = ((actEnd - actStart)   / ganttRange) * 100
                 return (
@@ -166,7 +170,7 @@ export default function TimelinePage() {
                         className={`absolute h-3 top-1 rounded-sm ${act.isCritical ? 'bg-status-attention' : progressOf(act) === 'complete' ? 'bg-status-complete' : 'bg-accent-400'}`}
                         style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.5, Math.min(width, 100 - left))}%` }}
                       >
-                        {act.percentComplete > 0 && (
+                        {act.percentComplete > 0 && progressOf(act) !== 'complete' && (
                           <div
                             className={`h-full rounded-sm ${act.isCritical ? 'bg-status-attention' : 'bg-accent-600'}`}
                             style={{ width: `${act.percentComplete}%` }}
@@ -183,8 +187,10 @@ export default function TimelinePage() {
             </div>
             <div className="flex gap-5 mt-3 text-[11px] text-warm-400">
               <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-accent-400 rounded-sm inline-block" /> Normal</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-status-attention rounded-sm inline-block" /> Priority</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-status-attention rounded-sm inline-block" /> Critical</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-status-complete rounded-sm inline-block" /> Complete</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2 bg-accent-600 rounded-sm inline-block" /> Progress to date</span>
+              {ganttAll.length > ganttActivities.length && <span className="ml-auto">First {ganttActivities.length} of {ganttAll.length} activities by start date</span>}
             </div>
           </div>
         </div>

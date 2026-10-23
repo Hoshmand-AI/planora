@@ -81,7 +81,12 @@ export default function PlansPage() {
         </div>
       ) : (
         <>
-          <h2 className="text-[13px] font-medium text-warm-500 mb-3">Your plans</h2>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-[13px] font-medium text-warm-500">Your plans</h2>
+            <button onClick={trySample} disabled={creating} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline disabled:opacity-50">
+              <Sparkles size={13} aria-hidden /> Open a sample project
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {plans.map(p => (
               <Link key={p.id} href={`/dashboard/plan/${p.id}`} className="group block bg-white/70 border border-warm-200 rounded-2xl p-5 hover:bg-white hover:border-warm-300 hover:shadow-[0_8px_24px_-16px_rgba(10,22,40,0.25)] transition-[background-color,border-color,box-shadow] duration-200">
@@ -94,7 +99,7 @@ export default function PlansPage() {
                 </div>
                 <div className="mt-4">
                   <div className="flex justify-between text-[12.5px] text-warm-500 mb-1.5">
-                    <span>Interview readiness</span><span className="tabular-nums font-medium text-navy-950">{p.readiness}%</span>
+                    <span>Interview questions answered</span><span className="tabular-nums font-medium text-navy-950">{p.readiness}%</span>
                   </div>
                   <div className="h-1.5 bg-warm-200 rounded-full overflow-hidden"><div className="h-full rounded-full bg-accent-500" style={{ width: `${p.readiness}%` }} /></div>
                 </div>

@@ -111,7 +111,7 @@ export function Portfolio({ compact = false }: { compact?: boolean }) {
         <RingTile mood={good === t.projects ? 'done' : 'working'} percent={t.projects ? (good / t.projects) * 100 : 0}
           label="on track" sub={`${good} of ${plural(t.projects, 'project', 'projects')}${good !== t.onTrack ? ` (${good - t.onTrack} complete)` : ''}`} />
         <CounterTile mood={t.alerts ? 'idle' : 'done'} value={t.alerts} label="open alerts"
-          sub={<><span className="text-status-at-risk font-medium">{t.atRisk} at risk</span> · <span className="text-status-attention font-medium">{t.attention} need attention</span> · {t.onTrack} on track</>} />
+          sub={<>Projects: <span className="text-status-at-risk font-medium">{t.atRisk} at risk</span> · <span className="text-status-attention font-medium">{t.attention} need attention</span> · {t.onTrack} on track</>} />
       </div>
 
       {waiting.length > 0 && (

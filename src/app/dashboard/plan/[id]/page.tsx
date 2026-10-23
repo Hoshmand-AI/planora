@@ -55,6 +55,7 @@ export default function PlanPage() {
   const router = useRouter()
   const [view, setView] = useState<View | null>(null)
   const [tab, setTab] = useState<Tab>('interview')
+  const opened = useRef(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -102,6 +103,8 @@ export default function PlanPage() {
     const res = await fetch(`/api/plans/${id}`)
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Could not load plan.'); return }
+    // A plan that already has a schedule opens on it; a new one opens on the interview.
+    if (!opened.current) { opened.current = true; if (data.plan?.generated) setTab('schedule') }
     setView(data)
   }, [id])
   useEffect(() => { load() }, [load])

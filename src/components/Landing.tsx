@@ -181,7 +181,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             { icon: CheckCircle,   title: 'DCMA 14-Point Assessment', desc: 'All 14 checks, with the published thresholds by default or your organization’s own. Each failing check lists the activities involved and a suggested fix.' },
             { icon: Activity,      title: 'Critical path and float', desc: 'Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float for every activity.' },
             { icon: BarChart3,     title: 'Schedule risk and recovery', desc: 'Monte Carlo risk analysis (200 to 1,000 iterations of the full network) gives P50 and P80 finish dates. When a date is missed, recovery options are modeled on the network and priced from your labor cost.' },
-            { icon: Shield,        title: 'Ask AI, with limits', desc: 'Ask questions in plain English and draft narrative reports with a version-pinned OpenAI model (GPT-4o by default). Calculated figures such as DCMA results come from the engine, not the model. AI can be switched off.' },
+            { icon: Shield,        title: 'Ask AI, with limits', desc: 'Ask questions in plain English and draft narrative reports with a version-pinned model (Anthropic Claude by default, or a model in your own network). Calculated figures such as DCMA results come from the engine, not the model. AI is off until an admin turns it on.' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex gap-4">
               <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -288,7 +288,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               <div className="text-[36px] font-bold text-navy-950">Custom</div>
               <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For organizations deploying across teams.</p>
               <ul className="space-y-2.5 mb-6">
-                {['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Support by email from the founder'].map(f => (
+                {['Everything in Pro', 'Single sign-on (OpenID Connect or SAML)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Support by email from the founder'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
                     <span className="text-status-on-track font-bold text-[12px]">✓</span>{f}
                   </li>

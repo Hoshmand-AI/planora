@@ -9,7 +9,7 @@ import { PROJECT_TYPES, PROJECT_TYPE_LABELS, isCivilType } from './types'
 import { resolveRegional, SUPPORTED_STATES } from '@/lib/knowledge/regions'
 import { US_STATES } from '@/lib/knowledge/us-states'
 import { listLongLeadItems } from '@/lib/knowledge/long-lead'
-import { appliesTri } from '@/lib/knowledge/applicability'
+import { appliesTri, effectiveFederal } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
 import { civilOptionsFrom, civilQuestions, featuresFrom } from './civil-options'
@@ -403,9 +403,13 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
   return qs
 }
 
-function permitQuestions(permits: PermitSpec[], answers: Record<string, Answer>): Question[] {
+function permitQuestions(permits: PermitSpec[], answers: Record<string, Answer>, profile: ProjectProfile): Question[] {
   const qs: Question[] = []
+  // Federal-only reviews (NEPA, Section 106…) are asked only once the project is known to be federal:
+  // a private project should never be asked about them before "Is this federally funded?".
+  const federalUnknown = effectiveFederal(profile) === undefined
   for (const pm of permits) {
+    if (federalUnknown && pm.appliesWhen?.federalOnly && known(answers, `permit.${pm.id}.status`) === undefined) continue
     const rw = pm.reviewWeeks
     const grounded = [src('catalog', pm.name, `${pm.authority} — ${pm.source}`)]
     qs.push({
@@ -602,7 +606,7 @@ export function questionBank(state: InterviewState, ctx: ElicitationContext = {}
   const regulations = regional.regulations
   const all = [
     ...baseQuestions(profile, answers, ctx),
-    ...permitQuestions(permits, answers),
+    ...permitQuestions(permits, answers, profile),
     ...procurementQuestions(longLead, answers),
     ...regulationQuestions(regulations, profile),
     ...(ctx.extraQuestions || []),
@@ -731,8 +735,7 @@ function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permi
   if (p.classification === 'classified' && ctx.aiMode === 'cloud') out.push('Classified project while AI runs in cloud mode. Switch this deployment to air-gapped mode (PLANORA_AIRGAPPED=true with an on-prem model) before entering any controlled information.')
 
   const start = str(known(answers, 'project.target_start'))
-  const finish = str(known(answers, 'project.required_finish'))
-  if (start && finish && finish <= start) out.push(`Required finish ${finish} is on or before the target start ${start}.`)
+  // A required finish on or before the start is reported once, by checkAnswerDates (dateIssues).
   if (start && pct !== undefined && pct < 90) {
     const bp = permits.find(pm => pm.gates === 'foundations' && known(answers, `permit.${pm.id}.status`) === 'not_submitted')
     if (bp) out.push(`The ${bp.name} is not submitted and drawings are ${pct}% complete; construction cannot start at ${start} — the schedule will show NTP for design/preconstruction, with field work gated by the permit.`)
