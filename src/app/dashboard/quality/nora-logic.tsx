@@ -36,7 +36,9 @@ function headline(d: Data): { mood: RobotMood; title: string; sub: string } {
   const mood: RobotMood = s.looseEnds > Math.max(5, s.activities * 0.25) ? 'worried' : 'waiting'
   const title = s.looseEnds > 0
     ? `${plural(s.looseEnds, 'activity has', 'activities have')} a loose end${adds ? ': here are likely fixes.' : '.'}`
-    : `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: here is where ${s.completionOnly === 1 ? 'it' : 'they'} likely fit${s.completionOnly === 1 ? 's' : ''}.`
+    : tiedOnly > 0 && tiedOnly < s.completionOnly
+      ? `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: Nora has a likely place for ${tiedOnly}.`
+      : `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: here is where ${s.completionOnly === 1 ? 'it' : 'they'} likely fit${s.completionOnly === 1 ? 's' : ''}.`
   const sub = s.unresolved > 0 ? `Nora found a likely fix for ${s.suggested} of ${s.looseEnds}; the other ${s.unresolved} are listed under “Show all”.` : 'Read from the activity names: the kind of work, its location and the usual trade order.'
   return { mood, title, sub }
 }

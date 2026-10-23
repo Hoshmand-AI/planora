@@ -70,7 +70,7 @@ export function SmartInterview(p: SmartInterviewProps) {
 
       {el.conflicts.length > 0 && (
         <div role="status" className="mt-4 rounded-2xl border border-status-attention/50 bg-status-attention-bg px-5 py-4 text-[13.5px] text-warm-700">
-          <div className="font-semibold text-navy-950 mb-1">Two answers don&apos;t fit together</div>
+          <div className="font-semibold text-navy-950 mb-1">{el.conflicts.length === 1 ? 'Two answers don\u2019t fit together' : 'Some answers don\u2019t fit together'}</div>
           <ul className="space-y-1">{el.conflicts.map((c, i) => <li key={i}>{fmtDates(c)}</li>)}</ul>
         </div>
       )}
@@ -81,7 +81,7 @@ export function SmartInterview(p: SmartInterviewProps) {
             <Robot mood="done" size={84} className="mx-auto mb-2" />
             <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em]">Nothing left that changes your finish date</div>
             <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">
-              {p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything Planora needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
+              {el.conflicts.length > 0 ? 'Fix the answers flagged above first — the schedule is only as good as its dates.' : p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything Planora needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
             </p>
           </MoodTile>
         ) : group ? (

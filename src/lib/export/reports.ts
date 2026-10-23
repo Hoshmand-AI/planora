@@ -417,7 +417,7 @@ export function editsSection(edits: { label: string; before: string; after: stri
  * reviewer's dispositions (QA/QC).
  */
 export function reportSupplement(type: string, r: ReportInput): string {
-  const out: string[] = [`**${baselineLine(r)}.** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
+  const out: string[] = [`**${baselineLine(r).replace(/\.?$/, '.')}** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
   if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (Planora calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
   if (type === 'variance' || type === 'executive_summary') { const e = evmMarkdown(r.evm, type === 'variance' ? r.evmTrend : null); if (e.length) out.push(...e, '') }
   if (type === 'qa_qc') out.push('## Reviewer disposition', ...reviewMarkdown(r.review, { dcma: r.dcma.checks.map(c => ({ id: c.id, name: c.name, result: c.result })), questions: (r.dataQuestions ?? []).filter(q => q.id).map(q => ({ id: q.id!, question: q.question })) }), '')
@@ -432,7 +432,7 @@ export function buildReport(type: string, r: ReportInput): string {
   return fmtDates([
     `# ${REPORT_TITLES[t]} — ${r.schedule.name} (${r.schedule.version})`, '',
     `_Prepared by Planora from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
-    `**${baselineLine(r)}.** Every variance, milestone and activity table, BEI and missed tasks in this report measure against this baseline.`, '',
+    `**${baselineLine(r).replace(/\.?$/, '.')}** Every variance, milestone and activity table, BEI and missed tasks in this report measure against this baseline.`, '',
     ...(r.provenance ? provenanceMarkdown(r.provenance) : []),
     ...body,
   ].join('\n'))

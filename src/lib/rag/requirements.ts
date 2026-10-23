@@ -62,7 +62,7 @@ type Rule = { kind: RequirementKind; test: (s: string) => string | null }
 const RULES: Rule[] = [
   { kind: 'max_activity_duration', test: s => {
     if (!/\bdurations?\b/i.test(s) || !/\b(?:activit|task)/i.test(s)) return null
-    const m = new RegExp(String.raw`(?:maximum|max\.?|not\s+(?:to\s+)?exceed|no\s+(?:more|longer)\s+than|shall\s+not\s+exceed|exceeding|greater\s+than|in\s+excess\s+of|limited\s+to)[^.;]{0,60}?\b${NUM}\s*${DAYS}`, 'i').exec(s)
+    const m = new RegExp(String.raw`(?:maximum|max\.?|\bno\b[^.;]{0,50}?\bshall\s+exceed|not\s+(?:to\s+)?exceed|no\s+(?:more|longer)\s+than|shall\s+not\s+exceed|exceeding|greater\s+than|in\s+excess\s+of|limited\s+to)[^.;]{0,60}?\b${NUM}\s*${DAYS}`, 'i').exec(s)
     return m ? `${num(m[1])} ${dayKind(m[2])}` : null
   } },
   { kind: 'update_frequency', test: s => {

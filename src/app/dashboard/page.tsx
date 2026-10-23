@@ -19,7 +19,13 @@ export default function DashboardPage() {
   const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, user, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
-  useEffect(() => { setTab(typeof window !== 'undefined' && window.location.hash === '#earned-value' ? 'evm' : 'overview') }, [selectedSchedule?.id])
+  useEffect(() => {
+    const sync = () => setTab(window.location.hash === '#earned-value' ? 'evm' : 'overview')
+    sync()
+    // Links to #earned-value from elsewhere on this page (or the browser's back button) switch the tab too.
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [selectedSchedule?.id])
 
   if (!selectedSchedule) {
     return (
@@ -35,7 +41,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 id="upload-h" className="text-[15px] font-semibold text-navy-950">Upload a schedule to get started</h2>
-            <p className="text-[13.5px] text-warm-600 mt-0.5">Upload a Primavera P6 (.xer), MS Project (.xml), or PDF file to see your project dashboard.</p>
+            <p className="text-[13.5px] text-warm-600 mt-0.5">Upload a Primavera P6 (.xer or .xml), MS Project (.xml), Excel/CSV or PDF schedule to see your project dashboard.</p>
           </div>
           <button type="button" onClick={openUpload} className="pressable self-start sm:self-center border border-warm-300 bg-warm-50 hover:bg-warm-100 text-navy-950 px-4 py-2 rounded-full text-[13.5px] font-semibold">
             {can('schedule.write') ? 'Upload a schedule' : 'Build a schedule'}
@@ -163,7 +169,7 @@ export default function DashboardPage() {
                 <p className="text-warm-600">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
               )}
               {(baselineHeader || varianceBasis) && (
-                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{[baselineHeader && `${baselineHeader}.`, varianceBasis].filter(Boolean).join(' ')}</p>
+                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{varianceNote(baselineHeader, varianceBasis)}</p>
               )}
             </div>
           </Disclosure>
@@ -348,8 +354,16 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
   )
 }
 
+/** The baseline header and the variance basis, without repeating the reason both carry or doubling a period. */
+function varianceNote(header: string, basis: string) {
+  const h = header ? header.replace(/\.?$/, '.') : ''
+  const reason = header.replace(/^Baseline:[^.]*\.\s*/, '').trim()
+  const b = reason && basis.startsWith(reason) ? basis.slice(reason.length).trim() : basis
+  return [h, b].filter(Boolean).join(' ')
+}
+
 /* ─── Greeting ───────────────────────────────────── */
 function greeting(name?: string | null) {
   const first = (name || '').trim().split(/\s+/)[0]
-  return first ? `Hi ${first}, welcome back` : 'Welcome back'
+  return first ? `Hi ${first}` : 'Welcome'
 }

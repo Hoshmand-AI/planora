@@ -118,7 +118,7 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDate(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact sales@hoshmand.ai.">
+      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-navy-950 font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
@@ -214,7 +214,7 @@ export default function OrgPage() {
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
               ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never Planora re-imports or third-party schedules).'],
-              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (OpenAI on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
+              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (Anthropic Claude by default on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={settings[k]} onChange={e => setSettings({ ...settings, [k]: e.target.checked })} />
