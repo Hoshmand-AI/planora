@@ -72,7 +72,7 @@ const table = (head: string[], rows: unknown[][]) => rows.length
   : '_None._'
 const open = (a: Activity) => a.status !== 'complete' && !a.actualFinish
 const isWork = (a: Activity) => a.activityType !== 'summary' && a.activityType !== 'loe'
-const STATUS = { on_track: 'On track', attention: 'Needs attention', at_risk: 'At risk', complete: 'Complete' } as const
+const STATUS = { on_track: 'On track', attention: 'Needs attention', at_risk: 'At risk', complete: 'Complete', no_baseline: 'No baseline yet' } as const
 
 /** "Baseline: Update 0 'Baseline' uploaded MM/DD/YYYY" — the source every table here measures against. */
 export function baselineLine(r: Pick<ReportInput, 'analysis' | 'activities'>): string {
@@ -84,7 +84,7 @@ function statusSection(r: ReportInput): string[] {
   const { analysis: an, schedule: s } = r
   const fm = an.finishMilestone
   return [
-    `**Status: ${STATUS[an.status]}.** ${an.statusReasons.join(' ') || 'No negative float, no overruled constraints and no slip against the baseline.'}`,
+    `**Status: ${STATUS[an.status] ?? an.status}.** ${an.statusReasons.join(' ') || (an.status === 'no_baseline' ? 'No negative float and no overruled constraints, but there is no baseline and no required finish to measure the forecast against.' : 'No negative float, no overruled constraints and no slip against the baseline.')}`,
     '',
     table(['Item', 'Value'], [
       ['Baseline', baselineLine(r).replace(/^Baseline:\s*/, '')],

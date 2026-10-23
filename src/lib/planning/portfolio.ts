@@ -22,7 +22,7 @@ export interface PortfolioRow {
   gapDays: number | null
   readiness: number | null
   updatedAt: string
-  status: 'on_track' | 'attention' | 'at_risk' | 'not_started' | 'complete'
+  status: 'on_track' | 'attention' | 'at_risk' | 'no_baseline' | 'not_started' | 'complete'
   alerts: PortfolioAlert[]
   /** Uploaded schedules: how many updates of this project are on file (the row shows the latest) */
   updates?: number
@@ -147,7 +147,7 @@ export function latestUpdates(schedules: Schedule[]): { schedule: Schedule; upda
   return out
 }
 
-const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, not_started: 3, complete: 4 }
+const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, no_baseline: 3, not_started: 4, complete: 5 }
 
 export function buildPortfolio(plans: Plan[], schedules: Schedule[], today = new Date().toISOString().slice(0, 10)): Portfolio {
   // A published plan's generated schedule is represented by the plan row.

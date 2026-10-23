@@ -4,7 +4,8 @@
 //   - variance = forecast vs baseline of the finish milestone (calendar days), with the basis stated;
 //     in an update series, against the forecast in the upload marked Baseline
 //   - status = from negative float, overruled constraints, variance, the required finish and
-//     execution against the baseline (BEI / missed tasks)
+//     execution against the baseline (BEI / missed tasks); a file without logic needs attention, and
+//     a clean network with neither a baseline nor a required finish is 'no_baseline', never 'on_track'
 // Dates in text are MM/DD/YYYY. Pure, so it is unit tested.
 
 import type { Activity } from '@/lib/db'
@@ -14,7 +15,11 @@ import { pickFinishCandidate } from '@/lib/analysis/finish-milestone'
 import { baselineExecution, DEFAULT_DCMA_RULES, fmtIndex, roundIndex } from '@/lib/analysis/dcma'
 import { applyBaseline, summarizeBaseline, type BaselineSummary, type ResolvedBaseline } from '@/lib/analysis/baseline'
 
-export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete'
+/**
+ * 'no_baseline': nothing is wrong with the network, but there is no baseline and no required finish
+ * to be on track against, so Planora does not claim "on track".
+ */
+export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline'
 
 export interface FinishMilestone {
   id: string
@@ -352,6 +357,11 @@ export function analyzeSchedule(input: {
         : `Forecast finish ${fmtDate(completion)} is after the required finish ${fmtDate(input.mustFinishBy)}.`)
     }
     if (input.today && forecastFinish && day(forecastFinish) < day(input.today)) bump('at_risk', `Forecast finish ${fmtDate(forecastFinish)} has already passed.`)
+    // Without logic there is no float or critical path to judge: say so instead of looking healthy.
+    const workIds = new Set(work.map(a => a.id))
+    if (work.length > 1 && !input.links.some(l => workIds.has(l.from) && workIds.has(l.to))) {
+      bump('attention', `No logic links: the file has no relationships between its ${work.length} activities, so float and the critical path cannot be calculated. Import the logic (for a P6 Excel file, the TASKPRED sheet) or an XER/XML export.`)
+    }
     // Execution against the baseline (DCMA #11 Missed Tasks / #14 BEI at the default thresholds).
     const ex = baselineExecution(
       work.map(a => ({ id: a.id, code: a.activityId, name: a.name, type: a.activityType, duration: a.duration, status: a.status, percentComplete: a.percentComplete, actualFinish: a.actualFinish, baselineStart: a.baselineStart, baselineFinish: a.baselineFinish })),
@@ -363,6 +373,9 @@ export function analyzeSchedule(input: {
       if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} tasks baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
+
+  // Nothing to be on track against: no baseline variance and no required finish.
+  if (status === 'on_track' && varianceDays == null && !input.mustFinishBy) status = 'no_baseline'
 
   let recalc: ScheduleAnalysis['recalc'] = null
   if (input.fileValues && input.fileValues.size) {

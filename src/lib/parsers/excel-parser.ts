@@ -68,37 +68,39 @@ type Field =
   | 'code' | 'name' | 'duration' | 'remaining' | 'start' | 'finish' | 'lateStart' | 'lateFinish'
   | 'actualStart' | 'actualFinish' | 'baselineStart' | 'baselineFinish' | 'totalFloat' | 'freeFloat'
   | 'pct' | 'wbs' | 'calendar' | 'preds' | 'succs' | 'type' | 'constraint' | 'constraintDate'
-  | 'critical' | 'status' | 'milestone' | 'category' | 'resource' | 'resourceUnits'
+  | 'critical' | 'status' | 'milestone' | 'category' | 'resource' | 'resourceUnits' | 'deleteFlag'
 
 const SYNONYMS: Record<Field, string[]> = {
   code: ['activityid', 'taskid', 'id', 'actid', 'code', 'activitycode', 'taskcode', 'actcode', 'activitynumber', 'activityno', 'tasknumber'],
   name: ['activityname', 'taskname', 'name', 'description', 'activitydescription', 'taskdescription', 'activity', 'task', 'actname'],
-  duration: ['originalduration', 'duration', 'od', 'dur', 'durationdays', 'origdur', 'origduration', 'plannedduration', 'originaldur', 'baselineduration'],
-  remaining: ['remainingduration', 'rd', 'remdur', 'remainingdur', 'remduration'],
+  duration: ['originalduration', 'duration', 'od', 'dur', 'durationdays', 'origdur', 'origduration', 'plannedduration', 'originaldur', 'baselineduration', 'targetdrtnhrcnt'],
+  remaining: ['remainingduration', 'rd', 'remdur', 'remainingdur', 'remduration', 'remaindrtnhrcnt'],
   start: ['start', 'earlystart', 'es', 'plannedstart', 'startdate', 'scheduledstart', 'begin'],
   finish: ['finish', 'earlyfinish', 'ef', 'finishdate', 'plannedfinish', 'end', 'enddate', 'scheduledfinish'],
   lateStart: ['latestart', 'ls'],
   lateFinish: ['latefinish', 'lf'],
-  actualStart: ['actualstart', 'as', 'actstart'],
-  actualFinish: ['actualfinish', 'af', 'actfinish'],
+  actualStart: ['actualstart', 'as', 'actstart', 'actstartdate'],
+  actualFinish: ['actualfinish', 'af', 'actfinish', 'actenddate'],
   baselineStart: ['baselinestart', 'blstart', 'bl1start', 'baseline1start', 'blprojectstart', 'targetstart'],
   baselineFinish: ['baselinefinish', 'blfinish', 'bl1finish', 'baseline1finish', 'blprojectfinish', 'targetfinish'],
-  totalFloat: ['totalfloat', 'tf', 'totalslack', 'float'],
-  freeFloat: ['freefloat', 'ff', 'freeslack'],
-  pct: ['pctcomplete', 'percentcomplete', 'physicalpctcomplete', 'activitypctcomplete', 'durationpctcomplete', 'pct', 'complete', 'progress', 'physicalpercentcomplete'],
-  wbs: ['wbs', 'wbscode', 'wbspath', 'wbsname', 'outlinenumber'],
-  calendar: ['calendar', 'calendarname', 'cal', 'taskcalendar', 'activitycalendar'],
+  totalFloat: ['totalfloat', 'tf', 'totalslack', 'float', 'totalfloathrcnt'],
+  freeFloat: ['freefloat', 'ff', 'freeslack', 'freefloathrcnt'],
+  pct: ['pctcomplete', 'percentcomplete', 'physicalpctcomplete', 'activitypctcomplete', 'durationpctcomplete', 'pct', 'complete', 'progress', 'physicalpercentcomplete', 'physcompletepct', 'completepct'],
+  wbs: ['wbs', 'wbscode', 'wbspath', 'wbsname', 'outlinenumber', 'wbsid'],
+  calendar: ['calendar', 'calendarname', 'cal', 'taskcalendar', 'activitycalendar', 'clndrid'],
   preds: ['predecessors', 'preds', 'predecessor', 'pred', 'predecessorlist'],
   succs: ['successors', 'succs', 'successor', 'succ', 'successorlist'],
   type: ['activitytype', 'type', 'tasktype', 'acttype'],
-  constraint: ['constraint', 'primaryconstraint', 'constrainttype', 'primaryconstrainttype'],
-  constraintDate: ['constraintdate', 'primaryconstraintdate'],
+  constraint: ['constraint', 'primaryconstraint', 'constrainttype', 'primaryconstrainttype', 'cstrtype'],
+  constraintDate: ['constraintdate', 'primaryconstraintdate', 'cstrdate'],
   critical: ['critical', 'iscritical', 'criticalpath'],
-  status: ['activitystatus', 'status', 'taskstatus'],
+  status: ['activitystatus', 'status', 'taskstatus', 'statuscode'],
   milestone: ['milestone', 'ismilestone'],
   category: ['category'],
   resource: ['resource', 'resources', 'resourcename', 'resourcenames', 'resourceid', 'resourceids', 'crew', 'crewname'],
   resourceUnits: ['budgetedunits', 'budgetedlaborunits', 'resourceunits', 'laborhours', 'labourhours', 'manhours', 'budgetedhours', 'plannedunits', 'work', 'workhours'],
+  // P6 Excel import/export: rows marked here are deleted on import into P6
+  deleteFlag: ['deletethisrow', 'deleterecordflag'],
 }
 
 const SYN_LOOKUP = new Map<string, Field>()
@@ -189,6 +191,14 @@ function parseTypeLabel(v: string): Activity['activityType'] | null {
   if (n === 'loe' || n.includes('levelofeffort') || n === 'ttloe') return 'loe'
   if (n.includes('summary') || n === 'ttwbs' || n.includes('hammock')) return 'summary'
   return 'task'
+}
+
+/** P6 "Start Milestone" / TT_Mile occur at the start of their day, "Finish Milestone" / TT_FinMile at the end. */
+function milestoneKindOf(v: string): Activity['milestoneKind'] {
+  const n = v.toLowerCase().replace(/[^a-z]/g, '')
+  if (n === 'startmilestone' || n === 'ttmile') return 'start'
+  if (n === 'finishmilestone' || n === 'ttfinmile') return 'finish'
+  return null
 }
 
 function parseStatusLabel(v: string): Activity['status'] | null {
@@ -300,12 +310,81 @@ function detectHeader(grid: Cell[][]): HeaderInfo | null {
       else fields.set(f, i)
     })
     const score = fields.size
-    if (score > bestScore && score >= 2 && (fields.has('name') || fields.has('code'))) {
+    // P6 exports put field names (task_code, ...) in row 1 and column titles (Activity ID, ...) in
+    // row 2: on a tie the title row directly below wins (its units, e.g. "Original Duration(d)", apply).
+    const better = score > bestScore || (!!best && r === best.row + 1 && score === bestScore)
+    if (better && score >= 2 && (fields.has('name') || fields.has('code'))) {
       best = { row: r, fields, unrecognized, duplicates, ignoredCols }
       bestScore = score
     }
   }
   return best
+}
+
+/* ─── relationship sheets (P6 TASKPRED) ─────────────────── */
+
+type RelField = 'pred' | 'succ' | 'relType' | 'lag' | 'deleteFlag'
+const REL_SYNONYMS: Record<RelField, string[]> = {
+  pred: ['predecessor', 'predtaskid', 'predecessorid', 'predecessoractivityid', 'predactivityid', 'predecessoractivity', 'predid', 'fromactivity', 'fromactivityid'],
+  succ: ['successor', 'taskid', 'successorid', 'successoractivityid', 'succactivityid', 'successoractivity', 'succtaskid', 'succid', 'toactivity', 'toactivityid'],
+  relType: ['relationshiptype', 'predtype', 'reltype', 'linktype', 'relationship', 'type', 'dependencytype'],
+  lag: ['lag', 'laghrcnt', 'lagdays'],
+  deleteFlag: ['deletethisrow', 'deleterecordflag'],
+}
+const REL_LOOKUP = new Map<string, RelField>()
+for (const [f, list] of Object.entries(REL_SYNONYMS) as [RelField, string[]][]) for (const x of list) REL_LOOKUP.set(x, f)
+function matchRelHeader(raw: string): RelField | null {
+  if (!raw.trim()) return null
+  return REL_LOOKUP.get(normHeader(raw)) ?? REL_LOOKUP.get(normHeader(raw.replace(/\([^)]*\)|\[[^\]]*\]/g, ' '))) ?? null
+}
+
+/** Header of a relationship table (predecessor and successor columns), the title row winning a tie as above. */
+export function detectRelationshipHeader(grid: Cell[][]): { row: number; fields: Map<RelField, number>; lagHours: boolean } | null {
+  let best: { row: number; fields: Map<RelField, number>; lagHours: boolean } | null = null
+  for (let r = 0; r < Math.min(15, grid.length); r++) {
+    const fields = new Map<RelField, number>()
+    grid[r].forEach((c, i) => { const f = matchRelHeader(cellText(c)); if (f && !fields.has(f)) fields.set(f, i) })
+    if (!fields.has('pred') || !fields.has('succ')) continue
+    if (!best || fields.size > best.fields.size || (r === best.row + 1 && fields.size === best.fields.size)) {
+      const lagHours: boolean = fields.has('lag') && /hrcnt$/.test(normHeader(cellText(grid[r][fields.get('lag')!])))
+      best = { row: r, fields, lagHours }
+    }
+  }
+  return best
+}
+
+/** "PR_FS", "FS", "Finish to Start", "finish-start" → FS; null when unreadable. */
+export function parseRelType(v: string): Relationship['type'] | null {
+  const n = v.toUpperCase().replace(/^PR_/, '').replace(/[^A-Z]/g, '')
+  if (!n) return 'FS'
+  const map: Record<string, Relationship['type']> = {
+    FS: 'FS', SS: 'SS', FF: 'FF', SF: 'SF',
+    FINISHTOSTART: 'FS', STARTTOSTART: 'SS', FINISHTOFINISH: 'FF', STARTTOFINISH: 'SF',
+    FINISHSTART: 'FS', STARTSTART: 'SS', FINISHFINISH: 'FF', STARTFINISH: 'SF',
+  }
+  return map[n] ?? null
+}
+
+interface RelRow { sheet: string; row: number; pred: string; succ: string; type: Relationship['type']; typeRaw: string; typeKnown: boolean; lag: number | null; lagRaw: Cell; lagHours: boolean }
+
+/** Rows of a relationship sheet (blank, title and deleted rows skipped). */
+function readRelationshipSheet(s: { name: string; grid: Cell[][] }): RelRow[] | null {
+  const h = detectRelationshipHeader(s.grid)
+  if (!h) return null
+  const at = (row: Cell[], f: RelField) => (h.fields.has(f) ? row[h.fields.get(f)!] ?? null : null)
+  const out: RelRow[] = []
+  s.grid.slice(h.row + 1).forEach((row, i) => {
+    const pred = cellText(at(row, 'pred'))
+    const succ = cellText(at(row, 'succ'))
+    if (!pred && !succ) return
+    if (matchRelHeader(pred) === 'pred' || matchRelHeader(succ) === 'succ') return // the other header row
+    if (/^(y|yes|true|1|x|d|del|delete)$/i.test(cellText(at(row, 'deleteFlag')))) return
+    const typeRaw = cellText(at(row, 'relType'))
+    const t = parseRelType(typeRaw)
+    const lagRaw = at(row, 'lag')
+    out.push({ sheet: s.name, row: h.row + i + 2, pred, succ, type: t ?? 'FS', typeRaw, typeKnown: t !== null, lag: parseDurationDays(lagRaw), lagRaw, lagHours: h.lagHours })
+  })
+  return out
 }
 
 /* ─── main ──────────────────────────────────────────────── */
@@ -325,10 +404,15 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   if (!sheet || !header) {
     throw new Error('No schedule table found: expected a header row (within the first 15 rows) with columns such as "Activity ID", "Activity Name", "Duration", "Start", "Finish"')
   }
+  // Logic kept on its own sheet (P6 Excel import/export: TASKPRED with Predecessor, Successor,
+  // Relationship Type and Lag columns). Reading only the activity sheet dropped every relationship.
+  const relSheets = isCsv ? [] : sheets.filter(x => x !== sheet).map(x => ({ x, rows: readRelationshipSheet(x) })).filter((r): r is { x: typeof sheet & {}; rows: RelRow[] } => !!r.rows)
   if (!isCsv && sheets.length > 1) {
-    warnings.push(`Read worksheet "${sheet.name}" (workbook has ${sheets.length} sheets)`)
-    const others = sheets.filter(x => x !== sheet && x.grid.some(r => r.some(c => cellText(c) !== '')))
-    if (others.length) ex.add({ severity: 'warning', entity: 'other', field: 'Worksheets', disposition: 'dropped', count: others.length, examples: others.map(x => x.name), message: `Only worksheet "${sheet.name}" was read; the other sheets were not imported` })
+    const read = [sheet.name, ...relSheets.map(r => r.x.name)]
+    warnings.push(`Read worksheet${read.length > 1 ? 's' : ''} ${read.map(n => `"${n}"`).join(' and ')} (workbook has ${sheets.length} sheets)`)
+    // P6's USERDATA sheet holds only the exporter's layout settings.
+    const others = sheets.filter(x => x !== sheet && !relSheets.some(r => r.x === x) && !/^userdata$/i.test(x.name.trim()) && x.grid.some(r => r.some(c => cellText(c) !== '')))
+    if (others.length) ex.add({ severity: 'warning', entity: 'other', field: 'Worksheets', disposition: 'dropped', count: others.length, examples: others.map(x => x.name), message: `Only worksheet${read.length > 1 ? 's' : ''} ${read.map(n => `"${n}"`).join(' and ')} ${read.length > 1 ? 'were' : 'was'} read; the other sheets were not imported` })
   }
   // Cost columns (Budget, Actual cost, BCWS, ...) are not schedule fields but earned value reads them
   // from the stored file (./costs.ts), so they are not reported as ignored.
@@ -368,6 +452,15 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   }
 
   const headerTexts = new Set(sheet.grid[header.row].map(c => normHeader(cellText(c))))
+  // A header that is a P6 field name ending in _hr_cnt (no title row above the data) holds hours.
+  const hourField = (f: Field) => F.has(f) && /hrcnt$/.test(normHeader(cellText(sheet!.grid[header!.row][F.get(f)!])))
+  const days = (v: Cell, f: Field, hpd: number): number | null => {
+    const d = parseDurationDays(v)
+    // A bare number under an hours header is hours; a value with its own unit ("80h", "10d") keeps it.
+    const bare = typeof v === 'number' || /^\s*[+-]?\d+(\.\d+)?\s*$/.test(cellText(v))
+    return d !== null && bare && hourField(f) ? round2(d / hpd) : d
+  }
+  let deleted = 0
   const activities: Activity[] = []
   const rawPreds: { act: Activity; preds: string; succs: string; row: number }[] = []
   const resourceRows: { act: Activity; resources: string; units: Cell; hoursPerDay: number }[] = []
@@ -382,6 +475,10 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const name = txt(row, 'name')
     if (!code && !name) return
     if (headerTexts.has(normHeader(code || name)) && matchHeader(code || name)) return // repeated header row
+    // The other row of a two-row P6 header (field names above titles, or titles below field names)
+    if (matchHeader(code) === 'code' && (!name || matchHeader(name) === 'name')) return
+    // P6 import: rows marked "Delete This Row" are deleted, not imported
+    if (F.has('deleteFlag') && /^(y|yes|true|1|x|d|del|delete)$/i.test(txt(row, 'deleteFlag'))) { deleted++; return }
     const durCell = get(row, 'duration')
     const start = parseDateCell(get(row, 'start'))
     const finish = parseDateCell(get(row, 'finish'))
@@ -390,7 +487,9 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     // Outline/summary row (MS Project "Outline Level" sheets number every row): no duration, dates or logic.
     if (F.has('duration') && cellText(durCell) === '' && !start && !finish && !txt(row, 'preds') && !txt(row, 'succs')) { group = name; groupRows++; return }
 
-    let duration = parseDurationDays(durCell)
+    const calName0 = txt(row, 'calendar')
+    const hpd0 = calName0 ? (calendars.get(calName0) ?? inferCalendar(calName0)).hoursPerDay : 8
+    let duration = days(durCell, 'duration', hpd0)
     if (duration === null && !F.has('duration') && start && finish) {
       duration = weekdaysBetween(start, finish)
       computedDurations++
@@ -409,9 +508,9 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     if (F.has('milestone') && truthy(get(row, 'milestone'))) activityType = 'milestone'
     if (activityType === 'task' && duration === 0) activityType = 'milestone'
 
-    const tf = parseDurationDays(get(row, 'totalFloat'))
-    const ff = parseDurationDays(get(row, 'freeFloat'))
-    const rd = parseDurationDays(get(row, 'remaining'))
+    const tf = days(get(row, 'totalFloat'), 'totalFloat', hpd0)
+    const ff = days(get(row, 'freeFloat'), 'freeFloat', hpd0)
+    const rd = days(get(row, 'remaining'), 'remaining', hpd0)
     const isCritical = F.has('critical')
       ? truthy(get(row, 'critical'))
       : tf !== null && tf <= 0 && status !== 'complete'
@@ -459,6 +558,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
       isCritical,
       status,
       activityType,
+      milestoneKind: activityType === 'milestone' ? milestoneKindOf(txt(row, 'type')) : null,
       calendarId: calName || null,
       constraintType,
       constraintDate,
@@ -527,8 +627,38 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     if (r.preds) addLinks(r.act, r.preds, 'pred', r.row)
     if (r.succs) addLinks(r.act, r.succs, 'succ', r.row)
   }
+  for (const { rows } of relSheets) {
+    for (const r of rows) {
+      const p = resolve(r.pred)
+      const s = resolve(r.succ)
+      const label = `${r.pred} -> ${r.succ}`
+      if (!p || !s) {
+        unresolved.push(`${r.sheet} row ${r.row}: ${!p ? `predecessor "${r.pred}"` : `successor "${r.succ}"`}`)
+        ex.add({ severity: 'loss', entity: 'relationship', field: `${r.sheet} (relationships)`, disposition: 'dropped', example: label, message: 'Relationship to an activity not in the activity sheet (or unreadable) was skipped' })
+        continue
+      }
+      if (p === s) {
+        ex.add({ severity: 'loss', entity: 'relationship', field: `${r.sheet} (relationships)`, disposition: 'dropped', example: label, message: 'Self-reference skipped' })
+        continue
+      }
+      if (!r.typeKnown) ex.add({ severity: 'warning', entity: 'relationship', field: `${r.sheet}.Relationship Type`, disposition: 'converted', example: `${label} (${r.typeRaw})`, message: 'Unknown relationship type read as finish-to-start' })
+      if (r.lag === null && cellText(r.lagRaw) !== '') ex.add({ severity: 'warning', entity: 'relationship', field: `${r.sheet}.Lag`, disposition: 'defaulted', example: label, message: 'Unreadable lag; 0 days used' })
+      // A bare number under P6's lag_hr_cnt (no title row) is hours on the predecessor's calendar.
+      const bare = typeof r.lagRaw === 'number' || /^\s*[+-]?\d+(\.\d+)?\s*$/.test(cellText(r.lagRaw))
+      const hpd = (p.calendarId && calendars.get(p.calendarId)?.hoursPerDay) || 8
+      const lag = r.lag === null ? 0 : r.lagHours && bare ? round2(r.lag / hpd) : r.lag
+      const key = `${p.id}|${s.id}|${r.type}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      relationships.push({ id: uuid(), scheduleId, predecessorId: p.id, successorId: s.id, type: r.type, lag })
+    }
+  }
+  if (deleted) {
+    warnings.push(`${deleted} row${deleted === 1 ? '' : 's'} marked "Delete This Row" ${deleted === 1 ? 'was' : 'were'} not imported (P6 deletes them on import)`)
+    ex.add({ severity: 'info', entity: 'activity', field: 'Delete This Row', disposition: 'dropped', count: deleted, message: 'Rows marked for deletion in a P6 import sheet were not imported' })
+  }
   if (unresolved.length) warnings.push(`Unresolved logic references (${unresolved.length}): ${unresolved.slice(0, 50).join('; ')}${unresolved.length > 50 ? '; …' : ''}`)
-  if (!F.has('preds') && !F.has('succs')) {
+  if (!F.has('preds') && !F.has('succs') && !relSheets.length) {
     warnings.push('No Predecessors/Successors column: the spreadsheet carries no logic')
     ex.add({ severity: 'warning', entity: 'relationship', field: 'Predecessors', disposition: 'defaulted', count: Math.max(1, activities.length), message: 'No Predecessors/Successors column: the spreadsheet carries no logic' })
   }
