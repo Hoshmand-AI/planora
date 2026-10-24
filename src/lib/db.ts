@@ -51,8 +51,23 @@ const pool = new Pool({
   max: Number(process.env.PG_POOL_MAX) || 10,
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
+  keepAlive: true,
 })
-export const query = (text: string, params?: unknown[]) => pool.query(text, params)
+// An idle pooled connection can be closed by the server (e.g. Neon suspending compute after inactivity).
+// Without a listener that error would crash the process; the pool already discards the dead client.
+if (typeof pool.on === 'function') pool.on('error', err => console.warn(JSON.stringify({ level: 'warn', msg: 'idle database connection closed', error: err.message })))
+
+const STALE_CONNECTION = /Connection terminated unexpectedly|ECONNRESET|Client has encountered a connection error/i
+
+/** Runs a query; a read that hits a connection the server already closed is retried once on a fresh one. */
+export async function query(text: string, params?: unknown[]) {
+  try {
+    return await pool.query(text, params)
+  } catch (err) {
+    if (/^\s*SELECT\b/i.test(text) && STALE_CONNECTION.test((err as Error).message)) return pool.query(text, params)
+    throw err
+  }
+}
 
 let schemaReady: Promise<void> | null = null
 
