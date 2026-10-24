@@ -80,6 +80,12 @@ export default function DashboardPage() {
   const editedIds = new Set((mx.editedActivityIds as string[] | undefined) ?? [])
   const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
+  const allWarnings = ((m as Record<string, unknown> | null)?.warnings as string[]) ?? []
+  // A file built for import (no start, data date or activity dates) is scheduled from the day it was calculated:
+  // say so next to the forecast, so a far-off finish isn't read as the file's own date.
+  const undatedStart = allWarnings.map(w => /scheduled from (\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}).*calendar dates are not/i.exec(w)?.[1]).find(Boolean)
+  const undatedNote = undatedStart ? `The file has no dates, so Planora scheduled it from ${fmtDates(undatedStart)}. The durations, logic and float are the file's; the calendar dates are not.` : null
+  const isBaselineUpload = /baseline/i.test(selectedSchedule.version || '')
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
   // Nora's one-sentence read of the schedule's health (same status and variance as the badge).
@@ -138,7 +144,10 @@ export default function DashboardPage() {
           <div className="min-w-0">
             <div role="status" className="text-[18px] font-semibold text-navy-950 leading-snug tracking-[-0.01em]">{healthLine}</div>
             {statusReasons[0] && <p className="text-[13px] text-warm-600 mt-1">{fmtDates(statusReasons[0])}{statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : ''}</p>}
-            {!statusReasons[0] && status === 'no_baseline' && <p className="text-[13px] text-warm-600 mt-1">There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.</p>}
+            {!statusReasons[0] && status === 'no_baseline' && <p className="text-[13px] text-warm-600 mt-1">{isBaselineUpload
+              ? 'This upload is the baseline. Upload a status update of the same project and Planora measures variance against it.'
+              : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.'}</p>}
+            {undatedNote && <p className="text-[13px] text-warm-600 mt-1">{undatedNote}</p>}
           </div>
         </MoodTile>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
