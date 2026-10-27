@@ -108,7 +108,7 @@ if (process.env.BETA_BASE_URL) {
   const me = await (await admin.request.get(`${betaBase}/api/auth`)).json()
   if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.RUNF9_EMAIL_OUTBOX) {
     const dir = process.env.RUNF9_EMAIL_OUTBOX
-    for (const f of fs.readdirSync(dir).sort().reverse()) {
+    for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()) {
       const m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
       const link = m.to === adminEmail && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
       if (link) { await admin.request.get(link[0], { maxRedirects: 0 }); break }

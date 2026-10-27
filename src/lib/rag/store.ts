@@ -7,7 +7,9 @@ import { initSchema, query, withTransaction } from '@/lib/db'
 import { chunkDocument } from './chunk'
 import { detectInjection } from './injection'
 import { extractDocument, DocumentRejected } from './extract'
-import { buildChunksSql, buildGetDocumentSql, buildListDocumentsSql, rowToRetrieved, PostgresFtsRetriever } from './retrieval'
+import { buildChunksSql, buildGetDocumentSql, buildListDocumentsSql, rowToRetrieved, HybridRetriever, PostgresFtsRetriever } from './retrieval'
+import { embed, embeddingsActive } from './embeddings'
+import { log } from '@/lib/server/log'
 import type { DocScope, DocType, RetrievalScope, RetrievedChunk, StoredDocument, Trust } from './types'
 
 export const MAX_CHUNKS_PER_DOCUMENT = 4000
@@ -27,7 +29,44 @@ export function rowToDocument(r: Record<string, unknown>): StoredDocument & { an
   }
 }
 
-export const retriever = () => new PostgresFtsRetriever(query)
+/** Keyword search, plus meaning-based search when an in-network embedding model is configured. */
+export const retriever = () => {
+  const cfg = embeddingsActive()
+  return cfg.enabled ? new HybridRetriever(query, cfg, undefined, undefined, orgId => indexEmbeddings(orgId, 512)) : new PostgresFtsRetriever(query)
+}
+
+/**
+ * Gives passages of the organization that have no vector yet one from the in-network embedding
+ * model (newest documents first, in batches). Flagged passages are skipped; they stay findable by
+ * keyword and are never sent to any model. Best effort: failures leave keyword search unchanged.
+ */
+export async function indexEmbeddings(orgId: string, max = MAX_CHUNKS_PER_DOCUMENT): Promise<number> {
+  const cfg = embeddingsActive()
+  if (!cfg.enabled || !cfg.model) return 0
+  let done = 0
+  try {
+    while (done < max) {
+      const rows = (await query(`SELECT c.id, c.heading, c.section, c.text FROM document_chunks c
+        JOIN project_documents d ON d.id = c.document_id AND d.org_id = c.org_id AND d.deleted_at IS NULL
+        LEFT JOIN chunk_embeddings e ON e.chunk_id = c.id AND e.model = $2
+        WHERE c.org_id = $1 AND NOT c.flagged AND e.chunk_id IS NULL
+        ORDER BY d.created_at DESC, c.ordinal ASC LIMIT 64`, [orgId, cfg.model])).rows
+      if (!rows.length) break
+      const vectors = await embed(rows.map(r => [r.heading, r.section, r.text].filter(Boolean).join('\n')), cfg)
+      const values: unknown[] = []
+      const tuples = rows.map((r, k) => {
+        values.push(r.id, orgId, cfg.model, vectors[k].length, vectors[k])
+        const b = values.length - 5
+        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5}::real[])`
+      })
+      await query(`INSERT INTO chunk_embeddings (chunk_id, org_id, model, dims, embedding) VALUES ${tuples.join(',')} ON CONFLICT (chunk_id) DO UPDATE SET model=EXCLUDED.model, dims=EXCLUDED.dims, embedding=EXCLUDED.embedding, created_at=NOW()`, values)
+      done += rows.length
+    }
+  } catch (err) {
+    log('warn', 'rag.embedding_index_failed', { orgId, indexed: done, error: err instanceof Error ? err.message : String(err) })
+  }
+  return done
+}
 
 export async function listDocuments(s: RetrievalScope) {
   await initSchema()
@@ -95,6 +134,7 @@ export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
       await q(`INSERT INTO document_chunks (id, org_id, document_id, ordinal, page, page_end, section, heading, text, flagged, flag_reasons) VALUES ${rows.join(',')}`, values)
     }
   })
+  await indexEmbeddings(i.orgId)
   const row = (await query('SELECT * FROM project_documents WHERE id=$1 AND org_id=$2', [id, i.orgId])).rows[0]
   return {
     document: rowToDocument(row),

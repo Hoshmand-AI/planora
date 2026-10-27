@@ -736,6 +736,23 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS beta_invites_email_idx ON beta_invites(LOWER(email));
     `,
   },
+  {
+    id: 19, name: 'document_chunk_embeddings',
+    sql: `
+    -- Meaning-based document search (src/lib/rag/embeddings.ts). Vectors come only from an embedding
+    -- model inside the customer's network and are compared inside Postgres (REAL[], no extension).
+    -- Each vector is deleted with its passage. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS chunk_embeddings (
+      chunk_id TEXT PRIMARY KEY REFERENCES document_chunks(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      embedding REAL[] NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS chunk_embeddings_org_model_idx ON chunk_embeddings(org_id, model);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

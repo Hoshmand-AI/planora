@@ -16,6 +16,9 @@ import { createHash, randomUUID } from 'crypto'
 import type { WorkspaceAccess } from '@/lib/server/context'
 import { workspaceClause } from '@/lib/server/workspace-scope'
 import { citationFor } from './citations'
+import { expansionsFor, tsTerm } from './vocabulary'
+import { embed, fuse, type EmbeddingConfig } from './embeddings'
+import { log } from '@/lib/server/log'
 import type { DocType, RetrievalOptions, RetrievalScope, RetrievedChunk, Retriever, Tier, Trust, DocScope } from './types'
 
 type Q = (text: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>
@@ -54,10 +57,15 @@ function scope(access: WorkspaceAccess, ps: Params): { cte: string; join: string
 
 export const TIER_SQL = `CASE WHEN d.trust = 'approved' AND d.scope = 'project' THEN 1 WHEN d.trust = 'approved' THEN 2 WHEN d.doc_type IN ('contract', 'owner_requirement') THEN 3 ELSE 4 END`
 
-/** Lexemes for an OR ("any term") query, built from plain words only (no tsquery syntax from users). */
+/**
+ * Lexemes for an OR ("any term") query, built from plain words only (no tsquery syntax from users),
+ * plus construction synonyms and abbreviations from vocabulary.ts ("LDs" also matches "liquidated damages").
+ */
 export function anyTermsQuery(query: string): string {
   const words = [...new Set((query.toLowerCase().normalize('NFKC').match(/[\p{L}\p{N}]+/gu) || []).filter(w => w.length > 1 || /\d/.test(w)))].slice(0, 32)
-  return words.join(' | ')
+  if (!words.length) return ''
+  const extra = expansionsFor(query).map(tsTerm).filter((t): t is string => !!t)
+  return [...new Set([...words, ...extra])].join(' | ')
 }
 
 export interface Built { text: string; values: unknown[] }
@@ -82,6 +90,37 @@ export function buildSearchSql(s: RetrievalScope, query: string, o: RetrievalOpt
       AND (${unreviewed}::boolean OR d.trust = 'approved')
       AND c.tsv @@ q.tsq
     ORDER BY tier ASC, rank DESC, d.created_at ASC, c.ordinal ASC
+    LIMIT ${limit}`
+  return { text, values: ps.values }
+}
+
+/**
+ * Meaning-based search: passages whose stored vector is closest to the question's vector, under the
+ * same authorization SQL as keyword search. Similarity is a dot product of unit vectors computed
+ * inside Postgres; only vectors from the same model and length are compared.
+ */
+export function buildVectorSearchSql(s: RetrievalScope, vector: number[], model: string, o: RetrievalOptions & { minSimilarity: number }): Built {
+  const ps = new Params()
+  ps.p(s.orgId); ps.p(s.scheduleId)
+  const sc = scope(s.access, ps)
+  const v = ps.p(vector)
+  const m = ps.p(model)
+  const unreviewed = ps.p(o.includeUnreviewed)
+  const minSim = ps.p(o.minSimilarity)
+  const limit = ps.p(Math.min(Math.max(Math.floor(o.limit) || 8, 1), 50))
+  const text = `WITH ${sc.cte}
+    SELECT c.id AS chunk_id, c.document_id, c.ordinal, c.page, c.page_end, c.section, c.heading, c.text, c.flagged, c.flag_reasons,
+      d.title, d.doc_type, d.trust, d.scope, d.classification,
+      sim.score AS rank, ${TIER_SQL} AS tier
+    FROM document_chunks c
+    JOIN project_documents d ON d.id = c.document_id AND d.org_id = c.org_id
+    JOIN chunk_embeddings e ON e.chunk_id = c.id AND e.org_id = c.org_id AND e.model = ${m} AND e.dims = cardinality(${v}::real[])
+    ${sc.join}
+    CROSS JOIN LATERAL (SELECT SUM(x * y) AS score FROM unnest(e.embedding, ${v}::real[]) AS t(x, y)) sim
+    WHERE c.org_id = $1 AND ${sc.where}
+      AND (${unreviewed}::boolean OR d.trust = 'approved')
+      AND sim.score >= ${minSim}
+    ORDER BY sim.score DESC, d.created_at ASC, c.ordinal ASC
     LIMIT ${limit}`
   return { text, values: ps.values }
 }
@@ -154,6 +193,46 @@ export class PostgresFtsRetriever implements Retriever {
     // A search-box query with every term required can come back empty; fall back to ranked "any".
     if (!rows.length && o.match === 'all' && anyTermsQuery(query)) return this.search(s, query, { ...o, match: 'any' })
     return rows
+  }
+}
+
+/**
+ * Keyword search plus meaning-based search with an in-network embedding model, blended by
+ * reciprocal-rank fusion and then ordered by grounding tier, like keyword results. If the model is
+ * unavailable, results are keyword-only (the search never fails because of it).
+ */
+export class HybridRetriever implements Retriever {
+  readonly backend = 'postgres-fts+local-embeddings'
+  constructor(
+    private q: Q,
+    private cfg: EmbeddingConfig,
+    private embedder: (texts: string[], cfg: EmbeddingConfig) => Promise<number[][]> = embed,
+    private minSimilarity = Number(process.env.RUNF9_EMBEDDINGS_MIN_SIMILARITY) || 0.3,
+    /** Indexes passages that have no vector yet (documents uploaded before AI was turned on) */
+    private prepare: (orgId: string) => Promise<unknown> = async () => {},
+  ) {}
+  async search(s: RetrievalScope, query: string, o: RetrievalOptions): Promise<RetrievedChunk[]> {
+    if (!query.trim()) return []
+    await this.prepare(s.orgId)
+    const pool = Math.max(o.limit, 20)
+    const keyword = await new PostgresFtsRetriever(this.q).search(s, query, { ...o, limit: pool })
+    let semantic: RetrievedChunk[] = []
+    try {
+      const [vector] = await this.embedder([query.slice(0, 2000)], this.cfg)
+      const b = buildVectorSearchSql(s, vector, this.cfg.model!, { ...o, limit: pool, minSimilarity: this.minSimilarity })
+      semantic = (await this.q(b.text, b.values)).rows.map(rowToRetrieved)
+    } catch (err) {
+      // Never log the query or passages: only that the model could not be used.
+      log('warn', 'rag.embeddings_unavailable', { error: err instanceof Error ? err.message : String(err) })
+    }
+    if (!semantic.length) return keyword.slice(0, o.limit)
+    const score = fuse([keyword.map(c => c.chunkId), semantic.map(c => c.chunkId)])
+    const byId = new Map<string, RetrievedChunk>()
+    for (const c of [...keyword, ...semantic]) if (!byId.has(c.chunkId)) byId.set(c.chunkId, c)
+    return [...byId.values()]
+      .map(c => ({ ...c, rank: score.get(c.chunkId) ?? 0 }))
+      .sort((a, b) => a.tier - b.tier || b.rank - a.rank)
+      .slice(0, o.limit)
   }
 }
 
