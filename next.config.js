@@ -39,7 +39,12 @@ const nextConfig = {
   serverExternalPackages: ['pdf-parse'],
   experimental: {},
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Brand images (logos used in emails, social previews) must load inside mail apps and other
+      // sites, so they alone may be embedded cross-origin. Later rules win for the same header.
+      { source: '/brand/:path*', headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }] },
+    ]
   },
 }
 
