@@ -14,7 +14,7 @@ can retrieve it, what reaches a model, and how it is deleted. Code: `src/lib/rag
 | `document_requirement_reviews` | a person's confirm / dismiss decision on a candidate requirement (key, kind, user, time) | No document text. |
 | `retrieval_log` | who retrieved, for which project and purpose, SHA-256 of the query (salted with the org id), returned document and passage ids, flagged passage ids, how results were delivered (`search`, `model`, `passages_only`, `withheld_restricted`, `none`), number of invalid citations removed | Never the query or passage text. Purged after 400 days. |
 
-**The original file is not stored.** Planora extracts the text (PDF text layer, Word `document.xml`,
+**The original file is not stored.** Hoshmand Schedule extracts the text (PDF text layer, Word `document.xml`,
 plain text / Markdown), keeps the SHA-256 and size for chain of custody, and discards the bytes.
 Scanned PDFs without a text layer are refused with a request to OCR them first. Size limits: 15 MB
 per file, 1,500 pages, 2,000,000 characters, 4,000 passages, 200 documents per upload.
@@ -44,7 +44,7 @@ Permissions: `read` lists and searches; `schedule.write` uploads, deletes and co
 
 - Retrieval order (the grounding hierarchy): (1) approved project documents, (2) approved
   organization standards, (3) unreviewed contracts and owner requirements, (4) other unreviewed
-  documents — the last two only when the user opts in — then Planora's curated reference knowledge
+  documents — the last two only when the user opts in — then Hoshmand Schedule's curated reference knowledge
   (`src/lib/knowledge`), then general knowledge. The model is told this precedence.
 - Passages are sent as a separate data message inside `<<<DOCUMENT n nonce=…>>>` blocks with their
   title, section, page, trust and tier. The nonce is random per request and marker-like text inside a

@@ -1,6 +1,6 @@
 # Claims register
 
-Every public claim about Planora (website, sales decks, proposals) must be listed here with its evidence before it is published. The standard is the one the FTC applies to advertising: an objective claim needs "competent and reliable evidence" in hand *before* it is made. A claim that can't be shown here gets reworded or removed. Owner: founder. Review: before each release that changes the website, and quarterly.
+Every public claim about Hoshmand Schedule (website, sales decks, proposals) must be listed here with its evidence before it is published. The standard is the one the FTC applies to advertising: an objective claim needs "competent and reliable evidence" in hand *before* it is made. A claim that can't be shown here gets reworded or removed. Owner: founder. Review: before each release that changes the website, and quarterly.
 
 **Status:** ✅ evidenced · 👤 needs the founder's confirmation or documents · 🗑 removed (and why)
 

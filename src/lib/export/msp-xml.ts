@@ -156,7 +156,7 @@ type OutlineLine =
   | { kind: 'act'; a: PlanActivity; level: number; outline: string; wbs: string }
 
 /**
- * Task order and outline for MS Project: WBS summary tasks (Planora phases / work packages, or the
+ * Task order and outline for MS Project: WBS summary tasks (Hoshmand Schedule phases / work packages, or the
  * uploaded file's own WBS) with their activities nested one level below. The WBS field of a summary
  * is its WBS code without the project prefix ("03.02", or the source path "1.2.3"); an activity's
  * WBS is its parent's code plus its position.

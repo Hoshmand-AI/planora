@@ -12,7 +12,7 @@ const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' &
 const isoDay = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) && !Number.isNaN(Date.parse(v.trim()))
 
 /**
- * Validate risk inputs against the schedule's open work; activities by Planora id or activity code.
+ * Validate risk inputs against the schedule's open work; activities by Hoshmand Schedule id or activity code.
  * Ranges apply to open tasks; risk events to an open task or milestone (a milestone event delays the
  * milestone); commitments (a supplier's committed delivery date) to an open task.
  */

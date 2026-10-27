@@ -12,14 +12,14 @@ function Cta({ href, className, children }: { href: string; className: string; c
 }
 
 /**
- * Marketing page. While Planora is in private beta (PLANORA_SIGNUP not "open") the sign-up calls to
+ * Marketing page. While Hoshmand Schedule is in private beta (PLANORA_SIGNUP not "open") the sign-up calls to
  * action become "Request access" / "Sign in" and the page says access is by invitation.
  */
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
   // Request access: email the beta team (PLANORA_ACCESS_REQUEST_EMAIL, else the support address this page
   // already lists). Never the sign-up page: without an invitation it is a dead end for a prospect.
-  const requestHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('Planora private beta: access request')}`
+  const requestHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('Hoshmand Schedule private beta: access request')}`
   const primaryHref = inviteOnly ? requestHref : '/auth?mode=signup'
 
   return (
@@ -70,7 +70,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               Build and check construction schedules. Every number explained.
             </h1>
             <p className="text-[17px] text-warm-600 max-w-[520px] mx-auto md:mx-0 mb-8 leading-relaxed">
-              Answer a few questions and Planora builds the schedule with you. Already have one? Upload it and Planora checks it.
+              Answer a few questions and Hoshmand Schedule builds the schedule with you. Already have one? Upload it and Hoshmand Schedule checks it.
             </p>
             <div className="flex gap-3 justify-center md:justify-start flex-wrap">
               <Cta href={primaryHref} className="pressable bg-accent-500 text-navy-950 px-8 py-3.5 rounded-full text-[15px] font-semibold hover:bg-accent-400 transition-colors">
@@ -88,7 +88,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </div>
           </div>
 
-          {/* Meet Nora: an illustration of how Planora shows status (moods, not made-up numbers) */}
+          {/* Meet Nora: an illustration of how Hoshmand Schedule shows status (moods, not made-up numbers) */}
           <figure className="relative max-w-[420px] w-full mx-auto">
             <MoodTile mood="working" className="flex items-center gap-4 !p-5">
               <Robot mood="working" size={96} />
@@ -140,7 +140,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center mb-14">
           <h2 className="font-display text-[30px] text-navy-950 mb-3">Less time building and checking. More time managing.</h2>
-          <p className="text-warm-600 max-w-[580px] mx-auto text-[15px]">Planora does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
+          <p className="text-warm-600 max-w-[580px] mx-auto text-[15px]">Hoshmand Schedule does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </div>
         <div className="grid md:grid-cols-2 gap-5">
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-8">
@@ -155,7 +155,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </ul>
           </div>
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-8">
-            <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-status-on-track bg-status-on-track-bg px-3 py-1 rounded-md border-l-2 border-status-on-track mb-5">With Planora</span>
+            <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-status-on-track bg-status-on-track-bg px-3 py-1 rounded-md border-l-2 border-status-on-track mb-5">With Hoshmand Schedule</span>
             <ul className="space-y-3">
               {['An interview builds the first schedule; you review and adjust it', 'DCMA 14-Point checks run on every change', 'Each duration and link shows its source and assumptions', 'Recovery options are re-scheduled on the real network and priced from your labor cost'].map(item => (
                 <li key={item} className="flex items-start gap-3 text-[13.5px] text-warm-700 border-b border-warm-200 pb-3">
@@ -172,13 +172,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section id="features" className="max-w-6xl mx-auto px-6 pb-20">
         <h2 className="font-display text-[30px] text-navy-950 mb-3">Built by a scheduler, for everyone on the project</h2>
         <p className="text-[15px] text-warm-600 max-w-[680px] mb-10 leading-relaxed">
-          Planora interviews you like a senior scheduler, builds a CPM schedule with a written basis for every duration and link,
+          Hoshmand Schedule interviews you like a senior scheduler, builds a CPM schedule with a written basis for every duration and link,
           runs the DCMA 14-Point Assessment, and exports native Primavera P6 and MS Project files. Already have a schedule? Upload it to check it.
         </p>
         <div className="grid md:grid-cols-2 gap-8 gap-x-14">
           {[
             { icon: FileText,      title: 'Native P6 and MS Project files', desc: 'Import .xer and .xml with activities, logic, lags, constraints and calendars, and export the same formats. Excel and PDF imports read activities and dates; a PDF carries no logic.' },
-            { icon: MessageSquare, title: 'A schedule built from an interview', desc: 'Planora asks what a senior scheduler would ask: scope, permits, long-lead equipment, site and calendar. Questions are ranked by how far each answer can move your finish date.' },
+            { icon: MessageSquare, title: 'A schedule built from an interview', desc: 'Hoshmand Schedule asks what a senior scheduler would ask: scope, permits, long-lead equipment, site and calendar. Questions are ranked by how far each answer can move your finish date.' },
             { icon: CheckCircle,   title: 'DCMA 14-Point Assessment', desc: 'All 14 checks, with the published thresholds by default or your organization’s own. Each failing check lists the activities involved and a suggested fix.' },
             { icon: Activity,      title: 'Critical path and float', desc: 'Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float for every activity.' },
             { icon: BarChart3,     title: 'Schedule risk and recovery', desc: 'Monte Carlo risk analysis (200 to 1,000 iterations of the full network) gives P50 and P80 finish dates. When a date is missed, recovery options are modeled on the network and priced from your labor cost.' },
@@ -244,13 +244,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section id="pricing" className="bg-warm-100 border-y border-warm-200 py-20 px-6">
         <div className="max-w-[1000px] mx-auto">
           <h2 className="font-display text-[30px] text-navy-950 text-center mb-3">Simple, transparent pricing</h2>
-          <p className="text-center text-warm-500 mb-10 text-[15px]">{inviteOnly ? 'Planora is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
+          <p className="text-center text-warm-500 mb-10 text-[15px]">{inviteOnly ? 'Hoshmand Schedule is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
           <div className="grid md:grid-cols-3 gap-4">
 
             <div className="bg-warm-50 border border-warm-200 rounded-lg p-7">
               <div className="text-[11px] font-bold uppercase tracking-wider text-warm-400 mb-2">Free</div>
               <div className="text-[36px] font-bold text-navy-950">$0<span className="text-[15px] font-medium text-warm-400">/month</span></div>
-              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For trying Planora on real projects.</p>
+              <p className="text-[13.5px] text-warm-600 mt-1 mb-5">For trying Hoshmand Schedule on real projects.</p>
               <ul className="space-y-2.5 mb-6">
                 {['Up to 3 uploaded schedules', 'Unlimited interview-built schedules', 'Executive Summary report', '10 AI requests/day', 'Export to P6, MS Project & CSV', 'Roles, 2-step verification & audit log'].map(f => (
                   <li key={f} className="flex items-center gap-2 text-[13.5px] text-warm-700">
@@ -312,9 +312,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             ['14 of 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
             ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
-            ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves Planora’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
+            ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves Hoshmand Schedule’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
             inviteOnly
-              ? ['Private beta', 'Planora is in a private beta. New firms join with an invitation, and members join through their organization’s admin. Plan limits are listed in the pricing table and enforced by the server.']
+              ? ['Private beta', 'Hoshmand Schedule is in a private beta. New firms join with an invitation, and members join through their organization’s admin. Plan limits are listed in the pricing table and enforced by the server.']
               : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
           ].map(([term, def]) => (
             <div key={term} className="py-3.5 grid md:grid-cols-[200px_1fr] gap-1 md:gap-6">
@@ -365,7 +365,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </div>
           </div>
           <div className="border-t border-white/5 pt-5 flex flex-col md:flex-row items-center justify-between gap-2">
-            <span className="text-white/60 text-[12px]">© 2026 Planora. Built by Hoshmand AI. All rights reserved.</span>
+            <span className="text-white/60 text-[12px]">© 2026 Hoshmand Schedule. Built by Hoshmand AI. All rights reserved.</span>
           </div>
         </div>
       </footer>

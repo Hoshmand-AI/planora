@@ -84,7 +84,7 @@ describe('lean P6 import workbook (TASK + TASKPRED sheets)', async () => {
     expect(r.critical).toMatchObject({ determined: true, count: crit.length })
     expect(r.analysis.forecastFinish).toMatch(/^20\d\d-\d\d-\d\d$/)
     expect(r.brief.summary).toMatch(/The goal is Substantial Completion by \d\d\/\d\d\/\d{4}/)
-    // The file has no dates: the note says the calendar dates are Planora's, not the file's
+    // The file has no dates: the note says the calendar dates are Hoshmand Schedule's, not the file's
     expect(r.done.note).toMatch(/no project start, data date or activity dates/)
   })
 

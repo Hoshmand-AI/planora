@@ -154,7 +154,7 @@ async function dispatchNow(orgId: string, events: OutboundEvent[]) {
   for (const e of events.filter(x => SECURITY_ALERT_EVENTS.has(x.action))) {
     if (!alertUrl) { log('warn', 'security alert', { action: e.action, orgId, targetType: e.targetType, targetId: e.targetId }); continue }
     // Slack/Teams-compatible "text" plus structured fields; no secrets or content.
-    const body = JSON.stringify({ text: `Planora security alert: ${e.action} (org ${orgId}${e.actorEmail ? `, by ${e.actorEmail}` : ''}) at ${e.at}`, event: e.action, organizationId: orgId, targetType: e.targetType, targetId: e.targetId, at: e.at })
+    const body = JSON.stringify({ text: `Hoshmand Schedule security alert: ${e.action} (org ${orgId}${e.actorEmail ? `, by ${e.actorEmail}` : ''}) at ${e.at}`, event: e.action, organizationId: orgId, targetType: e.targetType, targetId: e.targetId, at: e.at })
     const r = await post(alertUrl, body, {})
     if (!r.ok) log('error', 'security alert delivery failed', { action: e.action, status: r.status })
   }

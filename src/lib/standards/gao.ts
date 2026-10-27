@@ -1,9 +1,9 @@
 // GAO Schedule Assessment Guide profile (GAO-16-89G): the ten best practices grouped under the four
-// characteristics, each with one or more deterministic checks on data Planora already holds.
+// characteristics, each with one or more deterministic checks on data Hoshmand Schedule already holds.
 //
-// GAO describes best practices; it does not publish numeric pass marks. Thresholds here are Planora
+// GAO describes best practices; it does not publish numeric pass marks. Thresholds here are Hoshmand Schedule
 // screening defaults (configurable per organization) and are labelled as such on every result.
-// Titles, messages and recommendations are Planora's own paraphrases; sourceReference is a citation.
+// Titles, messages and recommendations are Hoshmand Schedule's own paraphrases; sourceReference is a citation.
 // An automated scan is not a GAO compliance determination (see GAO_DISCLAIMER).
 
 import { isValidDate, toDayNumber } from '@/lib/planning/calendar'
@@ -14,7 +14,7 @@ import { notAssessable, threshold, type EngineConfig, type RuleDef } from './rul
 import type { Characteristic, RuleMeta, ThresholdSpec } from './types'
 
 export const GAO_VERSION = 'GAO-16-89G'
-export const GAO_DISCLAIMER = 'This is an automated screen of schedule data against practices described in the GAO Schedule Assessment Guide (GAO-16-89G). It is not a GAO assessment and not a determination of compliance with the guide: GAO assessments rely on documents, interviews and professional judgment that an automated scan cannot replace. Thresholds are Planora screening defaults unless your organization changed them.'
+export const GAO_DISCLAIMER = 'This is an automated screen of schedule data against practices described in the GAO Schedule Assessment Guide (GAO-16-89G). It is not a GAO assessment and not a determination of compliance with the guide: GAO assessments rely on documents, interviews and professional judgment that an automated scan cannot replace. Thresholds are Hoshmand Schedule screening defaults unless your organization changed them.'
 
 const BP_TITLES: Record<number, string> = {
   1: 'Capturing all activities',

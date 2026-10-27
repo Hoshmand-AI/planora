@@ -1282,7 +1282,7 @@ const INTERNATIONAL_PERMITS: PermitSpec[] = [
     gates: 'foundations',
     submitAfter: 'design_cd',
     source: 'Generic placeholder for jurisdictions outside the US (no US catalog applies)',
-    notes: 'Outside the US Planora has no permit catalog: replace this with the local approvals (planning consent, building approval, fire authority) and their review times.',
+    notes: 'Outside the US Hoshmand Schedule has no permit catalog: replace this with the local approvals (planning consent, building approval, fire authority) and their review times.',
   }),
   permit({
     id: 'intl-utility',

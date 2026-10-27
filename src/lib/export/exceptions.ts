@@ -1,9 +1,9 @@
-// Export exception reports: what Planora could not write (or had to change) in a given export format,
+// Export exception reports: what Hoshmand Schedule could not write (or had to change) in a given export format,
 // so nothing is dropped silently. Each export carries its report where provenance already goes: the
 // XLSX Provenance sheet, an X-Planora-Export-Exceptions response header on every download, and the
 // JSON report itself on request (?format=...&exceptions=json).
 //
-// The report lists (1) what the source file carried that Planora never imported (from the upload's
+// The report lists (1) what the source file carried that Hoshmand Schedule never imported (from the upload's
 // import exception report), (2) activities the export model leaves out (WBS summaries, level of
 // effort), and (3) what the target format cannot hold or holds differently.
 
@@ -50,19 +50,19 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
   const ex = new ExceptionCollector('export', format)
   const label = FORMAT_LABEL[format]
   // The P6 export of an uploaded P6 file re-emits the original file row for row: everything the file
-  // carried is written back, including what Planora does not model.
+  // carried is written back, including what Hoshmand Schedule does not model.
   if (format === 'xer-original') return ex.report()
 
   const resources = hasResourceData(s.resources) ? s.resources : null
   const writesResources = !!resources && WRITES_RESOURCES.has(format)
 
-  /* 1. What the source file carried that Planora never imported */
+  /* 1. What the source file carried that Hoshmand Schedule never imported */
   for (const r of ctx.importReport?.records || []) {
     if (r.disposition !== 'dropped' && r.disposition !== 'preserved_in_raw') continue
     if (writesResources && RESOURCE_IMPORT_FIELDS.has(r.field)) continue
     ex.add({
       severity: r.severity, entity: r.entity, field: r.field, disposition: 'dropped', count: r.count, examples: r.examples,
-      message: `Not imported into Planora, so not in this ${label} export${r.disposition === 'preserved_in_raw' ? ' (it is in the original file and in the upload\'s P6 .xer export)' : ' (the original file is kept with the upload)'}: ${r.message}`,
+      message: `Not imported into Hoshmand Schedule, so not in this ${label} export${r.disposition === 'preserved_in_raw' ? ' (it is in the original file and in the upload\'s P6 .xer export)' : ' (the original file is kept with the upload)'}: ${r.message}`,
     })
   }
 
@@ -120,7 +120,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
       const hpd = (id?: string) => (calById.get(id || s.defaultCalendarId) ?? calById.get(s.defaultCalendarId))?.hoursPerDay ?? 8
       const byId = new Map(acts.map(a => [a.id, a]))
       const lagOnOtherCal = s.links.filter(l => l.lag !== 0 && hpd(byId.get(l.from)?.calendarId) !== hpd(byId.get(l.to)?.calendarId))
-      if (lagOnOtherCal.length) ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink.LinkLag', disposition: 'converted', count: lagOnOtherCal.length, examples: lagOnOtherCal.map(l => `${byId.get(l.from)?.code} -> ${byId.get(l.to)?.code}`), message: 'MS Project schedules lag on the successor\'s calendar; Planora (like P6) uses the predecessor\'s. Lags between calendars with different hours per day may schedule differently' })
+      if (lagOnOtherCal.length) ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink.LinkLag', disposition: 'converted', count: lagOnOtherCal.length, examples: lagOnOtherCal.map(l => `${byId.get(l.from)?.code} -> ${byId.get(l.to)?.code}`), message: 'MS Project schedules lag on the successor\'s calendar; Hoshmand Schedule (like P6) uses the predecessor\'s. Lags between calendars with different hours per day may schedule differently' })
       if (s.mustFinishBy) ex.add({ severity: 'info', entity: 'project', field: 'Must Finish By', disposition: 'converted', example: s.mustFinishBy, message: 'The required finish is written as a Deadline on the project\'s finish task' })
       if (ctx.progressMode) ex.add({ severity: 'info', entity: 'project', field: 'Out-of-sequence progress', disposition: 'dropped', example: ctx.progressMode === 'override' ? 'Progress override' : 'Retained logic', message: 'MS Project has no retained-logic / progress-override setting' })
       assumptions()

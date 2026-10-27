@@ -33,8 +33,8 @@ export const POST = api({ permission: 'read' }, async (req, { auth }) => {
       const link = `${appOrigin(req)}/auth?beta=${encodeURIComponent(token)}`
       // Emailed when a provider is configured; the link is always shown to the operator as well.
       const emailed = (await sendEmail({
-        to: invite.email, subject: 'Your invitation to the Planora private beta',
-        text: `Hi,\n\n${auth.name} invited ${invite.company || 'you'} to the Planora private beta. Planora builds and checks construction schedules and explains every duration and link.\n\nCreate your firm's account:\n\n${link}\n\nThe link works once, only for ${invite.email}, and expires in ${BETA_INVITE_DAYS} days. You'll own your firm's private workspace and can invite colleagues from there.\n\n— Planora by Hoshmand AI`,
+        to: invite.email, subject: 'Your invitation to the Hoshmand Schedule private beta',
+        text: `Hi,\n\n${auth.name} invited ${invite.company || 'you'} to the Hoshmand Schedule private beta. Hoshmand Schedule builds and checks construction schedules and explains every duration and link.\n\nCreate your firm's account:\n\n${link}\n\nThe link works once, only for ${invite.email}, and expires in ${BETA_INVITE_DAYS} days. You'll own your firm's private workspace and can invite colleagues from there.\n\n— Hoshmand Schedule by Hoshmand AI`,
       })).sent
       await appendAudit([{ orgId: SYSTEM_ORG, action: 'beta.invite_created', targetType: 'beta_invite', targetId: invite.id, detail: { email: invite.email, company: invite.company, expiresAt: invite.expiresAt, emailed } }])
       return json({ invite, link, emailed, expiresInDays: BETA_INVITE_DAYS })

@@ -1,5 +1,5 @@
 // Loads what a Time Impact Analysis needs for one update (org-scoped): the update's network as loaded
-// (as submitted, or the what-if scenario with Planora edits), the previous update of the same project
+// (as submitted, or the what-if scenario with Hoshmand Schedule edits), the previous update of the same project
 // for the concurrency indicators, and whether the update was recorded as accepted in the submission review.
 
 import { getReviewState, getScheduleSeries } from '@/lib/db'

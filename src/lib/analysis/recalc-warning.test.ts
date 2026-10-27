@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { describeDifference, importNotes, recalcWarning } from './recalc-warning'
 
 describe('importNotes', () => {
-  const uploadNote = 'The file did not include calculated dates or float, so Planora scheduled 40 activities from their durations, logic and calendars (retained logic; critical path and float are Planora\'s calculation).'
-  const loadNote = 'Planora recalculated all 40 activities from their durations, logic, calendars and constraints (retained logic) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.'
+  const uploadNote = 'The file did not include calculated dates or float, so Hoshmand Schedule scheduled 40 activities from their durations, logic and calendars (retained logic; critical path and float are Hoshmand Schedule\'s calculation).'
+  const loadNote = 'Hoshmand Schedule recalculated all 40 activities from their durations, logic, calendars and constraints (retained logic) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.'
   it('keeps the upload-time note and does not add a contradictory one on read', () => {
     expect(importNotes([uploadNote, 'Calendar "X": odd'], loadNote, true, null)).toEqual([uploadNote, 'Calendar "X": odd'])
   })
@@ -12,11 +12,11 @@ describe('importNotes', () => {
     expect(importNotes([], loadNote, true, null)).toEqual([])
   })
   it('rewrites the stored file-vs-Planora comparison from its samples', () => {
-    const old = '2 of 9 open activities have a finish or total float in the file that differs from Planora\'s recalculation by more than 1 day (e.g. A1: file 5d / Planora 5d float).'
+    const old = '2 of 9 open activities have a finish or total float in the file that differs from Hoshmand Schedule\'s recalculation by more than 1 day (e.g. A1: file 5d / Hoshmand Schedule 5d float).'
     const out = importNotes([old], null, true, { compared: 9, differing: 2, samples: [{ code: 'A1', name: 'x', fileFinish: '2026-01-01', planoraFinish: '2026-01-10', fileFloat: 5, planoraFloat: 5 }] })
     expect(out).toHaveLength(1)
-    expect(out[0]).toContain('A1: finish file 01/01/2026 / Planora 01/10/2026')
-    expect(out[0]).not.toContain('5d / Planora 5d')
+    expect(out[0]).toContain('A1: finish file 01/01/2026 / Hoshmand Schedule 01/10/2026')
+    expect(out[0]).not.toContain('5d / Hoshmand Schedule 5d')
   })
 })
 
@@ -29,11 +29,11 @@ describe('recalcWarning', () => {
         { code: 'A300', name: 'Roof', fileFinish: '2026-10-01', planoraFinish: '2026-10-05', fileFloat: 0, planoraFloat: -4 },
       ],
     })!
-    expect(w).toContain('A100: finish file 10/01/2026 / Planora 10/09/2026')
+    expect(w).toContain('A100: finish file 10/01/2026 / Hoshmand Schedule 10/09/2026')
     expect(w).not.toMatch(/A100: [^;]*float/)
-    expect(w).toContain('A200: float file 10d / Planora 2d')
+    expect(w).toContain('A200: float file 10d / Hoshmand Schedule 2d')
     expect(w).not.toMatch(/A200: [^;]*finish/)
-    expect(w).toContain('A300: finish file 10/01/2026 / Planora 10/05/2026, float file 0d / Planora -4d')
+    expect(w).toContain('A300: finish file 10/01/2026 / Hoshmand Schedule 10/05/2026, float file 0d / Hoshmand Schedule -4d')
     expect(w).not.toMatch(/\d{4}-\d{2}-\d{2}/)
   })
   it('skips samples that differ by a day or less and returns null when nothing differs', () => {

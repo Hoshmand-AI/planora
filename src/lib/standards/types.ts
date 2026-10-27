@@ -3,12 +3,12 @@
 // A Rule is a deterministic check with provenance metadata (which framework and edition it comes
 // from, what kind of source that is, where in that source it is discussed). Rules never contain
 // text copied from a published standard: `sourceReference` is a citation only, and titles, messages
-// and recommendations are Planora's own short paraphrases.
+// and recommendations are Hoshmand Schedule's own short paraphrases.
 //
-// Kind taxonomy (what the source IS, not how strict Planora is about it):
+// Kind taxonomy (what the source IS, not how strict Hoshmand Schedule is about it):
 //   standard_guidance     published guidance on what a good schedule looks like (e.g. the GAO guide)
 //   assessment_metric     a published numeric test used to assess schedules (e.g. the DCMA 14-point)
-//   recommended_practice  a practice Planora recommends that no cited source prescribes numerically
+//   recommended_practice  a practice Hoshmand Schedule recommends that no cited source prescribes numerically
 //   contract_requirement  a requirement from the customer's contract or specification
 // Professional credentials (PSP, PMI-SP and the like) are certifications of people, never standards,
 // and are never used as a rule's framework or kind.
@@ -23,7 +23,7 @@ export const isFramework = (v: unknown): v is Framework => typeof v === 'string'
 export const isRunnableFramework = (v: unknown): v is Framework => typeof v === 'string' && (RUNNABLE_FRAMEWORKS as readonly string[]).includes(v)
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
-  PLANORA_COMPOSITE: 'Planora Composite',
+  PLANORA_COMPOSITE: 'Hoshmand Schedule Composite',
   GAO_SCHEDULE_GUIDE: 'GAO Schedule Assessment Guide',
   DCMA_14: 'DCMA 14-point assessment',
   CUSTOMER: 'Customer contract requirements',

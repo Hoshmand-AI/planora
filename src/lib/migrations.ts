@@ -293,7 +293,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 5, name: 'schedule_analysis_versions_source_files',
     sql: `
-    -- Planora's own analysis of an uploaded schedule (forecast vs reported finish, finish-milestone
+    -- Hoshmand Schedule's own analysis of an uploaded schedule (forecast vs reported finish, finish-milestone
     -- variance, status, recalculation differences) so lists and alerts don't depend on file headers.
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS analysis JSONB;
     -- Uploads of the same project (P6 project short name / MS Project title) form one update series.
@@ -318,7 +318,7 @@ export const MIGRATIONS: Migration[] = [
     id: 6, name: 'finish_milestone_designation',
     sql: `
     -- The contract/finish milestone a scheduler designated for an uploaded schedule (activity id or
-    -- activity code); NULL = Planora picks it. Additive: older code ignores the column.
+    -- activity code); NULL = Hoshmand Schedule picks it. Additive: older code ignores the column.
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS finish_milestone_id TEXT;
     -- P6 milestone type (TT_FinMile = 'finish', TT_Mile = 'start') so the finish milestone can be
     -- told apart from start milestones; NULL for sources without the distinction.
@@ -328,7 +328,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 7, name: 'uploaded_schedule_edits_and_risk_inputs',
     sql: `
-    -- Edits a scheduler makes to an uploaded schedule in Planora (remaining duration, relationship,
+    -- Edits a scheduler makes to an uploaded schedule in Hoshmand Schedule (remaining duration, relationship,
     -- constraint), each with a reason. An override layer: the imported activities and relationships
     -- are never changed; edits are applied in order on read. Reverting sets reverted_at (kept for the
     -- record). Additive: older code ignores the table.
@@ -371,7 +371,7 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS classification TEXT;
     -- Firm history: whose schedule it is ('own' / 'third_party', NULL = not stated), an explicit
     -- override to include a schedule that is not as-built, and whether the file is a re-imported
-    -- Planora export (never used to calibrate history). Additive: older code ignores the columns.
+    -- Hoshmand Schedule export (never used to calibrate history). Additive: older code ignores the columns.
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS upload_origin TEXT;
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS history_override BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE schedules ADD COLUMN IF NOT EXISTS planora_export BOOLEAN NOT NULL DEFAULT FALSE;
@@ -465,7 +465,7 @@ export const MIGRATIONS: Migration[] = [
     id: 13, name: 'standards_runs',
     sql: `
     -- Persisted standards-engine runs (src/lib/standards): the full result of running one or more
-    -- frameworks (GAO / DCMA 14-point / Planora Composite) against an uploaded schedule or a generated
+    -- frameworks (GAO / DCMA 14-point / Hoshmand Schedule Composite) against an uploaded schedule or a generated
     -- plan, with the rules version hash and thresholds used, so a past assessment can be reproduced
     -- exactly. Rows are written once and never updated. Additive: older code ignores the table.
     CREATE TABLE IF NOT EXISTS standards_runs (
@@ -498,7 +498,7 @@ export const MIGRATIONS: Migration[] = [
     -- Time Impact Analysis (src/lib/analysis/tia.ts). A delay event is modelled as a fragnet (new
     -- activities and their ties to existing activity codes, stored as JSON) and inserted into an
     -- accepted update (schedule_id) as of its data date. Responsibility is a label the user enters;
-    -- Planora makes no entitlement determination. Additive: older code ignores both tables.
+    -- Hoshmand Schedule makes no entitlement determination. Additive: older code ignores both tables.
     CREATE TABLE IF NOT EXISTS delay_events (
       id TEXT PRIMARY KEY,
       org_id TEXT NOT NULL,
@@ -713,7 +713,7 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_at TIMESTAMPTZ;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_revoked_at TIMESTAMPTZ;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_via TEXT;
-    -- Grandfather every account that exists when this ships, so nobody already using Planora is locked out.
+    -- Grandfather every account that exists when this ships, so nobody already using Hoshmand Schedule is locked out.
     UPDATE users SET beta_access_at = NOW(), beta_access_via = 'grandfathered' WHERE beta_access_at IS NULL;
 
     -- Beta invitations for NEW firms, created by platform operators (PLANORA_PLATFORM_ADMINS).

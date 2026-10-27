@@ -92,7 +92,7 @@ describe('P6 XML resources: same as XER', () => {
     const r = xml.exceptions!
     for (const f of ['Resource', 'ResourceRate', 'ResourceAssignment', 'UnitOfMeasure']) expect(r.records.find(x => x.field === f), f).toBeUndefined()
     expect(xml.warnings.some(w => w.startsWith('Not used') && /Resource/.test(w))).toBe(false)
-    // Expenses are read only for earned value: still listed (Planora's exports do not write them), with that said.
+    // Expenses are read only for earned value: still listed (Hoshmand Schedule's exports do not write them), with that said.
     expect(r.records.find(x => x.field === 'ActivityExpense')).toMatchObject({ count: 1, message: expect.stringMatching(/earned value/) })
     expect(xer.exceptions!.records.find(x => x.field === 'PROJCOST')).toMatchObject({ count: 1, message: expect.stringMatching(/earned value/) })
   })

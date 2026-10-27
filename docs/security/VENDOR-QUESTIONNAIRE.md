@@ -2,12 +2,12 @@
 
 For procurement and IT reviewers. These answers follow the topics of common questionnaires (SIG Lite, CAIQ, HECVAT Lite). They state what exists today and what does not. Each answer points to the evidence in this repository. Last updated 10/06/2026.
 
-**What Planora does not have yet** (see [POAM.md](POAM.md)):
+**What Hoshmand Schedule does not have yet** (see [POAM.md](POAM.md)):
 - No SOC 2 report, ISO 27001 certificate, FedRAMP/StateRAMP authorization or CMMC assessment.
 - No third-party penetration test yet. The scope is written: [PENTEST-PLAN.md](PENTEST-PLAN.md).
 - No cyber / E&O insurance bound yet.
 - No counsel-reviewed DPA yet. A template exists: [../privacy/DPA-TEMPLATE.md](../privacy/DPA-TEMPLATE.md).
-- Planora is a single-founder company. Continuity measures are described in section 9.
+- Hoshmand Schedule is a single-founder company. Continuity measures are described in section 9.
 
 ## 1. Company and scope
 | Question | Answer | Evidence |
@@ -15,7 +15,7 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 | Legal entity / contact | Hoshmand AI; security contact support@hoshmand.ai | Terms, Privacy pages |
 | What data is processed? | Schedule files (activities, dates, logic, calendars), interview answers, account data, audit log | [../privacy/DATA-MAP.md](../privacy/DATA-MAP.md) |
 | Where is data stored? | Hosted service: United States only (Vercel iad1 application hosting, Neon Postgres us-east). There is no hosted EU or Canadian region | [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md) |
-| EU / Canadian data residency | Available only through a customer-hosted (on-premises or private-cloud) deployment that you run in the country or region you choose. Planora does not offer it as a hosted region. The customer-hosted instance makes no runtime calls to Planora or other outside services, so residency follows your hosting | [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md) section 9 |
+| EU / Canadian data residency | Available only through a customer-hosted (on-premises or private-cloud) deployment that you run in the country or region you choose. Hoshmand Schedule does not offer it as a hosted region. The customer-hosted instance makes no runtime calls to Hoshmand Schedule or other outside services, so residency follows your hosting | [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md) section 9 |
 | Can it run on-premises / air-gapped? | Yes. The same build runs on your own servers with a local or no AI model (`PLANORA_DEPLOYMENT=onprem`, `PLANORA_AIRGAPPED=1`). A production `Dockerfile` (non-root, standalone server) and a `docker-compose.yml` with PostgreSQL 17 are provided, with an install, upgrade, backup and hardening guide. Nothing leaves your network | [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md), [CUI-HANDLING.md](CUI-HANDLING.md) |
 
 ## 2. Access control
@@ -80,6 +80,6 @@ For procurement and IT reviewers. These answers follow the topics of common ques
 
 ## 9. Business continuity (single-founder vendor)
 - **Source code escrow:** not in place today; can be discussed for an Enterprise contract.
-- **On-premises licence:** your on-premises installation keeps working without Planora's servers.
+- **On-premises licence:** your on-premises installation keeps working without Hoshmand Schedule's servers.
 - **Data portability:** every schedule exports to P6 XER, MS Project XML, Excel and CSV, and the original file is always downloadable. You are never locked in.
 - **Operational runbooks:** in [../operations/RUNBOOKS.md](../operations/RUNBOOKS.md).

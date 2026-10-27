@@ -1,5 +1,5 @@
 // What the "Critical activities" number on the dashboard can honestly say. A count of 0 is only a
-// finding when Planora calculated the network; a file without logic (or one Planora could not
+// finding when Hoshmand Schedule calculated the network; a file without logic (or one Hoshmand Schedule could not
 // calculate) has no critical path at all, and the dashboard must say why instead of showing 0.
 
 import type { Activity } from '@/lib/db'
@@ -23,7 +23,7 @@ const isWork = (a: Pick<Activity, 'activityType'>) => a.activityType !== 'summar
 export function criticalPathStatus(input: {
   activities: Pick<Activity, 'id' | 'activityType' | 'status' | 'actualFinish' | 'isCritical' | 'earlyStart' | 'earlyFinish'>[]
   links: { from: string; to: string }[]
-  /** true when Planora recalculated the network (CPM ran) */
+  /** true when Hoshmand Schedule recalculated the network (CPM ran) */
   calculated: boolean
   mustFinishBy?: string | null
   /** lowest total float among open activities (work days) */
@@ -56,7 +56,7 @@ export function criticalPathStatus(input: {
   if (!input.calculated) {
     return {
       determined: false, count: 0, label: "Critical path can't be determined", openEnds,
-      detail: 'Planora could not recalculate this schedule (see the calculation notes), so the float in the file is not confirmed and no critical path is claimed.',
+      detail: 'Hoshmand Schedule could not recalculate this schedule (see the calculation notes), so the float in the file is not confirmed and no critical path is claimed.',
     }
   }
   const endsNote = openEnds > 0 && openEnds >= Math.max(2, Math.round(work.length * 0.05))

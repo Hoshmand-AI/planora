@@ -24,7 +24,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * finish-float / BEI trend per update. CSV carries no provenance row (it would break re-import);
  * the XLSX has a Provenance sheet and workbook metadata.
  * Every update is analyzed AS SUBMITTED; &basis=scenario uses each update's what-if scenario (with its
- * Planora edits) and says so in the notes and the provenance.
+ * Hoshmand Schedule edits) and says so in the notes and the provenance.
  */
 export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth }) => {
   const id = req.nextUrl.searchParams.get('id')

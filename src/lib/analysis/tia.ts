@@ -1,7 +1,7 @@
 // Time Impact Analysis (TIA) on an uploaded schedule update, after AACE RP 52R-06 ("prospective"
 // TIA): a delay event is modelled as a fragnet (new activities plus their ties to existing activity
 // codes), inserted into an accepted update as of its data date, and the network is recalculated with
-// Planora's own CPM (src/lib/planning/cpm.ts via completeSchedule) exactly as every other view does:
+// Hoshmand Schedule's own CPM (src/lib/planning/cpm.ts via completeSchedule) exactly as every other view does:
 // calendars, lags, progress (retained logic / override), mandatory constraints (scheduled dates and
 // the logic-driven dates they overrule). The result compares before and after for the project finish
 // and every contract / interim milestone, in calendar and work days, shows float change, the driving
@@ -11,7 +11,7 @@
 //
 // Calculation, not conclusion: responsibility is a label the user enters. Whether a delay is
 // excusable, compensable or gives an entitlement to time or money is a contractual / legal
-// determination Planora does not make; every result and report says so (TIA_DISCLAIMER).
+// determination Hoshmand Schedule does not make; every result and report says so (TIA_DISCLAIMER).
 //
 // Deterministic and reproducible: no clock, no randomness; inputsHash is the SHA-256 of the canonical
 // calculation inputs (network, calendars, settings, fragnet, event dates, previous update), and
@@ -37,7 +37,7 @@ export const RESPONSIBILITY_LABELS: Record<Responsibility, string> = {
 export const DELAY_EVENT_STATUSES = ['draft', 'analyzed', 'accepted', 'rejected'] as const
 export type DelayEventStatus = typeof DELAY_EVENT_STATUSES[number]
 
-export const TIA_DISCLAIMER = 'This Time Impact Analysis is a schedule calculation. Planora inserts the fragnet as modelled, recalculates the network and reports the difference. It does not determine whether a delay is excusable, compensable or gives an entitlement to time or money, nor who is responsible for it: those are contractual and legal determinations for the parties under the contract. The responsibility shown is a label entered by the user. Concurrency indicators are potential concurrent delay only and require analyst judgment.'
+export const TIA_DISCLAIMER = 'This Time Impact Analysis is a schedule calculation. Hoshmand Schedule inserts the fragnet as modelled, recalculates the network and reports the difference. It does not determine whether a delay is excusable, compensable or gives an entitlement to time or money, nor who is responsible for it: those are contractual and legal determinations for the parties under the contract. The responsibility shown is a label entered by the user. Concurrency indicators are potential concurrent delay only and require analyst judgment.'
 export const CONCURRENCY_LABEL = 'Potential concurrent delay — requires analyst judgment'
 
 /* ─── Fragnet model ─────────────────────────────────── */
@@ -295,7 +295,7 @@ export function validateFragnet(fragnet: Fragnet, net: Pick<TiaNetwork, 'schedul
     if (!fFrom && !eFrom) { errors.push(`Relationship ${label}: no activity "${r.from}" in the fragnet or in this update.`); continue }
     if (!fTo && !eTo) { errors.push(`Relationship ${label}: no activity "${r.to}" in the fragnet or in this update.`); continue }
     if (!fFrom && !fTo) { errors.push(`Relationship ${label} links two existing activities; a fragnet relationship must start or end at a fragnet activity.`); continue }
-    if ((eFrom && !isWork(eFrom)) || (eTo && !isWork(eTo))) { errors.push(`Relationship ${label}: ${(eFrom && !isWork(eFrom) ? eFrom : eTo)!.activityId} is a level-of-effort or summary activity, which Planora does not schedule.`); continue }
+    if ((eFrom && !isWork(eFrom)) || (eTo && !isWork(eTo))) { errors.push(`Relationship ${label}: ${(eFrom && !isWork(eFrom) ? eFrom : eTo)!.activityId} is a level-of-effort or summary activity, which Hoshmand Schedule does not schedule.`); continue }
     if (!LINK_TYPES.includes(r.type)) { errors.push(`Relationship ${label}: type must be FS, SS, FF or SF.`); continue }
     if (!Number.isFinite(r.lag) || Math.abs(r.lag) > 1000) { errors.push(`Relationship ${label}: lag must be between -1000 and 1000 work days.`); continue }
     const from = fFrom ? fragId(fFrom) : eFrom!.id
@@ -514,7 +514,7 @@ export function runTia(net: TiaNetwork, event: TiaEventInput, previous?: TiaPrev
   const fmBefore = before.analysis.finishMilestone
   const after = recalc(net, [...net.activities, ...v.activities], [...net.relationships, ...v.relationships], fmBefore?.id ?? net.finishMilestoneId)
   if (!before.done.cpm || !after.done.cpm) {
-    v.errors.push('Planora could not recalculate this update.')
+    v.errors.push('Hoshmand Schedule could not recalculate this update.')
     const r = empty()
     r.resultHash = sha(canonical({ ...r, resultHash: '' }))
     return { result: r, before: null, after: null }
@@ -616,10 +616,10 @@ export function runTia(net: TiaNetwork, event: TiaEventInput, previous?: TiaPrev
   // Assumptions: what the calculation rests on.
   const mand = before.done.cpm.violations.length
   const assumptions = [
-    `Update analysed: ${net.scheduleName} (${net.version}), data date ${fmtDate(net.dataDate)}, ${update.basis === 'scenario' && update.editsApplied ? `with ${update.editsApplied} Planora edit${update.editsApplied === 1 ? '' : 's'} applied (a what-if scenario)` : 'as submitted'}.`,
+    `Update analysed: ${net.scheduleName} (${net.version}), data date ${fmtDate(net.dataDate)}, ${update.basis === 'scenario' && update.editsApplied ? `with ${update.editsApplied} Hoshmand Schedule edit${update.editsApplied === 1 ? '' : 's'} applied (a what-if scenario)` : 'as submitted'}.`,
     `The fragnet (${v.activities.length} activit${v.activities.length === 1 ? 'y' : 'ies'}, ${v.relationships.length} relationship${v.relationships.length === 1 ? '' : 's'}) is inserted as modelled by the user; durations, logic and lags are the user's.`,
     'Fragnet work cannot start before the data date; completed activities and actual dates are not moved.',
-    `Recalculated with Planora's CPM: ${net.progressMode === 'retained' ? 'retained logic' : 'progress override'} for out-of-sequence progress; relationship lags on the predecessor's calendar; float in work days of each activity's own calendar.`,
+    `Recalculated with Hoshmand Schedule's CPM: ${net.progressMode === 'retained' ? 'retained logic' : 'progress override'} for out-of-sequence progress; relationship lags on the predecessor's calendar; float in work days of each activity's own calendar.`,
     `Calendars: ${cals.map(c => c.name).join(', ')} (default ${defCal.name}); fragnet activities use ${[...new Set(v.activities.map(a => calOf(a.calendarId).name))].join(', ') || defCal.name}.`,
     mand
       ? `Mandatory constraints (MSO/MFO) are honoured as scheduled and relaxed for the logic-driven dates; ${mand} overrule${mand === 1 ? 's' : ''} logic in this update, so both dates are reported.`

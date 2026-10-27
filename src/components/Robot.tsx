@@ -1,4 +1,4 @@
-// Nora, Planora's little scheduling robot. One face, a handful of moods, so a glance says
+// Nora, Hoshmand Schedule's little scheduling robot. One face, a handful of moods, so a glance says
 // what state things are in before any number does: working (blue, eyes wander), needs you
 // (amber, "!"), all good (green, happy eyes), behind (rose, worried), idle (grey, sleepy).
 // Motion is CSS-only (float, blink, look around) and stops under prefers-reduced-motion.

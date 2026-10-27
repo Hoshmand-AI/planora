@@ -232,7 +232,7 @@ export default function PlanPage() {
     ...(ev ? [{ key: 'dcma', label: 'DCMA', value: `${ev.dcma.passed}/${ev.dcma.applicable}`, tone: failing ? 'warn' as const : undefined,
       explain: 'The DCMA 14-point assessment, a standard schedule health check from the U.S. Defense Contract Management Agency: checks passing out of those that apply.', go: { label: failing ? `${failing} to fix` : 'Details', onClick: goEvaluation } }] : []),
     { key: 'ai', label: 'AI', value: <span className="inline-flex items-center gap-1">{llm.airgapped && <Lock size={11} aria-label="Air-gapped" />}{aiLabel}</span>,
-      explain: llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : 'No AI model is used: questions, durations and logic come from Planora’s rules and your firm’s data.' },
+      explain: llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : 'No AI model is used: questions, durations and logic come from Hoshmand Schedule’s rules and your firm’s data.' },
   ]
 
   // One obvious next step; everything else is quieter.
@@ -312,7 +312,7 @@ export default function PlanPage() {
 
       {tab === 'interview' && (<>
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
-          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} Planora will not send this plan to a cloud AI model.</p>
+          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} Hoshmand Schedule will not send this plan to a cloud AI model.</p>
         )}
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />

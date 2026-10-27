@@ -144,7 +144,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     }
     if (status === 'complete' && pct === 0) pct = 100
     const pctType = t['complete_pct_type']
-    if (pctType && pctType !== 'CP_Phys') ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.complete_pct_type', disposition: 'converted', example: code, message: `Percent complete type ${pctType === 'CP_Drtn' ? 'Duration' : pctType === 'CP_Units' ? 'Units' : pctType} is not modeled; Planora reads the physical % complete and the remaining duration` })
+    if (pctType && pctType !== 'CP_Phys') ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.complete_pct_type', disposition: 'converted', example: code, message: `Percent complete type ${pctType === 'CP_Drtn' ? 'Duration' : pctType === 'CP_Units' ? 'Units' : pctType} is not modeled; Hoshmand Schedule reads the physical % complete and the remaining duration` })
     if (t['task_type'] === 'TT_Rsrc') ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.task_type', disposition: 'converted', example: code, message: 'Resource dependent activities are scheduled as task dependent (on the activity calendar, not resource calendars)' })
 
     let activityType: Activity['activityType'] = 'task'
@@ -237,15 +237,15 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
 
-  // Tables Planora does not model. They stay in the stored original file and the .xer export of this
+  // Tables Hoshmand Schedule does not model. They stay in the stored original file and the .xer export of this
   // upload passes them through unchanged (see exportXerFromOriginal); other exports leave them out.
   const notModeled = Object.keys(tables).filter(t => !MODELED_TABLES.has(t) && tables[t].length > 0)
   for (const t of notModeled) {
     const [entity, severity] = TABLE_ENTITY[t] ?? ['other', 'info']
     ex.add({ severity, entity, field: t, disposition: 'preserved_in_raw', count: tables[t].length, examples: tables[t].map(rowKey),
-      message: `${TABLE_LABELS[t] ? `${TABLE_LABELS[t][0].toUpperCase()}${TABLE_LABELS[t].slice(1)}` : `Table ${t}`}: ${EV_ONLY_TABLES.has(t) ? 'read only for earned value (from the stored file), not otherwise imported' : 'not used by Planora'}; kept in the original file and in this upload's P6 (.xer) export, not in the MS Project, Excel or CSV exports` })
+      message: `${TABLE_LABELS[t] ? `${TABLE_LABELS[t][0].toUpperCase()}${TABLE_LABELS[t].slice(1)}` : `Table ${t}`}: ${EV_ONLY_TABLES.has(t) ? 'read only for earned value (from the stored file), not otherwise imported' : 'not used by Hoshmand Schedule'}; kept in the original file and in this upload's P6 (.xer) export, not in the MS Project, Excel or CSV exports` })
   }
-  // Fields of the tables Planora reads that carry data it does not map.
+  // Fields of the tables Hoshmand Schedule reads that carry data it does not map.
   for (const [table, read] of Object.entries(READ_FIELDS)) {
     const rows = tables[table] || []
     if (!rows.length) continue
@@ -255,19 +255,19 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
       const withValue = rows.filter(r => r[f] !== '')
       const [entity, severity] = FIELD_ENTITY[`${table}.${f}`] ?? [TABLE_ENTITY[table]?.[0] ?? 'other', 'info' as ExceptionSeverity]
       ex.add({ severity, entity, field: `${table}.${f}`, disposition: 'preserved_in_raw', count: withValue.length, examples: withValue.map(r => r['task_code'] || rowKey(r)),
-        message: FIELD_NOTES[`${table}.${f}`] ?? 'Field not mapped by Planora; kept in the original file and in this upload\'s P6 (.xer) export' })
+        message: FIELD_NOTES[`${table}.${f}`] ?? 'Field not mapped by Hoshmand Schedule; kept in the original file and in this upload\'s P6 (.xer) export' })
     }
   }
   const unused = notModeled.filter(t => !EV_ONLY_TABLES.has(t))
   if (unused.length) {
-    warnings.push(`Not used in Planora's analysis: ${unused.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
+    warnings.push(`Not used in Hoshmand Schedule's analysis: ${unused.map(t => `${t} (${tables[t].length} ${tables[t].length === 1 ? 'row' : 'rows'}${TABLE_LABELS[t] ? `, ${TABLE_LABELS[t]}` : ''})`).join('; ')}. They are kept in the original file and in this upload's P6 (.xer) export, but not in the MS Project, Excel or CSV exports.`)
   }
 
   /* ── Scheduling options (P6 SCHEDOPTIONS) ─────────────── */
   const opt = (tables['SCHEDOPTIONS'] || []).find(o => !projId || !o['proj_id'] || o['proj_id'] === projId)
   const progressMode = progressModeFromSchedOptions(opt)
   if (opt && !progressMode) {
-    warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Planora does not model; Planora uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
+    warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Hoshmand Schedule does not model; Hoshmand Schedule uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
     ex.add({ severity: 'warning', entity: 'project', field: 'SCHEDOPTIONS.sched_retained_logic', disposition: 'converted', example: project['proj_short_name'] || projId, message: 'Out-of-sequence progress "Actual Dates" is not modeled; Retained Logic is used' })
   }
   const lagCal = opt?.['sched_calendar_on_relationship_lag']
@@ -327,7 +327,7 @@ export function progressModeFromSchedOptions(opt: Row | undefined | null): Progr
 
 /**
  * True when the XER was written by Planora's own exporter (its ERMHDR names Planora as the exporting
- * application), so a re-import is recognized as Planora's output rather than the project's record.
+ * application), so a re-import is recognized as Hoshmand Schedule's output rather than the project's record.
  */
 export function isPlanoraXer(content: string): boolean {
   const first = content.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/, 1)[0] || ''
@@ -350,7 +350,7 @@ const READ_FIELDS: Record<string, Set<string>> = {
   TASKPRED: new Set(['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt']),
   SCHEDOPTIONS: new Set(['schedoptions_id', 'proj_id', 'sched_retained_logic', 'sched_progress_override', 'sched_calendar_on_relationship_lag']),
 }
-/** Entity and severity of the tables Planora does not model. */
+/** Entity and severity of the tables Hoshmand Schedule does not model. */
 const TABLE_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity]> = {
   ACTVTYPE: ['code', 'warning'], ACTVCODE: ['code', 'warning'], TASKACTV: ['code', 'warning'], PCATTYPE: ['code', 'info'], PCATVAL: ['code', 'info'], PROJPCAT: ['code', 'info'],
   RCATTYPE: ['code', 'info'], RCATVAL: ['code', 'info'], RSRCRCAT: ['code', 'info'],
@@ -568,7 +568,7 @@ function parseCalendarRow(c: Row, warnings: string[], ex: ExceptionCollector | n
     } else if (!workDays.includes(wd)) {
       extraWorkDays.push(iso)
     } else if (Math.abs(intervalHours(e.children) - (dayHours[workDays.indexOf(wd)] ?? 0)) > 0.01) {
-      ex?.add({ severity: 'info', entity: 'calendar', field: 'CALENDAR.clndr_data.Exceptions', disposition: 'converted', example: `${calName} ${iso}`, message: 'Exception changes the work hours of a work day; Planora counts it as a normal work day' })
+      ex?.add({ severity: 'info', entity: 'calendar', field: 'CALENDAR.clndr_data.Exceptions', disposition: 'converted', example: `${calName} ${iso}`, message: 'Exception changes the work hours of a work day; Hoshmand Schedule counts it as a normal work day' })
     }
   }
   holidays.sort()

@@ -76,7 +76,7 @@ export default function DocumentsPage() {
         <h1 className="font-display text-[22px] text-navy-950 mb-1">Project documents</h1>
         <p className="text-[13.5px] text-warm-500 max-w-[720px]">
           Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
-          Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. Planora keeps the extracted text only, not the original file.
+          Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. Hoshmand Schedule keeps the extracted text only, not the original file.
         </p>
       </div>
 

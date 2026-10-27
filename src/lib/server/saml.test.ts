@@ -49,7 +49,7 @@ function memoryStore() {
 
 const config = (over: Partial<SamlConfig> = {}): SamlConfig => normalizeSaml({
   enabled: true, connectionId: 'conn_test_1234', idpEntityId: IDP, ssoUrl: 'https://idp.example.test/sso', certs: [idp.cert],
-  domains: ['acme.test'], defaultRole: 'viewer', groupRoles: [{ group: 'Planora Admins', role: 'admin' }, { group: 'Schedulers', role: 'scheduler' }], ...over,
+  domains: ['acme.test'], defaultRole: 'viewer', groupRoles: [{ group: 'Hoshmand Schedule Admins', role: 'admin' }, { group: 'Schedulers', role: 'scheduler' }], ...over,
 })
 const urls = spUrls(ORIGIN, 'conn_test_1234')
 

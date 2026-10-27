@@ -1,10 +1,10 @@
-# Planora
+# Hoshmand Schedule
 
 AI construction scheduling that **asks before it builds**. Built by [Hoshmand AI](https://www.hoshmand.ai).
 
-Planora works in three stages: **build** a schedule, **analyze** it, then **monitor** it.
+Hoshmand Schedule works in three stages: **build** a schedule, **analyze** it, then **monitor** it.
 
-1. **Build.** Planora interviews the scheduler the way a senior scheduler would. It asks how complete the drawings are, which permits this facility type needs in this jurisdiction, which long-lead equipment is involved, and about site, calendar and security constraints. Then it generates a CPM schedule and explains every duration and link.
+1. **Build.** Hoshmand Schedule interviews the scheduler the way a senior scheduler would. It asks how complete the drawings are, which permits this facility type needs in this jurisdiction, which long-lead equipment is involved, and about site, calendar and security constraints. Then it generates a CPM schedule and explains every duration and link.
 2. **Analyze.** It runs DCMA 14-point quality checks, a critical-path and float review, and asks questions about the input data itself (for example, "your calendar is 5-day but this activity runs on a Saturday — intentional?").
 3. **Monitor.** Publishing a plan creates a baseline. Dashboards, the timeline, Ask AI and reports all run on it.
 
@@ -70,7 +70,7 @@ DATABASE_URL=… node scripts/backup.mjs backups && ADMIN_DATABASE_URL=… node 
 
 ### Private beta access
 
-Planora is in private beta: **sign-up and sign-in are by invitation** unless the instance re-opens self sign-up.
+Hoshmand Schedule is in private beta: **sign-up and sign-in are by invitation** unless the instance re-opens self sign-up.
 
 | Variable | Purpose |
 |---|---|
@@ -107,7 +107,7 @@ src/lib/
   semantic/   taxonomy (activity + calendar normalization)
   analysis/   dcma, input-checks
   standards/  versioned rules engine: GAO Schedule Assessment Guide profile, DCMA 14-point adapter,
-              Planora Composite (threshold conflicts reported, never blended); runs stored in standards_runs
+              Hoshmand Schedule Composite (threshold conflicts reported, never blended); runs stored in standards_runs
   parsers/    xer, xml, excel/csv, pdf, index
   export/     msp-xml, csv, narrative (Basis of Schedule)
   llm/        gateway (provider-agnostic contract + model registry), provider (cloud / local / offline,

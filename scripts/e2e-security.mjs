@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end security and governance checks against a running Planora server.
+// End-to-end security and governance checks against a running Hoshmand Schedule server.
 //   BASE_URL=http://localhost:3200 [DATABASE_URL=postgres://…] node scripts/e2e-security.mjs
 // Covers: password policy, generic sign-in errors, lockout, CSRF, sessions & revocation, roles and
 // invitations, two-step verification (incl. replay), org MFA policy, optimistic locking, separation
@@ -152,7 +152,7 @@ async function main() {
         const path = await import('node:path')
         const mails = await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))
         ok(!mails.some(m => m.to === `nobody-reset${stamp}@example.com`), 'Nothing is sent to an address without an account')
-        const mail = mails.find(m => m.to === email('resetter') && m.subject === 'Reset your Planora password')
+        const mail = mails.find(m => m.to === email('resetter') && m.subject === 'Reset your Hoshmand Schedule password')
         ok(!!mail && /expires in 30 minutes/.test(mail.text) && /ignore this message/.test(mail.text), 'The reset email says it expires in 30 minutes and to ignore it if not requested')
       }
       await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
@@ -495,7 +495,7 @@ async function main() {
       if (OUTBOX) {
         const fs = await import('node:fs/promises')
         const path = await import('node:path')
-        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your Planora password').length
+        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your Hoshmand Schedule password').length
         r = await new Client().post('/api/auth', { action: 'request_password_reset', email: `pw@${domain}` })
         ok(r.status === 200 && /If an account exists/.test(r.data.message), 'A reset request for an SSO-enforced member gets the generic answer')
         await new Promise(res => setTimeout(res, 1500))

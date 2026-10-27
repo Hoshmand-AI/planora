@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Automated accessibility check (WCAG 2.2 A/AA rules via axe-core) of Planora's main screens,
+// Automated accessibility check (WCAG 2.2 A/AA rules via axe-core) of Hoshmand Schedule's main screens,
 // signed in as a real user with a generated plan. Also checks that every page can be operated
 // from the keyboard to the main actions (focus is visible and lands on interactive elements).
 //   BASE_URL=http://localhost:3200 node scripts/a11y-check.mjs
@@ -103,7 +103,7 @@ if (process.env.BETA_BASE_URL) {
   const admin = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   const adminEmail = process.env.BETA_ADMIN_EMAIL || 'ops@beta.test'
   const pw = 'correct horse battery staple'
-  const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'Planora Operations' }, headers: { origin: betaOrigin } })
+  const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'Hoshmand Schedule Operations' }, headers: { origin: betaOrigin } })
   if (res.status() === 409) await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signin', email: adminEmail, password: pw }, headers: { origin: betaOrigin } })
   const me = await (await admin.request.get(`${betaBase}/api/auth`)).json()
   if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.PLANORA_EMAIL_OUTBOX) {

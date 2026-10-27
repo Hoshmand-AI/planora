@@ -58,7 +58,7 @@ export const POST = publicApi<{ connection: string }>(async (req, { params }) =>
     })
     let user = await getUserByEmail(id.email)
     // Never link to (or reveal details of) an account that belongs to another organization.
-    if (user && user.orgId !== id.orgId) throw new ApiError(403, 'This email already belongs to another Planora organization.')
+    if (user && user.orgId !== id.orgId) throw new ApiError(403, 'This email already belongs to another Hoshmand Schedule organization.')
     if (user?.disabledAt) throw new ApiError(403, 'Your access to this organization was removed. Ask an admin.')
 
     if (test) {
@@ -77,7 +77,7 @@ export const POST = publicApi<{ connection: string }>(async (req, { params }) =>
       if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
       await audit({ orgId: id.orgId, action: 'member.joined', targetType: 'user', targetId: user.id, detail: { via: 'saml', role: user.role, idp: found.config.idpEntityId } })
     } else if (id.groupRole && user.role !== 'owner' && user.role !== id.groupRole) {
-      // The identity provider's groups are authoritative for roles (owners are managed in Planora).
+      // The identity provider's groups are authoritative for roles (owners are managed in Hoshmand Schedule).
       if (r) Object.assign(r, { userId: user.id, email: user.email, orgId: user.orgId })
       const change = await changeRole(id.orgId, user.id, id.groupRole)
       await audit({ orgId: id.orgId, action: 'member.role_changed', targetType: 'user', targetId: user.id, detail: { email: user.email, before: change.from, after: change.to, via: 'saml_groups' } })

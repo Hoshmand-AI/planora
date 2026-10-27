@@ -24,7 +24,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * per change category (before/after with both data dates) and a Provenance sheet.
  * A schedule is never compared with itself (same id, or an upload of byte-identical file): 400.
  * Both uploads are compared AS SUBMITTED; &basis=scenario compares their what-if scenarios (each with
- * its own Planora edits) and says so in the warnings and the provenance.
+ * its own Hoshmand Schedule edits) and says so in the warnings and the provenance.
  */
 export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth }) => {
   const id = req.nextUrl.searchParams.get('id')
@@ -75,7 +75,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
   let window: WindowRow | null = null
   try { window = analyzeWindow(wu(b), wu(a)) } catch { window = null }
   const comparison = compareSchedules(side(b), side(a), { window })
-  // Say which network each side is: as submitted, or the scenario with its Planora edits.
+  // Say which network each side is: as submitted, or the scenario with its Hoshmand Schedule edits.
   const basisNotes = [basisWarning(basis, b.editsApplied, b.schedule.version), basisWarning(basis, a.editsApplied, a.schedule.version)].filter((x): x is string => !!x)
   if (basisNotes.length) { comparison.warnings.unshift(...basisNotes); comparison.summary.unshift(...basisNotes) }
   await audit({ action: 'schedule.compare', targetType: 'schedule', targetId: after.id, detail: { name: after.name, after: after.version, before: before.version, baseId: before.id, format, basis } })

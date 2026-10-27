@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end checks of the private beta gate against a running Planora server in its DEFAULT
+// End-to-end checks of the private beta gate against a running Hoshmand Schedule server in its DEFAULT
 // sign-up mode (invite-only: PLANORA_SIGNUP unset) with a platform operator configured.
 //   BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test [DATABASE_URL=…] [PLANORA_EMAIL_OUTBOX=dir] node scripts/e2e-beta.mjs
 // The server must run with PLANORA_PLATFORM_ADMINS containing BETA_ADMIN_EMAIL.
@@ -15,7 +15,7 @@ const ORIGIN = new URL(BASE).origin
 const ADMIN = (process.env.BETA_ADMIN_EMAIL || 'ops@beta.test').toLowerCase()
 const OUTBOX = process.env.PLANORA_EMAIL_OUTBOX
 const PW = 'correct horse battery staple'
-const BETA_MESSAGE = 'Planora is in private beta. You need an invitation to sign in — ask your organization admin or request access.'
+const BETA_MESSAGE = 'Hoshmand Schedule is in private beta. You need an invitation to sign in — ask your organization admin or request access.'
 let passed = 0
 
 function ok(cond, msg, extra) {
@@ -73,7 +73,7 @@ async function main() {
 
   /* ── Platform operator ── */
   const ops = new Client()
-  r = await ops.post('/api/auth', { action: 'signup', email: ADMIN, password: PW, name: 'Olga Operator', company: 'Planora Operations' })
+  r = await ops.post('/api/auth', { action: 'signup', email: ADMIN, password: PW, name: 'Olga Operator', company: 'Hoshmand Schedule Operations' })
   if (r.status === 409) r = await ops.post('/api/auth', { action: 'signin', email: ADMIN, password: PW })
   ok(r.status === 200, 'A platform operator (PLANORA_PLATFORM_ADMINS) can create an account and sign in without an invitation', r.data)
   r = await ops.get('/api/auth')

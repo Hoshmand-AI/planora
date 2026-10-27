@@ -1,7 +1,7 @@
 // Citations: every passage given to a model carries an exact citation string, and every citation in
 // the model's answer is checked against the passages that were actually retrieved. A citation that
 // does not match one of them (an invented clause, a wrong page, a document that was never retrieved)
-// is removed from the answer and counted, so a reader never sees a reference Planora can't back.
+// is removed from the answer and counted, so a reader never sees a reference Hoshmand Schedule can't back.
 
 export interface Citable {
   chunkId: string

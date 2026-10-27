@@ -1,4 +1,4 @@
-// Treat an uploaded schedule like a Planora plan so the same engines apply to it: Monte Carlo risk
+// Treat an uploaded schedule like a Hoshmand Schedule plan so the same engines apply to it: Monte Carlo risk
 // analysis and exports to P6 / MS Project / Excel. Activity IDs, the source WBS, progress, baseline
 // dates, calendars, constraints and the required finish are carried over unchanged.
 
@@ -18,7 +18,7 @@ const isoOf = (v: unknown): string => {
 }
 
 /**
- * Edits made in Planora become overrides on the activities they touch (relationship edits on the
+ * Edits made in Hoshmand Schedule become overrides on the activities they touch (relationship edits on the
  * successor), so their reasons travel with the activity in exports (XER notebook, Basis of Schedule).
  */
 export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
