@@ -31,7 +31,7 @@ export const inputClass = 'w-full bg-warm-100 border border-warm-300 rounded-md 
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
   const styles = {
-    primary: 'bg-accent-500 text-navy-950 hover:bg-accent-400 font-semibold',
+    primary: 'bg-accent-600 text-white hover:bg-accent-700 font-semibold pressable shadow-sm',
     secondary: 'border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium',
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',

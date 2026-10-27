@@ -82,13 +82,13 @@ export default function F9Demo() {
                     style={{
                       left: `${(a.es / SPAN) * 100}%`,
                       width: shown ? `${(a.dur / SPAN) * 100}%` : '0%',
-                      background: lit ? '#2563eb' : '#B8C4D6',
+                      background: lit ? '#2563eb' : '#CCD0CF',
                       transition: shown ? `width 700ms cubic-bezier(0.22,1,0.36,1) ${i * 140}ms, background-color 500ms ease ${a.crit ? i * 90 : 0}ms` : 'none',
                     }}
                   />
                   {a.float ? (
                     <div
-                      className="absolute top-[3px] h-[12px] rounded-full border border-dashed border-[#8FA3BF]"
+                      className="absolute top-[3px] h-[12px] rounded-full border border-dashed border-[#9BA8AB]"
                       style={{
                         left: `${((a.es + a.dur) / SPAN) * 100}%`,
                         width: `${(a.float / SPAN) * 100}%`,
@@ -130,7 +130,7 @@ export default function F9Demo() {
       >
         <span
           className="block w-[84px] h-[84px] md:w-[96px] md:h-[96px] rounded-[22px] bg-navy-900 border-[3px] border-accent-400 transition-transform duration-150"
-          style={{ transform: pressed ? 'translateY(6px)' : 'none', boxShadow: pressed ? '0 2px 0 #0A1628' : '0 8px 0 #0A1628, 0 24px 40px -12px rgba(37,99,235,0.55)' }}
+          style={{ transform: pressed ? 'translateY(6px)' : 'none', boxShadow: pressed ? '0 2px 0 #06141B' : '0 8px 0 #06141B, 0 24px 40px -12px rgba(37,99,235,0.55)' }}
         >
           <span className="flex h-full items-center justify-center">
             <span className="text-white font-bold text-[28px] md:text-[32px] tracking-tight">F9</span>

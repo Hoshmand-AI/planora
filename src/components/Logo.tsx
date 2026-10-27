@@ -13,7 +13,7 @@ interface LogoProps {
 }
 
 export function Logo({ variant = 'light', size = 'text-[18px]' }: LogoProps) {
-  const word = variant === 'light' ? '#FFFFFF' : '#0A1628'
+  const word = variant === 'light' ? '#FFFFFF' : '#06141B'
   return (
     <span className={`inline-flex items-center leading-none select-none ${size}`}>
       <svg viewBox="10 34 1182 394" role="img" aria-label="RunF9" className="h-[1.5em] w-auto">
@@ -24,7 +24,7 @@ export function Logo({ variant = 'light', size = 'text-[18px]' }: LogoProps) {
           <path d="M530 332 V206 A74 74 0 0 1 678 206 V332 M530 206 V132" />
         </g>
         <g transform="translate(760 -6) scale(0.9)">
-          <rect x="48" y="56" width="416" height="416" rx="96" fill="#0F2140" stroke="#60a5fa" strokeWidth="10" />
+          <rect x="48" y="56" width="416" height="416" rx="96" fill="#11212D" stroke="#60a5fa" strokeWidth="10" />
           <rect x="84" y="80" width="344" height="316" rx="64" fill="#24477F" />
           <g fill="none" stroke="#FFFFFF" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round">
             <path d="M150 158 V310 M150 158 H226 M150 230 H210" />

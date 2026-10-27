@@ -89,7 +89,7 @@ export default function PlansPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {plans.map(p => (
-              <Link key={p.id} href={`/dashboard/plan/${p.id}`} className="group block bg-white/70 border border-warm-200 rounded-2xl p-5 hover:bg-white hover:border-warm-300 hover:shadow-[0_8px_24px_-16px_rgba(10,22,40,0.25)] transition-[background-color,border-color,box-shadow] duration-200">
+              <Link key={p.id} href={`/dashboard/plan/${p.id}`} className="group card-lift block bg-white/70 border border-warm-200 rounded-2xl p-5 hover:bg-white hover:border-warm-300">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[15.5px] font-semibold text-navy-950 truncate">{p.name}</div>

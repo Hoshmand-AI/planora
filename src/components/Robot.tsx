@@ -11,7 +11,7 @@ const COLOR: Record<RobotMood, string> = {
   waiting: '#B86E1A',
   done: '#2F7358',
   worried: '#A64848',
-  idle: '#736A60',
+  idle: '#56656F',
 }
 
 export function Robot({ mood = 'working', size = 64, label, className = '', still = false }: {

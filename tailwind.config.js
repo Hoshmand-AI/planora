@@ -4,40 +4,44 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Midnight steel: the RunF9 palette (#06141B #11212D #253745 #4A5C6A #9BA8AB #CCD0CF)
         navy: {
-          950: '#0A1628',
-          900: '#0F2140',
-          800: '#162D54',
-          700: '#1E3A6A',
+          950: '#06141B',
+          900: '#11212D',
+          800: '#253745',
+          700: '#4A5C6A',
+          400: '#9BA8AB',
+          200: '#CCD0CF',
         },
         // RunF9 accent (steel blue) per Hoshmand AI brand standard
         accent: {
+          700: '#1d4ed8',
           600: '#2563eb',
           500: '#3b82f6',
           400: '#60a5fa',
           100: '#eff6ff',
         },
-        // Text tokens meet WCAG 2.2 AA contrast (4.5:1) on every warm/accent/status background.
+        // Cool steel neutrals (names kept from the original warm scale). Text tokens meet WCAG 2.2 AA contrast (4.5:1) on every warm/accent/status background.
         warm: {
-          50:  '#FDFCFA',
-          100: '#F8F6F3',
-          200: '#F0EDE8',
-          300: '#E2DDD5',
-          400: '#736A60',
-          500: '#665E54',
-          600: '#575047',
-          700: '#433D36',
+          50:  '#FAFBFB',
+          100: '#F4F6F6',
+          200: '#EBEEEE',
+          300: '#CCD0CF',
+          400: '#56656F',
+          500: '#4C5B66',
+          600: '#3F4E5A',
+          700: '#253745',
         },
         // Legacy aliases so existing class names don't break
         surface: {
-          50:  '#FDFCFA',
-          100: '#F8F6F3',
-          200: '#F0EDE8',
-          300: '#E2DDD5',
-          400: '#736A60',
-          500: '#665E54',
-          600: '#575047',
-          700: '#433D36',
+          50:  '#FAFBFB',
+          100: '#F4F6F6',
+          200: '#EBEEEE',
+          300: '#CCD0CF',
+          400: '#56656F',
+          500: '#4C5B66',
+          600: '#3F4E5A',
+          700: '#253745',
         },
         status: {
           'on-track':     '#2F7358',
