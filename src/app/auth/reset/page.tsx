@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { Logo } from '@/components/Logo'
-import { Robot } from '@/components/Robot'
 
 /** Target of the emailed "Reset your RunF9 password" link: /auth/reset?token=… */
 function ResetForm() {
@@ -36,13 +35,12 @@ function ResetForm() {
   }
 
   const linkDead = errorCode === 'reset_invalid'
-  const mood = done ? 'done' : linkDead ? 'worried' : 'waiting'
 
   return (
     <div className="min-h-screen bg-warm-50 flex flex-col">
-      <nav className="bg-navy-900 h-14 flex items-center px-6">
-        <Link href="/">
-          <Logo variant="light" size="text-[18px]" />
+      <nav className="h-16 flex items-center px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
+        <Link href="/" aria-label="RunF9 home">
+          <Logo variant="dark" size="text-[22px]" />
         </Link>
       </nav>
 
@@ -51,10 +49,6 @@ function ResetForm() {
           <Link href="/auth" className="inline-flex items-center gap-1.5 text-warm-400 text-[13px] font-medium hover:text-warm-700 transition-colors mb-8">
             <ArrowLeft size={14} /> Back to sign in
           </Link>
-
-          <div className="mood-tile grain flex w-fit items-center border rounded-[24px] px-4 pt-3 pb-2 mb-5" data-mood={mood}>
-            <Robot mood={mood} size={64} />
-          </div>
           <h1 className="font-display text-[32px] text-navy-950 mb-2">{done ? 'Password reset' : linkDead ? 'This link can’t be used' : 'Choose a new password'}</h1>
           <p className="text-warm-500 text-[15px] mb-8">
             {done

@@ -37,9 +37,9 @@ function headline(d: Data): { mood: RobotMood; title: string; sub: string } {
   const title = s.looseEnds > 0
     ? `${plural(s.looseEnds, 'activity has', 'activities have')} a loose end${adds ? ': here are likely fixes.' : '.'}`
     : tiedOnly > 0 && tiedOnly < s.completionOnly
-      ? `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: Nora has a likely place for ${tiedOnly}.`
+      ? `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: RunF9 has a likely place for ${tiedOnly}.`
       : `No loose ends, but ${plural(s.completionOnly, 'activity leads', 'activities lead')} only to the finish: here is where ${s.completionOnly === 1 ? 'it' : 'they'} likely fit${s.completionOnly === 1 ? 's' : ''}.`
-  const sub = s.unresolved > 0 ? `Nora found a likely fix for ${s.suggested} of ${s.looseEnds}; the other ${s.unresolved} are listed under “Show all”.` : 'Read from the activity names: the kind of work, its location and the usual trade order.'
+  const sub = s.unresolved > 0 ? `RunF9 found a likely fix for ${s.suggested} of ${s.looseEnds}; the other ${s.unresolved} are listed under “Show all”.` : 'Read from the activity names: the kind of work, its location and the usual trade order.'
   return { mood, title, sub }
 }
 
@@ -52,7 +52,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     setError('')
     const res = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/logic-suggestions`)
     const d = await res.json().catch(() => ({}))
-    if (!res.ok) { setError(d.error || 'Nora could not read this schedule’s logic.'); return }
+    if (!res.ok) { setError(d.error || 'RunF9 could not read this schedule’s logic.'); return }
     setData(d)
   }, [scheduleId])
   useEffect(() => { setData(null); setStatus(''); load() }, [load])
@@ -80,7 +80,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     return (
       <MoodTile mood="working" as="section" className="flex items-center gap-3">
         <Robot mood="working" size={48} />
-        <p className="text-[13.5px] text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Nora is reading the activity names and tracing the logic…</p>
+        <p className="text-[13.5px] text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Reading the activity names and tracing the logic…</p>
       </MoodTile>
     )
   }
@@ -98,7 +98,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
       <MoodTile mood={h.mood} className="flex items-start gap-3.5">
         <Robot mood={h.mood} size={56} className="flex-shrink-0 -mt-1" />
         <div className="min-w-0 flex-1">
-          <h2 id="nora-logic-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">Nora&apos;s logic suggestions</h2>
+          <h2 id="nora-logic-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">Logic suggestions</h2>
           <p className="text-[15px] font-medium text-navy-950 mt-0.5">{h.title}</p>
           <p className="text-[12.5px] text-warm-600 mt-0.5">{h.sub}</p>
         </div>
@@ -139,7 +139,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
             {data.unresolved.length > 0 && (
               <div>
                 <h3 className="text-[12.5px] font-semibold text-navy-950 mb-1">Loose ends without a suggestion</h3>
-                <p className="text-[12px] text-warm-600 mb-1">Nora could not tell what kind of work these are, or every likely link would have created a loop. Link them in your scheduling tool or in RunF9&apos;s edits.</p>
+                <p className="text-[12px] text-warm-600 mb-1">RunF9 could not tell what kind of work these are, or every likely link would have created a loop. Link them in your scheduling tool or in RunF9&apos;s edits.</p>
                 <ul className="text-[12.5px] text-warm-700 space-y-0.5">
                   {data.unresolved.map(u => <li key={`${u.id}-${u.missing}`}><span className="font-mono text-warm-600">{u.code}</span> {u.name} <span className="text-warm-600">· no {u.missing}</span></li>)}
                 </ul>
@@ -175,7 +175,7 @@ function LinkText({ s }: { s: LogicSuggestion }) {
 
 function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }: { s: LogicSuggestion; scheduleId: string; canApply: boolean; onApplied: (s: LogicSuggestion) => void; compact?: boolean }) {
   const [confirming, setConfirming] = useState(false)
-  const [reason, setReason] = useState(`Nora suggestion: ${s.reason}`)
+  const [reason, setReason] = useState(`Suggested fix: ${s.reason}`)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const apply = async () => {

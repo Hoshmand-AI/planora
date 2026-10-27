@@ -1,7 +1,7 @@
 'use client'
 
-// A calm zero state: Nora (resting, or another mood), one short line, and one clear action.
-// Nora is decorative here; the heading says what is going on.
+// A calm zero state: a status mark, one short line, and one clear action.
+// The mark is decorative here; the heading says what is going on.
 
 import Link from 'next/link'
 import { Robot, type RobotMood } from '@/components/Robot'
@@ -26,7 +26,7 @@ export function EmptyState({ title, children, action, secondary, mood = 'idle', 
   const H = heading
   return (
     <div className={`flex flex-col items-center justify-center text-center ${inline ? 'px-4 py-6' : 'px-6 py-16 md:py-20'} ${className}`}>
-      <div className={`mood-tile grain border ${inline ? 'rounded-2xl px-4 pt-3 pb-2 mb-3' : 'rounded-[28px] px-6 pt-5 pb-3 mb-5'}`} data-mood={mood}>
+      <div className={`mood-tile border ${inline ? 'rounded-2xl px-4 pt-3 pb-2 mb-3' : 'rounded-[28px] px-6 pt-5 pb-3 mb-5'}`} data-mood={mood}>
         <Robot mood={mood} size={inline ? 56 : 84} />
       </div>
       <H className={`${inline ? 'text-[15px]' : 'text-[18px]'} font-semibold text-navy-950 tracking-[-0.01em] mb-1.5`}>{title}</H>

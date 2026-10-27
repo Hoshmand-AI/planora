@@ -1,7 +1,7 @@
 'use client'
 
 // Organization-wide view: every plan and uploaded schedule with its alerts, most urgent first.
-// It opens with a glance row (Nora's mood for the whole portfolio, the share on track, open alerts),
+// It opens with a glance row (the status for the whole portfolio, the share on track, open alerts),
 // then "Waiting for you": one row per project that needs something, with its single next action.
 // Every reason line and project fact is kept, under each project's "Details".
 
@@ -67,7 +67,7 @@ export function Portfolio({ compact = false }: { compact?: boolean }) {
   if (!data.rows.length) return (
     <EmptyState heading="h2" title="No projects yet" action={{ label: 'Build a schedule', href: '/dashboard/plan' }}
       secondary={can('schedule.write') && !compact ? { label: 'Or upload one you already have', onClick: openUpload } : undefined}>
-      Nora is ready when you are. Answer a short interview, or upload a schedule, and it shows up here.
+      Ready when you are. Answer a short interview, or upload a schedule, and it shows up here.
     </EmptyState>
   )
 

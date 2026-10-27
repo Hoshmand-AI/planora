@@ -195,13 +195,13 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
 
 /* ─── The one question in focus ──────────────────────── */
 
-/** Nora as the interviewer: a small waiting face beside a speech bubble that carries the text. */
+/** The interviewer: a small status mark beside a speech bubble that carries the text. */
 function Interviewer({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
       <Robot mood="waiting" size={46} className="flex-shrink-0 -ml-1" />
       <div className="relative min-w-0 rounded-2xl rounded-bl-md bg-warm-100 px-3.5 py-2">
-        <span className="sr-only">Nora: </span>{children}
+        <span className="sr-only">RunF9: </span>{children}
       </div>
     </div>
   )

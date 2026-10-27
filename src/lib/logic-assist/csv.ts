@@ -1,4 +1,4 @@
-// CSV of Nora's logic suggestions (client-safe: no server imports).
+// CSV of the logic suggestions (client-safe: no server imports).
 
 import type { LogicSuggestion } from './suggest'
 
