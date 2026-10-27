@@ -18,6 +18,7 @@ import { after } from 'next/server'
 import { initSchema, query } from '@/lib/db'
 import { decrypt, encrypt, randomToken } from './crypto'
 import { log, errorFields } from './log'
+import { airgapped, allowedHosts, egressProblem } from './egress'
 
 export const WEBHOOK_EVENTS = {
   'plan.created': 'A plan was created',
@@ -79,6 +80,14 @@ export async function urlProblem(raw: string): Promise<string | null> {
   try { u = new URL(raw) } catch { return 'Enter a full URL, e.g. https://hooks.example.com/runf9.' }
   if (u.username || u.password) return 'Remove the user name and password from the URL; use the signing secret instead.'
   if (raw.length > 500) return 'The URL is too long.'
+  // Air-gapped: receivers are inside the customer's network, so the public-address rule is inverted,
+  // and only hosts the customer listed explicitly are allowed (no other internal address is reachable).
+  if (airgapped()) {
+    if (u.protocol !== 'https:' && !(allowInsecure() && u.protocol === 'http:')) return 'Webhook URLs must use HTTPS.'
+    const h = u.hostname.replace(/^\[|\]$/g, '').toLowerCase()
+    return allowedHosts().includes(h) || (allowInsecure() && egressProblem(raw) === null) ? null
+      : `This RunF9 is installed air-gapped: webhook receivers must be inside your network and listed in RUNF9_ALLOWED_HOSTS (${h} is not).`
+  }
   if (allowInsecure()) return u.protocol === 'https:' || u.protocol === 'http:' ? null : 'Use an http(s) URL.'
   if (u.protocol !== 'https:') return 'Webhook URLs must use HTTPS.'
   const host = u.hostname.replace(/^\[|\]$/g, '')

@@ -115,6 +115,8 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://localhost:3001/api/health && break; sleep 2; done
           curl -sf http://localhost:3001/api/health
           BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/e2e-beta.mjs
+      - name: Air-gapped install sends nothing outside the network (egress guard)
+        run: node scripts/e2e-no-egress.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium

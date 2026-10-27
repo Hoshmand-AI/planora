@@ -67,7 +67,7 @@ async function mailLink(to, re) {
   const fs = await import('node:fs/promises')
   const path = await import('node:path')
   for (let i = 0; i < 30; i++) {
-    const files = (await fs.readdir(OUTBOX).catch(() => [])).sort().reverse()
+    const files = (await fs.readdir(OUTBOX).catch(() => [])).filter(f => f.endsWith('.json')).sort().reverse()
     for (const f of files) {
       const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
       const hit = m.to === to && re.exec(m.text)
@@ -82,7 +82,7 @@ async function mailLink(to, re) {
 async function lastMail(to) {
   const fs = await import('node:fs/promises')
   const path = await import('node:path')
-  for (const f of (await fs.readdir(OUTBOX).catch(() => [])).sort().reverse()) {
+  for (const f of (await fs.readdir(OUTBOX).catch(() => [])).filter(f => f.endsWith('.json')).sort().reverse()) {
     const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
     if (m.to === to) return m
   }
@@ -164,7 +164,7 @@ async function main() {
       {
         const fs = await import('node:fs/promises')
         const path = await import('node:path')
-        const mails = await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))
+        const mails = await Promise.all((await fs.readdir(OUTBOX)).filter(f => f.endsWith('.json')).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))
         ok(!mails.some(m => m.to === `nobody-reset${stamp}@example.com`), 'Nothing is sent to an address without an account')
         const mail = mails.find(m => m.to === email('resetter') && m.subject === 'Reset your RunF9 password')
         ok(!!mail && /expires in 30 minutes/.test(mail.text) && /ignore this message/.test(mail.text), 'The reset email says it expires in 30 minutes and to ignore it if not requested')
@@ -509,7 +509,7 @@ async function main() {
       if (OUTBOX) {
         const fs = await import('node:fs/promises')
         const path = await import('node:path')
-        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your RunF9 password').length
+        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).filter(f => f.endsWith('.json')).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your RunF9 password').length
         r = await new Client().post('/api/auth', { action: 'request_password_reset', email: `pw@${domain}` })
         ok(r.status === 200 && /If an account exists/.test(r.data.message), 'A reset request for an SSO-enforced member gets the generic answer')
         await new Promise(res => setTimeout(res, 1500))

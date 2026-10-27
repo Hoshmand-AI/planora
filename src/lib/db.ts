@@ -902,7 +902,8 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
       (SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1) AS last_hash`, [orgId])).rows[0]
     await q(`SELECT set_config('planora.audit_purge', 'on', true)`)
     await q('DELETE FROM audit_events WHERE org_id=$1', [orgId])
-    // Project documents: passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    // Project documents: passage vectors, passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    await q('DELETE FROM chunk_embeddings WHERE org_id=$1', [orgId])
     await q('DELETE FROM document_chunks WHERE org_id=$1', [orgId])
     await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])

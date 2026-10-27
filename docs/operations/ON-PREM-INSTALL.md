@@ -122,7 +122,10 @@ These are all the environment variables the application and its scripts read (co
 | `LLM_BASE_URL` | — | Local model endpoint, e.g. `http://gpu01.enclave.internal:11434/v1`. |
 | `LLM_MODEL` | `llama3.1:8b` (local) | Model name. Must be in the approved list. |
 | `LLM_API_KEY` | — | Key for the local endpoint, if it needs one. |
-| `RUNF9_ALLOWED_HOSTS` | — | Extra on-prem model host names allowed in air-gapped mode (comma-separated). |
+| `RUNF9_ALLOWED_HOSTS` | — | Host names inside your network that RunF9 may connect to in air-gapped mode, beyond loopback, private addresses and `*.internal` / `*.local` / `*.lan` (comma-separated): a model server, an identity provider, webhook and alert receivers. Webhook and alert receivers must be listed here. |
+| `RUNF9_EMBEDDINGS_MODEL` | — | Turns on meaning-based document search with this embedding model on an in-network OpenAI-compatible server (e.g. `nomic-embed-text` in Ollama). Unset: keyword search with the construction vocabulary only. |
+| `RUNF9_EMBEDDINGS_URL` | `LLM_BASE_URL` | The embedding server's `/v1` URL. Must be inside your network in **every** deployment; a public address is refused. |
+| `RUNF9_EMBEDDINGS_MIN_SIMILARITY` | `0.3` | Lowest cosine similarity a passage needs to count as a meaning-based match. |
 | `RUNF9_APPROVED_MODELS` | list in [../ai/MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) | Comma-separated registry; any other model is refused. |
 | `RUNF9_AI_DAILY_LIMIT` | 300 | Ceiling on each organization's AI requests per day. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `RUNF9_AI_PROVIDER` | — | Cloud mode only. Leave unset on CUI instances. |
@@ -146,10 +149,10 @@ network, whatever these settings say ([../security/CUI-HANDLING.md](../security/
 
 | Variable | Purpose |
 |---|---|
-| `RESEND_API_KEY` / `POSTMARK_TOKEN` | Cloud email providers. **Usually not reachable from an enclave.** Without a provider nothing is emailed: invitation links are shown to the admin to pass on, and email verification is reported as unavailable instead of blocking anyone. There is no SMTP option today. |
+| `RESEND_API_KEY` / `POSTMARK_TOKEN` | Cloud email providers. **Never called in air-gapped mode** (refused even if a key is set). Without a provider nothing is emailed: invitation links are shown to the admin to pass on, and email verification is reported as unavailable instead of blocking anyone. There is no SMTP option today. |
 | `EMAIL_FROM` | Sender address when a provider is set. |
 | `RUNF9_EMAIL_OUTBOX` | Tests only: writes emails as JSON files to a folder. |
-| `RUNF9_ALERT_WEBHOOK_URL` | Security alerts (lockouts, MFA turned off, role/SSO/ownership changes, organization exports, new API keys, failed audit verification). Webhook and alert destinations must be public HTTPS addresses (private and internal addresses are refused to prevent SSRF), so inside an enclave leave this unset: each alert is then written to the application log as a `security alert` line that your log collector can forward. |
+| `RUNF9_ALERT_WEBHOOK_URL` | Security alerts (lockouts, MFA turned off, role/SSO/ownership changes, organization exports, new API keys, failed audit verification). Outside air-gapped mode, webhook and alert destinations must be public HTTPS addresses (private and internal addresses are refused to prevent SSRF). In air-gapped mode the rule is inverted: only HTTPS receivers inside your network that are listed in `RUNF9_ALLOWED_HOSTS`. Unset, each alert is written to the application log as a `security alert` line that your log collector can forward. |
 | `RUNF9_ALLOW_INSECURE_WEBHOOKS` | Tests only: allows `http://` and private webhook destinations. Never set in production. |
 
 ### Runtime and diagnostics
@@ -163,6 +166,13 @@ network, whatever these settings say ([../security/CUI-HANDLING.md](../security/
 | `RUNF9_STANDALONE` | — | Build time only: `1` makes `next build` produce the standalone server the image uses. The hosted (Vercel) build doesn't set it. |
 | `VERCEL_GIT_COMMIT_SHA` | — | Set by Vercel on the hosted service only. |
 | `BASE_URL`, `OIDC_ISSUER`, `WEBHOOK_RECEIVER_PORT`, `LLM_LOG`, `FULL_PAGE`, `SCREENSHOTS` | — | End-to-end and accessibility test scripts only. |
+
+### Proving nothing leaves
+
+`scripts/e2e-no-egress.mjs` (run in CI on every change) starts RunF9 air-gapped with a network guard
+in the server process and fails if any feature attempts a connection outside the private network.
+Run it against your own build before acceptance: `npm run build && DATABASE_URL=… node scripts/e2e-no-egress.mjs`.
+See [WHERE-YOUR-DATA-GOES.md](../privacy/WHERE-YOUR-DATA-GOES.md).
 
 ## 5. TLS termination
 
