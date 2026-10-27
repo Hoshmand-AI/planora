@@ -52,7 +52,7 @@ describe('analyzeSchedule', () => {
     const { done, analysis } = run([a, b], [link(a, b)], { finish: '2026-03-13' })
     expect(done.activities.find(x => x.activityId === 'B')!.totalFloat).toBe(0)
     expect(analysis.recalc).toMatchObject({ compared: 2, differing: 1 })
-    expect(analysis.recalc!.samples[0]).toMatchObject({ code: 'B', fileFloat: 30, planoraFloat: 0 })
+    expect(analysis.recalc!.samples[0]).toMatchObject({ code: 'B', fileFloat: 30, runf9Float: 0 })
   })
   it('flags a forecast after the required finish', () => {
     const a = act('A', { duration: 10 })

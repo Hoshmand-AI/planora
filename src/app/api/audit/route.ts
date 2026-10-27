@@ -28,7 +28,7 @@ export const GET = api({ permission: 'audit.read' }, async (req, { auth }) => {
     await audit({ action: 'audit.exported', targetType: 'organization', targetId: auth.orgId, detail: { records: events.length } })
     const head = ['seq', 'at', 'actor_email', 'action', 'target_type', 'target_id', 'detail', 'ip', 'request_id', 'prev_hash', 'hash']
     const rows = events.reverse().map(e => [e.seq, e.at, e.actorEmail, e.action, e.targetType, e.targetId, JSON.stringify(e.detail), e.ip, e.requestId, e.prevHash, e.hash].map(v => csvCell(v == null ? '' : String(v))).join(','))
-    return new Response([head.join(','), ...rows].join('\r\n'), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="planora-audit-log-${new Date().toISOString().slice(0, 10)}.csv"` } })
+    return new Response([head.join(','), ...rows].join('\r\n'), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="runf9-audit-log-${new Date().toISOString().slice(0, 10)}.csv"` } })
   }
   const page = await listAudit(auth.orgId, { ...filters, limit: Number(sp.get('limit')) || 200 })
   // Paging continues from the last record read, even when some of the page was filtered out.

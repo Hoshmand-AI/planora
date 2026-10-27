@@ -3,7 +3,7 @@ import { getAuthContext } from '@/lib/auth'
 import { isPlatformAdmin } from '@/lib/server/signup-policy'
 import { BetaAdmin } from '@/components/BetaAdmin'
 
-// Private beta administration. Only platform operators (PLANORA_PLATFORM_ADMINS) get this page;
+// Private beta administration. Only platform operators (RUNF9_PLATFORM_ADMINS) get this page;
 // everyone else gets a 404, as from /api/platform/beta.
 export const dynamic = 'force-dynamic'
 

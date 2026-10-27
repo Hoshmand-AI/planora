@@ -5,7 +5,7 @@
 /** Which adapter served a call. 'local' is any OpenAI-compatible endpoint (Ollama, vLLM, …). */
 export type ProviderName = 'anthropic' | 'openai' | 'local'
 
-/** Cloud providers selectable with PLANORA_AI_PROVIDER. */
+/** Cloud providers selectable with RUNF9_AI_PROVIDER. */
 export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai'>
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
@@ -97,9 +97,9 @@ export function estimateCostUsd(model: string, usage: LlmUsage): number | null {
   return Math.round(((usage.inputTokens * p.input + usage.outputTokens * p.output) / 1_000_000) * 1e6) / 1e6
 }
 
-/** Provider-side refusal fallback (Anthropic) is on unless PLANORA_AI_FALLBACK=off (also false / 0 / no / disabled). */
+/** Provider-side refusal fallback (Anthropic) is on unless RUNF9_AI_FALLBACK=off (also false / 0 / no / disabled). */
 export function aiFallbackEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return !/^(off|false|0|no|disabled?)$/i.test((env.PLANORA_AI_FALLBACK || '').trim())
+  return !/^(off|false|0|no|disabled?)$/i.test((env.RUNF9_AI_FALLBACK || '').trim())
 }
 
 /** Display names for the UI and docs. */

@@ -39,7 +39,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * network, with their reasons as notes; its file name says "with-N-edits" and its provenance says
  * "derived from <sha> with N edits" rather than printing the original file's SHA-256 as the content's.
  * Export exceptions: every download says what the format could not carry (header
- * X-Planora-Export-Exceptions; XLSX also in the Provenance sheet); &exceptions=json returns that report
+ * X-RunF9-Export-Exceptions, also sent as X-Planora-…; XLSX also in the Provenance sheet); &exceptions=json returns that report
  * as JSON instead of the file.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
@@ -53,7 +53,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   // Edits in this export: only the scenario carries them.
   const scenarioEdits = basis === 'scenario' ? data.edits : []
   const editsApplied = basis === 'scenario' ? data.editsApplied : 0
-  const slug = (`${schedule.name}-${schedule.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule') + (editsApplied ? `-with-${editsApplied}-planora-edit${editsApplied === 1 ? '' : 's'}` : '')
+  const slug = (`${schedule.name}-${schedule.version}`.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule') + (editsApplied ? `-with-${editsApplied}-runf9-edit${editsApplied === 1 ? '' : 's'}` : '')
   const rl = await hit(`export:user:${auth.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
 
@@ -75,7 +75,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     const rows = lookaheadRows(data.activities, data.relationships, schedule.dataDate, 21)
     const file = `${slug}-3-week-look-ahead.xlsx`
     const body = await exportLookaheadXlsx(rows, await prov(), { project: `${schedule.name} (${schedule.version})`, dataDate: schedule.dataDate, days: 21 }, marking)
-    await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, basis, editsInPlanora: editsApplied, activities: rows.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
+    await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, basis, editsInRunF9: editsApplied, activities: rows.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex') } })
     return new NextResponse(body as unknown as BodyInit, { headers: { 'Content-Type': XLSX, 'Content-Disposition': `attachment; filename="${file}"` } })
   }
   if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships to export as a network.' }, { status: 400 })
@@ -119,6 +119,6 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     default: body = await exportP6LayoutXlsx(g, schedule.name, { marking, prov: await prov(exceptions) }); type = XLSX; file = `${slug}-p6-layout.xlsx`
   }
   const exSummary = summarizeExceptions(exceptions)
-  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInPlanora: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), exportExceptions: { records: exceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
+  await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInRunF9: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), exportExceptions: { records: exceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
   return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-RunF9-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-RunF9-Export-Exceptions': exceptionHeader(exceptions), 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } })
 })

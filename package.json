@@ -1,7 +1,7 @@
 {
-  "name": "planora",
+  "name": "runf9",
   "version": "1.0.0",
-  "description": "Planora - AI Schedule Analysis for Construction",
+  "description": "RunF9 - AI Schedule Analysis for Construction",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

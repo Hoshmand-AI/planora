@@ -11,7 +11,7 @@ import { randomToken } from '@/lib/server/crypto'
 import { log } from '@/lib/server/log'
 import { assertBetaAccess } from '@/lib/server/beta'
 
-const SSO_COOKIE = 'planora-sso'
+const SSO_COOKIE = 'runf9-sso'
 
 /** The identity provider redirects here with ?code&state. Signs the member in (creating them on first sign-in). */
 export const GET = publicApi(async req => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // End-to-end checks for SAML 2.0 single sign-on and SCIM 2.0 provisioning against a running server.
 //   BASE_URL=http://localhost:3200 DATABASE_URL=postgres://… node scripts/e2e-scim.mjs
-// The server must run with PLANORA_ALLOW_INSECURE_OIDC=1 (test domains *.example count as verified
+// The server must run with RUNF9_ALLOW_INSECURE_OIDC=1 (test domains *.example count as verified
 // and a plain-http IdP URL is accepted). DATABASE_URL is used to set the Enterprise plan
 // (scripts/set-plan.mjs) and to confirm the test owners' email addresses.
 // A test identity provider key pair and certificate are generated here; responses are signed with
@@ -17,10 +17,10 @@ import { SignedXml } from 'xml-crypto'
 import pg from 'pg'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
-// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
 // as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
 if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
-  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
   process.exit(1)
 }
 const ORIGIN = new URL(BASE).origin
@@ -40,7 +40,7 @@ class Client {
     let payload
     if (body !== undefined) { h['Content-Type'] = h['Content-Type'] || 'application/json'; payload = typeof body === 'string' ? body : JSON.stringify(body) }
     const res = await fetch(BASE + url, { method, headers: h, body: payload, redirect: 'manual' })
-    for (const c of res.headers.getSetCookie?.() || []) if (c.startsWith('planora-token=')) this.cookie = c.split(';')[0]
+    for (const c of res.headers.getSetCookie?.() || []) if (c.startsWith('runf9-token=')) this.cookie = c.split(';')[0]
     const text = await res.text()
     let data = {}
     try { data = JSON.parse(text) } catch { data = { raw: text } }
@@ -61,7 +61,7 @@ const scim = (token) => async (method, path, body) => {
 
 // A self-signed RSA-2048 / SHA-256 certificate, made with the system openssl (no extra dependency).
 function makeIdp() {
-  const dir = mkdtempSync(join(tmpdir(), 'planora-idp-'))
+  const dir = mkdtempSync(join(tmpdir(), 'runf9-idp-'))
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=RunF9 e2e IdP',
       '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' })
@@ -94,7 +94,7 @@ function samlResponse({ idpEntityId, acsUrl, audience, requestId, email, key, si
 async function startSamlSignIn(email) {
   const res = await fetch(`${BASE}/api/auth/sso`, { method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN }, body: JSON.stringify({ email }) })
   const data = await res.json()
-  const stateCookie = (res.headers.getSetCookie?.() || []).find(c => c.startsWith('planora-saml='))?.split(';')[0]
+  const stateCookie = (res.headers.getSetCookie?.() || []).find(c => c.startsWith('runf9-saml='))?.split(';')[0]
   const url = new URL(data.url)
   const request = inflateRawSync(Buffer.from(url.searchParams.get('SAMLRequest'), 'base64')).toString()
   return { status: res.status, url, request, requestId: /ID="([^"]+)"/.exec(request)[1], relay: url.searchParams.get('RelayState'), stateCookie }
@@ -107,7 +107,7 @@ async function postAcs(acsUrl, samlResp, relay, stateCookie) {
     headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://idp.example', 'sec-fetch-site': 'cross-site', cookie: stateCookie || '' },
     body: new URLSearchParams({ SAMLResponse: samlResp, RelayState: relay }).toString(),
   })
-  const session = (res.headers.getSetCookie?.() || []).find(c => c.startsWith('planora-token=') && !c.startsWith('planora-token=;'))?.split(';')[0]
+  const session = (res.headers.getSetCookie?.() || []).find(c => c.startsWith('runf9-token=') && !c.startsWith('runf9-token=;'))?.split(';')[0]
   return { status: res.status, location: res.headers.get('location') || '', session }
 }
 

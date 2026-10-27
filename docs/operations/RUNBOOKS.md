@@ -31,8 +31,8 @@ Migrations live in `src/lib/migrations.ts`. They are numbered, checksummed, appl
 |---|---|
 | "AI analysis temporarily unavailable" | Provider outage or key problem. Scheduling still works. Check `ai.request` events with `ok:false` |
 | Daily limit reached | The organization's admin raises **AI requests per day** within the plan limit |
-| Need to stop all AI immediately | Set `PLANORA_AI_MODE=offline` in Vercel and redeploy, or have organizations switch AI off |
-| Model change | Follow docs/ai/MODEL-REGISTRY.md (evaluation, then `PLANORA_APPROVED_MODELS` / `LLM_MODEL`) |
+| Need to stop all AI immediately | Set `RUNF9_AI_MODE=offline` in Vercel and redeploy, or have organizations switch AI off |
+| Model change | Follow docs/ai/MODEL-REGISTRY.md (evaluation, then `RUNF9_APPROVED_MODELS` / `LLM_MODEL`) |
 
 ## Database outage
 1. `/api/health` returns 503 and the uptime probe opens an incident.
@@ -51,7 +51,7 @@ Follow INCIDENT-RESPONSE.md. Useful queries:
 | Name | Purpose | Rotation |
 |---|---|---|
 | `JWT_SECRET` | Signs session and challenge tokens | Yearly, or after an incident. Signs everyone out |
-| `PLANORA_ENCRYPTION_KEY` | Encrypts MFA and SSO secrets (falls back to `JWT_SECRET`) | Rotating it requires re-enrolling MFA and re-entering SSO secrets |
+| `RUNF9_ENCRYPTION_KEY` | Encrypts MFA and SSO secrets (falls back to `JWT_SECRET`) | Rotating it requires re-enrolling MFA and re-entering SSO secrets |
 | `DATABASE_URL` | Database | Rotate the password in Neon, update it in Vercel, redeploy |
 | `ANTHROPIC_API_KEY` | Cloud AI (default provider) | Yearly, or after an incident |
 | `OPENAI_API_KEY` | Cloud AI (alternate provider, if used) | Yearly, or after an incident |

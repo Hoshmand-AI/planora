@@ -14,11 +14,11 @@ export function describeDifference(d: RecalcDifference): string {
   const date = (label: string, f: string | null | undefined, p: string | null | undefined) => {
     if (f && p && dayGap(f, p) > 1) parts.push(`${label} file ${fmtDate(f)} / RunF9 ${fmtDate(p)}`)
   }
-  date('start', d.fileStart, d.planoraStart)
-  date('finish', d.fileFinish, d.planoraFinish)
-  date('late start', d.fileLateStart, d.planoraLateStart)
-  date('late finish', d.fileLateFinish, d.planoraLateFinish)
-  if (d.fileFloat != null && d.planoraFloat != null && Math.abs(d.fileFloat - d.planoraFloat) > 1) parts.push(`float file ${d.fileFloat}d / RunF9 ${d.planoraFloat}d`)
+  date('start', d.fileStart, d.runf9Start)
+  date('finish', d.fileFinish, d.runf9Finish)
+  date('late start', d.fileLateStart, d.runf9LateStart)
+  date('late finish', d.fileLateFinish, d.runf9LateFinish)
+  if (d.fileFloat != null && d.runf9Float != null && Math.abs(d.fileFloat - d.runf9Float) > 1) parts.push(`float file ${d.fileFloat}d / RunF9 ${d.runf9Float}d`)
   return parts.length ? `${d.code}: ${parts.join(', ')}` : ''
 }
 

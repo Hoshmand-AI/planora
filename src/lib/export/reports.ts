@@ -359,8 +359,8 @@ const withBlank = (lines: string[]) => (lines.length ? ['', ...lines] : [])
  */
 export function recalcSection(rc: NonNullable<ReportInput['analysis']['recalc']>): string {
   const rows = rc.samples.map(x => [
-    x.code, x.name, d(x.fileStart), d(x.planoraStart), d(x.fileFinish), d(x.planoraFinish), d(x.fileLateStart), d(x.planoraLateStart),
-    d(x.fileLateFinish), d(x.planoraLateFinish), x.fileFloat ?? '—', x.planoraFloat ?? '—',
+    x.code, x.name, d(x.fileStart), d(x.runf9Start), d(x.fileFinish), d(x.runf9Finish), d(x.fileLateStart), d(x.runf9LateStart),
+    d(x.fileLateFinish), d(x.runf9LateFinish), x.fileFloat ?? '—', x.runf9Float ?? '—',
   ])
   const head = rc.samples.length === rc.differing
     ? `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in early/late dates or total float${rc.differing ? '; all are listed' : ''}.`

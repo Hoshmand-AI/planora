@@ -1,7 +1,7 @@
 // Transactional email (verification links, invitations). Provider chosen by environment:
 //   RESEND_API_KEY      → Resend (https://resend.com)
 //   POSTMARK_TOKEN      → Postmark (https://postmarkapp.com)
-//   PLANORA_EMAIL_OUTBOX=<dir>  → writes each message as JSON to a folder (tests/CI only)
+//   RUNF9_EMAIL_OUTBOX=<dir>  → writes each message as JSON to a folder (tests/CI only)
 // EMAIL_FROM sets the sending address (default no-reply@hoshmand.ai); the display name is always
 // "RunF9", whatever name EMAIL_FROM carries, so the brand can't drift. Replies go to EMAIL_REPLY_TO
 // (default support@hoshmand.ai). Messages carry the branded HTML (email-template.ts) and a plain-text
@@ -19,7 +19,7 @@ export interface Email { to: string; subject: string; text: string; html?: strin
 export function emailProvider(): 'resend' | 'postmark' | 'outbox' | null {
   if (process.env.RESEND_API_KEY) return 'resend'
   if (process.env.POSTMARK_TOKEN) return 'postmark'
-  if (process.env.PLANORA_EMAIL_OUTBOX) return 'outbox'
+  if (process.env.RUNF9_EMAIL_OUTBOX) return 'outbox'
   return null
 }
 export const emailConfigured = () => emailProvider() !== null
@@ -29,7 +29,10 @@ export const SENDER_NAME = 'RunF9'
 export function fromHeader(env: string | undefined = process.env.EMAIL_FROM): string {
   const raw = (env || '').trim()
   const addr = (/<([^>]+)>/.exec(raw)?.[1] ?? raw).trim()
-  return `${SENDER_NAME} <${/^[^\s@<>]+@[^\s@<>]+$/.test(addr) ? addr : 'no-reply@hoshmand.ai'}>`
+  if (!/^[^\s@<>]+@[^\s@<>]+$/.test(addr)) return `${SENDER_NAME} <no-reply@hoshmand.ai>`
+  // An address still named after the old brand (runf9@…) sends as no-reply@ on the same domain
+  const [local, domain] = addr.split('@')
+  return `${SENDER_NAME} <${/^planora$/i.test(local) ? 'no-reply' : local}@${domain}>`
 }
 const FROM = () => fromHeader()
 const REPLY_TO = () => process.env.EMAIL_REPLY_TO || 'support@hoshmand.ai'
@@ -53,7 +56,7 @@ export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: st
       })
       if (!res.ok) throw new Error(`Postmark responded ${res.status}`)
     } else if (provider === 'outbox') {
-      const dir = process.env.PLANORA_EMAIL_OUTBOX!
+      const dir = process.env.RUNF9_EMAIL_OUTBOX!
       await fs.mkdir(dir, { recursive: true })
       await fs.writeFile(path.join(dir, `${Date.now()}-${randomUUID()}.json`), JSON.stringify({ from: FROM(), replyTo: REPLY_TO(), ...m }, null, 2))
     } else {

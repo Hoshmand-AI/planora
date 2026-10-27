@@ -732,7 +732,7 @@ function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permi
   if ((p.scope === 'renovation' || p.scope === 'renovation_occupied') && (p.siteAcresDisturbed ?? 0) >= 5) out.push('Renovation scope but 5+ acres of site disturbance — is there significant sitework in scope?')
   if (p.projectType === 'multifamily' && (p.stories ?? 0) > 12 && p.scope === 'new_construction') out.push('High-rise multifamily: confirm structural system; the template assumes concrete above 5 stories.')
   if (known(answers, 'project.federal') === false && p.projectType === 'federal_defense') out.push('Project type is federal/defense but marked as not federal.')
-  if (p.classification === 'classified' && ctx.aiMode === 'cloud') out.push('Classified project while AI runs in cloud mode. Switch this deployment to air-gapped mode (PLANORA_AIRGAPPED=true with an on-prem model) before entering any controlled information.')
+  if (p.classification === 'classified' && ctx.aiMode === 'cloud') out.push('Classified project while AI runs in cloud mode. Switch this deployment to air-gapped mode (RUNF9_AIRGAPPED=true with an on-prem model) before entering any controlled information.')
 
   const start = str(known(answers, 'project.target_start'))
   // A required finish on or before the start is reported once, by checkAnswerDates (dateIssues).

@@ -24,10 +24,10 @@
 import { randomUUID } from 'node:crypto'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
-// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
 // as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
 if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
-  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
   process.exit(1)
 }
 const ORIGIN = new URL(BASE).origin
@@ -81,7 +81,7 @@ class Client {
     else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body) }
     const res = await fetch(BASE + url, { method, headers, body: payload, redirect: 'manual' })
     const set = res.headers.get('set-cookie')
-    if (!this.bearer && set && set.startsWith('planora-token=')) this.cookie = set.split(';')[0]
+    if (!this.bearer && set && set.startsWith('runf9-token=')) this.cookie = set.split(';')[0]
     const buf = Buffer.from(await res.arrayBuffer())
     const text = buf.toString('latin1')
     let data = {}

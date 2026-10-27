@@ -27,7 +27,7 @@ import { contractTarget, FINISH_DATE_CONSTRAINTS } from '@/lib/planning/contract
 import { analyzeSchedule, type ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import { fmtDate } from '@/lib/format'
 
-export const TIA_ENGINE = 'planora-tia/1'
+export const TIA_ENGINE = 'runf9-tia/1'
 
 export const RESPONSIBILITIES = ['owner', 'contractor', 'third_party', 'force_majeure', 'unassigned'] as const
 export type Responsibility = typeof RESPONSIBILITIES[number]

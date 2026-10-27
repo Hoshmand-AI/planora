@@ -6,7 +6,7 @@ import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { runDcma } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import { buildReport, reportSupplement } from '@/lib/export/reports'
-import { planoraRelease, withProvenance, type Provenance } from '@/lib/export/provenance'
+import { runf9Release, withProvenance, type Provenance } from '@/lib/export/provenance'
 import { defaultCalendar } from '@/lib/planning/calendar'
 
 // Same fixture as reports.test.ts: NTP done, A200 in progress, A300, M900 (baseline 03/30, forecast 04/01).
@@ -54,9 +54,9 @@ describe('report provenance header', () => {
     expect(sup).toContain('## Reviewer disposition')
   })
   it('states the release the same way /api/health does', () => {
-    expect(planoraRelease({ VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' })).toBe('0123456')
-    expect(planoraRelease({ PLANORA_RELEASE: 'v2.4.0' })).toBe('v2.4.0')
-    expect(planoraRelease({})).toBe('local')
+    expect(runf9Release({ VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' })).toBe('0123456')
+    expect(runf9Release({ RUNF9_RELEASE: 'v2.4.0' })).toBe('v2.4.0')
+    expect(runf9Release({})).toBe('local')
   })
 })
 

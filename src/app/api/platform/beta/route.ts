@@ -1,4 +1,4 @@
-// Private beta administration for platform operators (PLANORA_PLATFORM_ADMINS): invite a new firm,
+// Private beta administration for platform operators (RUNF9_PLATFORM_ADMINS): invite a new firm,
 // list and revoke beta invitations, and revoke or restore a person's beta access. Everyone else gets
 // 404. Invitation tokens are returned once, to the operator, and are never logged or audited.
 

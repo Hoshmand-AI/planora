@@ -114,7 +114,7 @@ export function Integrations() {
         const d = await act('hook', { action: 'create_webhook', url: hook.url, events: hook.events }, 'Webhook added.')
         if (d) { setSecret({ label: 'Webhook signing secret created.', value: String(d.secret) }); setHook({ ...hook, url: '' }) }
       }}>
-        <Field label="Endpoint URL (HTTPS)">{p => <input {...p} required type="url" className={inputClass} placeholder="https://hooks.example.com/planora" value={hook.url} onChange={e => setHook({ ...hook, url: e.target.value })} />}</Field>
+        <Field label="Endpoint URL (HTTPS)">{p => <input {...p} required type="url" className={inputClass} placeholder="https://hooks.example.com/runf9" value={hook.url} onChange={e => setHook({ ...hook, url: e.target.value })} />}</Field>
         <fieldset>
           <legend className="block text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Events</legend>
           <div className="grid sm:grid-cols-2 gap-1.5">

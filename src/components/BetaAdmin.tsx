@@ -68,7 +68,7 @@ export function BetaAdmin() {
         <p className="text-[13.5px] text-warm-600">
           {data.signup.mode === 'invite_only'
             ? 'RunF9 is in private beta: sign-up needs an invitation, and signing in needs beta access.'
-            : 'Self sign-up is open (PLANORA_SIGNUP=open), so the beta gate is off. Invitations still work.'}
+            : 'Self sign-up is open (RUNF9_SIGNUP=open), so the beta gate is off. Invitations still work.'}
           {' '}{withAccess} of {data.users.length} accounts can sign in. Only platform operators see this page.
         </p>
       </div>

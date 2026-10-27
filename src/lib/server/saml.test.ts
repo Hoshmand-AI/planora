@@ -15,12 +15,12 @@ import { ApiError } from './api'
 // SAML 2.0 response validation against a test identity provider whose key pair and certificate are
 // generated here. Signatures are produced with xml-crypto, the same way real IdPs sign.
 
-const ORIGIN = 'https://planora.test'
+const ORIGIN = 'https://runf9.test'
 const IDP = 'https://idp.example.test/metadata'
 
 // A self-signed RSA-2048 / SHA-256 certificate, made with the system openssl (no extra dependency).
 function makeIdp() {
-  const dir = mkdtempSync(join(tmpdir(), 'planora-idp-'))
+  const dir = mkdtempSync(join(tmpdir(), 'runf9-idp-'))
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=Test IdP',
       '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' })

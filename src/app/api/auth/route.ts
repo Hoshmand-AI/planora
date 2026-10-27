@@ -121,7 +121,7 @@ export const POST = publicApi(async req => {
     const beta = !invite && b.betaInvite ? await findBetaInvite(String(b.betaInvite)) : null
     if (!invite && b.betaInvite && !beta) throw new ApiError(400, 'This beta invitation link is no longer valid. Ask for a new one.', 'beta_invite_invalid')
     if (beta && beta.email !== email) throw new ApiError(400, `This invitation is for ${beta.email}. Sign up with that email address.`, 'invite_email')
-    // Private beta (PLANORA_SIGNUP, invite-only by default): without an invitation only a platform
+    // Private beta (RUNF9_SIGNUP, invite-only by default): without an invitation only a platform
     // operator or the first account on an empty instance (the bootstrapping owner) may sign up.
     // Checked before the "already exists" answer, so refused sign-ups learn nothing about accounts.
     const mode = signupMode()

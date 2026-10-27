@@ -120,7 +120,7 @@ function finishOf(done: ReturnType<typeof completeSchedule>, id: string): string
 /** Recalculate the network with these changes applied (nothing is stored); `measureId` = the contract milestone. */
 export function evaluateNetwork(net: NetworkInput, changes: ScheduleEditChange[] = [], measureId: string | null = net.contract?.milestoneId ?? null): NetworkOutcome {
   const edited = changes.length
-    ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `whatif-${i}`, change, reason: 'what-if', by: 'planora', at: '' })))
+    ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `whatif-${i}`, change, reason: 'what-if', by: 'runf9', at: '' })))
     : { activities: net.activities, relationships: net.relationships }
   const done = completeSchedule({
     activities: edited.activities, relationships: edited.relationships, calendars: net.calendars, defaultCalendarId: net.defaultCalendarId,

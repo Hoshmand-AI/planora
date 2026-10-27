@@ -170,7 +170,7 @@ function scimErrorResponse(err: unknown): Response {
   if (err instanceof ApiError) {
     const scimType = err instanceof ScimError ? err.scimType : undefined
     return scimJson({ schemas: [SCIM_ERROR_SCHEMA], status: String(err.status), ...(scimType ? { scimType } : {}), detail: err.message }, err.status,
-      err.status === 401 ? { 'WWW-Authenticate': 'Bearer realm="planora-scim"' } : err.status === 429 && err.extra?.retryAfterSec ? { 'Retry-After': String(err.extra.retryAfterSec) } : {})
+      err.status === 401 ? { 'WWW-Authenticate': 'Bearer realm="runf9-scim"' } : err.status === 429 && err.extra?.retryAfterSec ? { 'Retry-After': String(err.extra.retryAfterSec) } : {})
   }
   log('error', 'unhandled scim error', errorFields(err))
   return scimJson({ schemas: [SCIM_ERROR_SCHEMA], status: '500', detail: `Internal error (reference ${r?.requestId}).` }, 500)

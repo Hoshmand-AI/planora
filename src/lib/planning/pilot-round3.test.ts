@@ -108,12 +108,12 @@ describe('A. loadScheduleData: as submitted by default, the scenario on request'
   it('D. a schedule marked classified is refused (409) on the commercial cloud', async () => {
     const { loadScheduleData } = await import('./service')
     db.schedule = { ...db.schedule, classification: 'classified' }
-    const prev = process.env.PLANORA_DEPLOYMENT
-    delete process.env.PLANORA_DEPLOYMENT
+    const prev = process.env.RUNF9_DEPLOYMENT
+    delete process.env.RUNF9_DEPLOYMENT
     await expect(loadScheduleData('s1', 'o')).rejects.toMatchObject({ status: 409, code: 'classified_on_commercial_cloud' })
-    process.env.PLANORA_DEPLOYMENT = 'onprem'
+    process.env.RUNF9_DEPLOYMENT = 'onprem'
     await expect(loadScheduleData('s1', 'o')).resolves.toBeTruthy()
-    if (prev === undefined) delete process.env.PLANORA_DEPLOYMENT; else process.env.PLANORA_DEPLOYMENT = prev
+    if (prev === undefined) delete process.env.RUNF9_DEPLOYMENT; else process.env.RUNF9_DEPLOYMENT = prev
   })
 })
 

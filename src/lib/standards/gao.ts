@@ -53,10 +53,10 @@ function gao(meta: Meta, rest: Pick<RuleDef, 'evaluate'> & Partial<Pick<RuleDef,
   }
 }
 
-/** A GAO screening threshold: 'planora_default' unless the organization changed it. */
+/** A GAO screening threshold: 'runf9_default' unless the organization changed it. */
 function gt(cfg: EngineConfig, key: keyof GaoThresholds, metricKey: string, unit: ThresholdSpec['unit'], direction: ThresholdSpec['direction']): ThresholdSpec {
   const v = cfg.gao[key]
-  return threshold(metricKey, v, unit, direction, v === DEFAULT_GAO_THRESHOLDS[key] ? 'planora_default' : 'org_configured')
+  return threshold(metricKey, v, unit, direction, v === DEFAULT_GAO_THRESHOLDS[key] ? 'runf9_default' : 'org_configured')
 }
 
 const codes = (xs: AnalyzableActivity[]) => uniq(xs.map(a => a.code))
@@ -173,7 +173,7 @@ export const GAO_RULES: RuleDef[] = [
     message: 'Negative lags let a successor start before its predecessor logically allows and hide overlap assumptions.',
     applicability: { subjects: ['schedule', 'plan'], requires: ['logic'] },
   }, {
-    threshold: () => threshold('logic.leads_count', 0, 'count', 'max', 'planora_default'),
+    threshold: () => threshold('logic.leads_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
       const into = net.links.filter(l => net.openIds.has(l.to))
       if (!into.length) return notAssessable('There are no relationships into open activities.')
@@ -451,7 +451,7 @@ export const GAO_RULES: RuleDef[] = [
     message: 'Negative float means the plan cannot meet a required date as drawn.',
     applicability: { subjects: ['schedule', 'plan'], requires: ['float'] },
   }, {
-    threshold: () => threshold('float.negative_count', 0, 'count', 'max', 'planora_default'),
+    threshold: () => threshold('float.negative_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
       const withTf = net.open.map(a => ({ a, tf: net.totalFloat(a) })).filter((x): x is { a: AnalyzableActivity; tf: number } => x.tf !== null)
       if (!withTf.length) return notAssessable('Total float is not available.')

@@ -31,7 +31,7 @@ export function engineConfig(o: { gao?: Partial<GaoThresholds> | null; dcma?: Pa
 export function rulesOf(fw: Framework): RuleDef[] {
   if (fw === 'GAO_SCHEDULE_GUIDE') return GAO_RULES
   if (fw === 'DCMA_14') return DCMA_RULES
-  if (fw === 'PLANORA_COMPOSITE') return [...GAO_RULES, ...DCMA_RULES]
+  if (fw === 'RUNF9_COMPOSITE') return [...GAO_RULES, ...DCMA_RULES]
   return []
 }
 
@@ -138,7 +138,7 @@ export function rulesVersionOf(frameworks: Framework[], cfg: EngineConfig): stri
 }
 
 function frameworkVersionOf(fw: Framework): string {
-  return fw === 'GAO_SCHEDULE_GUIDE' ? GAO_VERSION : fw === 'DCMA_14' ? DCMA_VERSION : fw === 'PLANORA_COMPOSITE' ? COMPOSITE_VERSION : 'n/a'
+  return fw === 'GAO_SCHEDULE_GUIDE' ? GAO_VERSION : fw === 'DCMA_14' ? DCMA_VERSION : fw === 'RUNF9_COMPOSITE' ? COMPOSITE_VERSION : 'n/a'
 }
 
 export function runFramework(fw: Framework, net: Network, cfg: EngineConfig): FrameworkResult {
@@ -152,7 +152,7 @@ export function runFramework(fw: Framework, net: Network, cfg: EngineConfig): Fr
     groups: fw === 'DCMA_14' ? byCategory(results) : byCharacteristic(results),
     counts,
     score: scoreOf(counts),
-    conflicts: fw === 'PLANORA_COMPOSITE' ? detectConflicts(results) : [],
+    conflicts: fw === 'RUNF9_COMPOSITE' ? detectConflicts(results) : [],
     disclaimer: fw === 'GAO_SCHEDULE_GUIDE' ? GAO_DISCLAIMER : fw === 'DCMA_14' ? DCMA_DISCLAIMER : COMPOSITE_DISCLAIMER,
   }
 }

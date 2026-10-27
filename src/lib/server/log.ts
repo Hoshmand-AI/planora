@@ -16,7 +16,7 @@ function redact(v: unknown, depth = 0): unknown {
 }
 
 export function log(level: Level, msg: string, fields: Record<string, unknown> = {}) {
-  if (level === 'debug' && !process.env.PLANORA_DEBUG) return
+  if (level === 'debug' && !process.env.RUNF9_DEBUG) return
   const r = currentRequest()
   const line = {
     ts: new Date().toISOString(), level, msg,

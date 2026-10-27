@@ -11,9 +11,9 @@ describe('importNotes', () => {
     expect(importNotes(['a', 'a'], loadNote, false, null)).toEqual([loadNote, 'a'])
     expect(importNotes([], loadNote, true, null)).toEqual([])
   })
-  it('rewrites the stored file-vs-Planora comparison from its samples', () => {
+  it('rewrites the stored file-vs-RunF9 comparison from its samples', () => {
     const old = '2 of 9 open activities have a finish or total float in the file that differs from RunF9\'s recalculation by more than 1 day (e.g. A1: file 5d / RunF9 5d float).'
-    const out = importNotes([old], null, true, { compared: 9, differing: 2, samples: [{ code: 'A1', name: 'x', fileFinish: '2026-01-01', planoraFinish: '2026-01-10', fileFloat: 5, planoraFloat: 5 }] })
+    const out = importNotes([old], null, true, { compared: 9, differing: 2, samples: [{ code: 'A1', name: 'x', fileFinish: '2026-01-01', runf9Finish: '2026-01-10', fileFloat: 5, runf9Float: 5 }] })
     expect(out).toHaveLength(1)
     expect(out[0]).toContain('A1: finish file 01/01/2026 / RunF9 01/10/2026')
     expect(out[0]).not.toContain('5d / RunF9 5d')
@@ -24,9 +24,9 @@ describe('recalcWarning', () => {
   it('lists only the field that differs, with US dates', () => {
     const w = recalcWarning({
       compared: 50, differing: 3, samples: [
-        { code: 'A100', name: 'Pour', fileFinish: '2026-10-01', planoraFinish: '2026-10-09', fileFloat: 5, planoraFloat: 5 },
-        { code: 'A200', name: 'Frame', fileFinish: '2026-10-01', planoraFinish: '2026-10-01', fileFloat: 10, planoraFloat: 2 },
-        { code: 'A300', name: 'Roof', fileFinish: '2026-10-01', planoraFinish: '2026-10-05', fileFloat: 0, planoraFloat: -4 },
+        { code: 'A100', name: 'Pour', fileFinish: '2026-10-01', runf9Finish: '2026-10-09', fileFloat: 5, runf9Float: 5 },
+        { code: 'A200', name: 'Frame', fileFinish: '2026-10-01', runf9Finish: '2026-10-01', fileFloat: 10, runf9Float: 2 },
+        { code: 'A300', name: 'Roof', fileFinish: '2026-10-01', runf9Finish: '2026-10-05', fileFloat: 0, runf9Float: -4 },
       ],
     })!
     expect(w).toContain('A100: finish file 10/01/2026 / RunF9 10/09/2026')
@@ -37,7 +37,7 @@ describe('recalcWarning', () => {
     expect(w).not.toMatch(/\d{4}-\d{2}-\d{2}/)
   })
   it('skips samples that differ by a day or less and returns null when nothing differs', () => {
-    expect(describeDifference({ code: 'B', name: 'x', fileFinish: '2026-10-01', planoraFinish: '2026-10-02', fileFloat: 3, planoraFloat: 4 })).toBe('')
+    expect(describeDifference({ code: 'B', name: 'x', fileFinish: '2026-10-01', runf9Finish: '2026-10-02', fileFloat: 3, runf9Float: 4 })).toBe('')
     expect(recalcWarning({ compared: 10, differing: 0, samples: [] })).toBeNull()
     expect(recalcWarning(null)).toBeNull()
   })

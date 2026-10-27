@@ -41,13 +41,13 @@ export function decideHistory(input: {
   requested: boolean | null
   override?: boolean
   origin: UploadOrigin | null
-  planoraExport: boolean
+  runf9Export: boolean
   workCount: number
   openCount: number
 }): HistoryDecision {
   const warnings: string[] = []
   const asBuilt = isAsBuilt(input)
-  if (input.planoraExport) {
+  if (input.runf9Export) {
     warnings.push('This file is a RunF9 export re-imported (it was produced by RunF9), so it is not used for firm history: its durations are RunF9\'s own, not the project\'s record.')
     return { inHistory: false, historyOverride: false, warnings }
   }

@@ -14,7 +14,7 @@ import { initSchema, query, withTransaction } from '@/lib/db'
 import { randomToken, sha256 } from './crypto'
 import { ApiError } from './api'
 import type { AuthContext } from '@/lib/auth'
-import { BETA_SIGNIN_MESSAGE, isPlatformAdmin, mayUsePlanora } from './signup-policy'
+import { BETA_SIGNIN_MESSAGE, isPlatformAdmin, mayUseRunF9 } from './signup-policy'
 import { emailConfigured } from './email'
 import { auditQuietly } from './audit'
 
@@ -57,7 +57,7 @@ export function requirePlatformAdmin(auth: AuthContext): void {
  * the same rule in auth.ts). Refusals are audited in the person's organization.
  */
 export async function assertBetaAccess(user: { id: string; email: string; orgId: string; betaAccessAt: string | null; betaRevokedAt: string | null }, method: string): Promise<void> {
-  if (mayUsePlanora(user)) return
+  if (mayUseRunF9(user)) return
   await auditQuietly({
     orgId: user.orgId, action: 'auth.login_refused_beta', targetType: 'user', targetId: user.id, actor: { id: null, email: user.email },
     detail: { method, reason: user.betaRevokedAt ? 'beta_access_revoked' : 'no_beta_access' },
@@ -138,7 +138,7 @@ export async function revokeBetaAccess(userId: string): Promise<{ email: string;
     const cur = await q('SELECT email, org_id, beta_revoked_at FROM users WHERE id=$1 FOR UPDATE', [userId])
     const row = cur.rows[0]
     if (!row) throw new ApiError(404, 'Person not found.')
-    if (isPlatformAdmin(String(row.email))) throw new ApiError(400, 'Platform operators always have access. Remove them from PLANORA_PLATFORM_ADMINS first.')
+    if (isPlatformAdmin(String(row.email))) throw new ApiError(400, 'Platform operators always have access. Remove them from RUNF9_PLATFORM_ADMINS first.')
     if (row.beta_revoked_at) throw new ApiError(409, 'Their beta access is already revoked.')
     await q('UPDATE users SET beta_revoked_at=NOW() WHERE id=$1', [userId])
     const s = await q('UPDATE sessions SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL', [userId])

@@ -45,7 +45,7 @@ const finishTime = (hours: number) => {
  */
 export function projShortName(name: string): string {
   const clean = xerText(name).replace(/["'|\\]/g, '').replace(/\s+/g, ' ').trim()
-  if (clean.length <= 40) return clean || 'PLANORA'
+  if (clean.length <= 40) return clean || 'RUNF9'
   const cut = clean.slice(0, 41)
   const atWord = cut.lastIndexOf(' ')
   return (atWord >= 20 ? cut.slice(0, atWord) : clean.slice(0, 40)).trim()
@@ -147,7 +147,7 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     const msKind = a.milestoneKind ?? (hasPred.has(a.id) ? 'finish' : 'start')
     const type = a.type === 'milestone' ? (msKind === 'finish' ? 'TT_FinMile' : 'TT_Mile') : 'TT_Task'
     // Uploaded activities carry their own baseline fields (possibly empty); never invent planned/target
-    // dates for them. Planora-built plans have no baseline yet, so their planned dates are the CPM dates.
+    // dates for them. RunF9-built plans have no baseline yet, so their planned dates are the CPM dates.
     const fromUpload = a.baselineStart !== undefined || a.baselineFinish !== undefined
     const targetStart = fromUpload ? a.baselineStart : tm?.earlyStart
     const targetFinish = fromUpload ? a.baselineFinish : tm?.earlyFinish

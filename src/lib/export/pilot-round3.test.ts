@@ -160,7 +160,7 @@ describe('recalculation differences are not capped (finding 3)', () => {
   it('keeps every differing activity with file vs RunF9 ES/EF/LS/LF/TF', () => {
     expect(analysis.recalc!.differing).toBe(15)
     expect(analysis.recalc!.samples).toHaveLength(15)
-    expect(analysis.recalc!.samples[0]).toMatchObject({ code: 'A100', fileStart: '2026-06-01', planoraStart: '2026-03-02', fileFinish: '2026-06-05', fileLateStart: '2026-07-01', fileLateFinish: '2026-07-07', fileFloat: 20 })
+    expect(analysis.recalc!.samples[0]).toMatchObject({ code: 'A100', fileStart: '2026-06-01', runf9Start: '2026-03-02', fileFinish: '2026-06-05', fileLateStart: '2026-07-01', fileLateFinish: '2026-07-07', fileFloat: 20 })
   })
 
   it('QA/QC section 5 prints every row and its count matches the heading', () => {

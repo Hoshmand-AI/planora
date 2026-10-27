@@ -34,7 +34,7 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
         <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(codes.join('\n')); setCopied(true) }}><Copy size={13} className="inline mr-1" aria-hidden="true" />{copied ? 'Copied' : 'Copy'}</Button>
         <Button variant="secondary" onClick={() => {
           const url = URL.createObjectURL(new Blob([`RunF9 recovery codes\n\n${codes.join('\n')}\n`], { type: 'text/plain' }))
-          const a = document.createElement('a'); a.href = url; a.download = 'planora-recovery-codes.txt'; a.click()
+          const a = document.createElement('a'); a.href = url; a.download = 'runf9-recovery-codes.txt'; a.click()
         }}><Download size={13} className="inline mr-1" aria-hidden="true" />Download</Button>
       </div>
     </div>
@@ -203,7 +203,7 @@ function AccountPage() {
         {note('export')}
         <Button variant="secondary" disabled={busy === 'export'} onClick={async () => {
           const d = await act('export', { action: 'export_my_data' }, 'Downloaded.')
-          if (d) downloadJson(`planora-my-data-${new Date().toISOString().slice(0, 10)}.json`, d)
+          if (d) downloadJson(`runf9-my-data-${new Date().toISOString().slice(0, 10)}.json`, d)
         }}><Download size={13} className="inline mr-1" aria-hidden="true" />Download my data</Button>
       </Section>
 

@@ -275,7 +275,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
 
   return {
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,
-    planoraExport: isPlanoraXer(content),
+    runf9Export: isRunF9Xer(content),
     activities, relationships, calendars, defaultCalendarId, warnings,
     exceptions: ex.report(),
     sourceType: 'p6_xer', embeddedBaseline,
@@ -326,11 +326,11 @@ export function progressModeFromSchedOptions(opt: Row | undefined | null): Progr
 }
 
 /**
- * True when the XER was written by RunF9's own exporter (its ERMHDR names RunF9, or Planora for files
+ * True when the XER was written by RunF9's own exporter (its ERMHDR names RunF9, or RunF9 for files
  * exported before the rename, as the exporting application), so a re-import is recognized as RunF9's
  * output rather than the project's record.
  */
-export function isPlanoraXer(content: string): boolean {
+export function isRunF9Xer(content: string): boolean {
   const first = content.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/, 1)[0] || ''
   const cols = first.split('\t')
   return cols[0].trim() === 'ERMHDR' && ['RunF9', 'Planora'].includes(cols[5]?.trim() ?? '')

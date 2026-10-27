@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   requireIndependentReview: false,
   requireApprovalToPublish: false,
   aiEnabled: true,
-  aiDailyLimit: Number(process.env.PLANORA_AI_DAILY_LIMIT) || 300,
+  aiDailyLimit: Number(process.env.RUNF9_AI_DAILY_LIMIT) || 300,
   sessionIdleHours: 12,
   chatRetentionDays: 365,
   projectRetentionDays: 0,

@@ -58,7 +58,7 @@ function summarize(e: AuditEvent): string {
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
 
-const STANDARD_FRAMEWORK_OPTIONS = [['PLANORA_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
+const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -243,14 +243,14 @@ export default function OrgPage() {
               <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
               <div className="space-y-1.5">
                 {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
-                  const current = settings.standards?.defaultFrameworks ?? ['PLANORA_COMPOSITE']
+                  const current = settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']
                   const on = current.includes(fw)
                   return (
                     <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
                       <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
                         onChange={e => {
                           const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
-                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['PLANORA_COMPOSITE'] } })
+                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['RUNF9_COMPOSITE'] } })
                         }} />
                       {label}
                     </label>
@@ -353,7 +353,7 @@ export default function OrgPage() {
             setBusy(null)
             if (!res.ok) { setMsg({ tone: 'error', text: 'Export failed.', section: 'data' }); return }
             const url = URL.createObjectURL(await res.blob())
-            const a = document.createElement('a'); a.href = url; a.download = `planora-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+            const a = document.createElement('a'); a.href = url; a.download = `runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
           }}><Download size={13} className="inline mr-1" aria-hidden="true" />{busy === 'data' ? 'Preparing…' : 'Export organization data'}</Button>
         </Section>
       )}

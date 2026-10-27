@@ -142,7 +142,7 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       requireVerifiedEmail(auth)
       const data = await exportOrganization(auth.orgId)
       await audit({ action: 'privacy.organization_exported', targetType: 'organization', targetId: auth.orgId, detail: { plans: data.plans.length, schedules: data.schedules.length, projectDocuments: data.projectDocuments.length, auditEvents: data.auditEvents.length } })
-      return new Response(JSON.stringify(data, null, 2), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="planora-organization-export-${new Date().toISOString().slice(0, 10)}.json"` } })
+      return new Response(JSON.stringify(data, null, 2), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json"` } })
     }
     case 'delete_org': {
       if (actorRole !== 'owner') throw new ApiError(403, 'Only an owner can delete the organization.')

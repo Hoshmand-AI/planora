@@ -11,6 +11,7 @@ import { engineConfig } from './engine'
 import { scheduleStandardsInput } from './inputs'
 import type { EngineConfig } from './rule'
 import { FRAMEWORKS, RUNNABLE_FRAMEWORKS, isRunnableFramework, type Framework, type StandardsInput } from './types'
+import { currentName } from '@/lib/legacy-data'
 
 export function configFor(settings: OrgSettings): EngineConfig {
   return engineConfig({ gao: settings.standards.gao, dcma: settings.quality })
@@ -22,7 +23,7 @@ export function configFor(settings: OrgSettings): EngineConfig {
  */
 export function frameworksFrom(raw: unknown, settings: OrgSettings): Framework[] {
   if (raw === undefined || raw === null || raw === '') return normalizeFrameworkList(settings.standards.defaultFrameworks)
-  const list = (Array.isArray(raw) ? raw : String(raw).split(',')).map(x => String(x).trim()).filter(Boolean)
+  const list = (Array.isArray(raw) ? raw : String(raw).split(',')).map(x => currentName(String(x).trim())).filter(Boolean)
   const bad = list.filter(x => !isRunnableFramework(x))
   if (bad.length || !list.length) {
     const known = (FRAMEWORKS as readonly string[]).includes(bad[0] ?? '')

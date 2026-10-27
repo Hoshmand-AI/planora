@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // End-to-end checks of the private beta gate against a running RunF9 server in its DEFAULT
-// sign-up mode (invite-only: PLANORA_SIGNUP unset) with a platform operator configured.
-//   BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test [DATABASE_URL=…] [PLANORA_EMAIL_OUTBOX=dir] node scripts/e2e-beta.mjs
-// The server must run with PLANORA_PLATFORM_ADMINS containing BETA_ADMIN_EMAIL.
+// sign-up mode (invite-only: RUNF9_SIGNUP unset) with a platform operator configured.
+//   BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test [DATABASE_URL=…] [RUNF9_EMAIL_OUTBOX=dir] node scripts/e2e-beta.mjs
+// The server must run with RUNF9_PLATFORM_ADMINS containing BETA_ADMIN_EMAIL.
 // Covers: self sign-up refused (no account created), landing page and /auth copy, platform operator
 // invites a firm (link hashed at rest, single use, expiring, revocable), invitee gets a new
 // organization as owner and invites a member, the member joins, non-operators get 404 on the
@@ -13,7 +13,7 @@
 const BASE = process.env.BASE_URL || 'http://localhost:3001'
 const ORIGIN = new URL(BASE).origin
 const ADMIN = (process.env.BETA_ADMIN_EMAIL || 'ops@beta.test').toLowerCase()
-const OUTBOX = process.env.PLANORA_EMAIL_OUTBOX
+const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
 const PW = 'correct horse battery staple'
 const BETA_MESSAGE = 'RunF9 is in private beta. You need an invitation to sign in — ask your organization admin or request access.'
 let passed = 0
@@ -32,7 +32,7 @@ class Client {
     if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body) }
     const res = await fetch(BASE + url, { method, headers, body: payload, redirect: 'manual' })
     const set = res.headers.get('set-cookie')
-    if (set && set.startsWith('planora-token=')) this.cookie = set.split(';')[0]
+    if (set && set.startsWith('runf9-token=')) this.cookie = set.split(';')[0]
     const text = await res.text()
     let data = {}
     try { data = JSON.parse(text) } catch { data = { raw: text } }
@@ -75,7 +75,7 @@ async function main() {
   const ops = new Client()
   r = await ops.post('/api/auth', { action: 'signup', email: ADMIN, password: PW, name: 'Olga Operator', company: 'RunF9 Operations' })
   if (r.status === 409) r = await ops.post('/api/auth', { action: 'signin', email: ADMIN, password: PW })
-  ok(r.status === 200, 'A platform operator (PLANORA_PLATFORM_ADMINS) can create an account and sign in without an invitation', r.data)
+  ok(r.status === 200, 'A platform operator (RUNF9_PLATFORM_ADMINS) can create an account and sign in without an invitation', r.data)
   r = await ops.get('/api/auth')
   ok(r.data.platformAdmin === true, '/api/auth tells the operator they are one')
   if (r.data.security?.emailDelivery && !r.data.security?.emailVerified) {

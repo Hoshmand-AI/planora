@@ -4,7 +4,7 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta, setScheduleImportExceptions } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isRunF9ExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta, setScheduleImportExceptions } from '@/lib/db'
 import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
@@ -262,10 +262,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const varianceDays = analysis.varianceDays
     const percentComplete = schedulePercentComplete(parsed.activities)
     // Firm history: own as-built projects by default; never a RunF9 re-import or a third-party schedule.
-    const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
+    const runf9Export = !!parsed.runf9Export || await isRunF9ExportSha(ctx.orgId, sha256).catch(() => false)
     const history = decideHistory({
       requested: inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : null, override: historyOverrideInput,
-      origin: originInput, planoraExport, ...workCounts(parsed.activities),
+      origin: originInput, runf9Export, ...workCounts(parsed.activities),
     })
     const inHistory = history.inHistory
     warnings.push(...history.warnings)
@@ -307,7 +307,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       grossSqft: profile.grossSqft,
       workspaceId,
     })
-    const meta = { classification: classificationInput, uploadOrigin: originInput, planoraExport, historyOverride: history.historyOverride }
+    const meta = { classification: classificationInput, uploadOrigin: originInput, runf9Export, historyOverride: history.historyOverride }
     await updateScheduleMeta(schedule.id, ctx.orgId, meta)
     await setScheduleBaselineMeta(schedule.id, ctx.orgId, baselineMeta)
     // What the parser saw but did not map, converted or defaulted (never dropped silently).
@@ -322,7 +322,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, planoraExport, progressMode, workspaceId, importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, runf9Export, progressMode, workspaceId, importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -402,7 +402,7 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     const requested = typeof body.inHistory === 'boolean' ? body.inHistory : (s.inHistory ?? true)
     const decision = decideHistory({
       requested, override: typeof body.historyOverride === 'boolean' ? body.historyOverride : (s.historyOverride ?? false),
-      origin: 'origin' in body ? (body.origin ?? null) : (s.uploadOrigin ?? null), planoraExport: !!s.planoraExport, ...workCounts(await getActivities(s.id)),
+      origin: 'origin' in body ? (body.origin ?? null) : (s.uploadOrigin ?? null), runf9Export: !!s.runf9Export, ...workCounts(await getActivities(s.id)),
     })
     warnings.push(...decision.warnings)
     if (decision.inHistory !== (s.inHistory ?? true) || decision.historyOverride !== !!s.historyOverride) {

@@ -41,7 +41,7 @@ export interface ParsedSchedule {
   /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */
   progressMode?: ProgressMode | null
   /** The file was written by RunF9's own exporter (a re-import of RunF9 output, not a project record) */
-  planoraExport?: boolean
+  runf9Export?: boolean
   /** P6 only: the project baseline exported in the same file (per-activity baseline by activity id) */
   embeddedBaseline?: EmbeddedBaseline | null
 }

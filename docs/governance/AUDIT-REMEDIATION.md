@@ -147,7 +147,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | 74 | Withheld-data protection | ✅ | Tests cover the brief, generated schedule and coercion paths |
 | 75 | Prompt minimization / inspection | ✅ | Every call is audited with a prompt SHA-256, sizes and purpose |
 | 76 | Structured output validation | ✅ | Unchanged validators; the quota error is surfaced instead of being swallowed |
-| 77 | Model / version governance | ✅ | Approved registry (`PLANORA_APPROVED_MODELS`); default pinned to `claude-opus-5-5` (Anthropic; `gpt-4o-2024-11-20` when the OpenAI provider is selected); certified vs approved-alternate flag per model; [MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) |
+| 77 | Model / version governance | ✅ | Approved registry (`RUNF9_APPROVED_MODELS`); default pinned to `claude-opus-5-5` (Anthropic; `gpt-4o-2024-11-20` when the OpenAI provider is selected); certified vs approved-alternate flag per model; [MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) |
 | 78 | AI evaluation | ◐📄 | Golden prompts and acceptance criteria defined; an automated live-model harness is still to do |
 | 79 | AI monitoring / incidents | ✅ | `ai.request` events with ok/error and latency; incident handling in AI-GOVERNANCE.md |
 | 80 | Claims / calibration | ✅ | Scenario vs Monte Carlo labelling; method and assumptions shown with every result |
@@ -222,7 +222,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
    - required checks `check`, `e2e`, `sast` and `analyze`;
    - optionally require code-owner review (adds human approval only for security-sensitive paths).
 2. **Backup secrets:** `BACKUP_DATABASE_URL` (read-only role) and `BACKUP_PASSPHRASE` in GitHub → Settings → Secrets → Actions.
-3. **Optional:** set `PLANORA_ENCRYPTION_KEY` (32+ random characters) in Vercel, separate from `JWT_SECRET`. Do this before anyone enrolls 2-step verification; changing it later forces re-enrollment.
-4. **Optional:** set `PLANORA_DEFAULT_PLAN`. New organizations start on **Free** unless it is set to `pro`.
+3. **Optional:** set `RUNF9_ENCRYPTION_KEY` (32+ random characters) in Vercel, separate from `JWT_SECRET`. Do this before anyone enrolls 2-step verification; changing it later forces re-enrollment.
+4. **Optional:** set `RUNF9_DEFAULT_PLAN`. New organizations start on **Free** unless it is set to `pro`.
 5. **Log drain** to a log service and alerts on `auth.locked` and 5xx (POA&M #3).
 6. **Third parties:** pen test, counsel review, insurance, email provider for verification (POA&M #1, #2, #8, #9).

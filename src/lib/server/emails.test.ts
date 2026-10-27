@@ -12,6 +12,11 @@ describe('sender', () => {
     expect(fromHeader(undefined)).toBe('RunF9 <no-reply@hoshmand.ai>')
     expect(fromHeader('not an address')).toBe('RunF9 <no-reply@hoshmand.ai>')
   })
+
+  it('never sends from an address named after the old brand', () => {
+    expect(fromHeader('Planora <planora@hoshmand.ai>')).toBe('RunF9 <no-reply@hoshmand.ai>')
+    expect(fromHeader('PLANORA@hoshmand.ai')).toBe('RunF9 <no-reply@hoshmand.ai>')
+  })
 })
 
 describe('branded emails', () => {

@@ -31,7 +31,7 @@ Maps RunF9's controls to common frameworks, with the evidence an assessor can ch
 
 ## NIST SP 800-171 Rev. 3 (for CUI deployments)
 
-RunF9's cloud service is **not** offered for Controlled Unclassified Information. For CUI, RunF9 runs on-premises / air-gapped inside the customer's assessed boundary (`PLANORA_AIRGAPPED=true`, on-prem model or no model, on-prem PostgreSQL). The application then provides these controls; the hosting environment provides the rest. On the commercial cloud, the app warns against entering CUI and refuses to send projects marked CUI or classified to a cloud model ([CUI-HANDLING.md](CUI-HANDLING.md)).
+RunF9's cloud service is **not** offered for Controlled Unclassified Information. For CUI, RunF9 runs on-premises / air-gapped inside the customer's assessed boundary (`RUNF9_AIRGAPPED=true`, on-prem model or no model, on-prem PostgreSQL). The application then provides these controls; the hosting environment provides the rest. On the commercial cloud, the app warns against entering CUI and refuses to send projects marked CUI or classified to a cloud model ([CUI-HANDLING.md](CUI-HANDLING.md)).
 
 | Family | Application control | Status |
 |---|---|---|

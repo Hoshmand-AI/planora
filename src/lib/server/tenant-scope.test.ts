@@ -20,7 +20,7 @@ const CHILD_TABLES = new Set(['activities', 'relationships', 'chat_messages', 'd
 /** Not firm data: per-user or operational tables, scoped by user id, token hash or key. */
 const NON_TENANT_TABLES = new Set(['sessions', 'rate_limits', 'email_tokens', 'maintenance_runs', 'schema_migrations',
   // Private beta invitations for NEW firms: platform-operator data (no organization exists yet), read
-  // and written only through /api/platform/beta (404 unless PLANORA_PLATFORM_ADMINS) and by token hash at sign-up.
+  // and written only through /api/platform/beta (404 unless RUNF9_PLATFORM_ADMINS) and by token hash at sign-up.
   'beta_invites'])
 const IDENTITY_TABLES = new Set(['users'])
 const ROOT_TABLE = 'organizations'
@@ -90,7 +90,7 @@ const ALLOWLIST: { file: string; sql: string; why: string }[] = [
   // Sign-up of a new firm creates its organization (the id is new; nothing is read).
   { file: 'src/lib/db.ts', sql: 'INSERT INTO organizations (id, name, plan)', why: 'createUser: a new organization for a self sign-up' },
   // Private beta administration: the platform operator's cross-organization view (/api/platform/beta
-  // answers 404 to everyone not in PLANORA_PLATFORM_ADMINS).
+  // answers 404 to everyone not in RUNF9_PLATFORM_ADMINS).
   { file: 'src/lib/server/beta.ts', sql: 'FROM beta_invites b LEFT JOIN organizations o ON o.id = b.accepted_org_id', why: 'listBetaInvites: platform operators only; names the firm each invitation created' },
   { file: 'src/lib/server/beta.ts', sql: 'FROM users u JOIN organizations o ON o.id = u.org_id ORDER BY u.created_at DESC', why: 'listBetaUsers: platform operators only; beta status of every account' },
   // Invite-only sign-up needs to know whether the instance is empty (a count, no data).

@@ -11,7 +11,7 @@ import { completeSchedule } from './complete-schedule'
 import { generateSchedule } from './generator'
 import { resolveProgressMode, progressModeWarning } from './upload-rules'
 import { makeActivity } from '@/lib/parsers/types'
-import { isPlanoraXer, parseXER, progressModeFromSchedOptions, readXerTables } from '@/lib/parsers/xer-parser'
+import { isRunF9Xer, parseXER, progressModeFromSchedOptions, readXerTables } from '@/lib/parsers/xer-parser'
 import { exportXer, exportXerFromOriginal } from '@/lib/export/xer'
 import { runDcma } from '@/lib/analysis/dcma'
 import { compareSchedules, type CompareSide } from '@/lib/analysis/compare'
@@ -144,14 +144,14 @@ describe('RunF9 exports are recognizable on re-import', () => {
   it('a fresh RunF9 XER is marked in its header; a P6 file is not', () => {
     const g = generateSchedule({ answers: { 'project.type': k('warehouse_industrial'), 'project.state': k('TX'), 'project.target_start': k('2026-03-02') }, today: '2026-01-15' })
     const x = exportXer(g, 'Warehouse', { exportedBy: 'Ana', progressMode: 'override' })
-    expect(isPlanoraXer(x)).toBe(true)
+    expect(isRunF9Xer(x)).toBe(true)
     const parsed = parseXER(x, 's')
-    expect(parsed.planoraExport).toBe(true)
+    expect(parsed.runf9Export).toBe(true)
     expect(parsed.progressMode).toBe('override')
-    expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tuser\tPlanner Name\tdb\tProject Management\tUSD\r\n%E\r\n')).toBe(false)
+    expect(isRunF9Xer('ERMHDR\t19.12\t2026-03-01\tProject\tuser\tPlanner Name\tdb\tProject Management\tUSD\r\n%E\r\n')).toBe(false)
     // files exported before the RunF9 rename still count as our own output
-    expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tPlanora\tPlanora\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
-    expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tRunF9\tRunF9\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
+    expect(isRunF9Xer('ERMHDR\t19.12\t2026-03-01\tProject\tPlanora\tPlanora\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
+    expect(isRunF9Xer('ERMHDR\t19.12\t2026-03-01\tProject\tRunF9\tRunF9\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
   })
 })
 

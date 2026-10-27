@@ -8,7 +8,7 @@ import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import type { Schedule } from '@/lib/db'
 import { exportExceptions } from './exceptions'
 import { exportImportXlsx } from './xlsx'
-import { planoraRelease, type Provenance } from './provenance'
+import { runf9Release, type Provenance } from './provenance'
 import { exceptionHeader } from '@/lib/parsers/exceptions'
 
 // The equivalence fixture: two calendars (one with an added Saturday work day), constraints including a
@@ -72,7 +72,7 @@ describe('export exception reports', () => {
     const exceptions = exportExceptions(g, 'xlsx-import', ctx)
     const prov: Provenance = {
       sources: [{ scheduleName: 'EQ-1', version: 'Update 1', fileName: 'eq.xer', sha256: 'abc', dataDate: '2026-03-16', progressMode: 'retained' }],
-      release: planoraRelease({}), settings: ['CPM'], generatedAt: '2026-03-16T00:00:00.000Z', exceptions,
+      release: runf9Release({}), settings: ['CPM'], generatedAt: '2026-03-16T00:00:00.000Z', exceptions,
     }
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(await exportImportXlsx(g, 'EQ-1', { prov }) as unknown as ArrayBuffer)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Restore drill: proves a backup can actually be restored, and measures how long it takes.
-//   ADMIN_DATABASE_URL=postgres://…/postgres node scripts/restore-drill.mjs backups/planora-….dump
+//   ADMIN_DATABASE_URL=postgres://…/postgres node scripts/restore-drill.mjs backups/runf9-….dump
 // Creates a scratch database, restores the dump into it, then checks: the file's SHA-256 matches
 // its manifest, every table's row count matches, the schema is at the backed-up migration, and
 // every organization's audit hash chain still verifies end to end. Drops the scratch database
@@ -21,7 +21,7 @@ const check = (ok, msg) => { console.log(`${ok ? '✓' : '✗'} ${msg}`); if (!o
 
 check(createHash('sha256').update(fs.readFileSync(dump)).digest('hex') === manifest.sha256, 'Backup file matches its SHA-256')
 
-const scratch = `planora_restore_drill_${Date.now()}`
+const scratch = `runf9_restore_drill_${Date.now()}`
 const adminDb = new pg.Client({ connectionString: admin })
 await adminDb.connect()
 await adminDb.query(`CREATE DATABASE ${scratch}`)

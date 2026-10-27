@@ -22,7 +22,7 @@ describe('upload limits where the app runs', () => {
 
 describe('public site URL (robots, sitemap, link previews)', () => {
   it('prefers APP_URL, then the Vercel production domain, then localhost', () => {
-    expect(siteUrl({ APP_URL: 'https://app.planora.example/', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' })).toBe('https://app.planora.example')
+    expect(siteUrl({ APP_URL: 'https://app.runf9.example/', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' })).toBe('https://app.runf9.example')
     expect(siteUrl({ VERCEL_PROJECT_PRODUCTION_URL: 'planora-chi.vercel.app' })).toBe('https://planora-chi.vercel.app')
     expect(siteUrl({ APP_URL: 'not a url' })).toBe('http://localhost:3000')
   })
