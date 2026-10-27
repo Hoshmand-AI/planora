@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import F9Demo from '@/components/landing/F9Demo'
 import Pillars from '@/components/landing/Pillars'
+import Deployment from '@/components/landing/Deployment'
 import { CountUp, Reveal } from '@/components/landing/motion'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
@@ -194,7 +195,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             { name: 'Free', price: '$0', per: '/month', blurb: 'For trying RunF9 on real projects.', yes: ['Up to 3 uploaded schedules', 'Unlimited interview-built schedules', 'Executive Summary report', '10 AI requests/day', 'Export to P6, MS Project & CSV', 'Roles, 2-step verification & audit log'], no: ['Critical Path, Variance & QA/QC reports', 'Export to PDF & Excel', 'API keys & webhooks'], cta: inviteOnly ? 'Request access' : 'Start free', href: primaryHref, featured: false },
             { name: 'Pro', price: '$49', per: '/month', blurb: 'For schedulers and consultants who need every report and export.', yes: ['Unlimited uploaded schedules', 'All 4 report types', 'Up to 1,000 AI requests/day', 'Export to P6, MS Project, PDF & Excel', 'Monte Carlo schedule risk analysis', 'API keys & signed webhooks', 'Roles, 2-step verification & audit log'], no: [], cta: inviteOnly ? 'Request access' : 'Start free, then upgrade', href: primaryHref, featured: true },
-            { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
+            { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'Deploy in your AWS, Azure or Google Cloud account, or air-gapped', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
           ].map((p, i) => (
             <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 bg-white border flex flex-col ${p.featured ? 'border-accent-600 shadow-[0_30px_60px_-30px_rgba(37,99,235,0.35)]' : 'border-warm-200'}`}>
               <div className="text-[15px] font-semibold text-navy-950">{p.name}</div>
@@ -209,6 +210,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           ))}
         </div>
       </section>
+
+      {/* Where RunF9 runs: our cloud, the customer's cloud account, or their own servers */}
+      <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} contactEmail="support@hoshmand.ai" />
 
       {/* Evidence: how each figure on this page can be checked */}
       <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32">

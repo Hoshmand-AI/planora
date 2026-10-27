@@ -134,7 +134,10 @@ describe('field encryption', () => {
     expect(sealed).not.toContain('JBSWY3DP')
     expect(decrypt(sealed)).toBe('JBSWY3DPEHPK3PXP')
     const parts = sealed.split('.')
-    parts[3] = parts[3].slice(0, -2) + (parts[3].endsWith('A') ? 'BB' : 'AA')
+    // Flip a bit in the decoded bytes (editing base64 text can land in padding bits and change nothing)
+    const bytes = Buffer.from(parts[3], 'base64url')
+    bytes[0] ^= 0x01
+    parts[3] = bytes.toString('base64url')
     expect(() => decrypt(parts.join('.'))).toThrow()
     const short = sealed.split('.')
     short[2] = Buffer.from(short[2], 'base64url').subarray(0, 4).toString('base64url')
