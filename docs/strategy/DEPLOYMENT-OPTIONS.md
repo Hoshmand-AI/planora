@@ -24,6 +24,11 @@ your AWS / Azure / Google account or on your own servers"** (an enterprise contr
 The cloud is picked when the contract is signed, not by a self-serve button that provisions
 infrastructure. Building that button means building a cloud platform company.
 
+This choice is on the website now: the "Run it where your data lives" section
+(`src/components/landing/Deployment.tsx`) lets a visitor pick RunF9 Cloud, their AWS, Azure or
+Google Cloud account, or their own servers, shows where the data lives and which AI is used for each,
+labels each option "Available now" or "On request", and routes the request with the cloud named.
+
 ## Why this is feasible for RunF9 specifically
 
 RunF9 already avoids cloud-specific services. It is:
