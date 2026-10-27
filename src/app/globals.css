@@ -3,22 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --navy-950: #0A1628;
-  --navy-900: #0F2140;
-  --navy-800: #162D54;
-  --navy-700: #1E3A6A;
+  --navy-950: #06141B;
+  --navy-900: #11212D;
+  --navy-800: #253745;
+  --navy-700: #4A5C6A;
+  --navy-400: #9BA8AB;
+  --navy-200: #CCD0CF;
+  --accent-700: #1d4ed8;
   --accent-600: #2563eb;
   --accent-500: #3b82f6;
   --accent-400: #60a5fa;
   --accent-100: #eff6ff;
-  --warm-50:  #FDFCFA;
-  --warm-100: #F8F6F3;
-  --warm-200: #F0EDE8;
-  --warm-300: #E2DDD5;
-  --warm-400: #736A60;
-  --warm-500: #665E54;
-  --warm-600: #575047;
-  --warm-700: #433D36;
+  --warm-50:  #FAFBFB;
+  --warm-100: #F4F6F6;
+  --warm-200: #EBEEEE;
+  --warm-300: #CCD0CF;
+  --warm-400: #56656F;
+  --warm-500: #4C5B66;
+  --warm-600: #3F4E5A;
+  --warm-700: #253745;
 }
 
 * { -webkit-font-smoothing: antialiased; }
@@ -95,12 +98,12 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 .status-pulse { animation: status-pulse 2.4s ease-in-out infinite; }
 
 /* Mood tiles: a soft tint and glow per status */
-.mood-tile { position: relative; isolation: isolate; background: var(--tile-bg, #FDFCFA); border-color: var(--tile-line, #F0EDE8); box-shadow: 0 10px 30px -18px var(--tile-glow, transparent); }
+.mood-tile { position: relative; isolation: isolate; background: var(--tile-bg, #FAFBFB); border-color: var(--tile-line, #EBEEEE); box-shadow: 0 10px 30px -18px var(--tile-glow, transparent); }
 .mood-tile[data-mood='working'] { --tile-bg: #F5F9FF; --tile-line: #DCE8FB; --tile-glow: #3b82f6; }
 .mood-tile[data-mood='waiting'] { --tile-bg: #FFF8F0; --tile-line: #F6DFC2; --tile-glow: #E0902F; }
 .mood-tile[data-mood='done']    { --tile-bg: #F3FBF6; --tile-line: #CDEBD8; --tile-glow: #2F9E6A; }
 .mood-tile[data-mood='worried'] { --tile-bg: #FFF5F5; --tile-line: #F3D3D3; --tile-glow: #C25B5B; }
-.mood-tile[data-mood='idle']    { --tile-bg: #FAF8F5; --tile-line: #EAE5DE; --tile-glow: #9A9186; }
+.mood-tile[data-mood='idle']    { --tile-bg: #F7F9F9; --tile-line: #DDE2E2; --tile-glow: #7D8B90; }
 
 
 /* ── Marketing page motion (src/components/landing): fade up on first view, nothing loops ── */
@@ -112,3 +115,32 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 .steps:not(.reveal) .steps-line, .steps.is-in .steps-line { transform: scaleX(1); }
 .step-dot { transition: background-color 400ms ease, color 400ms ease; }
 .steps:not(.reveal) .step-dot, .steps.is-in .step-dot { background-color: var(--accent-600); color: #fff; }
+
+/* ── App motion and depth: one language across every page ── */
+@layer base {
+  /* Controls change colour smoothly and give a small, immediate press; `scale` leaves any transform alone */
+  a, button, [role='button'], summary {
+    transition-property: color, background-color, border-color, box-shadow, opacity, scale;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+  }
+  button:not(:disabled):active, [role='button']:active { scale: 0.985; }
+}
+
+/* Each page settles in from just below when you move between tabs */
+@keyframes page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.page-enter { animation: page-enter 420ms var(--ease-out) both; }
+
+/* Clickable cards lift a little toward the pointer */
+.card-lift { transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out), border-color 200ms ease-out, background-color 200ms ease-out; }
+@media (hover: hover) {
+  .card-lift:hover { transform: translateY(-2px); box-shadow: 0 1px 2px rgb(6 20 27 / 0.04), 0 14px 32px -14px rgb(6 20 27 / 0.22); }
+}
+
+/* Frosted app bar: the page scrolls softly beneath it */
+.glass-bar { background: rgb(17 33 45 / 0.86); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); }
+
+/* Active tab marker slides in rather than snapping */
+.tab-mark { position: relative; }
+.tab-mark::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent-400); transform: scaleX(0); transition: transform 320ms var(--ease-out); }
+.tab-mark[aria-current='page']::after { transform: scaleX(1); }

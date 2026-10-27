@@ -322,7 +322,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Top Header ──────────────────────────────────────── */}
-        <header className="bg-navy-900 flex-shrink-0 sticky top-0 z-40 border-b border-white/5">
+        <header className="glass-bar flex-shrink-0 sticky top-0 z-40 border-b border-white/5">
           <div className="h-14 flex items-center justify-between px-4 md:px-5">
 
             {/* Left: logo */}
@@ -365,7 +365,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {can('schedule.write') && (
               <button
                 onClick={openUpload}
-                className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors pressable shadow-sm"
               >
                 <Upload size={12} aria-hidden="true" />
                 <span className="hidden sm:inline">Upload</span>
@@ -392,10 +392,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={tab.href}
                   href={tab.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
-                    active
-                      ? 'text-white border-accent-500'
-                      : 'text-white/70 border-transparent hover:text-white'
+                  className={`tab-mark flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
+                    active ? 'text-white' : 'text-white/70 hover:text-white'
                   }`}
                 >
                   <tab.icon size={13} aria-hidden="true" />
@@ -424,13 +422,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           )}
-          <div className="max-w-5xl mx-auto">
+          <div key={pathname} className="max-w-5xl mx-auto page-enter">
             {children}
           </div>
         </main>
 
         {/* ── Mobile bottom tab bar ────────────────────────────── */}
-        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900 border-t border-white/8 safe-area-bottom">
+        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-bar border-t border-white/8 safe-area-bottom">
           <div className="flex">
             {TABS.map(tab => {
               const active = isActive(pathname, tab.href)
@@ -487,7 +485,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Link href="/dashboard/quality" onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-500 text-navy-950 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-400 transition-colors">Review data questions</Link>
+                    <Link href="/dashboard/quality" onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     <button onClick={() => setShowUpload(false)} className="flex-1 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors">Done</button>
                   </div>
                 </div>
@@ -537,7 +535,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[14px] font-semibold hover:bg-accent-400 disabled:opacity-50 transition-colors">
+                  className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 disabled:opacity-50 transition-colors pressable shadow-sm">
                   {uploading ? 'Parsing schedule…' : 'Upload & Parse'}
                 </button>
               </form>
