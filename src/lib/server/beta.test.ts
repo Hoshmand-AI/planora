@@ -302,7 +302,7 @@ describe('private beta sign-in gate', () => {
     const r = await signin('nobeta@firm-a.test')
     expect(r.status).toBe(403)
     expect(r.data.code).toBe('beta_access_required')
-    expect(r.data.error).toBe('Hoshmand Schedule is in private beta. You need an invitation to sign in — ask your organization admin or request access.')
+    expect(r.data.error).toBe('RunF9 is in private beta. You need an invitation to sign in — ask your organization admin or request access.')
     expect(r.cookie).not.toContain('planora-token=')
     const refused = state.audit.find(a => a.action === 'auth.login_refused_beta')!
     expect(refused.orgId).toBe('org_a')

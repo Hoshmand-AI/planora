@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Page not found — Hoshmand Schedule', robots: { index: false } }
+export const metadata = { title: 'Page not found — RunF9', robots: { index: false } }
 
 export default function NotFound() {
   return (

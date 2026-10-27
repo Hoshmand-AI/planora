@@ -1,6 +1,6 @@
 // Windows analysis of an update series (forensic / owner-side delay review). For every consecutive
 // pair of updates (ordered by data date) it reports how far the finish milestone moved and splits
-// the movement into causes with a stepped "half-step" recalculation on Hoshmand Schedule's own CPM:
+// the movement into causes with a stepped "half-step" recalculation on RunF9's own CPM:
 //
 //   E0  the earlier update as submitted (its logic, durations, constraints, calendars and progress)
 //   H1  half-step: the earlier update's network with the LATER update's progress (actual dates,
@@ -112,7 +112,7 @@ export interface WindowRow {
   after: { id: string; version: string; dataDate: string | null; finish: string | null }
   /** Activity whose finish is measured (null: project forecast finish) */
   finishCode: string | null
-  /** Calendar days the logic-driven finish moved (+ = later), from Hoshmand Schedule's recalculation */
+  /** Calendar days the logic-driven finish moved (+ = later), from RunF9's recalculation */
   movement: number | null
   /** The finish as scheduled (mandatory constraints honored, as the activity dates show it) */
   asScheduled: { before: string | null; after: string | null; movement: number | null }
@@ -631,7 +631,7 @@ export function analyzeWindows(series: WindowUpdate[], opts: { includeReissues?:
     else if (p.uploads > 1) notes.push(`${p.uploads} uploads have the data date ${fmtDate(p.dataDate)}; reissues are included, so a window compares revisions of the same period.`)
   }
   if (updates.length < 2) notes.push('A windows analysis needs at least two updates of the project (with different data dates).')
-  notes.push('Movement and attribution are in calendar days (+ = later) of the logic-driven finish (mandatory constraints cannot hide delay), from Hoshmand Schedule\'s recalculation of each step; the as-scheduled movement is shown next to it; float and hidden delay are in work days.')
+  notes.push('Movement and attribution are in calendar days (+ = later) of the logic-driven finish (mandatory constraints cannot hide delay), from RunF9\'s recalculation of each step; the as-scheduled movement is shown next to it; float and hidden delay are in work days.')
   notes.push('Attribution: progress first (half-step), then scope (added/deleted activities with the links that replace them), logic, durations, constraints and calendars, each credited with the average of its effect applied forward and in reverse order; the parts add up to the movement. Activity-level drivers telescope along the later driving path.')
   return { finishCode, finishName: fm?.name ?? null, windows, trend: seriesTrend(updates, finishCode), series: periods, notes }
 }

@@ -28,7 +28,7 @@ export interface PortfolioRow {
   updates?: number
   /** Uploaded schedules: the latest update's data date */
   dataDate?: string | null
-  /** Uploaded schedules: what the variance was measured against (Hoshmand Schedule's analysis) */
+  /** Uploaded schedules: what the variance was measured against (RunF9's analysis) */
   varianceBasis?: string | null
 }
 
@@ -86,7 +86,7 @@ export function planRow(p: Plan, today: string): PortfolioRow {
 }
 
 /**
- * One uploaded schedule. Status, variance and their reasons come from Hoshmand Schedule's stored analysis
+ * One uploaded schedule. Status, variance and their reasons come from RunF9's stored analysis
  * (src/lib/analysis/schedule-analysis.ts) — the same numbers the dashboard overview shows — never
  * from a separate computation here. Uploads without a stored analysis show no status until opened.
  */
@@ -97,7 +97,7 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
   if (an) {
     for (const reason of an.statusReasons ?? []) alerts.push(reasonAlert(reason, an.varianceDays))
   } else {
-    alerts.push({ code: 'not_analyzed', severity: 'info', text: 'Hoshmand Schedule has not analyzed this upload yet; open it to calculate status and variance.' })
+    alerts.push({ code: 'not_analyzed', severity: 'info', text: 'RunF9 has not analyzed this upload yet; open it to calculate status and variance.' })
   }
   if (s.dataDate) {
     const age = days(s.dataDate, today)

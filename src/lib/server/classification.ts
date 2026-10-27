@@ -19,7 +19,7 @@ export function classificationFromAnswer(a: unknown): DataClassification | null 
 export const isRestrictedClassification = (c: string | null | undefined) => c === 'cui' || c === 'classified'
 
 /** Returned with 409 when the commercial cloud service is asked to hold a classified schedule or plan. */
-export const CLASSIFIED_CLOUD_REFUSAL = 'This is the commercial cloud service, which is not accredited for classified information, so it does not accept or process schedules or plans marked classified. Use the on-premises / air-gapped Hoshmand Schedule package (container image and Docker Compose bundle; see docs/operations/ON-PREM-INSTALL.md) inside your accredited enclave. If this item was marked classified by mistake, mark it unclassified or CUI instead; if it is classified, delete it here and report it to your security officer.'
+export const CLASSIFIED_CLOUD_REFUSAL = 'This is the commercial cloud service, which is not accredited for classified information, so it does not accept or process schedules or plans marked classified. Use the on-premises / air-gapped RunF9 package (container image and Docker Compose bundle; see docs/operations/ON-PREM-INSTALL.md) inside your accredited enclave. If this item was marked classified by mistake, mark it unclassified or CUI instead; if it is classified, delete it here and report it to your security officer.'
 export const CLASSIFIED_CLOUD_CODE = 'classified_on_commercial_cloud'
 
 /**
@@ -51,7 +51,7 @@ export function mostRestrictive(...cs: (string | null | undefined)[]): DataClass
   return out
 }
 
-/** An uploaded schedule: its own classification setting and, when built in Hoshmand Schedule, its plan's. */
+/** An uploaded schedule: its own classification setting and, when built in RunF9, its plan's. */
 async function ofSchedule(scheduleId: string, orgId: string): Promise<DataClassification | null> {
   const res = await query(`SELECT s.classification AS own, p.answers->'security.classification' AS c FROM schedules s
     LEFT JOIN plans p ON p.id = s.plan_id AND p.org_id = s.org_id

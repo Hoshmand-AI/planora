@@ -90,7 +90,7 @@ export interface ScheduleComparison {
   finishMovement: number | null
   /**
    * Calendar days the latest-finishing activity moved, whichever activity finishes last, on the same
-   * basis as the activity dates (Hoshmand Schedule's recalculated dates; latestFinish names the activities)
+   * basis as the activity dates (RunF9's recalculated dates; latestFinish names the activities)
    */
   projectFinishMovement: number | null
   /** The latest-finishing activity in each update, from the activity dates */
@@ -402,7 +402,7 @@ export function compareSchedules(before: CompareSide, after: CompareSide, opts: 
   if (finishActivity && projectFinishMovement != null && latestFinish.before && latestFinish.after
     && (projectFinishMovement !== finishMovement || latestFinish.after.code !== finishActivity)) {
     const who = latestFinish.before.code === latestFinish.after.code ? latestFinish.after.code : `${latestFinish.before.code} → ${latestFinish.after.code}`
-    summary.push(`The latest-finishing activity (${who}) moved ${projectFinishMovement === 0 ? '0 days' : days(projectFinishMovement)} (${fmtDate(latestFinish.before.date)} → ${fmtDate(latestFinish.after.date)}, Hoshmand Schedule's recalculated activity dates).`)
+    summary.push(`The latest-finishing activity (${who}) moved ${projectFinishMovement === 0 ? '0 days' : days(projectFinishMovement)} (${fmtDate(latestFinish.before.date)} → ${fmtDate(latestFinish.after.date)}, RunF9's recalculated activity dates).`)
   }
   if (finishHeldBy) summary.push(`The finish ${finishMovement === 0 ? 'did not move' : 'moved earlier'} only because a Mandatory Finish constraint on ${finishHeldBy.code} holds it at ${fmtDate(finishHeldBy.constraintDate)}; logic alone would finish it ${fmtDate(finishHeldBy.logicDate)}, ${n(finishHeldBy.days, 'work day')} later.`)
   if (finishBasis.after && !finishHeldBy) summary.push(`${finishBasis.after.code} is held by a ${finishBasis.after.type === 'MFO' ? 'Mandatory Finish' : 'Mandatory Start'} at ${fmtDate(finishBasis.after.constrainedFinish)}; the logic-driven finish is ${fmtDate(finishBasis.after.logicFinish)} (${n(finishBasis.after.days, 'work day')} later).`)

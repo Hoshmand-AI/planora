@@ -61,7 +61,7 @@ export default function HistoryPage() {
 
       <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Your schedules</div>
-        <p className="text-[12px] text-warm-500 mb-3">Tag each with facility type, state and area so Hoshmand Schedule can compare like with like. A new firm with no history starts from reference templates; accuracy improves as you add completed projects.</p>
+        <p className="text-[12px] text-warm-500 mb-3">Tag each with facility type, state and area so RunF9 can compare like with like. A new firm with no history starts from reference templates; accuracy improves as you add completed projects.</p>
         {data.schedules.length === 0 ? (
           <EmptyState inline heading="h2" title="No schedules yet" action={can('schedule.write') ? { label: 'Upload a past schedule', onClick: openUpload } : undefined}>
             <Database size={14} className="inline mr-1 -mt-0.5" aria-hidden="true" />Upload past P6 / MS Project / Excel schedules with actual dates.
@@ -113,8 +113,8 @@ export default function HistoryPage() {
         </div>
 
         <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Backtest: would Hoshmand Schedule have predicted your real projects?</div>
-          <p className="text-[12px] text-warm-500 mb-2">For each completed project, Hoshmand Schedule rebuilds the construction schedule from its facility type and size using only your <em>other</em> projects (leave-one-out), then compares to what actually happened.</p>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Backtest: would RunF9 have predicted your real projects?</div>
+          <p className="text-[12px] text-warm-500 mb-2">For each completed project, RunF9 rebuilds the construction schedule from its facility type and size using only your <em>other</em> projects (leave-one-out), then compares to what actually happened.</p>
           {bt.projects.length === 0 ? <p className="text-[13px] text-warm-500">Not enough tagged, completed projects yet.</p> : (
             <table className="w-full text-[12.5px]">
               <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-400"><th className="py-1">Project</th><th className="py-1 text-right">Actual</th><th className="py-1 text-right">Predicted</th><th className="py-1 text-right">Error</th></tr></thead>

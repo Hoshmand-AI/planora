@@ -36,7 +36,7 @@ export async function createInvitation(orgId: string, email: string, role: Role,
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized)) throw new ApiError(400, 'Enter a valid email address.')
   const existing = await query('SELECT org_id FROM users WHERE LOWER(email)=$1', [normalized])
   if (existing.rows[0]) {
-    throw new ApiError(409, existing.rows[0].org_id === orgId ? 'That person is already a member.' : 'That email already has a Hoshmand Schedule account in another organization. They need to use a different work email, or close that account first.')
+    throw new ApiError(409, existing.rows[0].org_id === orgId ? 'That person is already a member.' : 'That email already has a RunF9 account in another organization. They need to use a different work email, or close that account first.')
   }
   await query('UPDATE invitations SET revoked_at=NOW() WHERE org_id=$1 AND LOWER(email)=$2 AND accepted_at IS NULL AND revoked_at IS NULL', [orgId, normalized])
   const token = randomToken(24)

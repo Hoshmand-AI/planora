@@ -9,6 +9,6 @@
 | Resend, Inc. **or** Wildbit LLC (Postmark) | Transactional email (confirmation links, invitations) | Recipient email address, message text | United States | Only if `RESEND_API_KEY` or `POSTMARK_TOKEN` is configured |
 | GitHub, Inc. | Encrypted off-provider backup artifacts | Encrypted database dump | United States | Only if the nightly backup workflow is enabled |
 
-Only one cloud AI provider is active at a time (shown in the AI status in Settings). Training and data-retention terms must be verified against the provider agreement in force; Hoshmand Schedule does not assert them here.
+Only one cloud AI provider is active at a time (shown in the AI status in Settings). Training and data-retention terms must be verified against the provider agreement in force; RunF9 does not assert them here.
 
 On-premises / air-gapped deployments use none of these. Customers are notified 30 days before a new subprocessor that processes customer data is added.

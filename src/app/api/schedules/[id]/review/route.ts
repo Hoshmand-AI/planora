@@ -20,7 +20,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 export const POST = api<{ id: string }>({ permission: 'plan.review' }, async (req, { params, auth }) => {
   const schedule = await getScheduleById(params.id, auth.orgId)
   if (!schedule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (schedule.sourceType === 'generated') return NextResponse.json({ error: 'Schedules built in Hoshmand Schedule are reviewed on the plan (Build → Review), not as a submission.' }, { status: 400 })
+  if (schedule.sourceType === 'generated') return NextResponse.json({ error: 'Schedules built in RunF9 are reviewed on the plan (Build → Review), not as a submission.' }, { status: 400 })
   const parsed = parseReviewInput(await req.json().catch(() => ({})))
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
   const v = parsed.value

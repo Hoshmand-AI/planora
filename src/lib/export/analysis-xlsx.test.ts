@@ -18,7 +18,7 @@ const prov: Provenance = {
     { role: 'Earlier update', scheduleName: 'Riverside', version: 'Update 5', fileName: 'upd5.xer', sha256: '1'.repeat(64), dataDate: '2026-03-02', progressMode: 'retained' },
     { role: 'Later update', scheduleName: 'Riverside', version: 'Update 6', fileName: 'upd6.xer', sha256: '2'.repeat(64), dataDate: '2026-04-01', progressMode: 'retained' },
   ],
-  release: 'abc1234', settings: ['CPM recalculation by Hoshmand Schedule'], generatedAt: '2026-10-06T12:00:00.000Z',
+  release: 'abc1234', settings: ['CPM recalculation by RunF9'], generatedAt: '2026-10-06T12:00:00.000Z',
 }
 const load = async (buf: Buffer) => { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf as unknown as ArrayBuffer); return wb }
 
@@ -66,7 +66,7 @@ describe('compare XLSX export', () => {
     expect(wb.worksheets.map(w => w.name)).toEqual(['Provenance', ...COMPARISON_SHEETS])
     expect(wb.keywords).toContain(`sha256:${'1'.repeat(64)}`)
     expect(wb.keywords).toContain(`sha256:${'2'.repeat(64)}`)
-    expect(wb.description).toContain('Hoshmand Schedule version (release): abc1234')
+    expect(wb.description).toContain('RunF9 version (release): abc1234')
     const pv = wb.getWorksheet('Provenance')!
     const pvText = pv.getSheetValues().flat().map(String).join(' ')
     expect(pvText).toContain('upd6.xer')
@@ -106,7 +106,7 @@ describe('XLSX provenance on schedule exports', () => {
     const wb = await load(await exportP6LayoutXlsx(g, 'Riverside', { prov: one }))
     expect(wb.worksheets.map(w => w.name)).toEqual(['Schedule', 'Provenance'])
     expect(wb.keywords).toBe(`sha256:${'2'.repeat(64)}`)
-    expect(String(wb.getWorksheet('Schedule')!.getCell(3, 1).value)).toMatch(/Source upd6\.xer · SHA-256 2{64} · Hoshmand Schedule abc1234 · Retained logic/)
+    expect(String(wb.getWorksheet('Schedule')!.getCell(3, 1).value)).toMatch(/Source upd6\.xer · SHA-256 2{64} · RunF9 abc1234 · Retained logic/)
   })
 })
 

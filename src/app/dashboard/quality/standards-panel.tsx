@@ -11,7 +11,7 @@ import type { StoredRun, StoredRunSummary } from '@/lib/standards/store'
 
 type Choice = 'PLANORA_COMPOSITE' | 'GAO_SCHEDULE_GUIDE' | 'DCMA_14' | 'multiple'
 const CHOICES: { value: Choice; label: string; hint: string }[] = [
-  { value: 'PLANORA_COMPOSITE', label: 'Hoshmand Schedule Composite (recommended)', hint: 'GAO screening checks and DCMA 14-point side by side, with any threshold conflicts listed.' },
+  { value: 'PLANORA_COMPOSITE', label: 'RunF9 Composite (recommended)', hint: 'GAO screening checks and DCMA 14-point side by side, with any threshold conflicts listed.' },
   { value: 'GAO_SCHEDULE_GUIDE', label: 'GAO Schedule Assessment Guide', hint: 'The ten best practices, grouped under the four characteristics.' },
   { value: 'DCMA_14', label: 'DCMA 14-point', hint: 'The 14 DCMA assessment metrics.' },
   { value: 'multiple', label: 'Several frameworks', hint: 'Choose two or more to run separately.' },
@@ -24,7 +24,7 @@ const RESULT_UI: Record<RuleResultStatus, { label: string; cls: string; Icon: ty
   fail: { label: 'Fail', cls: 'text-status-at-risk', Icon: XCircle },
   not_assessable: { label: 'Not assessable', cls: 'text-warm-600', Icon: CircleSlash },
 }
-const SOURCE_LABEL = { published: 'published value', planora_default: 'Hoshmand Schedule screening default', org_configured: 'set by your organization' } as const
+const SOURCE_LABEL = { published: 'published value', planora_default: 'RunF9 screening default', org_configured: 'set by your organization' } as const
 
 /** Standards view: pick framework(s), see results by characteristic with evidence and sources, record a run. */
 export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canRecord: boolean }) {

@@ -123,7 +123,7 @@ export function baselineFromEmbedded(e: EmbeddedBaseline): ResolvedBaseline | nu
 
 /**
  * Whether the file's own P6 target dates describe a baseline. `early` gives the file's own planned
- * (early) dates per activity id when they differ from the activity's (stored dates are Hoshmand Schedule's
+ * (early) dates per activity id when they differ from the activity's (stored dates are RunF9's
  * recalculation after import); without it the activity's early dates are used.
  */
 export function assessFileTargets(activities: Activity[], early?: Map<string, { earlyStart: string | null; earlyFinish: string | null }> | null): FileTargetsAssessment {

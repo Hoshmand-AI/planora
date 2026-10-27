@@ -20,26 +20,26 @@ export interface CheckGuidance {
 }
 
 interface Ctx {
-  /** Plan built in Hoshmand Schedule (edits possible) vs an uploaded file (fix in P6/MSP) */
+  /** Plan built in RunF9 (edits possible) vs an uploaded file (fix in P6/MSP) */
   generated: boolean
   /** Share of offenders that are design, permit review or fabrication activities */
   offCalendarShare?: number
   hasRecovery?: boolean
   hasOpenQuestions?: boolean
   hasTargets?: boolean
-  /** Uploaded schedules: where its what-if / recovery options and Hoshmand Schedule edits live (dashboard) */
+  /** Uploaded schedules: where its what-if / recovery options and RunF9 edits live (dashboard) */
   uploadedRecoveryHref?: string
 }
 
 export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
   const where = ctx.generated ? 'on the Schedule tab (open the activity → Override)'
-    : ctx.uploadedRecoveryHref ? 'in P6 / MS Project and re-upload, or as a Hoshmand Schedule edit with a reason (schedule dashboard → Edits made in Hoshmand Schedule)' : 'in P6 / MS Project, then re-upload'
+    : ctx.uploadedRecoveryHref ? 'in P6 / MS Project and re-upload, or as a RunF9 edit with a reason (schedule dashboard → Edits made in RunF9)' : 'in P6 / MS Project, then re-upload'
   // Recovery for a plan is on its Schedule tab; for an upload, on the schedule dashboard (modeled on its own network).
   const recoverySteps = ctx.generated
     ? ['Decide how to recover the time: shorten or re-sequence the critical path, or move the date.', 'Use the recovery options — each is modeled on the real network with its new finish.']
     : ['Decide how to recover the time: shorten or re-sequence the driving path, or move the date.',
       ctx.uploadedRecoveryHref
-        ? 'Open What-if and recovery on the schedule dashboard: crashing, overlapping and expediting options are modeled on this file\'s own network with the new finish and float. Apply one as a Hoshmand Schedule edit with a reason, or make the change in P6 / MS Project and re-upload.'
+        ? 'Open What-if and recovery on the schedule dashboard: crashing, overlapping and expediting options are modeled on this file\'s own network with the new finish and float. Apply one as a RunF9 edit with a reason, or make the change in P6 / MS Project and re-upload.'
         : 'Make the change in P6 / MS Project (shorten or re-sequence driving activities), then re-upload.']
   const recoveryActions: GuidanceAction[] = ctx.generated
     ? (ctx.hasRecovery ? [{ kind: 'recovery', label: 'See recovery options' }] : [])
@@ -112,7 +112,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
     case 9: return {
       id: 9, meaning: 'Dates that are impossible relative to the data date: actuals in the future or forecasts in the past.',
       whyItMatters: 'Invalid dates mean the schedule wasn\'t statused or recalculated correctly, so every forecast after them is suspect.',
-      steps: ['Move unfinished work to start on or after the data date and recalculate.', 'Actual dates must be on or before the data date.', ctx.generated ? 'For a plan built in Hoshmand Schedule, regenerate after checking the start date is a working day.' : 'Fix in P6 (F9 schedule) or MS Project, then re-upload.'],
+      steps: ['Move unfinished work to start on or after the data date and recalculate.', 'Actual dates must be on or before the data date.', ctx.generated ? 'For a plan built in RunF9, regenerate after checking the start date is a working day.' : 'Fix in P6 (F9 schedule) or MS Project, then re-upload.'],
       actions: [...filter],
     }
     case 10: return {

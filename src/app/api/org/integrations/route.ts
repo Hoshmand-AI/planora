@@ -73,7 +73,7 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       if (!row) throw new ApiError(404, 'Webhook not found.')
       const hook = (await listWebhooks(auth.orgId)).find(h => h.id === row.id)!
       const result = await deliverToWebhook({ ...hook, secret: decrypt(String(row.secret_enc)) }, auth.orgId, {
-        id: randomUUID(), action: 'webhook.test', at: new Date().toISOString(), targetType: 'webhook', targetId: hook.id, detail: { message: 'Test delivery from Hoshmand Schedule' }, actorEmail: auth.email,
+        id: randomUUID(), action: 'webhook.test', at: new Date().toISOString(), targetType: 'webhook', targetId: hook.id, detail: { message: 'Test delivery from RunF9' }, actorEmail: auth.email,
       })
       await audit({ action: 'webhook.tested', targetType: 'webhook', targetId: hook.id, detail: { status: result.status } })
       return json(result)

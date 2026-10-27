@@ -89,7 +89,7 @@ function statusSection(r: ReportInput): string[] {
     table(['Item', 'Value'], [
       ['Baseline', baselineLine(r).replace(/^Baseline:\s*/, '')],
       ['Data date', d(s.dataDate)],
-      ['Forecast finish (Hoshmand Schedule recalculation)', `${d(an.forecastFinish)}${an.forecastBasis === 'logic' ? ' (logic-driven)' : ''}`],
+      ['Forecast finish (RunF9 recalculation)', `${d(an.forecastFinish)}${an.forecastBasis === 'logic' ? ' (logic-driven)' : ''}`],
       ...(an.scheduledFinish && an.logicFinish && an.scheduledFinish !== an.logicFinish
         ? [[FINISH_LABELS.scheduled, d(an.scheduledFinish)], [FINISH_LABELS.logic, d(an.logicFinish)]]
         : []),
@@ -181,7 +181,7 @@ function issues(r: ReportInput, failing: DcmaReport['checks']): string[] {
     ...r.analysis.violations.map(v => `- ${codeOf(r, v.id)}: mandatory ${v.type === 'MSO' ? 'start' : 'finish'} ${d(v.constraintDate)} overrules logic by ${v.days} work days (logic date ${d(v.logicDate)}).`),
     ...failing.slice(0, 6).map(c => `- DCMA #${c.id} ${c.name} (${c.metric}): ${c.explanation}`),
   ]
-  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry dates or float in the file that differ from Hoshmand Schedule's recalculation by more than 1 day.`)
+  if (r.analysis.recalc?.differing) out.push(`- ${r.analysis.recalc.differing} of ${r.analysis.recalc.compared} open activities carry dates or float in the file that differ from RunF9's recalculation by more than 1 day.`)
   return out.length ? out : ['_None found._']
 }
 
@@ -353,8 +353,8 @@ function variance(r: ReportInput): string[] {
 const withBlank = (lines: string[]) => (lines.length ? ['', ...lines] : [])
 
 /**
- * QA/QC section 5: every activity whose file dates or float differ from Hoshmand Schedule's recalculation, with
- * file vs Hoshmand Schedule ES/EF/LS/LF/TF; the count in the text is the number of rows. Analyses stored before
+ * QA/QC section 5: every activity whose file dates or float differ from RunF9's recalculation, with
+ * file vs RunF9 ES/EF/LS/LF/TF; the count in the text is the number of rows. Analyses stored before
  * every difference was kept hold at most 10, which the text says.
  */
 export function recalcSection(rc: NonNullable<ReportInput['analysis']['recalc']>): string {
@@ -366,7 +366,7 @@ export function recalcSection(rc: NonNullable<ReportInput['analysis']['recalc']>
     ? `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in early/late dates or total float${rc.differing ? '; all are listed' : ''}.`
     : `${rc.differing} of ${rc.compared} open activities differ by more than 1 day in finish or total float. This upload was analyzed before every difference was kept, so only ${rc.samples.length} are listed; upload the file again to list all ${rc.differing}.`
   return rows.length
-    ? `${head}\n\n${table(['ID', 'Activity', 'File ES', 'Hoshmand Schedule ES', 'File EF', 'Hoshmand Schedule EF', 'File LS', 'Hoshmand Schedule LS', 'File LF', 'Hoshmand Schedule LF', 'File TF', 'Hoshmand Schedule TF'], rows)}`
+    ? `${head}\n\n${table(['ID', 'Activity', 'File ES', 'RunF9 ES', 'File EF', 'RunF9 EF', 'File LS', 'RunF9 LS', 'File LF', 'RunF9 LF', 'File TF', 'RunF9 TF'], rows)}`
     : head
 }
 
@@ -379,8 +379,8 @@ function qaqc(r: ReportInput): string[] {
     ...(fail.length ? fail.map(c => `- **#${c.id} ${c.name} (${c.metric}).** ${c.explanation}${c.offenders.length ? ` Activities (${c.offenders.length}): ${c.offenders.join(', ')}.` : ''}`) : ['_All applicable checks pass._']), '',
     '## 4. Mandatory constraints that overrule logic',
     r.analysis.violations.length ? table(['Activity', 'Type', 'Constraint date', 'Logic date', 'Work days hidden'], r.analysis.violations.map(v => [codeOf(r, v.id), v.type, d(v.constraintDate), d(v.logicDate), v.days])) : '_None._', '',
-    '## 5. File vs Hoshmand Schedule recalculation',
-    r.analysis.recalc ? recalcSection(r.analysis.recalc) : '_The file carried no calculated dates, so Hoshmand Schedule scheduled it from logic; there is nothing to compare._', '',
+    '## 5. File vs RunF9 recalculation',
+    r.analysis.recalc ? recalcSection(r.analysis.recalc) : '_The file carried no calculated dates, so RunF9 scheduled it from logic; there is nothing to compare._', '',
     '## 6. Data questions for the scheduler',
     ...(r.dataQuestions?.length ? r.dataQuestions.slice(0, 30).map(q => `- (${q.severity}) ${q.question}${q.activityCodes?.length ? ` [${q.activityCodes.slice(0, 8).join(', ')}]` : ''}`) : ['_None._']), '',
     '## 7. Reviewer disposition',
@@ -389,7 +389,7 @@ function qaqc(r: ReportInput): string[] {
 }
 
 /**
- * "Edits made in Hoshmand Schedule": every change made to the uploaded schedule inside Hoshmand Schedule, with who, when,
+ * "Edits made in RunF9": every change made to the uploaded schedule inside RunF9, with who, when,
  * before/after and the reason, so a report never presents an edited network as the contractor's file.
  * Empty string when there are none.
  */
@@ -401,10 +401,10 @@ export function editsSection(edits: { label: string; before: string; after: stri
   const applied = edits.filter(e => e.status === 'applied')
   const skipped = edits.filter(e => e.status === 'skipped')
   return fmtDates([
-    '## Edits made in Hoshmand Schedule',
+    '## Edits made in RunF9',
     inFigures
-      ? `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Hoshmand Schedule to the uploaded file (a what-if scenario; the original file is unchanged and kept with its SHA-256).`
-      : `This report is on the schedule as submitted: its forecast, float and driving path do NOT include the ${applied.length} edit${applied.length === 1 ? '' : 's'} made in Hoshmand Schedule listed below (a what-if scenario; request the report on the scenario to include them).`, '',
+      ? `The forecast, float and driving path in this report include ${applied.length} edit${applied.length === 1 ? '' : 's'} made in RunF9 to the uploaded file (a what-if scenario; the original file is unchanged and kept with its SHA-256).`
+      : `This report is on the schedule as submitted: its forecast, float and driving path do NOT include the ${applied.length} edit${applied.length === 1 ? '' : 's'} made in RunF9 listed below (a what-if scenario; request the report on the scenario to include them).`, '',
     table(['Date', 'By', 'Change', 'Before', 'After', 'Reason', 'Source'], applied.map(e => [d(e.at), e.byName || e.by, e.label, e.before, e.after, e.reason, e.source === 'recovery' ? 'Recovery option' : 'Manual'])),
     ...(skipped.length ? ['', `${skipped.length} edit${skipped.length === 1 ? ' no longer applies' : 's no longer apply'}: ${skipped.map(e => `${e.label} (${e.note ?? 'not applicable'})`).join('; ')}.`] : []),
     ...(reverted.length ? ['', `${reverted.length} earlier edit${reverted.length === 1 ? ' was' : 's were'} reverted: ${reverted.map(e => `${e.change.kind.replace('_', ' ')} edit of ${d(e.at)} reverted ${d(e.revertedAt)}${e.revertReason ? ` (${e.revertReason})` : ''}`).join('; ')}.`] : []),
@@ -418,7 +418,7 @@ export function editsSection(edits: { label: string; before: string; after: stri
  */
 export function reportSupplement(type: string, r: ReportInput): string {
   const out: string[] = [`**${baselineLine(r).replace(/\.?$/, '.')}** Variance, milestone and activity tables, BEI and missed tasks all measure against this baseline.`, '']
-  if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (Hoshmand Schedule calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
+  if (type === 'variance' && r.windows?.windows.length) out.push('## Windows analysis (RunF9 calculation)', ...windowsMarkdown(r.windows, d), '', '## Driving-path float and execution trend', ...trendMarkdown(r.windows.trend, d), '')
   if (type === 'variance' || type === 'executive_summary') { const e = evmMarkdown(r.evm, type === 'variance' ? r.evmTrend : null); if (e.length) out.push(...e, '') }
   if (type === 'qa_qc') out.push('## Reviewer disposition', ...reviewMarkdown(r.review, { dcma: r.dcma.checks.map(c => ({ id: c.id, name: c.name, result: c.result })), questions: (r.dataQuestions ?? []).filter(q => q.id).map(q => ({ id: q.id!, question: q.question })) }), '')
   if (r.provenance) out.push(...provenanceMarkdown(r.provenance))
@@ -431,7 +431,7 @@ export function buildReport(type: string, r: ReportInput): string {
   // Analysis reasons, variance basis, comparisons and findings carry ISO dates; people read MM/DD/YYYY.
   return fmtDates([
     `# ${REPORT_TITLES[t]} — ${r.schedule.name} (${r.schedule.version})`, '',
-    `_Prepared by Hoshmand Schedule from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
+    `_Prepared by RunF9 from the schedule data (no AI model). Data date ${d(r.schedule.dataDate)}. Dates MM/DD/YYYY; variances in calendar days (cd); float and durations in work days (wd)._`, '',
     `**${baselineLine(r).replace(/\.?$/, '.')}** Every variance, milestone and activity table, BEI and missed tasks in this report measure against this baseline.`, '',
     ...(r.provenance ? provenanceMarkdown(r.provenance) : []),
     ...body,

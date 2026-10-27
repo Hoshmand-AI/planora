@@ -74,7 +74,7 @@ export function tiaMarkdown(input: TiaReportInput): string {
   const r = run.result
   const out: string[] = []
   out.push(`# Time Impact Analysis — ${e.title}`, '')
-  out.push(`**${r.update.name} (${r.update.version})** · data date ${d(r.update.dataDate)} · basis: ${r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} Hoshmand Schedule edits (a what-if scenario)` : 'as submitted'} · run ${fmtDate(run.createdAt)}${run.createdByName ? ` by ${run.createdByName}` : ''}`, '')
+  out.push(`**${r.update.name} (${r.update.version})** · data date ${d(r.update.dataDate)} · basis: ${r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} RunF9 edits (a what-if scenario)` : 'as submitted'} · run ${fmtDate(run.createdAt)}${run.createdByName ? ` by ${run.createdByName}` : ''}`, '')
   for (const n of input.notes ?? []) out.push(`**Note:** ${n}`, '')
   out.push('## Calculation, not conclusion', '', `> ${TIA_DISCLAIMER}`, '')
   out.push('## Delay event', '', table(['Item', 'Value'], [
@@ -91,7 +91,7 @@ export function tiaMarkdown(input: TiaReportInput): string {
   } else {
     out.push('## Findings (calculated)', '', ...r.findings.map(f => `- ${f}`), '')
     const nar = input.narrative ?? { text: tiaNarrative(r, e), source: 'template' as const }
-    out.push('## Narrative', '', nar.source === 'ai' ? `_Written by an AI model${nar.model ? ` (${nar.model})` : ''} from the computed results only; the tables below are Hoshmand Schedule's calculation and govern._` : '_Template narrative generated from the computed results (no AI model)._', '', nar.text, '')
+    out.push('## Narrative', '', nar.source === 'ai' ? `_Written by an AI model${nar.model ? ` (${nar.model})` : ''} from the computed results only; the tables below are RunF9's calculation and govern._` : '_Template narrative generated from the computed results (no AI model)._', '', nar.text, '')
     out.push('## Milestone impact', '', 'Impact = after − before (+ = later). "Logic" dates relax mandatory constraints; "as scheduled" dates honour them.', '', table(MILESTONE_HEAD, milestoneRows(r)), '')
     out.push('## Project finish', '', table(['', 'Before', 'After', 'Impact cd', `Impact wd (${r.projectFinish.calendar})`], [
       ['Logic-driven', d(r.projectFinish.before.logic), d(r.projectFinish.after.logic), signed(r.projectFinish.impactCd.logic), signed(r.projectFinish.impactWd.logic)],
@@ -138,7 +138,7 @@ export async function exportTiaXlsx(input: TiaReportInput, prov: Provenance, mar
     ['Delay event', e.title], ['Description', e.description ?? ''],
     ['Responsibility (label entered by the user, not a determination)', RESPONSIBILITY_LABELS[e.responsibility] ?? e.responsibility],
     ['Event start', d(e.eventStart)], ['Event end', d(e.eventEnd)], ['Notice date', d(e.notifiedOn)], ['Status', STATUS_LABELS[e.status]],
-    ['Update', `${r.update.name} (${r.update.version})`], ['Data date', d(r.update.dataDate)], ['Basis', r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} Hoshmand Schedule edits` : 'as submitted'],
+    ['Update', `${r.update.name} (${r.update.version})`], ['Data date', d(r.update.dataDate)], ['Basis', r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} RunF9 edits` : 'as submitted'],
     ...r.findings.map((f, i) => [`Finding ${i + 1}`, f]),
     ...r.validation.errors.map(x => ['Validation error', x]),
     ['Engine', run.engine], ['Inputs hash (SHA-256)', run.inputsHash], ['Result hash (SHA-256)', run.resultHash], ['Run', `${fmtDate(run.createdAt)}${run.createdByName ? ` by ${run.createdByName}` : ''}`],
@@ -182,7 +182,7 @@ export async function exportTiaPdf(markdown: string, title: string, marking?: Ex
   const W = 612, H = 792, M = 48
   const doc = await PDFDocument.create()
   doc.setTitle(pdfSafe(title))
-  doc.setProducer('Hoshmand Schedule')
+  doc.setProducer('RunF9')
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const NAVY = rgb(0.059, 0.129, 0.251), TEXT = rgb(0.2, 0.19, 0.17), GREY = rgb(0.36, 0.34, 0.31)
@@ -195,7 +195,7 @@ export async function exportTiaPdf(markdown: string, title: string, marking?: Ex
       page.drawText(marking.banner, { x: (W - bw) / 2, y: H - 22, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
       page.drawText(marking.banner, { x: (W - bw) / 2, y: 30, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
     }
-    page.drawText(pdfSafe(`${title} · Hoshmand Schedule · page ${n}`).slice(0, 120), { x: M, y: 16, size: 7, font, color: GREY })
+    page.drawText(pdfSafe(`${title} · RunF9 · page ${n}`).slice(0, 120), { x: M, y: 16, size: 7, font, color: GREY })
   }
   decorate()
   const ensure = (h: number) => {

@@ -293,7 +293,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     else if (/\b(activity\s*id|activity\s*code|task\s*code|code)\b/i.test(alias)) codeFieldIds.add(fid)
   }
   const fieldLabel = new Map(extAttrs.map(ea => [tagText(ea, 'FieldID'), tagText(ea, 'Alias') || tagText(ea, 'FieldName') || tagText(ea, 'FieldID')]))
-  // Project-level collections Hoshmand Schedule does not model.
+  // Project-level collections RunF9 does not model.
   for (const [coll, item, entity, severity, message] of MSP_COLLECTIONS) {
     const items = allBlocks(firstBlock(xml, coll) || '', item)
       .filter(b => !(item === 'Resource' && tagText(b, 'UID') === '0') && !(item === 'Assignment' && tagText(b, 'ResourceUID') === '-1'))
@@ -411,14 +411,14 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     const timephased = allBlocks(block, 'TimephasedData').length
     if (timephased) ex.add({ severity: 'info', entity: 'other', field: 'Task.TimephasedData', disposition: 'dropped', count: timephased, example: name, message: 'Timephased data is not imported' })
     for (const oc of allBlocks(block, 'OutlineCode')) if (tagText(oc, 'ValueID') || tagText(oc, 'Value')) ex.add({ severity: 'warning', entity: 'code', field: 'Task.OutlineCode', disposition: 'dropped', example: name, message: 'Outline code values are not modeled' })
-    // Simple fields Hoshmand Schedule does not read that carry data.
+    // Simple fields RunF9 does not read that carry data.
     const simple = /<([A-Za-z][\w]*)>([^<]*)<\/\1>/g
     let fm: RegExpExecArray | null
     const ownFlat = stripBlocks(own, ['OutlineCode', 'TimephasedData'])
     while ((fm = simple.exec(ownFlat)) !== null) {
       if (MSP_TASK_READ.has(fm[1]) || MSP_EMPTYISH.test(fm[2].trim())) continue
       const entity: ExceptionEntity = /Work|Cost|Overtime|BCWS|BCWP|ACWP|CV|SV|VAC|EAC|Fixed/.test(fm[1]) ? 'assignment' : fm[1] === 'Notes' || fm[1] === 'Hyperlink' || fm[1] === 'HyperlinkAddress' ? 'other' : 'activity'
-      ex.add({ severity: 'info', entity, field: `Task.${fm[1]}`, disposition: 'dropped', example: name, message: 'Field not mapped by Hoshmand Schedule; the original file is kept with the upload' })
+      ex.add({ severity: 'info', entity, field: `Task.${fm[1]}`, disposition: 'dropped', example: name, message: 'Field not mapped by RunF9; the original file is kept with the upload' })
     }
 
     const isMilestone = tagText(own, 'Milestone') === '1'
@@ -499,7 +499,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
 
-  // Deadlines: an end activity's (nothing follows it) is the project's required finish (Hoshmand Schedule's own
+  // Deadlines: an end activity's (nothing follows it) is the project's required finish (RunF9's own
   // export writes the required finish there, as P6 Must Finish By); any other activity's becomes its
   // Finish On or Before constraint unless it already has a constraint, which it keeps.
   const hasSucc = new Set(relationships.map(r => r.predecessorId))

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Logical backup of the Hoshmand Schedule database with an integrity manifest.
+// Logical backup of the RunF9 database with an integrity manifest.
 //   DATABASE_URL=postgres://… node scripts/backup.mjs [out-dir]
 // Writes planora-<timestamp>.dump (pg_dump custom format, compressed) and a .manifest.json with
 // the SHA-256 of the dump, per-table row counts and the latest migration, which the restore drill

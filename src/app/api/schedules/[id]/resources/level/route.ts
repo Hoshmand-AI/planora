@@ -11,7 +11,7 @@ import { availabilityFrom, isLevelingEdit, levelingNetworkOf, loadScheduleResour
 /**
  * Save a resource leveling run as the "Leveled scenario" of an uploaded schedule.
  *   POST { mode: 'level'|'smooth', allowFinishExtension?, availability?, reason }
- *     Levels the schedule as submitted plus the non-leveling Hoshmand Schedule edits, replaces the previous
+ *     Levels the schedule as submitted plus the non-leveling RunF9 edits, replaces the previous
  *     leveled scenario (its edits are reverted, kept in the record) and records one Start On or After
  *     edit per delayed activity (source 'leveling'), each with the reason. The scenario is then the
  *     basis=scenario network of every view and export. Audited.
@@ -21,8 +21,8 @@ import { availabilityFrom, isLevelingEdit, levelingNetworkOf, loadScheduleResour
 export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async (req, { params, auth }) => {
   const data = await loadScheduleData(params.id, auth.orgId)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (data.schedule.sourceType === 'generated') return NextResponse.json({ error: 'This schedule was published from a Hoshmand Schedule plan; level the plan instead.', code: 'edit_plan_instead' }, { status: 400 })
-  if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships, so Hoshmand Schedule cannot recalculate it to level resources.', code: 'no_logic' }, { status: 400 })
+  if (data.schedule.sourceType === 'generated') return NextResponse.json({ error: 'This schedule was published from a RunF9 plan; level the plan instead.', code: 'edit_plan_instead' }, { status: 400 })
+  if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships, so RunF9 cannot recalculate it to level resources.', code: 'no_logic' }, { status: 400 })
   const b = await readBody<Record<string, unknown>>(req)
   const reasonErr = reasonError(b.reason)
   if (reasonErr) return NextResponse.json({ error: reasonErr, code: 'reason_required' }, { status: 400 })

@@ -1,28 +1,28 @@
 import type { Metadata } from 'next'
 import { LegalPage } from '@/components/LegalPage'
 
-export const metadata: Metadata = { title: 'Privacy Policy — Hoshmand Schedule' }
+export const metadata: Metadata = { title: 'Privacy Policy — RunF9' }
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" effective="10/04/2026">
-      <p>Hoshmand AI (&quot;we&quot;, &quot;us&quot;) operates Hoshmand Schedule, a construction scheduling application. This policy explains what Hoshmand Schedule collects, why, who processes it, how long it is kept and the controls you have. If your organization has a signed agreement with us, that agreement takes precedence where it differs.</p>
+      <p>Hoshmand AI (&quot;we&quot;, &quot;us&quot;) operates RunF9, a construction scheduling application. This policy explains what RunF9 collects, why, who processes it, how long it is kept and the controls you have. If your organization has a signed agreement with us, that agreement takes precedence where it differs.</p>
 
       <h2>1. What we collect</h2>
       <ul>
         <li><strong>Account data:</strong> your name, work email, organization, role, and a one-way hash of your password (bcrypt). If you turn on two-step verification, its secret is stored encrypted and recovery codes are stored only as hashes.</li>
-        <li><strong>Project data your organization adds:</strong> interview answers and notes, generated schedules, overrides with reasons, reviews and quality decisions. When you upload a schedule file (P6 XER, MS Project XML, Excel/CSV, PDF), Hoshmand Schedule extracts the activities, relationships, calendars and dates and stores those; the original file is not kept.</li>
+        <li><strong>Project data your organization adds:</strong> interview answers and notes, generated schedules, overrides with reasons, reviews and quality decisions. When you upload a schedule file (P6 XER, MS Project XML, Excel/CSV, PDF), RunF9 extracts the activities, relationships, calendars and dates and stores those; the original file is not kept.</li>
         <li><strong>Ask AI history:</strong> questions you ask about a schedule and the answers.</li>
-        <li><strong>Security and audit records:</strong> sign-ins and failed sign-ins, the actions taken in Hoshmand Schedule (for example &quot;exported plan&quot;, &quot;changed a role&quot;), with time, IP address and browser type. Your organization uses these to prove who did what.</li>
+        <li><strong>Security and audit records:</strong> sign-ins and failed sign-ins, the actions taken in RunF9 (for example &quot;exported plan&quot;, &quot;changed a role&quot;), with time, IP address and browser type. Your organization uses these to prove who did what.</li>
       </ul>
-      <p>Hoshmand Schedule uses one strictly necessary cookie to keep you signed in. It has no advertising or analytics trackers.</p>
+      <p>RunF9 uses one strictly necessary cookie to keep you signed in. It has no advertising or analytics trackers.</p>
 
       <h2>2. How we use it</h2>
       <p>To provide the service (scheduling, analysis, exports, AI features your organization allows), to secure accounts and detect abuse, to keep the audit record your organization relies on, and to support you when you ask. We do not sell personal data or use your organization&apos;s project data to train AI models or to serve other customers.</p>
 
       <h2>3. AI processing</h2>
       <ul>
-        <li>Your organization controls AI. An admin can switch AI off completely, in which case nothing is sent to any model and Hoshmand Schedule runs on its built-in rules.</li>
+        <li>Your organization controls AI. An admin can switch AI off completely, in which case nothing is sent to any model and RunF9 runs on its built-in rules.</li>
         <li>In <strong>cloud AI</strong> mode, the parts of a schedule needed to answer a request are sent to one cloud AI provider&apos;s API: Anthropic (Claude) by default, or OpenAI where a deployment selects it. Only one provider is active at a time. Projects marked CUI or classified are never sent to a cloud model.</li>
         <li>In <strong>on-premises / air-gapped</strong> deployments, requests go only to a model inside your own network.</li>
         <li>Interview answers marked &quot;Can&apos;t share&quot; are never sent to any model.</li>

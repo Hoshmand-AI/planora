@@ -67,7 +67,7 @@ export function BetaAdmin() {
         <h1 className="font-display text-[26px] text-navy-950">Beta access</h1>
         <p className="text-[13.5px] text-warm-600">
           {data.signup.mode === 'invite_only'
-            ? 'Hoshmand Schedule is in private beta: sign-up needs an invitation, and signing in needs beta access.'
+            ? 'RunF9 is in private beta: sign-up needs an invitation, and signing in needs beta access.'
             : 'Self sign-up is open (PLANORA_SIGNUP=open), so the beta gate is off. Invitations still work.'}
           {' '}{withAccess} of {data.users.length} accounts can sign in. Only platform operators see this page.
         </p>
@@ -127,7 +127,7 @@ export function BetaAdmin() {
         )}
       </Section>
 
-      <Section title={`People (${data.users.length})`} description="Everyone with a Hoshmand Schedule account and whether they can sign in. Revoking beta access signs the person out everywhere; their organization keeps its data.">
+      <Section title={`People (${data.users.length})`} description="Everyone with a RunF9 account and whether they can sign in. Revoking beta access signs the person out everywhere; their organization keeps its data.">
         {note('users')}
         <div className="mb-3 max-w-sm">
           <Field label="Filter">{p => <input {...p} type="search" className={inputClass} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Email, name or organization" />}</Field>

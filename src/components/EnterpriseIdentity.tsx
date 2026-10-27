@@ -1,7 +1,7 @@
 'use client'
 
 // Organization → SAML single sign-on and SCIM provisioning (admins, Enterprise plan).
-// SAML: paste IdP metadata (or fill the fields), download Hoshmand Schedule's SP metadata, test sign-in.
+// SAML: paste IdP metadata (or fill the fields), download RunF9's SP metadata, test sign-in.
 // SCIM: base URL, bearer tokens (shown once, revocable) and the latest provisioning events.
 
 import { useCallback, useEffect, useState } from 'react'
@@ -120,7 +120,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
           <form className="space-y-3" onSubmit={save}>
             {sp ? (
               <div className="grid gap-2 border border-warm-200 rounded-md p-3">
-                <p className="text-[12.5px] font-semibold text-navy-950">Register Hoshmand Schedule with your identity provider</p>
+                <p className="text-[12.5px] font-semibold text-navy-950">Register RunF9 with your identity provider</p>
                 <CopyLine label="Entity ID (Audience)" value={sp.entityId} />
                 <CopyLine label="Assertion consumer service (Reply) URL, HTTP-POST" value={sp.acsUrl} />
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -129,7 +129,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
                 </div>
                 <p className="text-[12px] text-warm-600">Test sign-in checks the whole response from your identity provider and reports the result here. It does not sign you in or add anyone.</p>
               </div>
-            ) : <p className="text-[12.5px] text-warm-600">Save once to get Hoshmand Schedule&apos;s entity ID, reply URL and SP metadata.</p>}
+            ) : <p className="text-[12.5px] text-warm-600">Save once to get RunF9&apos;s entity ID, reply URL and SP metadata.</p>}
 
             <Field label="IdP metadata XML (optional)" hint="Paste your identity provider's federation metadata to fill in the fields below.">{p => (
               <textarea {...p} rows={3} className={`${inputClass} font-mono text-[12px]`} value={metadata} onChange={e => setMetadata(e.target.value)} />
@@ -163,7 +163,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
               <Field label="Role for new members">{p => <select {...p} className={inputClass} value={form.defaultRole} onChange={e => setForm({ ...form, defaultRole: e.target.value })}>{assignable.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select>}</Field>
             </div>
             <Field label="Group to role mapping" hint="One per line: IdP group = role (admin, scheduler, reviewer or viewer). Applied at every sign-in; owners are never changed.">{p => (
-              <textarea {...p} rows={3} className={`${inputClass} font-mono text-[12px]`} placeholder="Hoshmand Schedule Admins = admin" value={form.groupRoles} onChange={e => setForm({ ...form, groupRoles: e.target.value })} />
+              <textarea {...p} rows={3} className={`${inputClass} font-mono text-[12px]`} placeholder="RunF9 Admins = admin" value={form.groupRoles} onChange={e => setForm({ ...form, groupRoles: e.target.value })} />
             )}</Field>
             {(saml.saml.verification || help) && (
               <p className="text-[12.5px] text-warm-600">Domain ownership: add a DNS TXT record at <code className="text-navy-950">{help?.hosts.join(', ') || saml.saml.verification?.host}</code> with the value <code className="text-navy-950 break-all">{help?.value || saml.saml.verification?.value}</code>.</p>
@@ -175,7 +175,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
         )}
       </Section>
 
-      <Section id="scim" title="SCIM provisioning" description="Let your identity provider add, update and remove members automatically (SCIM 2.0). Deactivating or deleting someone in your identity provider disables their Hoshmand Schedule account and signs them out everywhere at once. Members are matched by email and must be in one of your verified single sign-on domains.">
+      <Section id="scim" title="SCIM provisioning" description="Let your identity provider add, update and remove members automatically (SCIM 2.0). Deactivating or deleting someone in your identity provider disables their RunF9 account and signs them out everywhere at once. Members are matched by email and must be in one of your verified single sign-on domains.">
         {note('scim')}
         {scim && (!scim.available ? <p className="text-[13px] text-warm-600">SCIM provisioning is part of the Enterprise plan.</p> : (
           <div className="space-y-4">

@@ -52,7 +52,7 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
           <ul className="list-disc pl-5 mt-2 space-y-1 text-[13px] text-warm-700">
             {evm.missing.map(m => <li key={m.code}>{m.message}</li>)}
           </ul>
-          <p className="text-[12.5px] text-warm-600 mt-3">Hoshmand Schedule computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
+          <p className="text-[12.5px] text-warm-600 mt-3">RunF9 computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
           <p className="text-[12px] text-warm-600 mt-1">{evm.baseline.header}</p>
         </div>
       </section>

@@ -128,7 +128,7 @@ describe('Progress mode from the XER (SCHEDOPTIONS)', () => {
     expect(resolveProgressMode('override', 'override').warning).toBeNull()
     const r = resolveProgressMode('retained', 'override')
     expect(r.mode).toBe('retained')
-    expect(r.warning).toMatch(/scheduled in P6 with Progress Override, but Hoshmand Schedule is scheduling it with Retained Logic/)
+    expect(r.warning).toMatch(/scheduled in P6 with Progress Override, but RunF9 is scheduling it with Retained Logic/)
     expect(progressModeWarning('override', null)).toBeNull()
   })
   it('the XER export keeps the setting (pass-through rewrites it only when changed; a fresh export writes it)', () => {
@@ -140,8 +140,8 @@ describe('Progress mode from the XER (SCHEDOPTIONS)', () => {
   })
 })
 
-describe('Hoshmand Schedule exports are recognizable on re-import', () => {
-  it('a fresh Hoshmand Schedule XER is marked in its header; a P6 file is not', () => {
+describe('RunF9 exports are recognizable on re-import', () => {
+  it('a fresh RunF9 XER is marked in its header; a P6 file is not', () => {
     const g = generateSchedule({ answers: { 'project.type': k('warehouse_industrial'), 'project.state': k('TX'), 'project.target_start': k('2026-03-02') }, today: '2026-01-15' })
     const x = exportXer(g, 'Warehouse', { exportedBy: 'Ana', progressMode: 'override' })
     expect(isPlanoraXer(x)).toBe(true)

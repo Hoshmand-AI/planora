@@ -6,7 +6,7 @@ import { CANONICAL_CATEGORIES } from '@/lib/planning/types'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
 
 /**
- * Correct the category Hoshmand Schedule assigned to an activity of an uploaded schedule: { category }.
+ * Correct the category RunF9 assigned to an activity of an uploaded schedule: { category }.
  * Categories drive phase names, the brief and firm-history durations, so a scheduler can fix a
  * misread name (e.g. "Seeding" read as commissioning on a highway job). Audited.
  */

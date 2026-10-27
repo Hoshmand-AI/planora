@@ -58,7 +58,7 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
           <fieldset className="flex items-center gap-3">
             <legend className="sr-only">Basis</legend>
             <label><input type="radio" name="res-basis" checked={basis === 'submitted'} onChange={() => setBasis('submitted')} /> As submitted</label>
-            <label><input type="radio" name="res-basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With Hoshmand Schedule edits{data.levelingEdits ? ' (Leveled scenario)' : ''}</label>
+            <label><input type="radio" name="res-basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With RunF9 edits{data.levelingEdits ? ' (Leveled scenario)' : ''}</label>
           </fieldset>
         )}
         {loading && <span role="status" className="text-warm-600">Updating…</span>}
@@ -312,7 +312,7 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
     const r = await postJson(`${base}/level`, { ...opts(), reason })
     setBusy(false)
     if (!r.ok) { setErr(r.data.error || 'Could not save the leveled scenario.'); return }
-    setMsg(`Saved as the Leveled scenario: ${(r.data.added as string[] | undefined)?.length ?? 0} delay edit(s)${r.data.replaced ? `, replacing ${r.data.replaced} from the previous run` : ''}. Every view and export can now use it (basis: with Hoshmand Schedule edits).`)
+    setMsg(`Saved as the Leveled scenario: ${(r.data.added as string[] | undefined)?.length ?? 0} delay edit(s)${r.data.replaced ? `, replacing ${r.data.replaced} from the previous run` : ''}. Every view and export can now use it (basis: with RunF9 edits).`)
     setReason('')
     onSaved()
   }

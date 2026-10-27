@@ -41,7 +41,7 @@ export interface LlmAdapter {
 }
 
 /** User-facing text when a provider declines to answer. */
-export const AI_REFUSAL_MESSAGE = 'The AI model declined to answer this request. Hoshmand Schedule\'s schedule facts and rule-based results are still available; rephrase the question or continue without AI.'
+export const AI_REFUSAL_MESSAGE = 'The AI model declined to answer this request. RunF9\'s schedule facts and rule-based results are still available; rephrase the question or continue without AI.'
 
 /** The provider declined the request (e.g. a safety refusal). Never treat the content as an answer. */
 export class AiRefusalError extends Error {
@@ -60,7 +60,7 @@ export interface ModelEntry {
   provider: ProviderName
   /**
    * Certified models were evaluated with the golden prompts in docs/ai/AI-GOVERNANCE.md. Others are
-   * approved alternates: allowed, but Hoshmand Schedule does not promise equivalent quality on them.
+   * approved alternates: allowed, but RunF9 does not promise equivalent quality on them.
    */
   certified: boolean
   /** USD per 1M tokens, for spend estimates in the audit trail */

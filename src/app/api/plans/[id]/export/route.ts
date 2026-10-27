@@ -61,7 +61,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (exceptions && req.nextUrl.searchParams.get('exceptions') === 'json') return NextResponse.json({ format, exceptions, summary: summarizeExceptions(exceptions) })
   const prov = (): Provenance => ({
     exceptions,
-    sources: [{ scheduleName: plan.name, version: `plan version ${plan.version}`, fileName: `Generated in Hoshmand Schedule (plan "${plan.name}")`, sha256: scheduleFingerprint(g), dataDate: g.dataDate ?? g.projectStart, progressMode: g.cpm?.progressMode ?? 'retained' }],
+    sources: [{ scheduleName: plan.name, version: `plan version ${plan.version}`, fileName: `Generated in RunF9 (plan "${plan.name}")`, sha256: scheduleFingerprint(g), dataDate: g.dataDate ?? g.projectStart, progressMode: g.cpm?.progressMode ?? 'retained' }],
     release: planoraRelease(), generatedAt: new Date().toISOString(),
     settings: calculationSettings({ calendars: g.calendars, defaultCalendarId: g.defaultCalendarId }, { progressMode: g.cpm?.progressMode ?? 'retained', mustFinishBy: g.mustFinishBy ?? null, finishMilestone: null }, ctx.settings?.quality),
   })

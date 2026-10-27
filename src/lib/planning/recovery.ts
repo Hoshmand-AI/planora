@@ -145,7 +145,7 @@ export function recoveryPlan(g: GeneratedSchedule, answers: Record<string, Answe
       if (pm && pm.reviewWeeks.low * 7 < a.duration) expediteEdits.push({ kind: 'duration', activityId: a.id, value: pm.reviewWeeks.low * 7, reason: `${REASON}: expedited review (pre-application meeting, phased or third-party review) at ${pm.reviewWeeks.low} weeks` })
     }
   }
-  const runEdits = (edits: Edit[]) => edits.reduce((s, e) => applyEdit(s, e, 'Hoshmand Schedule').schedule, g).cpm!.projectFinish
+  const runEdits = (edits: Edit[]) => edits.reduce((s, e) => applyEdit(s, e, 'RunF9').schedule, g).cpm!.projectFinish
   if (expediteEdits.length) {
     options.push(opt({
       id: 'expedite', title: `Expedite ${expediteEdits.length} driving permit/procurement item${expediteEdits.length > 1 ? 's' : ''}`, newFinish: runEdits(expediteEdits),
@@ -209,7 +209,7 @@ export function recoveryPlan(g: GeneratedSchedule, answers: Record<string, Answe
     const next = { ...answers }
     for (const [k, v] of Object.entries(patch)) next[k] = { status: 'known', value: v, answeredAt: new Date().toISOString(), source: 'user' }
     let sch = Object.keys(patch).length ? generateSchedule({ answers: next, history, previous: g }) : g
-    for (const o of levers) if (o.apply.type === 'edits') for (const e of o.apply.edits) { try { sch = applyEdit(sch, e, 'Hoshmand Schedule').schedule } catch { /* activity may have changed */ } }
+    for (const o of levers) if (o.apply.type === 'edits') for (const e of o.apply.edits) { try { sch = applyEdit(sch, e, 'RunF9').schedule } catch { /* activity may have changed */ } }
     combined = { ids: levers.map(o => o.id), newFinish: sch.cpm!.projectFinish, meetsDate: sch.cpm!.projectFinish <= required }
   }
 

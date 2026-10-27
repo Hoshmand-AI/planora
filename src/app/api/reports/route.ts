@@ -87,11 +87,11 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   const raw = await generateReport(reportType, { schedule, activities, relationships, brief, hasLogic, rules: auth.settings.quality, analysis, comparison, evidence, grounding: docs?.grounding })
   const grounded = docs ? await docs.finish(raw) : null
   const generated = grounded ? grounded.report : raw
-  // Edits made in Hoshmand Schedule to the uploaded file are always listed (whether or not a model wrote the report).
+  // Edits made in RunF9 to the uploaded file are always listed (whether or not a model wrote the report).
   const edits = editsSection(data.edits, data.revertedEdits, basis === 'scenario')
   const withEdits = edits ? `${generated.trimEnd()}\n\n${edits}\n` : generated
   // Header line: which network the report is on.
-  const basisLine = `**Basis:** ${basisLabel(basis, data.editsApplied)}${basis === 'scenario' && data.editsApplied ? ' (a what-if scenario, not the schedule as submitted)' : data.editsApplied ? ` (${data.editsApplied} Hoshmand Schedule edit${data.editsApplied === 1 ? ' is' : 's are'} not included)` : ''}`
+  const basisLine = `**Basis:** ${basisLabel(basis, data.editsApplied)}${basis === 'scenario' && data.editsApplied ? ' (a what-if scenario, not the schedule as submitted)' : data.editsApplied ? ` (${data.editsApplied} RunF9 edit${data.editsApplied === 1 ? ' is' : 's are'} not included)` : ''}`
   const lines = withEdits.split('\n')
   const report = lines[0]?.startsWith('#') ? [lines[0], '', basisLine, ...lines.slice(1)].join('\n') : `${basisLine}\n\n${withEdits}`
 

@@ -1,6 +1,6 @@
 // Organization-level configuration of the standards engine: which framework(s) run by default and
 // the GAO screening thresholds. GAO's guide states best practices, not numeric pass marks, so every
-// GAO threshold here is a Hoshmand Schedule screening default (source 'planora_default') that an organization
+// GAO threshold here is a RunF9 screening default (source 'planora_default') that an organization
 // may tune; DCMA thresholds stay in OrgSettings.quality (the DCMA 14-point rules).
 
 import { isRunnableFramework, type Framework } from './types'
@@ -54,7 +54,7 @@ const LIMITS: Record<keyof GaoThresholds, [number, number]> = {
 }
 
 export interface StandardsSettings {
-  /** Framework(s) the Standards view runs first. Hoshmand Schedule Composite is the recommended default. */
+  /** Framework(s) the Standards view runs first. RunF9 Composite is the recommended default. */
   defaultFrameworks: Framework[]
   gao: GaoThresholds
 }

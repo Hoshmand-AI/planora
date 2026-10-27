@@ -2,15 +2,15 @@
 
 _Last updated 10/06/2026._
 
-This guide is for customers who run Hoshmand Schedule inside their own network: federal and defense
+This guide is for customers who run RunF9 inside their own network: federal and defense
 contractors handling Controlled Unclassified Information (CUI), firms that need EU or Canadian data
 residency, and enterprises that don't use the hosted service. It covers the container deliverable
 (`Dockerfile`, `docker-compose.yml`), every setting the application reads, TLS, backups, upgrades,
 hardening, and what support exists today.
 
-Hoshmand Schedule's commercial cloud service is not authorized for CUI (see
+RunF9's commercial cloud service is not authorized for CUI (see
 [../security/CUI-HANDLING.md](../security/CUI-HANDLING.md)). An on-premises instance runs inside
-your boundary, under your controls. How Hoshmand Schedule's own controls map to NIST SP 800-171 is in
+your boundary, under your controls. How RunF9's own controls map to NIST SP 800-171 is in
 [../security/NIST-800-171-MAPPING.md](../security/NIST-800-171-MAPPING.md).
 
 ## 1. What you get
@@ -46,7 +46,7 @@ against your own PostgreSQL. The settings are identical.
 **On a connected build host:**
 
 ```bash
-git clone <your Hoshmand Schedule source or release bundle> planora && cd planora
+git clone <your RunF9 source or release bundle> planora && cd planora
 git checkout <release commit>
 docker build -t planora:<version> .                 # app image
 docker build --target ops -t planora-ops:<version> .  # backup / restore tools
@@ -276,7 +276,7 @@ docker compose --profile ops run --rm restore-drill /backups/planora-<timestamp>
 - Apply your OS baseline (DISA STIG or CIS benchmark), time synchronization from your authoritative
   NTP source (audit timestamps come from the host clock), host-based audit logging, endpoint
   protection, and full-disk or volume encryption for the Docker data directory and backup media.
-  Hoshmand Schedule does not encrypt schedule content itself at the application layer; protection at rest is
+  RunF9 does not encrypt schedule content itself at the application layer; protection at rest is
   provided by your storage encryption.
 - Collect the app's JSON logs (`docker logs`, or a log driver to your SIEM). Every line carries a
   request id; security alerts appear as `security alert` lines (section 4).
@@ -289,13 +289,13 @@ walls for client separation, and review the audit log (it can be verified and ex
 
 ## 9. Data residency
 
-Hoshmand Schedule's hosted service stores data in the United States only (Vercel iad1 and Neon us-east; see
+RunF9's hosted service stores data in the United States only (Vercel iad1 and Neon us-east; see
 [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md)). There is **no hosted EU or Canadian
 region**. Customers who need data to stay in the EU, Canada or any other jurisdiction can run this
 on-premises or private-cloud deployment in a data centre or cloud region of their choice: the
 application, database, backups and (optional) model all run where you put them, and the instance
-makes no calls to Hoshmand Schedule or any other outside service at runtime. Residency is then determined by
-your hosting, not by Hoshmand Schedule.
+makes no calls to RunF9 or any other outside service at runtime. Residency is then determined by
+your hosting, not by RunF9.
 
 ## 10. Versioning and support
 
@@ -311,8 +311,8 @@ What exists today, stated plainly:
   [../security/VULNERABILITY-MANAGEMENT.md](../security/VULNERABILITY-MANAGEMENT.md). On-premises
   customers receive fixes as a new image; applying it is the customer's change.
 - **No phone-home and no licence server:** the instance keeps working without any connection to
-  Hoshmand Schedule.
-- **Support channel:** support@hoshmand.ai. Hoshmand Schedule is a single-founder company (see
+  RunF9.
+- **Support channel:** support@hoshmand.ai. RunF9 is a single-founder company (see
   [../security/VENDOR-QUESTIONNAIRE.md](../security/VENDOR-QUESTIONNAIRE.md), section 9).
 
 **To be agreed per contract** (no standard terms exist yet): support hours and response times,

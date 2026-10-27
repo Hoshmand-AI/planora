@@ -301,7 +301,7 @@ export function spreadsheetResourceData(rows: { act: Activity; resources: string
   }
   if (!assignments.length) return null
   const notes: string[] = []
-  if (derived) notes.push(`${derived} assignment${derived === 1 ? ' has' : 's have'} no units column value; Hoshmand Schedule assumed the resource works the whole duration, 8 hours a day at its bracketed units (1 when none).`)
+  if (derived) notes.push(`${derived} assignment${derived === 1 ? ' has' : 's have'} no units column value; RunF9 assumed the resource works the whole duration, 8 hours a day at its bracketed units (1 when none).`)
   if (split) notes.push(`${split} row${split === 1 ? ' names' : 's name'} several resources with one units value; the units were split evenly between them.`)
   notes.push('Spreadsheet actual units follow percent complete (the sheet has no actual units).')
   return { source, resources: [...resById.values()].sort((a, b) => a.code.localeCompare(b.code)), assignments, notes }

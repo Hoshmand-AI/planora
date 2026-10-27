@@ -167,7 +167,7 @@ function ProjectRow({ r, onOpen, onAct }: { r: PortfolioRow; onOpen: (r: Portfol
       <div className="mt-2">
         <Disclosure title="Details" meta={r.alerts.length > 1 ? `${r.alerts.length} notes` : undefined}>
           <div className="text-[12px] text-warm-600">
-            {r.kind === 'plan' ? 'Hoshmand Schedule plan' : r.updates && r.updates > 1 ? `Uploaded schedule · latest of ${r.updates} updates` : 'Uploaded schedule'}
+            {r.kind === 'plan' ? 'RunF9 plan' : r.updates && r.updates > 1 ? `Uploaded schedule · latest of ${r.updates} updates` : 'Uploaded schedule'}
             {r.dataDate && <> · data date <span className="tabular-nums text-warm-700">{fmtDate(r.dataDate)}</span></>}
             {r.finish && <> · finish <span className="tabular-nums text-warm-700">{fmtDate(r.finish)}</span></>}
             {r.required && <> · required <span className="tabular-nums text-warm-700">{fmtDate(r.required)}</span></>}

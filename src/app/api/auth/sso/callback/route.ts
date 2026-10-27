@@ -24,7 +24,7 @@ export const GET = publicApi(async req => {
   try {
     const id = await finishSso(url.searchParams, req.cookies.get(SSO_COOKIE)?.value)
     let user = await getUserByEmail(id.email)
-    if (user && user.orgId !== id.orgId) throw new ApiError(403, 'This email already belongs to another Hoshmand Schedule organization.')
+    if (user && user.orgId !== id.orgId) throw new ApiError(403, 'This email already belongs to another RunF9 organization.')
     if (user?.disabledAt) throw new ApiError(403, 'Your access to this organization was removed. Ask an admin.')
     const r = currentRequest()
     if (!user) {

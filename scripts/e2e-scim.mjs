@@ -63,7 +63,7 @@ const scim = (token) => async (method, path, body) => {
 function makeIdp() {
   const dir = mkdtempSync(join(tmpdir(), 'planora-idp-'))
   try {
-    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=Hoshmand Schedule e2e IdP',
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=RunF9 e2e IdP',
       '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' })
     return { key: readFileSync(join(dir, 'key.pem'), 'utf8'), cert: readFileSync(join(dir, 'cert.pem'), 'utf8') }
   } finally {
@@ -78,7 +78,7 @@ function samlResponse({ idpEntityId, acsUrl, audience, requestId, email, key, si
     + `<saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${email}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="${requestId}" NotOnOrAfter="${iso(300_000)}" Recipient="${acsUrl}"/></saml:SubjectConfirmation></saml:Subject>`
     + `<saml:Conditions NotBefore="${iso(-60_000)}" NotOnOrAfter="${iso(300_000)}"><saml:AudienceRestriction><saml:Audience>${audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions>`
     + `<saml:AuthnStatement AuthnInstant="${iso()}" SessionIndex="_s"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>`
-    + `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${email}</saml:AttributeValue></saml:Attribute><saml:Attribute Name="displayName"><saml:AttributeValue>Jane SAML</saml:AttributeValue></saml:Attribute><saml:Attribute Name="groups"><saml:AttributeValue>Hoshmand Schedule Schedulers</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>`
+    + `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${email}</saml:AttributeValue></saml:Attribute><saml:Attribute Name="displayName"><saml:AttributeValue>Jane SAML</saml:AttributeValue></saml:Attribute><saml:Attribute Name="groups"><saml:AttributeValue>RunF9 Schedulers</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>`
   let signed = assertion
   if (sign) {
     const sig = new SignedXml({ privateKey: key, canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#', signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256' })
@@ -134,7 +134,7 @@ async function main() {
   const idpEntityId = `http://localhost:4011/${stamp}`
 
   /* ── SAML configuration ── */
-  let r = await ownerA.post('/api/org/saml', { action: 'save', saml: { enabled: true, idpEntityId, ssoUrl: 'http://localhost:4011/sso', certs: idp.cert, domains: [domA], defaultRole: 'viewer', groupRoles: [{ group: 'Hoshmand Schedule Schedulers', role: 'scheduler' }] } })
+  let r = await ownerA.post('/api/org/saml', { action: 'save', saml: { enabled: true, idpEntityId, ssoUrl: 'http://localhost:4011/sso', certs: idp.cert, domains: [domA], defaultRole: 'viewer', groupRoles: [{ group: 'RunF9 Schedulers', role: 'scheduler' }] } })
   ok(r.status === 200 && r.data.saml.enabled && r.data.saml.sp?.acsUrl && r.data.saml.certs[0]?.fingerprint256, 'Admin configures SAML (SP URLs issued, certificate parsed)', r.data)
   const sp = r.data.saml.sp
   r = await ownerB.post('/api/org/saml', { action: 'save', saml: { enabled: true, idpEntityId, ssoUrl: 'http://localhost:4011/sso', certs: idp.cert, domains: [domA] } })

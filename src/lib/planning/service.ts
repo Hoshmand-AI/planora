@@ -20,7 +20,7 @@ import { contractTarget } from './contract-target'
 
 /**
  * Which network an output is built on. 'submitted' (the default everywhere) is the schedule exactly as
- * the contractor submitted it, recalculated by Hoshmand Schedule; 'scenario' applies the edits made in Hoshmand Schedule
+ * the contractor submitted it, recalculated by RunF9; 'scenario' applies the edits made in RunF9
  * (schedule_edits, an override layer) as a named what-if scenario. Status, variance, the portfolio
  * and the stored headline are always as submitted.
  */
@@ -34,18 +34,18 @@ export function basisFrom(params: URLSearchParams | Record<string, unknown> | nu
   return b === 'scenario' || sc === '1' || sc === 'true' || sc === true ? 'scenario' : 'submitted'
 }
 
-/** The basis in words, for report headers and XLSX provenance: "as submitted" | "with N Hoshmand Schedule edits". */
+/** The basis in words, for report headers and XLSX provenance: "as submitted" | "with N RunF9 edits". */
 export function basisLabel(basis: ScheduleBasis, editsApplied: number): string {
-  return basis === 'scenario' && editsApplied > 0 ? `with ${editsApplied} Hoshmand Schedule edit${editsApplied === 1 ? '' : 's'}` : 'as submitted'
+  return basis === 'scenario' && editsApplied > 0 ? `with ${editsApplied} RunF9 edit${editsApplied === 1 ? '' : 's'}` : 'as submitted'
 }
 
 /** What a reader must know about the basis (edits exist), else null. */
 export function basisWarning(basis: ScheduleBasis, editsApplied: number, who = 'this schedule'): string | null {
   if (!editsApplied) return null
-  const n = `${editsApplied} Hoshmand Schedule edit${editsApplied === 1 ? '' : 's'}`
+  const n = `${editsApplied} RunF9 edit${editsApplied === 1 ? '' : 's'}`
   return basis === 'scenario'
     ? `Basis: ${who} with ${n} applied (a what-if scenario). These figures are not the schedule as submitted.`
-    : `Basis: ${who} as submitted. ${n} ${editsApplied === 1 ? 'is' : 'are'} not applied; choose "With Hoshmand Schedule edits" (basis=scenario) to see the scenario.`
+    : `Basis: ${who} as submitted. ${n} ${editsApplied === 1 ? 'is' : 'are'} not applied; choose "With RunF9 edits" (basis=scenario) to see the scenario.`
 }
 
 /**
@@ -59,7 +59,7 @@ export function analyzableFromDb(s: Schedule, activities: Activity[], rels: Rela
     projectFinish: s.projectFinish,
     mustFinishBy: s.analysis?.mustFinishBy ?? null,
     finishMilestoneId: s.finishMilestoneId ?? null,
-    // DCMA #9: the file's own forecasts before the data date, captured at upload (stored dates are Hoshmand Schedule's).
+    // DCMA #9: the file's own forecasts before the data date, captured at upload (stored dates are RunF9's).
     fileDates: s.analysis?.recalc?.fileForecastsBeforeDataDate
       ? Object.fromEntries(s.analysis.recalc.fileForecastsBeforeDataDate.map(f => [f.id, { earlyStart: f.earlyStart, earlyFinish: f.earlyFinish }]))
       : null,
@@ -126,10 +126,10 @@ export async function loadSeriesBaseline(orgId: string, current: SeriesMember & 
 }
 
 /**
- * Load a firm's schedule with activities and logic, filling in dates/float Hoshmand Schedule had to calculate
+ * Load a firm's schedule with activities and logic, filling in dates/float RunF9 had to calculate
  * for files that arrived without them (older uploads are corrected on read).
  * By default the network is the schedule AS SUBMITTED. With { basis: 'scenario' } the edits made in
- * Hoshmand Schedule (schedule_edits, an override layer) are applied before the recalculation, as a named what-if
+ * RunF9 (schedule_edits, an override layer) are applied before the recalculation, as a named what-if
  * scenario. Either way `edits` lists the active edits (as they apply to the imported network) so the
  * UI can offer the scenario; only the as-submitted analysis is stored as the schedule's headline.
  */
@@ -177,8 +177,8 @@ export async function loadScheduleData(id: string, orgId: string, opts: { basis?
     dataDate: schedule.dataDate, finishMilestoneId: schedule.finishMilestoneId ?? null, baseline,
     calendars: schedule.calendars, defaultCalendarId: schedule.defaultCalendarId, fileProgressMode: prior?.fileProgressMode ?? null,
   })
-  // After the first upload the stored dates are Hoshmand Schedule's own recalculation, so a fresh comparison
-  // would compare Hoshmand Schedule with itself; the upload-time comparison with the file stays authoritative.
+  // After the first upload the stored dates are RunF9's own recalculation, so a fresh comparison
+  // would compare RunF9 with itself; the upload-time comparison with the file stays authoritative.
   if (prior) analysis.recalc = prior.recalc ?? analysis.recalc
   const criticalCount = activities.filter(a => a.isCritical).length
   // Only the as-submitted analysis is the schedule's stored headline (lists, portfolio, dashboard status).
@@ -191,7 +191,7 @@ export async function loadScheduleData(id: string, orgId: string, opts: { basis?
   const warnings = importNotes(schedule.warnings, done.note, !!prior, analysis.recalc)
   const bw = basisWarning(basis, editsApplied)
   if (bw) warnings.unshift(bw)
-  // Location and size for the overview: from the plan interview when this schedule was built in Hoshmand Schedule.
+  // Location and size for the overview: from the plan interview when this schedule was built in RunF9.
   let extra: { city?: string | null; state?: string | null; sqft?: number | null; type?: string | null; valueMusd?: number | null } = {}
   if (schedule.planId) {
     const { getPlan } = await import('@/lib/db')
@@ -214,13 +214,13 @@ export async function loadScheduleData(id: string, orgId: string, opts: { basis?
     hasLogic: done.hasLogic,
     analysis,
     cpm: done.cpm,
-    /** 'submitted' (the file as submitted) or 'scenario' (with the Hoshmand Schedule edits applied) */
+    /** 'submitted' (the file as submitted) or 'scenario' (with the RunF9 edits applied) */
     basis,
     /** Forecast finish of the schedule as submitted (the stored headline when the scenario was loaded) */
     submittedForecastFinish: basis === 'submitted' ? analysis.forecastFinish : prior?.forecastFinish ?? null,
     /** Edits that apply to the imported network: the scenario's size, whichever basis was loaded */
     editsApplied,
-    /** Active edits made in Hoshmand Schedule, in order, as they apply to the imported network (with before/after) */
+    /** Active edits made in RunF9, in order, as they apply to the imported network (with before/after) */
     edits: edited.applied,
     /** Reverted edits, kept for the record */
     revertedEdits: storedEdits.filter(e => e.revertedAt),

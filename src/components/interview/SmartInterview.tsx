@@ -81,7 +81,7 @@ export function SmartInterview(p: SmartInterviewProps) {
             <Robot mood="done" size={84} className="mx-auto mb-2" />
             <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em]">Nothing left that changes your finish date</div>
             <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">
-              {el.conflicts.length > 0 ? 'Fix the answers flagged above first — the schedule is only as good as its dates.' : p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything Hoshmand Schedule needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
+              {el.conflicts.length > 0 ? 'Fix the answers flagged above first — the schedule is only as good as its dates.' : p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything RunF9 needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
             </p>
           </MoodTile>
         ) : group ? (

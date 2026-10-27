@@ -13,7 +13,7 @@ export interface ParsedSchedule {
   projectName: string
   dataDate: string | null
   projectStart: string | null
-  /** Finish date the file reports (P6 scheduled finish / MSP finish); Hoshmand Schedule recalculates its own */
+  /** Finish date the file reports (P6 scheduled finish / MSP finish); RunF9 recalculates its own */
   projectFinish: string | null
   /** Required finish the file imposes (P6 PROJECT.plan_end_date "Must Finish By") */
   mustFinishBy?: string | null
@@ -40,7 +40,7 @@ export interface ParsedSchedule {
   sourceTables?: string[]
   /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */
   progressMode?: ProgressMode | null
-  /** The file was written by Hoshmand Schedule's own exporter (a re-import of Hoshmand Schedule output, not a project record) */
+  /** The file was written by RunF9's own exporter (a re-import of RunF9 output, not a project record) */
   planoraExport?: boolean
   /** P6 only: the project baseline exported in the same file (per-activity baseline by activity id) */
   embeddedBaseline?: EmbeddedBaseline | null

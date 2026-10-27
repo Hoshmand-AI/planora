@@ -137,7 +137,7 @@ export interface PublishBlocker {
 /**
  * What must be confirmed before this plan is published as a baseline: the deterministic forecast
  * missing the required finish (or a contractual milestone target) by more than LATE_THRESHOLD_DAYS,
- * and a project type typed in by the user that matches no Hoshmand Schedule template (planned with the
+ * and a project type typed in by the user that matches no RunF9 template (planned with the
  * generic building network).
  */
 export function publishBlockers(s: GeneratedSchedule, answers: Record<string, Answer>): PublishBlocker[] {
@@ -163,7 +163,7 @@ export function publishBlockers(s: GeneratedSchedule, answers: Record<string, An
   if (type?.status === 'known' && typeof type.value === 'string' && (type.custom || !(PROJECT_TYPES as readonly string[]).includes(type.value))) {
     out.push({
       code: 'no_template', maxGrade: 'C',
-      text: `“${type.value}” is not a Hoshmand Schedule project type, so the plan uses the generic building network. Choose the closest listed type, or review every activity and its logic before publishing.`,
+      text: `“${type.value}” is not a RunF9 project type, so the plan uses the generic building network. Choose the closest listed type, or review every activity and its logic before publishing.`,
     })
   }
   return out
