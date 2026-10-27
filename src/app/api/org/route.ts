@@ -11,6 +11,7 @@ import { normalizeSso, publicSso, saveSsoConfig, ssoConfigFor } from '@/lib/serv
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { requireVerifiedEmail } from '@/lib/server/email-verification'
 import { appOrigin, sendEmail } from '@/lib/server/email'
+import { orgInviteEmail } from '@/lib/server/emails'
 import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
 
 /** Organization overview: members are visible to every member; invitations and settings to admins. */
@@ -57,8 +58,8 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       const link = `${appOrigin(req)}/auth?invite=${encodeURIComponent(token)}`
       // Emailed when a provider is configured; the link is always shown to the admin as well.
       const emailed = (await sendEmail({
-        to: invitation.email, subject: `${auth.name} invited you to ${auth.orgName} on RunF9`,
-        text: `${auth.name} (${auth.email}) invited you to join ${auth.orgName} on RunF9 as ${ROLE_LABELS[b.role]}.\n\nAccept the invitation:\n\n${link}\n\nThe link works once, only for this email address, and expires in ${INVITE_DAYS} days.\n\n— RunF9 by Hoshmand AI`,
+        to: invitation.email,
+        ...orgInviteEmail({ inviter: auth.name, inviterEmail: auth.email, org: auth.orgName, role: ROLE_LABELS[b.role], link, days: INVITE_DAYS }, appOrigin(req)),
       })).sent
       await audit({ action: 'member.invited', targetType: 'invitation', targetId: invitation.id, detail: { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt, emailed } })
       return json({ invitation, link, emailed, expiresInDays: INVITE_DAYS })

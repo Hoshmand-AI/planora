@@ -94,5 +94,5 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
   const exSummary = exceptions ? summarizeExceptions(exceptions) : null
   await audit({ action: 'plan.export', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, format, file, version: plan.version, activities: g.activities.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), ...(exSummary ? { exportExceptions: { records: exceptions!.records.length, total: exSummary.total, losses: exSummary.losses } } : {}) } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, ...(exceptions ? { 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } : {}) } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, ...(exceptions ? { 'X-RunF9-Export-Exceptions': exceptionHeader(exceptions), 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } : {}) } })
 })

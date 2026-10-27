@@ -8,6 +8,8 @@ import { getUserByEmail, initSchema, query } from '@/lib/db'
 import { hashPassword, revokeAllSessions } from '@/lib/auth'
 import { randomToken, sha256 } from './crypto'
 import { sendEmail } from './email'
+import { renderEmail } from './email-template'
+import { passwordResetContent, passwordResetEmail } from './emails'
 import { audit, auditQuietly } from './audit'
 import { ssoEnforced } from './saml'
 import { passwordProblem } from './password'
@@ -29,8 +31,9 @@ export function resetLink(origin: string, token: string): string {
   return `${origin}/auth/reset?token=${encodeURIComponent(token)}`
 }
 
+/** Plain-text part of the reset email (the HTML part has the same words). */
 export function resetEmailText(name: string, link: string): string {
-  return `Hi ${name},\n\nSomeone (hopefully you) asked to reset the password for your RunF9 account. Choose a new password here:\n\n${link}\n\nThe link works once and expires in ${RESET_VALID_MINUTES} minutes. If you didn't ask for this, ignore this message: your password stays the same.\n\n— RunF9 by Hoshmand AI`
+  return renderEmail(passwordResetContent(name, link, RESET_VALID_MINUTES), '').text
 }
 
 /** Issues a fresh reset token for a user (older unused reset tokens stop working). Returns the token. */
@@ -72,7 +75,7 @@ export async function requestPasswordReset(email: string, origin: string): Promi
   if (user.disabledAt) return 'disabled'
   if (user.role !== 'owner' && await ssoEnforced(user.orgId)) return 'sso_required'
   const token = await issueResetToken(user.id)
-  const r = await sendEmail({ to: user.email, subject: 'Reset your RunF9 password', text: resetEmailText(user.name, resetLink(origin, token)) })
+  const r = await sendEmail({ to: user.email, ...passwordResetEmail(user.name, resetLink(origin, token), RESET_VALID_MINUTES, origin) })
   // Never the token or the link.
   await auditQuietly({ orgId: user.orgId, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id, actor: { id: null, email: user.email }, detail: { emailed: r.sent } })
   return r.sent ? 'sent' : 'send_failed'

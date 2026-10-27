@@ -96,7 +96,7 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     lines.push(`%T\t${name}`, `%F\t${fields.join('\t')}`)
     for (const r of data) lines.push(`%R\t${r.map(xerText).join('\t')}`)
   }
-  lines.push(['ERMHDR', '19.12', today, 'Project', xerText(opts.exportedBy || 'Planora'), 'Planora', 'dbxDatabaseNoName', 'Project Management', 'USD'].join('\t'))
+  lines.push(['ERMHDR', '19.12', today, 'Project', xerText(opts.exportedBy || 'RunF9'), 'RunF9', 'dbxDatabaseNoName', 'Project Management', 'USD'].join('\t'))
 
   const PROJ = 1
   const calId = calendarIds(s.calendars)

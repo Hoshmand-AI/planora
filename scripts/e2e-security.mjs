@@ -78,6 +78,17 @@ async function mailLink(to, re) {
   throw new Error(`no email to ${to}`)
 }
 
+/** Latest message in the test outbox for this recipient. */
+async function lastMail(to) {
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  for (const f of (await fs.readdir(OUTBOX).catch(() => [])).sort().reverse()) {
+    const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
+    if (m.to === to) return m
+  }
+  return null
+}
+
 async function main() {
   const stamp = Date.now()
   if (process.env.DATABASE_URL) {
@@ -110,6 +121,9 @@ async function main() {
     r = await owner.post('/api/org', { action: 'invite', email: email('early'), role: 'viewer' })
     ok(r.status === 403 && r.data.code === 'email_unverified', 'Inviting people waits for a confirmed email')
     const link = await mailLink(email('owner'), /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/)
+    const mail = await lastMail(email('owner'))
+    ok(/^RunF9 <[^>]+@[^>]+>$/.test(mail?.from || '') && !/planora/i.test(`${mail?.subject}${mail?.text}${mail?.html}`) && /border-radius:999px/.test(mail?.html || '') && mail?.html.includes(link.replace(/&/g, '&amp;')),
+      'Emails come from "RunF9" with the branded HTML design and the same link in the plain-text part')
     r = await new Client().get(new URL(link).pathname + '?token=nope')
     ok(r.status === 303 && r.headers.get('location').includes('verified=0'), 'A bad confirmation token is refused')
     r = await owner.get(new URL(link).pathname + new URL(link).search)
@@ -561,11 +575,13 @@ async function main() {
     r = await owner2.post('/api/org/integrations', { action: 'test_webhook', id: hookId })
     ok(r.status === 200 && r.data.ok, 'Test delivery succeeds')
     await owner2.post('/api/plans', { name: `Webhook plan ${stamp}` })
-    for (let i = 0; i < 50 && !got.some(g => g.headers['x-planora-event'] === 'plan.created'); i++) await new Promise(r2 => setTimeout(r2, 100))
-    const d = got.find(g => g.headers['x-planora-event'] === 'plan.created')
+    for (let i = 0; i < 50 && !got.some(g => g.headers['x-runf9-event'] === 'plan.created'); i++) await new Promise(r2 => setTimeout(r2, 100))
+    const d = got.find(g => g.headers['x-runf9-event'] === 'plan.created')
     ok(!!d && JSON.parse(d.body).data.detail.plan === `Webhook plan ${stamp}`, 'Creating a plan delivers a plan.created webhook')
-    const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(d.headers['x-planora-signature']) || []
+    const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(d.headers['x-runf9-signature']) || []
     ok(t && v1 === createHmac('sha256', whSecret).update(`${t}.${d.body}`).digest('hex'), 'The delivery signature verifies with the secret')
+    ok(d.headers['x-planora-signature'] === d.headers['x-runf9-signature'] && d.headers['x-planora-event'] === 'plan.created' && d.headers['user-agent'] === 'RunF9-Webhooks/1',
+      'Deliveries carry X-RunF9-* headers, the legacy X-Planora-* copies, and the RunF9 user agent')
     srv.close()
     r = await owner2.post('/api/org/integrations', { action: 'delete_webhook', id: hookId })
     ok(r.status === 200, 'Webhook removed')

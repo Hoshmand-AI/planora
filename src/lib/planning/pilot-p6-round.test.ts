@@ -149,6 +149,9 @@ describe('RunF9 exports are recognizable on re-import', () => {
     expect(parsed.planoraExport).toBe(true)
     expect(parsed.progressMode).toBe('override')
     expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tuser\tPlanner Name\tdb\tProject Management\tUSD\r\n%E\r\n')).toBe(false)
+    // files exported before the RunF9 rename still count as our own output
+    expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tPlanora\tPlanora\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
+    expect(isPlanoraXer('ERMHDR\t19.12\t2026-03-01\tProject\tRunF9\tRunF9\tdbxDatabaseNoName\tProject Management\tUSD\r\n%E\r\n')).toBe(true)
   })
 })
 
