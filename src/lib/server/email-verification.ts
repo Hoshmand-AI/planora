@@ -24,8 +24,8 @@ export async function sendVerificationEmail(user: { id: string; email: string; n
   await query(`INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES ($1,$2,$3, NOW() + make_interval(hours => $4))`, [sha256(token), user.id, PURPOSE, VALID_HOURS])
   const link = `${origin}/api/auth/verify?token=${encodeURIComponent(token)}`
   const r = await sendEmail({
-    to: user.email, subject: 'Confirm your email for Planora',
-    text: `Hi ${user.name},\n\nConfirm that this is your email address for Planora:\n\n${link}\n\nThe link works once and expires in ${VALID_HOURS} hours. If you didn't create a Planora account, ignore this message.\n\n— Planora by Hoshmand AI`,
+    to: user.email, subject: 'Confirm your email for Hoshmand Schedule',
+    text: `Hi ${user.name},\n\nConfirm that this is your email address for Hoshmand Schedule:\n\n${link}\n\nThe link works once and expires in ${VALID_HOURS} hours. If you didn't create a Hoshmand Schedule account, ignore this message.\n\n— Hoshmand Schedule by Hoshmand AI`,
   })
   return r.sent
 }

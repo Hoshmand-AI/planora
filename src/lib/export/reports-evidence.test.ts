@@ -27,7 +27,7 @@ const input = { schedule, activities: done.activities, relationships: rels, anal
 
 const prov: Provenance = {
   sources: [{ scheduleName: 'Bridge 12', version: 'Update 3', fileName: 'bridge12_upd3.xer', sha256: 'a'.repeat(64), dataDate: '2026-03-09', progressMode: 'retained' }],
-  release: 'abc1234', settings: ['CPM recalculation by Planora; out-of-sequence progress: Retained logic'], generatedAt: '2026-10-06T12:00:00.000Z',
+  release: 'abc1234', settings: ['CPM recalculation by Hoshmand Schedule; out-of-sequence progress: Retained logic'], generatedAt: '2026-10-06T12:00:00.000Z',
 }
 
 describe('report provenance header', () => {
@@ -39,10 +39,10 @@ describe('report provenance header', () => {
       expect(at).toBeLessThan(out.indexOf('## 1.'))
       expect(out).toContain('| Source file | bridge12_upd3.xer |')
       expect(out).toContain(`| SHA-256 | ${'a'.repeat(64)} |`)
-      expect(out).toContain('| Planora version (release) | abc1234 |')
+      expect(out).toContain('| Hoshmand Schedule version (release) | abc1234 |')
       expect(out).toContain('| Progress mode | Retained logic |')
       expect(out).toContain('| Data date | 03/09/2026 |')
-      expect(out).toContain('| Calculation settings | CPM recalculation by Planora')
+      expect(out).toContain('| Calculation settings | CPM recalculation by Hoshmand Schedule')
     }
   })
   it('adds provenance once to an AI-written report, and in the supplement', () => {

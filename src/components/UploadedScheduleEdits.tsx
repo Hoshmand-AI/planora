@@ -1,6 +1,6 @@
 'use client'
 
-// Uploaded schedules, inside Planora: edits with reasons (an override layer on the imported file),
+// Uploaded schedules, inside Hoshmand Schedule: edits with reasons (an override layer on the imported file),
 // what-if / recovery options modeled on the file's own network, and the scheduler's Monte Carlo inputs
 // (three-point ranges and discrete risk events). Writing needs schedule.write; others see read-only.
 
@@ -97,9 +97,9 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
   const applied = data.edits
   return (
     <div className="space-y-4 text-[13px] text-warm-700">
-      <p className="text-warm-600">Edits change Planora&apos;s copy of this schedule only; the uploaded file is kept unchanged. Each edit is recalculated with the full network, recorded with its reason in the audit log, and included in exports and reports.</p>
+      <p className="text-warm-600">Edits change Hoshmand Schedule&apos;s copy of this schedule only; the uploaded file is kept unchanged. Each edit is recalculated with the full network, recorded with its reason in the audit log, and included in exports and reports.</p>
       {applied.length === 0 ? <p>No edits yet.</p> : (
-        <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in Planora · forecast finish {fmtDate(data.forecastFinish)}</caption>
+        <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in Hoshmand Schedule · forecast finish {fmtDate(data.forecastFinish)}</caption>
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
@@ -139,7 +139,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           </label>
           <button type="submit" disabled={busy || reason.trim().length < 5 || !a.trim()} className={primary}>{busy ? 'Recalculating…' : 'Save edit and recalculate'}</button>
         </form>
-      ) : !data.editable ? <p className="text-warm-600">This schedule was published from a Planora plan; edit the plan instead.</p>
+      ) : !data.editable ? <p className="text-warm-600">This schedule was published from a Hoshmand Schedule plan; edit the plan instead.</p>
         : <p className="text-warm-600">Your role can view edits but not make them.</p>}
       {err && <p role="alert" className="text-status-at-risk">{err}</p>}
     </div>
@@ -169,7 +169,7 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
     const r = await postJson(`/api/schedules/${scheduleId}/edits`, { changes: o.changes, reason: reasons[o.id] ?? o.reason, source: 'recovery', optionId: o.id })
     setBusy('')
     if (!r.ok) { setMsg(r.data.error || 'The option was not applied.'); return }
-    setMsg(`Applied to the "With Planora edits" scenario: ${o.title}. Scenario forecast finish ${fmtDate(String(r.data.forecastFinish ?? ''))}; the schedule as submitted is unchanged.`)
+    setMsg(`Applied to the "With Hoshmand Schedule edits" scenario: ${o.title}. Scenario forecast finish ${fmtDate(String(r.data.forecastFinish ?? ''))}; the schedule as submitted is unchanged.`)
     onApplied()
   }
 

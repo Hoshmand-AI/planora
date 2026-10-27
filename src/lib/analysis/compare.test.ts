@@ -164,7 +164,7 @@ describe('comparison CSV', () => {
 
 describe('compare and windows agree on a pair', () => {
   const cal: WorkCalendar = { id: 'c1', name: 'Standard 5-Day', workDays: [1, 2, 3, 4, 5], hoursPerDay: 8, holidays: [] }
-  // An update as the routes load it: Planora's recalculated dates and analysis.
+  // An update as the routes load it: Hoshmand Schedule's recalculated dates and analysis.
   function load(id: string, version: string, dataDate: string, acts: Partial<Activity>[], links: [string, string][]) {
     const activities = acts.map(f => makeActivity(id, { calendarId: cal.id, name: f.activityId, ...f }))
     const byCode = new Map(activities.map(x => [x.activityId, x]))
@@ -212,7 +212,7 @@ describe('compare and windows agree on a pair', () => {
     const p = l.cs.activities.find(x => x.activityId === 'P500')!
     expect(withW.latestFinish).toEqual({ before: { code: 'P500', date: '2026-04-24' }, after: { code: 'P500', date: p.earlyFinish } })
     expect(withW.projectFinishMovement).toBe(Math.round((Date.parse(p.earlyFinish!) - Date.parse('2026-04-24')) / 86_400_000))
-    expect(withW.summary.join(' ')).toMatch(/The latest-finishing activity \(P500\) moved \d+ calendar days later \(04\/24\/2026 → \d\d\/\d\d\/2026, Planora's recalculated activity dates\)/)
+    expect(withW.summary.join(' ')).toMatch(/The latest-finishing activity \(P500\) moved \d+ calendar days later \(04\/24\/2026 → \d\d\/\d\d\/2026, Hoshmand Schedule's recalculated activity dates\)/)
     expect(withW.changes.find(c => c.code === 'B200' && c.field === 'duration')).toMatchObject({ unit: 'wd', calendar: 'Standard 5-Day', delta: 2 })
     expect(withW.changes.find(c => c.code === 'B200' && c.field === 'finish')).toMatchObject({ unit: 'cd', delta: 4 })
   })

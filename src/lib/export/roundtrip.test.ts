@@ -12,7 +12,7 @@ import { exportMspXml } from './msp-xml'
 import { exportImportXlsx } from './xlsx'
 
 // Interoperability corpus: schedules of different types, calendars and logic are exported to P6
-// (.xer), MS Project (.xml) and the Excel import workbook, read back by Planora's own importers, and
+// (.xer), MS Project (.xml) and the Excel import workbook, read back by Hoshmand Schedule's own importers, and
 // then RE-SCHEDULED from scratch (stored dates and float discarded). The re-computed dates must match
 // the original CPM, activity by activity, which proves logic, durations, lags, calendars, holidays
 // and constraints survive the trip. (Parity with P6/MS Project themselves is the separate reference

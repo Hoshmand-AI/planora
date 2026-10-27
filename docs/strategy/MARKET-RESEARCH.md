@@ -1,4 +1,4 @@
-# Planora: Competitive Landscape & Positioning
+# Hoshmand Schedule: Competitive Landscape & Positioning
 
 *Research date: 2026-10-04. Sources were checked through web search, and every claim about a company carries a numbered source `[n]` (see **Sources** at the end). Funding totals from aggregators (CB Insights, Tracxn, VCBacked, Dealroom) are third-party estimates. Where a number could not be verified, this document says **unverified** or **not public**. Pricing in the "recommendation" sections is our proposal, not market data.*
 
@@ -6,13 +6,13 @@
 
 ## 1. Executive summary (decision-oriented)
 
-1. **The incumbent "system of record" is still Primavera P6, and specifications enforce it.** USACE/NAVFAC spec UFGS 01 32 01.00 10 has a section headed *"Primavera P6 Mandatory Requirements"* and requires a native P6 XER baseline [37]. Every AI entrant that won traction (ALICE, nPlan, SmartPM, Nodes & Links, Foresight) **reads and writes P6** rather than trying to replace it [17][1][3][27][31]. Planora must be "P6-native in, P6-native out".
+1. **The incumbent "system of record" is still Primavera P6, and specifications enforce it.** USACE/NAVFAC spec UFGS 01 32 01.00 10 has a section headed *"Primavera P6 Mandatory Requirements"* and requires a native P6 XER baseline [37]. Every AI entrant that won traction (ALICE, nPlan, SmartPM, Nodes & Links, Foresight) **reads and writes P6** rather than trying to replace it [17][1][3][27][31]. Hoshmand Schedule must be "P6-native in, P6-native out".
 2. **Capital is going to "AI layers on top of the schedule", not to new CPM engines.** Recent rounds: ALICE (about $201M total, Series C-II Feb 2025) [2]; nPlan (€13.7M Series B, Oct 2025) [4]; Nodes & Links ($12M Series B, Feb 2025) [27]; Foresight ($25M Series A, Mar 2026) [31]; Planera ($8M, Oct 2025, $26.5M total) [8]; Buildots ($130M, total $297M) [10].
 3. **Consolidation is accelerating in 2026.** Procore bought Datagrid (agentic AI, about $190M, Jan 2026) [13] and agreed to buy DroneDeploy for about $845M [14]. OpenSpace bought Disperse (Oct 2025) [29]. Autodesk renamed ACC to **Forma** (Mar 2026) [21]. Kahua raised $250M at a valuation above $1B from Bain (Sep 29, 2026) [41]. The exit path for an AI scheduling tool is acquisition by a platform, so integrations matter more than owning the workflow.
 4. **The low end is commoditizing quickly.** Several new tools now run DCMA 14-point checks on uploaded XER/MPP files with an "AI copilot": Kazinex Planner, XERXES, PathProof and XER Toolkit, plus open-source P6 MCP servers [36]. Schedule Validator charges about **$40/user/month** [24] and Steelray Project Analyzer about **$1,500/year** [24]. **On its own, a DCMA check is not a differentiator.**
 5. **Generative scheduling is proven at the megaproject top end but sold through consultants.** ALICE formalized a McKinsey alliance in April 2026 and claims up to 20% schedule reduction across more than 35 deployments [16]. This is high-touch and expensive. Nobody has made **explained** generative scheduling usable for a mid-market scheduler.
 6. **Trust is the primary barrier.** In one 2025 survey of 400 US and Canadian construction professionals, **65% "don't fully trust AI"** [39]. Concerns about data accuracy (57%) and security (54%) lead the list of barriers [39]. Black-box output ("the model says 14 days") will not survive a USACE schedule reviewer or a claims expert.
-7. **Federal and defense security is a real gap.** Oracle Primavera Cloud only reached **FedRAMP "In Process"** in Jan 2026 [38]. Kahua is FedRAMP Moderate authorized and sells to USACE, State OBO, the VA and GSA [40]. None of the AI-native schedulers found here advertise an air-gapped or on-premises deployment. This is not a crowded space for Planora's air-gapped mode.
+7. **Federal and defense security is a real gap.** Oracle Primavera Cloud only reached **FedRAMP "In Process"** in Jan 2026 [38]. Kahua is FedRAMP Moderate authorized and sells to USACE, State OBO, the VA and GSA [40]. None of the AI-native schedulers found here advertise an air-gapped or on-premises deployment. This is not a crowded space for Hoshmand Schedule's air-gapped mode.
 8. **There is a timing opportunity right now.** Microsoft **retired Project Online on Sep 30, 2026**, four days before this report. Desktop Project remains, and Microsoft is pushing users to Planner and Copilot agents [19]. MSP-based schedulers at mid-size GCs are being forced to re-platform.
 9. **Pricing norms favor per-project, unlimited-user pricing for team tools** (SmartPM, Touchplan, Planera, ALICE) [5][25][9][18]. Per-seat pricing is the norm for desktop schedulers (P6 Pro is about $2,570 perpetual plus about $550/year maintenance; Asta is about £1,470/year) [17][22].
 10. **The failure lessons:** companies tried to change how construction *is done* (Katerra, Veev; vertical integration that burned more than $2B and about $600M respectively) [33][34], or depended on one platform's distribution. Software that augmented existing workflows got acquired (PlanGrid for $875M, Fieldwire for $300M, Synchro by Bentley, Avvir by Hexagon) [30][23][20][28].
@@ -66,7 +66,7 @@
 | **Outbuild** | 2021; remote [6] | $11M Series A, Nov 2024 (Sway; Hilti and Trimble Ventures) [6] | More than 4,000 projects in 10 countries (2024); about 83 staff (Aug 2026) [6][57] | Not public [58] | CPM plus lookahead and pull planning; ACC integration [21b] | Mid-market GC focus overlaps with Procore and Autodesk | **Growing** |
 | **Touchplan** (MOCA Systems) | 2014; Boston [25] | Not public | More than 59K users, more than 4,600 projects; Boldt and Alberici enterprise deals [59] | **$15–30K per $50–100M project**, unlimited seats [25] | Lean pull planning; Doxel integration [12] | "Priced for larger companies" [25] | Active |
 | **Karmen** | 2024; San Francisco; YC F24 [60] | YC (amount not public) | Early | Not public | Builds baselines from specs and drawings and keeps them updated [60] | Two-person team; trust problem | Early. **The closest conceptual competitor** |
-| **Kazinex Planner, XERXES, PathProof, XER Toolkit** | 2024–2026 (*dates unverified*) | Not public | Not public | Not public | Browser DCMA-14, Monte Carlo, update comparison, TIA and forensic PDFs, AI copilot [36] | Thin moats | **Commoditizing Planora's analysis features** |
+| **Kazinex Planner, XERXES, PathProof, XER Toolkit** | 2024–2026 (*dates unverified*) | Not public | Not public | Not public | Browser DCMA-14, Monte Carlo, update comparison, TIA and forensic PDFs, AI copilot [36] | Thin moats | **Commoditizing Hoshmand Schedule's analysis features** |
 | **Buildots** | Tel Aviv / London | $130M (2026, led by OG Venture Partners); $297M total [10]; $45M Series D, May 2025 [10b] | More than 100 large organizations (Intel, Digital Realty, JE Dunn, Mortenson) [10] | Not public | Computer-vision progress tracking against the schedule | Requires capture hardware | **Breakout** |
 | **Doxel** | 2016 [12] | $56.5M total; $40M Series B, Aug 2021 [12] | Kaiser, Shell [12] | Not public | CV progress tracking | No new round since 2021 [12] | Operating; *trajectory unverified* |
 | **OpenSpace** | San Francisco | About $200M total; $50M Series D (2025) (aggregator) [29] | Acquired Disperse, Oct 28, 2025 [29] | Not public | 360° capture plus progress tracking | Not a scheduler | **Consolidator** |
@@ -97,7 +97,7 @@
 
 ### 3.4 Failures, exits and pivots
 
-| Company | What happened | Lesson for Planora |
+| Company | What happened | Lesson for Hoshmand Schedule |
 |---|---|---|
 | **Katerra** (founded 2015) | Raised more than $2B (about $1B from SoftBank), was valued at $4B, filed Chapter 11 in June 2021. Layoffs began in 2019, then its lender Greensill collapsed [33] | Don't try to change how construction is *done*. Capital intensity kills. Sell software into existing workflows |
 | **Veev** | About $600M raised, unicorn in 2022, shut down Nov 2023 after a funding round was cancelled [34] | The same lesson: vertical integration needs continuous fundraising |
@@ -122,7 +122,7 @@
 
 ## 5. Unmet needs (what schedulers complain about)
 
-| Pain | Evidence | Planora answer |
+| Pain | Evidence | Hoshmand Schedule answer |
 |---|---|---|
 | P6 is costly and hard to learn, and overkill for most projects | Planning Planet threads ("Fed up with Primavera", "P6 more easy options") [44]; perpetual about $2.5K plus 22%/yr [17] | Interview-driven schedule build that **exports clean XER**, so the client never opens P6 to create a baseline |
 | AI is not trusted; black-box outputs | 65% don't fully trust AI; 57% worry about data accuracy [39] | **Every duration and logic link carries a written basis**: source (spec section, historical analog, production rate), assumptions, and confidence |
@@ -135,17 +135,17 @@
 
 ---
 
-## 6. Positioning and differentiation for Planora
+## 6. Positioning and differentiation for Hoshmand Schedule
 
 ### 6.1 Positioning statement
 
-> **Planora is the explainable AI scheduler for public and federal work: it interviews you, builds a CPM schedule where every duration and tie has a written basis, proves it against DCMA, GAO and UFGS, and hands you a clean P6 file. It runs in the cloud or fully air-gapped.**
+> **Hoshmand Schedule is the explainable AI scheduler for public and federal work: it interviews you, builds a CPM schedule where every duration and tie has a written basis, proves it against DCMA, GAO and UFGS, and hands you a clean P6 file. It runs in the cloud or fully air-gapped.**
 
 The positioning against each class of competitor:
-- **vs. P6, MSP and Asta:** "Planora doesn't replace P6. It produces the P6 file faster and better."
+- **vs. P6, MSP and Asta:** "Hoshmand Schedule doesn't replace P6. It produces the P6 file faster and better."
 - **vs. ALICE:** "Generative scheduling for the 95% of projects too small for a McKinsey engagement, and it explains itself."
-- **vs. SmartPM, Acumen and the DCMA checkers:** "They tell you what's wrong. Planora tells you why, fixes it, and builds the next one right."
-- **vs. Procore and Forma:** they display schedules; Planora creates and defends them, and integrates with them.
+- **vs. SmartPM, Acumen and the DCMA checkers:** "They tell you what's wrong. Hoshmand Schedule tells you why, fixes it, and builds the next one right."
+- **vs. Procore and Forma:** they display schedules; Hoshmand Schedule creates and defends them, and integrates with them.
 
 ### 6.2 Wedge market (in order)
 
@@ -159,16 +159,16 @@ Avoid in year 1: megaproject owners (ALICE, nPlan, Foresight territory, with 12�
 
 | Tier | Who | Price (proposal) | Anchors |
 |---|---|---|---|
-| **Free "Schedule Check"** | Anyone with an XER or MPP file | Free: 1 file a month, DCMA-14 report with plain-English explanations, Planora watermark | Commodity checkers at $40/user/mo and $1,500/yr [24]. Use this as the lead magnet |
+| **Free "Schedule Check"** | Anyone with an XER or MPP file | Free: 1 file a month, DCMA-14 report with plain-English explanations, Hoshmand Schedule watermark | Commodity checkers at $40/user/mo and $1,500/yr [24]. Use this as the lead magnet |
 | **Pro (individual scheduler or consultant)** | Solo schedulers | **$149/mo or $1,490/yr**: unlimited checks, generation, XER/MSP export, Monte Carlo | Below P6 Pro maintenance plus Acumen; above the commodity checkers because it *generates* |
 | **Project** | GC or owner team on a single job | **$500–$1,000 per project-month, unlimited users**: update narratives, recovery options, review workflow | SmartPM 2021 list of $69–$250 per project-month [5]; Touchplan $15–30K per project [25] |
 | **Enterprise / Gov** | Firms with 10+ projects; federal | **From $25K/yr**. Self-hosted or air-gapped, SSO/SAML, audit export, compliance package | Primavera EPPM cloud at about $125–£244/user/mo with 25-seat minimums [17] |
 
-Offer a **"consultant partner" program**: wholesale pricing (for example 40% off) so consultants can resell or bundle Planora in their fixed-fee schedule-development services.
+Offer a **"consultant partner" program**: wholesale pricing (for example 40% off) so consultants can resell or bundle Hoshmand Schedule in their fixed-fee schedule-development services.
 
 ### 6.4 Go-to-market for a solo founder with little money
 
-1. **Sell the service first, the software second.** Offer a "48-hour defensible baseline" or a "UFGS pre-flight review" as a fixed-fee service delivered with Planora ($2.5–7.5K; *suggested*). This produces cash, case studies and training data.
+1. **Sell the service first, the software second.** Offer a "48-hour defensible baseline" or a "UFGS pre-flight review" as a fixed-fee service delivered with Hoshmand Schedule ($2.5–7.5K; *suggested*). This produces cash, case studies and training data.
 2. **Use the founder's network:** 22 years of consulting contacts translate into 30 warm calls to owner's reps, CM agencies and federal GCs. Target 10 paid pilots at $500–$1,000 each.
 3. **Content where schedulers already gather:** Planning Planet, the AACE International community, LinkedIn, PMI-SP circles (*channels named by us; no audience sizes verified*). Publish "DCMA-14 explained with real fixes" and "Why your USACE baseline got rejected" as teardown posts that use the free checker.
 4. **Integrations as distribution:** an Autodesk Forma Build partner listing (Outbuild has one [21b]), the Procore App Marketplace, and XER round-tripping with Primavera Cloud.
@@ -200,8 +200,8 @@ Offer a **"consultant partner" program**: wholesale pricing (for example 40% off
 
 ## 7. Key risks to this strategy
 
-- **Commodity squeeze:** DCMA checkers and MCP servers are free or cheap [36]. Planora's moat must be the **explained generation, spec pre-flight and round-trip fidelity**, not the checks.
-- **Oracle catches up:** Primavera Cloud already advertises AI logic and duration suggestions and RFP-based generation [35]. Planora should differentiate on explainability, MSP and Asta support, and air-gapped deployment, which Oracle's cloud cannot offer.
+- **Commodity squeeze:** DCMA checkers and MCP servers are free or cheap [36]. Hoshmand Schedule's moat must be the **explained generation, spec pre-flight and round-trip fidelity**, not the checks.
+- **Oracle catches up:** Primavera Cloud already advertises AI logic and duration suggestions and RFP-based generation [35]. Hoshmand Schedule should differentiate on explainability, MSP and Asta support, and air-gapped deployment, which Oracle's cloud cannot offer.
 - **Liability:** an AI-generated baseline that gets used in a claim can be attacked. Keep a human scheduler of record and keep the full audit trail.
 
 ---

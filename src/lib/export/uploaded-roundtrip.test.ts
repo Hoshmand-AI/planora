@@ -1,4 +1,4 @@
-// Uploaded schedules exported by Planora and imported again must give the same network: the same
+// Uploaded schedules exported by Hoshmand Schedule and imported again must give the same network: the same
 // activities, logic, forecast finish, required finish and critical path. (The generated-schedule
 // corpus is in roundtrip.test.ts; these are contractor files with progress and constraints.)
 import { describe, it, expect } from 'vitest'

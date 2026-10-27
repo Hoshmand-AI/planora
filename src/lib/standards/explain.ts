@@ -5,7 +5,7 @@
 import type { StandardsRunOutput } from './types'
 
 export const STANDARDS_AI_INSTRUCTIONS = [
-  'The results below were computed by Planora\'s deterministic rules engine and are authoritative.',
+  'The results below were computed by Hoshmand Schedule\'s deterministic rules engine and are authoritative.',
   'Explain them; do not re-judge, re-score, upgrade or downgrade any result, and do not add findings of your own.',
   'Cite the ruleId (for example GAO-BP2-01 or DCMA-06) for every statement about a result.',
   'Do not describe the scan as a GAO assessment or a compliance determination.',

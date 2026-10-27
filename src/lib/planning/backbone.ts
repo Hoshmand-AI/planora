@@ -28,7 +28,7 @@ export interface BackboneContext {
 }
 
 const src = (label: string, detail?: string): SourceRef => ({ kind: 'template', label, detail })
-const why = (summary: string, detail?: string): Rationale => ({ summary, sources: [src('Planora data center backbone', detail)], confidence: 'medium' })
+const why = (summary: string, detail?: string): Rationale => ({ summary, sources: [src('Hoshmand Schedule data center backbone', detail)], confidence: 'medium' })
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** Share of the template's commissioning duration for each level (L5 IST keeps the rest). */

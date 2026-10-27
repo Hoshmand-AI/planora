@@ -366,7 +366,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     const before = (d: string | null | undefined) => isValidDate(d) && toDayNumber(d) < dd
     const after = (d: string | null | undefined) => isValidDate(d) && toDayNumber(d) > dd
     // Forecasts are judged on the contractor file's own early dates when they were captured before
-    // Planora's recalculation (which always schedules open work from the data date); actuals are never
+    // Hoshmand Schedule's recalculation (which always schedules open work from the data date); actuals are never
     // recalculated, so the stored ones are the file's.
     const fileDates = s.fileDates ?? null
     const es = (a: AnalyzableActivity) => (fileDates?.[a.id] ? fileDates[a.id].earlyStart ?? a.earlyStart : a.earlyStart)
@@ -383,7 +383,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     if (actualsAfter.length) parts.push(`${plural(actualsAfter.length, 'activity', 'activities')} ${actualsAfter.length === 1 ? 'has an actual date' : 'have actual dates'} after the ${fmtDate(dataDate)} data date`)
     if (forecastsBefore.length) parts.push(`${plural(forecastsBefore.length, 'incomplete activity', 'incomplete activities')} ${forecastsBefore.length === 1 ? 'has a forecast (early) date' : 'have forecast (early) dates'} before it${fileDates ? ' in the contractor\'s file' : ''}`)
     const notScheduledNote = unscheduled.length
-      ? ` Not scheduled to the data date: ${plural(unscheduled.length, 'unstarted activity', 'unstarted activities')} (${unscheduled.slice(0, 5).map((a) => a.code).join(', ')}${unscheduled.length > 5 ? ', …' : ''}) ${unscheduled.length === 1 ? 'has its' : 'have their'} early start before the data date, so the file's dates were not recalculated to its ${fmtDate(dataDate)} data date after statusing (schedule it, F9 in P6, before submitting)${fileDates ? '; Planora\'s recalculation moves this work to the data date' : ''}.`
+      ? ` Not scheduled to the data date: ${plural(unscheduled.length, 'unstarted activity', 'unstarted activities')} (${unscheduled.slice(0, 5).map((a) => a.code).join(', ')}${unscheduled.length > 5 ? ', …' : ''}) ${unscheduled.length === 1 ? 'has its' : 'have their'} early start before the data date, so the file's dates were not recalculated to its ${fmtDate(dataDate)} data date after statusing (schedule it, F9 in P6, before submitting)${fileDates ? '; Hoshmand Schedule\'s recalculation moves this work to the data date' : ''}.`
       : ''
     add({
       id: 9, name: 'Invalid dates', metric: String(bad.length), threshold: '0', result: bad.length === 0 ? 'pass' : 'fail',

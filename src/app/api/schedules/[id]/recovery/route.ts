@@ -10,7 +10,7 @@ import { recoveryUnavailableReason, uploadedRecoveryOptions } from '@/lib/planni
  * milestone's FNLT / FO / MFO date, else Must Finish By); work by others, fixed-duration work and work
  * after the milestone are never crashed or overlapped.
  * The network is the schedule as submitted; ?basis=scenario models on the what-if scenario with the
- * Planora edits. Each option lists its edits; apply one with POST /api/schedules/{id}/edits
+ * Hoshmand Schedule edits. Each option lists its edits; apply one with POST /api/schedules/{id}/edits
  * { changes, reason, source: 'recovery', optionId }.
  * A schedule that cannot have options (no logic, a network the CPM could not run, no open work)
  * answers 200 with { available: false, reason, options: [] }: that is a state of the schedule, not an

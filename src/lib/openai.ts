@@ -21,7 +21,7 @@ interface ScheduleContext {
   hasLogic?: boolean
   /** The organization's quality thresholds */
   rules?: Partial<DcmaRules>
-  /** Planora's recalculated analysis (forecast, variance basis, status, driving path) */
+  /** Hoshmand Schedule's recalculated analysis (forecast, variance basis, status, driving path) */
   analysis?: ScheduleAnalysis
   /** Change since the previous upload of the same project */
   comparison?: ScheduleComparison | null
@@ -61,7 +61,7 @@ export function buildAskPrompt(question: string, context: ScheduleContext): { sy
     missingSuccessors: findMissingSuccessors(activities, relationships).length,
   }
   
-  const systemPrompt = `You are an expert construction schedule analyst working for Planora. You analyze Primavera P6 and MS Project schedules with precision.
+  const systemPrompt = `You are an expert construction schedule analyst working for Hoshmand Schedule. You analyze Primavera P6 and MS Project schedules with precision.
 
 RULES:
 - Use exact data from the schedule. Never guess or make up activity names, dates, or float values.
@@ -280,7 +280,7 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
       { role: 'user', content: prompt },
     ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}${g ? '.documents' : ''}` })
     if (report) {
-      // The model writes the narrative; the evidence sections are Planora's own calculation.
+      // The model writes the narrative; the evidence sections are Hoshmand Schedule's own calculation.
       if (!context.analysis) return withProvenance(report, context.evidence?.provenance)
       const sup = reportSupplement(reportType, {
         schedule, activities, relationships, analysis: context.analysis, dcma, ...context.evidence,

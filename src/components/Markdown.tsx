@@ -1,5 +1,5 @@
 /**
- * Renders the small Markdown subset Planora's reports and Ask AI answers use (headings, paragraphs,
+ * Renders the small Markdown subset Hoshmand Schedule's reports and Ask AI answers use (headings, paragraphs,
  * bullet and numbered lists, pipe tables, **bold**, _italic_ / *italic*, `code`) as React elements.
  * No HTML is ever injected: model output and document text stay plain text nodes.
  */

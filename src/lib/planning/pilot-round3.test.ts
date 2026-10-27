@@ -1,4 +1,4 @@
-// Round-3 pilot findings: Planora edits are a named scenario (as submitted by default), recovery and
+// Round-3 pilot findings: Hoshmand Schedule edits are a named scenario (as submitted by default), recovery and
 // Monte Carlo target the contract milestone, recovery domain rules, classified data refused on the
 // commercial cloud.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -41,21 +41,21 @@ function withCloseout(net: NetworkInput): NetworkInput {
 }
 
 describe('A. edits are a named scenario; outputs say which basis they use', () => {
-  it('provenance of a scenario says "with N Planora edits" and derives from the SHA-256 instead of claiming it', () => {
+  it('provenance of a scenario says "with N Hoshmand Schedule edits" and derives from the SHA-256 instead of claiming it', () => {
     const sha = 'a'.repeat(64)
     const p = (editsApplied?: number): Provenance => ({ sources: [{ scheduleName: 'P', version: 'U1', fileName: 'f.xer', sha256: sha, dataDate: '2026-04-01', progressMode: 'retained', editsApplied }], release: 'abc', settings: [], generatedAt: '2026-10-07T00:00:00.000Z' })
     const asSubmitted = Object.fromEntries(provenanceRows(p()))
     expect(asSubmitted['Basis']).toBe('as submitted')
     expect(asSubmitted['SHA-256']).toBe(sha)
     const scenario = Object.fromEntries(provenanceRows(p(3)))
-    expect(scenario['Basis']).toBe('with 3 Planora edits')
+    expect(scenario['Basis']).toBe('with 3 Hoshmand Schedule edits')
     expect(scenario['SHA-256']).toMatch(new RegExp(`^derived from ${sha} with 3 edits`))
   })
 
   it('a report on the schedule as submitted lists the edits but says they are not in its figures', () => {
     const e = [{ label: 'A1050 Steel: remaining duration', before: '15d', after: '10d', reason: 'Crane added', by: 'u1', at: '2026-10-01T00:00:00.000Z', status: 'applied' as const }]
     expect(editsSection(e, [], false)).toMatch(/as submitted: its forecast, float and driving path do NOT include the 1 edit/)
-    expect(editsSection(e, [], true)).toMatch(/include 1 edit made in Planora/)
+    expect(editsSection(e, [], true)).toMatch(/include 1 edit made in Hoshmand Schedule/)
   })
 })
 
@@ -86,13 +86,13 @@ describe('A. loadScheduleData: as submitted by default, the scenario on request'
     expect(sub.editsApplied).toBe(1)
     expect(code(sub.activities, 'A1050').duration).toBe(15)
     expect(sub.editedActivityIds).toEqual([])
-    expect(sub.schedule.warnings[0]).toMatch(/as submitted\. 1 Planora edit is not applied/)
+    expect(sub.schedule.warnings[0]).toMatch(/as submitted\. 1 Hoshmand Schedule edit is not applied/)
     expect(db.updates.length).toBe(1)
     const sc = (await loadScheduleData('s1', 'o', { basis: 'scenario' }))!
     expect(sc.basis).toBe('scenario')
     expect(code(sc.activities, 'A1050').duration).toBe(5)
     expect(sc.analysis.forecastFinish! < sub.analysis.forecastFinish!).toBe(true)
-    expect(sc.schedule.warnings[0]).toMatch(/with 1 Planora edit applied/)
+    expect(sc.schedule.warnings[0]).toMatch(/with 1 Hoshmand Schedule edit applied/)
     // The scenario never overwrites the stored (portfolio / dashboard) analysis.
     expect(db.updates.length).toBe(1)
   })
@@ -254,7 +254,7 @@ describe('C. recovery domain rules', () => {
 describe('D. classified data on the commercial cloud', () => {
   it('refuses classified only on the commercial cloud, pointing to the on-prem package', () => {
     expect(classifiedCloudRefusal('classified', 'commercial_cloud')).toBe(CLASSIFIED_CLOUD_REFUSAL)
-    expect(CLASSIFIED_CLOUD_REFUSAL).toMatch(/on-premises \/ air-gapped Planora package/)
+    expect(CLASSIFIED_CLOUD_REFUSAL).toMatch(/on-premises \/ air-gapped Hoshmand Schedule package/)
     expect(CLASSIFIED_CLOUD_REFUSAL).toMatch(/ON-PREM-INSTALL\.md/)
     expect(classifiedCloudRefusal('classified', 'on_prem')).toBeNull()
     expect(classifiedCloudRefusal('classified', 'airgapped')).toBeNull()

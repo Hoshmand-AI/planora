@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Cross-tenant isolation suite against a running Planora server (same env as CI's e2e job).
+// Cross-tenant isolation suite against a running Hoshmand Schedule server (same env as CI's e2e job).
 //   BASE_URL=http://localhost:3200 DATABASE_URL=postgres://… (test owners are confirmed in the database)
 //   [WEBHOOK_RECEIVER_PORT=4020] node scripts/e2e-tenant-isolation.mjs
 //

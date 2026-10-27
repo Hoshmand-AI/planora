@@ -81,5 +81,5 @@ export function signupAccess(r: SignupRequest): BetaAccessVia | null {
   return null
 }
 
-export const INVITE_ONLY_MESSAGE = 'Planora is in private beta. Sign up with your invitation link — ask your organization admin or request access.'
-export const BETA_SIGNIN_MESSAGE = 'Planora is in private beta. You need an invitation to sign in — ask your organization admin or request access.'
+export const INVITE_ONLY_MESSAGE = 'Hoshmand Schedule is in private beta. Sign up with your invitation link — ask your organization admin or request access.'
+export const BETA_SIGNIN_MESSAGE = 'Hoshmand Schedule is in private beta. You need an invitation to sign in — ask your organization admin or request access.'

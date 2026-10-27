@@ -77,7 +77,7 @@ export const POST = publicApi(async req => {
     const address = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
     if (!address || address.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) throw new ApiError(400, 'Enter a valid email address.')
     // Says nothing about any account: the same for every address on this installation.
-    if (!emailConfigured()) throw new ApiError(400, "Password reset by email isn't available on this Planora installation. Ask your organization admin for help.", 'email_unavailable')
+    if (!emailConfigured()) throw new ApiError(400, "Password reset by email isn't available on this Hoshmand Schedule installation. Ask your organization admin for help.", 'email_unavailable')
     // Counted for every address, existing or not, so the limits reveal nothing either.
     await limitOrThrow(`reset:request:ip:${ip}`, LIMITS.resetRequestsPerIp, 'Too many reset requests from this network. Wait a while and try again.')
     await limitOrThrow(`reset:request:email:${address}`, LIMITS.resetRequestsPerEmail, 'Too many reset requests for this email. Check your inbox and spam folder, or try again later.')

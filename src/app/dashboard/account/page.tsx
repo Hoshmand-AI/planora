@@ -33,7 +33,7 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
       <div className="flex gap-2">
         <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(codes.join('\n')); setCopied(true) }}><Copy size={13} className="inline mr-1" aria-hidden="true" />{copied ? 'Copied' : 'Copy'}</Button>
         <Button variant="secondary" onClick={() => {
-          const url = URL.createObjectURL(new Blob([`Planora recovery codes\n\n${codes.join('\n')}\n`], { type: 'text/plain' }))
+          const url = URL.createObjectURL(new Blob([`Hoshmand Schedule recovery codes\n\n${codes.join('\n')}\n`], { type: 'text/plain' }))
           const a = document.createElement('a'); a.href = url; a.download = 'planora-recovery-codes.txt'; a.click()
         }}><Download size={13} className="inline mr-1" aria-hidden="true" />Download</Button>
       </div>
@@ -86,7 +86,7 @@ function AccountPage() {
       </div>
 
       {(mfaNeeded || params.get('setup') === 'mfa') && !data.mfa.enabled && (
-        <Alert tone="warning">Your organization requires two-step verification. Set it up below to continue using Planora.</Alert>
+        <Alert tone="warning">Your organization requires two-step verification. Set it up below to continue using Hoshmand Schedule.</Alert>
       )}
 
       <Section title="Two-step verification" description="A code from an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Authy…) is required after your password. This protects your firm's projects even if your password leaks." id="mfa">
@@ -142,7 +142,7 @@ function AccountPage() {
           </div>
         )}
         {codes && data.mfa.enabled && mfaNeeded === false && params.get('setup') === 'mfa' && (
-          <div className="mt-3"><Button onClick={() => { window.location.href = '/dashboard/plan' }}>Continue to Planora</Button></div>
+          <div className="mt-3"><Button onClick={() => { window.location.href = '/dashboard/plan' }}>Continue to Hoshmand Schedule</Button></div>
         )}
       </Section>
 
@@ -199,7 +199,7 @@ function AccountPage() {
         {data.sessions.length > 1 && <Button variant="secondary" onClick={async () => { if (await act('sessions', { action: 'revoke_other_sessions' }, 'Signed out everywhere else.')) load() }}>Sign out everywhere else</Button>}
       </Section>
 
-      <Section title="Your personal data" description="Download what Planora holds about you as a person: your account, sign-ins, activity in the audit log and your Ask AI history. Project data belongs to your organization (an admin can export it).">
+      <Section title="Your personal data" description="Download what Hoshmand Schedule holds about you as a person: your account, sign-ins, activity in the audit log and your Ask AI history. Project data belongs to your organization (an admin can export it).">
         {note('export')}
         <Button variant="secondary" disabled={busy === 'export'} onClick={async () => {
           const d = await act('export', { action: 'export_my_data' }, 'Downloaded.')

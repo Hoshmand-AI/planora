@@ -1,8 +1,8 @@
-# Planora — QA/QC and Audit Handoff
+# Hoshmand Schedule — QA/QC and Audit Handoff
 
 | | |
 |---|---|
-| **Product** | Planora — AI construction scheduling (build, analyze, monitor) |
+| **Product** | Hoshmand Schedule — AI construction scheduling (build, analyze, monitor) |
 | **Owner** | Hoshmand AI |
 | **Repository** | `Hoshmand-AI/planora` (branch `main`) |
 | **Release under review** | Merge commit `d75f048` (PR #3), deployed to Vercel production 09/30/2026 |
@@ -15,7 +15,7 @@
 
 ## 1. Purpose and scope
 
-This document hands Planora over for independent **QA/QC testing** and **audit review**. It covers:
+This document hands Hoshmand Schedule over for independent **QA/QC testing** and **audit review**. It covers:
 
 - what the product does and where each function lives in the code
 - how to set up a test environment and run the automated checks
@@ -25,13 +25,13 @@ This document hands Planora over for independent **QA/QC testing** and **audit r
 - known limitations and open risks
 - a sign-off sheet
 
-**Out of scope:** the accuracy of third-party reference data (permit review times, equipment lead times). Planora presents these as planning ranges that must be checked with the Authority Having Jurisdiction (AHJ) and suppliers before a schedule is baselined.
+**Out of scope:** the accuracy of third-party reference data (permit review times, equipment lead times). Hoshmand Schedule presents these as planning ranges that must be checked with the Authority Having Jurisdiction (AHJ) and suppliers before a schedule is baselined.
 
 ---
 
 ## 2. Product overview
 
-Planora works in three stages:
+Hoshmand Schedule works in three stages:
 
 1. **Build.** It interviews the scheduler (drawings, permits, long-lead equipment, site, calendar, security, milestone targets). It then generates a CPM schedule that explains every duration and link.
 2. **Analyze.** It imports existing schedules (P6 XER, MS Project XML, Excel/CSV, PDF) and runs DCMA 14-point checks, a critical-path review and input-data checks.
@@ -169,7 +169,7 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | SCH-01 | Generate a schedule | Every activity shows duration, dates, total float, confidence and a "why" explanation with its source |
 | SCH-02 | Set the start date on a weekend | NTP moves to the next working day and a note explains the move |
 | SCH-03 | Check field activities | No field segment is longer than 44 working days; no negative lags (leads) |
-| SCH-04 | Hand-check one path: start + durations + lags across calendars | Matches the dates and float Planora shows |
+| SCH-04 | Hand-check one path: start + durations + lags across calendars | Matches the dates and float Hoshmand Schedule shows |
 | SCH-05 | Enter milestone targets the logic can't meet | The milestone is held as finish-no-later-than and shows negative float. "Your dates vs. what the logic can achieve" names the days late and the driving activities |
 | SCH-06 | All dates on screen and in exports | Shown as MM/DD/YYYY |
 
@@ -225,16 +225,16 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | IMP-01 | Upload a P6 XER file | Activities, relationships, calendars, constraints and WBS are imported; calendars show "as labeled vs. as understood" |
 | IMP-02 | Upload MS Project XML, Excel/CSV with messy headers, and a PDF | Each imports; activity names are mapped to standard categories |
 | IMP-03 | Upload a file larger than 25 MB | Rejected with a clear message (HTTP 413) |
-| IMP-04 | Upload a file with logic but no float or dates | Planora calculates CPM before analysis, and a warning says so |
+| IMP-04 | Upload a file with logic but no float or dates | Hoshmand Schedule calculates CPM before analysis, and a warning says so |
 | IMP-05 | Upload a file with no relationships | Activities are **not** all marked critical; a warning explains why |
 | IMP-06 | Open Overview for the uploaded schedule | "About this project" summary shows type, location, size, dates, scope by phase and next milestones |
-| IMP-07 | Upload a file with weekend work on a 5-day calendar, or out-of-sequence progress | Planora asks about each issue; answers are recorded |
+| IMP-07 | Upload a file with weekend work on a 5-day calendar, or out-of-sequence progress | Hoshmand Schedule asks about each issue; answers are recorded |
 
 ### 5.8 Exports
 
 | ID | Steps | Expected result |
 |---|---|---|
-| EXP-01 | Export P6 XER and import it into Primavera P6 | Imports without errors; activity count, logic, calendars and dates match Planora |
+| EXP-01 | Export P6 XER and import it into Primavera P6 | Imports without errors; activity count, logic, calendars and dates match Hoshmand Schedule |
 | EXP-02 | Export MS Project XML and open it in MS Project | Opens; tasks, links and dates match |
 | EXP-03 | Export the PDF | Readable, MM/DD/YYYY dates, matches the on-screen schedule |
 | EXP-04 | Export both Excel files (P6-style layout and import workbook) | The layout file shows WBS, indentation and colors; the import workbook re-imports into P6/MSP |

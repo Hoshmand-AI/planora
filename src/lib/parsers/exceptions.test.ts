@@ -39,7 +39,7 @@ describe('XER import exceptions', () => {
   const p = parseXER(readFileSync(path.join(fixtures, 'p6-equivalence.xer'), 'utf8'), 's')
   const r = p.exceptions!
 
-  it('lists every table Planora does not model, with row counts and examples, kept in the raw file', () => {
+  it('lists every table Hoshmand Schedule does not model, with row counts and examples, kept in the raw file', () => {
     expect(r.direction).toBe('import')
     expect(r.format).toBe('p6_xer')
     expect(rec(r, 'UDFVALUE')).toMatchObject({ entity: 'udf', count: 2, disposition: 'preserved_in_raw', examples: ['1004', '1006'] })
@@ -51,7 +51,7 @@ describe('XER import exceptions', () => {
     expect(rec(r, 'RSRC')).toBeUndefined()
     expect(rec(r, 'TASKRSRC')).toBeUndefined()
     // the free-text warning is still there
-    expect(p.warnings.some(w => w.startsWith('Not used in Planora') && w.includes('UDFVALUE (2 rows'))).toBe(true)
+    expect(p.warnings.some(w => w.startsWith('Not used in Hoshmand Schedule') && w.includes('UDFVALUE (2 rows'))).toBe(true)
   })
 
   it('lists unmapped fields of the tables it reads, and conversions it made', () => {
@@ -99,7 +99,7 @@ describe('MS Project XML import exceptions', () => {
   const p = parseMSProjectXML(xml, 's')
   const r = p.exceptions!
 
-  it('lists the project collections Planora does not model', () => {
+  it('lists the project collections Hoshmand Schedule does not model', () => {
     expect(xml).toContain('<Notes>Bring the trailer</Notes>')
     expect(r.format).toBe('ms_xml')
     // Resources and assignments are read by resource analysis (and their costs by earned value).

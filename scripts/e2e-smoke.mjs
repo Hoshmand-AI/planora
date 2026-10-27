@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end smoke test against a running Planora server.
+// End-to-end smoke test against a running Hoshmand Schedule server.
 //   BASE_URL=http://localhost:3200 node scripts/e2e-smoke.mjs
 // Exercises: two competing firms (tenant isolation), multi-format upload, data questions,
 // firm history + backtest, the interview → generate → override → review → export → publish flow,

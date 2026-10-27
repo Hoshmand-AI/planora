@@ -23,18 +23,18 @@ import { exceptionHeader, summarizeExceptions } from '@/lib/parsers/exceptions'
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 /**
- * Download an uploaded schedule, recalculated by Planora, with its own activity IDs, WBS, progress
+ * Download an uploaded schedule, recalculated by Hoshmand Schedule, with its own activity IDs, WBS, progress
  * and required finish:
  *   ?format=xer | xml | csv | xlsx-p6 | xlsx-import
  *   ?format=lookahead-xlsx  3-week look-ahead: activities in progress or starting within 21 days of
  *                           the data date, with remaining duration, float and predecessors
  * XLSX downloads carry provenance (source file, SHA-256, release, progress mode, settings, data date).
  *   ?format=original   the file exactly as uploaded (its SHA-256 is in the X-Content-SHA256 header)
- * An uploaded P6 file exports as its original XER with Planora's recalculated dates and float written
- * in, so everything Planora does not model (activity codes, UDFs, resources, notebooks...) is kept;
- * &rebuild=1 builds a fresh XER from Planora's model instead.
+ * An uploaded P6 file exports as its original XER with Hoshmand Schedule's recalculated dates and float written
+ * in, so everything Hoshmand Schedule does not model (activity codes, UDFs, resources, notebooks...) is kept;
+ * &rebuild=1 builds a fresh XER from Hoshmand Schedule's model instead.
  * Basis: every export is the schedule AS SUBMITTED unless the request asks for the what-if scenario
- * (&basis=scenario or &scenario=1). Only the scenario carries the edits made in Planora: written into
+ * (&basis=scenario or &scenario=1). Only the scenario carries the edits made in Hoshmand Schedule: written into
  * the original XER (durations, constraints, TASKPRED rows), and in the other formats through the edited
  * network, with their reasons as notes; its file name says "with-N-edits" and its provenance says
  * "derived from <sha> with N edits" rather than printing the original file's SHA-256 as the content's.

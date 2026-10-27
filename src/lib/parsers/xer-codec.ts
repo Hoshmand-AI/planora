@@ -1,7 +1,7 @@
 // Text encoding for P6 XER files. P6 writes and reads XER in the Windows client code page, which is
 // Windows-1252 for US/Western installs (not ISO-8859-1: bytes 0x80–0x9F are € ‚ ƒ „ … † ‡ ˆ ‰ Š ‹ Œ Ž
 // ‘ ’ “ ” • – — ˜ ™ š › œ ž Ÿ). Newer P6 releases can also write UTF-8. The importer and the exporter
-// share this module so a file written by Planora reads back byte-for-byte the same way.
+// share this module so a file written by Hoshmand Schedule reads back byte-for-byte the same way.
 
 export type XerEncoding = 'utf-8' | 'windows-1252'
 

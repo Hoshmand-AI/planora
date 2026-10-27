@@ -15,7 +15,7 @@ const cache = new Map<string, SraResult>()
 
 /**
  * Monte Carlo schedule risk analysis of an uploaded schedule (the contractor's own network as
- * submitted; ?basis=scenario simulates the what-if scenario with the Planora edits). The scheduler's
+ * submitted; ?basis=scenario simulates the what-if scenario with the Hoshmand Schedule edits). The scheduler's
  * per-activity ranges, discrete risk events (on a task or a milestone) and committed delivery dates
  * (PUT) are used over the rule-based ranges; activities are classified by name (procurement ranges,
  * fixed cure). The contract milestone and every milestone with a finish constraint get their own
@@ -23,7 +23,7 @@ const cache = new Map<string, SraResult>()
  *   GET → SraResult & { contract, basis, inputs: { ranges, events, commitments, updatedAt, defaults } }
  *   PUT { ranges: [{ activityId, optimistic, mostLikely, pessimistic }], events: [{ name, probability (0–1), impactDays, activityId }],
  *         commitments: [{ activityId, date (YYYY-MM-DD), note? }] }
- *       (work days; activities by Planora id or activity code) — needs schedule.write.
+ *       (work days; activities by Hoshmand Schedule id or activity code) — needs schedule.write.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   requireFeature(auth.plan, entitlementsFor(auth.plan).sra, 'Monte Carlo schedule risk analysis')

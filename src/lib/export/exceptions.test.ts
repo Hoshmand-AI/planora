@@ -92,8 +92,8 @@ describe('export exception reports', () => {
     const grLoe = uploadedToGenerated(schedule, done.activities, parsed.relationships, done.cpm, analysis, [], { includeLoe: true, resources: parsed.resources })
     // An older upload's import report that still names the resource tables as not imported.
     const old = { ...parsed.exceptions!, records: [...parsed.exceptions!.records,
-      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'resource' as const, field: 'RSRC', count: 2, examples: ['EXC', 'IW'], disposition: 'preserved_in_raw' as const, message: 'Resources: not used by Planora' },
-      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'assignment' as const, field: 'TASKRSRC', count: 3, examples: [], disposition: 'preserved_in_raw' as const, message: 'Resource assignments: not used by Planora' }] }
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'resource' as const, field: 'RSRC', count: 2, examples: ['EXC', 'IW'], disposition: 'preserved_in_raw' as const, message: 'Resources: not used by Hoshmand Schedule' },
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'assignment' as const, field: 'TASKRSRC', count: 3, examples: [], disposition: 'preserved_in_raw' as const, message: 'Resource assignments: not used by Hoshmand Schedule' }] }
     for (const [f, s] of [['xer', gr], ['xml', grLoe]] as const) {
       const r = exportExceptions(s, f, { ...ctx, importReport: old })
       expect(r.records.filter(x => x.entity === 'resource' || x.entity === 'assignment'), f).toEqual([])

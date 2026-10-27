@@ -54,7 +54,7 @@ export default function DashboardPage() {
   const m = metrics as Record<string, number | unknown[]> | null
 
   const mx = (m as Record<string, unknown> | null) ?? {}
-  // Status and variance come from Planora's recalculation (src/lib/analysis/schedule-analysis.ts).
+  // Status and variance come from Hoshmand Schedule's recalculation (src/lib/analysis/schedule-analysis.ts).
   const varianceDays: number | null = mx.varianceDays == null ? null : Number(mx.varianceDays)
   const varianceBasis = (mx.varianceBasis as string) || ''
   // The one baseline variance, BEI, missed tasks and reports measure against (src/lib/analysis/baseline.ts)
@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const percentComplete = Number(m?.percentComplete ?? 0)
   const nearTerm = (mx.nearTerm as NearTermOutlook | undefined) ?? null
   const drivingTasks  = (m?.drivingTasks as ActivityRow[])  ?? []
-  // Activities changed by edits made in Planora (shown with an "Edited" tag)
+  // Activities changed by edits made in Hoshmand Schedule (shown with an "Edited" tag)
   const editedIds = new Set((mx.editedActivityIds as string[] | undefined) ?? [])
   const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
@@ -84,7 +84,7 @@ export default function DashboardPage() {
   // A file built for import (no start, data date or activity dates) is scheduled from the day it was calculated:
   // say so next to the forecast, so a far-off finish isn't read as the file's own date.
   const undatedStart = allWarnings.map(w => /scheduled from (\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}).*calendar dates are not/i.exec(w)?.[1]).find(Boolean)
-  const undatedNote = undatedStart ? `The file has no dates, so Planora scheduled it from ${fmtDates(undatedStart)}. The durations, logic and float are the file's; the calendar dates are not.` : null
+  const undatedNote = undatedStart ? `The file has no dates, so Hoshmand Schedule scheduled it from ${fmtDates(undatedStart)}. The durations, logic and float are the file's; the calendar dates are not.` : null
   const isBaselineUpload = /baseline/i.test(selectedSchedule.version || '')
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
@@ -145,7 +145,7 @@ export default function DashboardPage() {
             <div role="status" className="text-[18px] font-semibold text-navy-950 leading-snug tracking-[-0.01em]">{healthLine}</div>
             {statusReasons[0] && <p className="text-[13px] text-warm-600 mt-1">{fmtDates(statusReasons[0])}{statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : ''}</p>}
             {!statusReasons[0] && status === 'no_baseline' && <p className="text-[13px] text-warm-600 mt-1">{isBaselineUpload
-              ? 'This upload is the baseline. Upload a status update of the same project and Planora measures variance against it.'
+              ? 'This upload is the baseline. Upload a status update of the same project and Hoshmand Schedule measures variance against it.'
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.'}</p>}
             {undatedNote && <p className="text-[13px] text-warm-600 mt-1">{undatedNote}</p>}
           </div>
@@ -175,7 +175,7 @@ export default function DashboardPage() {
                 <p className="text-warm-700">Forecast (as scheduled, constraints honoured): <span className="tabular-nums font-medium">{fmtDate(scheduledFinish)}</span> · Logic-driven (mandatory constraints relaxed): <span className="tabular-nums font-medium">{fmtDate(logicFinish)}</span></p>
               )}
               {reportedFinish && forecastFinish && reportedFinish !== forecastFinish && (
-                <p className="text-warm-600">Planora&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
+                <p className="text-warm-600">Hoshmand Schedule&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
               )}
               {(baselineHeader || varianceBasis) && (
                 <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{varianceNote(baselineHeader, varianceBasis)}</p>
@@ -327,7 +327,7 @@ interface ActivityRow {
 
 /* ─── Edited tag ─────────────────────────────────── */
 function EditedTag() {
-  return <span title="Changed by an edit made in Planora (see Edits made in Planora below)" className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
+  return <span title="Changed by an edit made in Hoshmand Schedule (see Edits made in Hoshmand Schedule below)" className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
 }
 
 /* ─── Near-term list ─────────────────────────────── */

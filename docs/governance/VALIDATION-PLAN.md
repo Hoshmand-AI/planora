@@ -1,6 +1,6 @@
 # Independent validation plan: CPM, DCMA and interoperability
 
-**Goal:** show that Planora's dates, float and DCMA results match Primavera P6 and Microsoft Project on a maintained reference corpus.
+**Goal:** show that Hoshmand Schedule's dates, float and DCMA results match Primavera P6 and Microsoft Project on a maintained reference corpus.
 
 1. **Corpus:** 30+ real or realistic schedules covering:
    - 5-day, 7-day and 6×10 calendars with holidays;

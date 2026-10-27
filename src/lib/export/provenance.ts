@@ -1,5 +1,5 @@
 // Provenance for every generated report and spreadsheet export: which file the numbers came from
-// (name and SHA-256 of the stored original), which Planora release calculated them, with which
+// (name and SHA-256 of the stored original), which Hoshmand Schedule release calculated them, with which
 // progress mode and calculation settings, and as of which data date. Forensic reviewers need this
 // to reproduce a result; the SHA-256 ties the output to the exact bytes in schedule_files.
 //
@@ -26,16 +26,16 @@ export interface ProvenanceSource {
   dataDate: string | null
   progressMode: ProgressMode
   /**
-   * Planora edits applied to this source (a what-if scenario); 0 / omitted = the schedule as submitted.
+   * Hoshmand Schedule edits applied to this source (a what-if scenario); 0 / omitted = the schedule as submitted.
    * A scenario's content is derived from the file, so its SHA-256 is not printed as the content's.
    */
   editsApplied?: number
 }
 
-/** "as submitted" | "with N Planora edits" */
+/** "as submitted" | "with N Hoshmand Schedule edits" */
 export function sourceBasis(s: Pick<ProvenanceSource, 'editsApplied'>): string {
   const n = s.editsApplied ?? 0
-  return n > 0 ? `with ${n} Planora edit${n === 1 ? '' : 's'}` : 'as submitted'
+  return n > 0 ? `with ${n} Hoshmand Schedule edit${n === 1 ? '' : 's'}` : 'as submitted'
 }
 
 /** The SHA-256 line: the file's hash as submitted; for a scenario, what it was derived from. */
@@ -47,7 +47,7 @@ export function sourceSha(s: Pick<ProvenanceSource, 'sha256' | 'editsApplied'>):
 
 export interface Provenance {
   sources: ProvenanceSource[]
-  /** Planora release id (the same value /api/health reports as "release") */
+  /** Hoshmand Schedule release id (the same value /api/health reports as "release") */
   release: string
   /** Calculation settings in plain language */
   settings: string[]
@@ -63,13 +63,13 @@ export function planoraRelease(env: Record<string, string | undefined> = process
 
 const MODE_TEXT: Record<ProgressMode, string> = { retained: 'Retained logic', override: 'Progress override' }
 
-/** The calculation settings Planora applied to one schedule, in plain language. */
+/** The calculation settings Hoshmand Schedule applied to one schedule, in plain language. */
 export function calculationSettings(s: Pick<Schedule, 'calendars' | 'defaultCalendarId'>, analysis: Pick<ScheduleAnalysis, 'progressMode' | 'mustFinishBy' | 'finishMilestone'> | null, rules?: Partial<DcmaRules> | null): string[] {
   const cal = s.calendars?.find(c => c.id === s.defaultCalendarId) ?? s.calendars?.[0]
   const r = { ...DEFAULT_DCMA_RULES, ...(rules || {}) }
   const fm = analysis?.finishMilestone
   return [
-    `CPM recalculation by Planora (dates and float from logic, durations, calendars and constraints, not from the file); out-of-sequence progress: ${MODE_TEXT[analysis?.progressMode ?? 'retained']}`,
+    `CPM recalculation by Hoshmand Schedule (dates and float from logic, durations, calendars and constraints, not from the file); out-of-sequence progress: ${MODE_TEXT[analysis?.progressMode ?? 'retained']}`,
     'Total float: most critical of start and finish float, in work days of each activity\'s own calendar; relationship lag on the predecessor\'s calendar',
     `Float anchor: ${analysis?.mustFinishBy ? `required finish ${fmtDate(analysis.mustFinishBy)} (Must Finish By)` : 'project early finish'}`,
     `Finish milestone: ${fm ? `${fm.code} ${fm.name} (${fm.designated ? 'designated by the scheduler' : 'picked automatically'})` : 'none (project forecast finish)'}`,
@@ -91,7 +91,7 @@ export function provenanceRows(p: Provenance): [string, string][] {
     rows.push([`${pre}Data date`, s.dataDate ? fmtDate(s.dataDate) : '—'])
     rows.push([`${pre}Progress mode`, MODE_TEXT[s.progressMode]])
   }
-  rows.push(['Planora version (release)', p.release])
+  rows.push(['Hoshmand Schedule version (release)', p.release])
   p.settings.forEach((x, i) => rows.push([i === 0 ? 'Calculation settings' : '', x]))
   rows.push(['Generated', `${fmtDate(p.generatedAt)} ${p.generatedAt.slice(11, 16)} UTC`])
   if (p.exceptions) rows.push(...exceptionRows(p.exceptions, 'Export exceptions (not written or converted)'))
@@ -117,12 +117,12 @@ export function withProvenance(markdown: string, p: Provenance | null | undefine
  * Call it before adding other sheets to make Provenance the first sheet.
  */
 export function addProvenance(wb: ExcelJS.Workbook, p: Provenance, title: string): ExcelJS.Worksheet {
-  wb.creator = 'Planora'
+  wb.creator = 'Hoshmand Schedule'
   wb.title = title
   wb.subject = p.sources.map(s => `${s.scheduleName} (${s.version})`).join(' vs ')
   wb.keywords = p.sources.map(s => s.sha256 ? (s.editsApplied ? `derived-from-sha256:${s.sha256}` : `sha256:${s.sha256}`) : '').filter(Boolean).join(' ')
   wb.description = provenanceRows(p).map(([k, v]) => (k ? `${k}: ${v}` : v)).join('\n')
-  wb.company = `Planora ${p.release}`
+  wb.company = `Hoshmand Schedule ${p.release}`
   const ws = wb.addWorksheet('Provenance')
   ws.columns = [{ header: 'Item', key: 'k', width: 34 }, { header: 'Value', key: 'v', width: 110 }]
   for (const [k, v] of provenanceRows(p)) ws.addRow({ k: neutralizeFormula(k), v: neutralizeFormula(v) })

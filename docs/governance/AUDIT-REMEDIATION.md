@@ -1,6 +1,6 @@
 # Audit remediation report
 
-Response to *Planora Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k` (round 1) and extended the same day (round 2: portfolio, sample project, priced recovery, API keys and webhooks, email verification, security alerting, configurable quality rules, round-trip interoperability corpus).
+Response to *Hoshmand Schedule Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k` (round 1) and extended the same day (round 2: portfolio, sample project, priced recovery, API keys and webhooks, email verification, security alerting, configurable quality rules, round-trip interoperability corpus).
 
 **Legend**
 - ✅ **Fixed:** implemented in code and covered by automated tests.

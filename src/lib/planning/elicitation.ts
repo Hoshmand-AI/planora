@@ -707,7 +707,7 @@ function assumptionFor(q: Question, a: Answer, permits: PermitSpec[], longLead: 
 /** An open question at generation time: planned with its default, buffered like "don't know". */
 export function unansweredAssumption(q: Question, permits: PermitSpec[], longLead: LongLeadSpec[]): Assumption {
   const a = assumptionFor(q, { status: 'unknown', answeredAt: '' }, permits, longLead, {})
-  return { ...a, text: `Not answered yet: ${q.prompt} ${q.fallback?.explanation || 'Planora uses its default for this item.'}` }
+  return { ...a, text: `Not answered yet: ${q.prompt} ${q.fallback?.explanation || 'Hoshmand Schedule uses its default for this item.'}` }
 }
 
 /** A typed answer outside the catalog: recorded verbatim, planned with the default, flagged for review. */
@@ -718,8 +718,8 @@ function customAssumption(q: Question, a: Answer): Assumption {
       : 'Generic US permitting and climate are used — add local permits as activities if needed.')
     : q.id === 'project.type'
       ? 'A generic building template is used; review the activity list for this facility type.'
-      : q.fallback?.explanation || 'Planora plans with its default for this item.'
-  return { questionId: q.id, text: `${q.prompt} — you entered “${String(a.value)}”, which is not in Planora's catalog. ${fallback}`, bufferDays: q.impact >= 60 ? 10 : q.impact >= 40 ? 5 : 0, kind: 'custom' }
+      : q.fallback?.explanation || 'Hoshmand Schedule plans with its default for this item.'
+  return { questionId: q.id, text: `${q.prompt} — you entered “${String(a.value)}”, which is not in Hoshmand Schedule's catalog. ${fallback}`, bufferDays: q.impact >= 60 ? 10 : q.impact >= 40 ? 5 : 0, kind: 'custom' }
 }
 
 function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permits: PermitSpec[], ctx: ElicitationContext): string[] {

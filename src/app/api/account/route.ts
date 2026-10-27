@@ -40,7 +40,7 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
   switch (b.action) {
     case 'resend_verification': {
       if (user.emailVerifiedAt) return json({ success: true, alreadyVerified: true })
-      if (!emailConfigured()) throw new ApiError(400, 'Email delivery is not set up on this Planora installation yet.', 'email_unavailable')
+      if (!emailConfigured()) throw new ApiError(400, 'Email delivery is not set up on this Hoshmand Schedule installation yet.', 'email_unavailable')
       const rl = await hit(`verify:resend:${user.id}`, 3, 60 * 60)
       if (!rl.ok) throw new ApiError(429, 'We already sent a few links. Check your inbox and spam folder, or try again in an hour.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
       const sent = await sendVerificationEmail(user, appOrigin(req))
@@ -107,7 +107,7 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
       return json({ success: true })
     }
     case 'export_my_data': {
-      // Data subject access: everything Planora holds about this person as an individual.
+      // Data subject access: everything Hoshmand Schedule holds about this person as an individual.
       const [sessions, events, chats] = await Promise.all([listSessions(user.id), listAudit(auth.orgId, { actorId: user.id, limit: 5000 }), getChatMessagesForUser(user.id)])
       await audit({ action: 'privacy.personal_data_exported', targetType: 'user', targetId: user.id })
       return json({

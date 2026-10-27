@@ -185,13 +185,13 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const tmplDays = computeTemplateDuration(t, profile)
     const hist = !isMs && useHistory ? historyDuration(history, t.category, profile.grossSqft) : null
     if (isMs) {
-      rationale = { summary: `Milestone from the ${labelType(profile)} template.`, sources: [src('template', 'Planora activity template', t.note)], confidence: 'high' }
+      rationale = { summary: `Milestone from the ${labelType(profile)} template.`, sources: [src('template', 'Hoshmand Schedule activity template', t.note)], confidence: 'high' }
     } else if (hist && rem === undefined) {
       duration = hist.days
       const s = hist.stats
       rationale = {
         summary: `${duration} work days = median ACTUAL duration of ${midSentence(categoryLabel(t.category))} on ${s.projects} of your firm's past${s.sameType ? ' ' + labelType(profile) : ''} projects${profile.grossSqft ? `, scaled to ${profile.grossSqft.toLocaleString()} sf` : ''} (your P20–P80: ${Math.round(s.actualP20)}–${Math.round(s.actualP80)} days at 100k sf). Template would give ${Math.round(tmplDays * hoursFactor)}.`,
-        sources: [src('firm_history', "Your firm's completed projects", `${s.samples} activities across ${s.projects} projects; private to your firm`), src('template', 'Planora template (for comparison)')],
+        sources: [src('firm_history', "Your firm's completed projects", `${s.samples} activities across ${s.projects} projects; private to your firm`), src('template', 'Hoshmand Schedule template (for comparison)')],
         confidence: s.projects >= 3 && s.sameType ? 'high' : 'medium',
       }
     } else {
@@ -202,7 +202,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       if (t.duration.perStory && profile.stories) parts.push(`${t.duration.perStory}/story × ${profile.stories}`)
       rationale = {
         summary: `${duration} work days from the ${labelType(profile)} template (${parts.join(' + ')}, clamped ${t.duration.min}–${t.duration.max}).${calNote}${rem !== undefined && rem < 1 ? ` Only ${Math.round(rem * 100)}% of this design phase remains (drawings ${pct}% complete).` : ''}${useHistory && history && !hist ? ' Not enough firm history for this activity (need 2+ projects).' : ''}`,
-        sources: [src('template', 'Planora activity template', t.note), ...(rem !== undefined ? [designSource] : [])],
+        sources: [src('template', 'Hoshmand Schedule activity template', t.note), ...(rem !== undefined ? [designSource] : [])],
         confidence: (civil ? profile.valueMusd : profile.grossSqft) ? 'medium' : 'low',
         assumptions: (civil ? profile.valueMusd : profile.grossSqft) ? undefined : [civil ? 'Construction value unknown — sized for a $20M reference project.' : 'Building area unknown — template minimums used.'],
       }
@@ -251,7 +251,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     summary: type === 'FS' && !lag
       ? `${categoryLabel(predCat)} must finish before ${midSentence(t.name)} starts.`
       : `${t.name} overlaps ${midSentence(categoryLabel(predCat))} (${type}${lag ? ` +${lag}d` : ''}) — standard trade stacking.`,
-    sources: [src('template', 'Planora activity template logic')],
+    sources: [src('template', 'Hoshmand Schedule activity template logic')],
     confidence: 'high',
   })
   // Resolve a pred category even when it was skipped (e.g. a permit placeholder) by walking its own preds.
@@ -366,7 +366,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     if (!b.acts.has(id) || !asked.length) continue
     if (!asked.every(pm => permitStatus(pm.id) === 'not_required' || permitStatus(pm.id) === 'issued')) continue
     const reason = asked.map(pm => `${pm.name} ${permitStatus(pm.id) === 'issued' ? 'already issued' : 'not required'}`).join('; ')
-    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Planora', at: today })
+    removeActivityBridging(b, id, { field: 'remove', reason, by: 'Hoshmand Schedule', at: today })
     if (b.byCat.get(cat) === id) b.byCat.delete(cat)
     assumptions.push({ questionId: `permit.${asked[0].id}.status`, text: `${categoryLabel(cat)} removed: ${reason} (from the interview).`, bufferDays: 0, kind: 'inferred' })
   }
@@ -467,7 +467,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       assumptions.push({ questionId: `procure.${definer}.status`, text: `${categoryLabel(cat)}: ${reason}; the activity covers only ${inScope.map(it => midSentence(it.name)).join(' and ')}.`, bufferDays: 0, kind: 'inferred' })
       continue
     }
-    for (const aid of ids) removeActivityBridging(b, aid, { field: 'remove', reason, by: 'Planora', at: today })
+    for (const aid of ids) removeActivityBridging(b, aid, { field: 'remove', reason, by: 'Hoshmand Schedule', at: today })
     if (b.byCat.has(cat) && !b.acts.has(b.byCat.get(cat)!)) b.byCat.delete(cat)
     assumptions.push({ questionId: `procure.${out[0].id}.status`, text: `${categoryLabel(cat)} removed: the interview says ${out.length > 1 ? 'these items are' : 'it is'} not in scope.`, bufferDays: 0, kind: 'inferred' })
   }
@@ -727,7 +727,7 @@ function addInstallActivity(b: Builder, cat: CanonicalCategory, it: LongLeadSpec
     id, name: INSTALL_NAMES[cat] ?? `Install ${midSentence(it.name)}`, category: cat, phase: phaseOf(cat), type: 'task', duration, calendarId: FIELD,
     rationale: {
       summary: `${duration} work days${scale !== 1 ? ` (${Math.round(scale * 100)}% of the new-construction template)` : ''}. ${why}`,
-      sources: [src('template', 'Planora activity template'), src('user', 'Item in scope (procurement question)')],
+      sources: [src('template', 'Hoshmand Schedule activity template'), src('user', 'Item in scope (procurement question)')],
       confidence: 'low',
       assumptions: ['Answer the item "Not in scope" if this work is not part of the project.'],
     },

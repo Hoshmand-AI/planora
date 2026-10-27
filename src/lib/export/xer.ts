@@ -5,9 +5,9 @@
 // result with encodeXer() from '@/lib/parsers/xer-codec' (the importer decodes with the same table).
 //
 // Two paths:
-//  - exportXer: builds a new XER from a schedule (Planora plans, MS Project / Excel uploads).
+//  - exportXer: builds a new XER from a schedule (Hoshmand Schedule plans, MS Project / Excel uploads).
 //  - exportXerFromOriginal: for an uploaded P6 file, re-emits the original file row for row and only
-//    replaces the dates and float Planora recalculated, so calendars (ids, names, work hours), percent
+//    replaces the dates and float Hoshmand Schedule recalculated, so calendars (ids, names, work hours), percent
 //    complete types, LOE activities, milestone types, WBS, baselines, activity codes, UDFs, resources,
 //    cost accounts and notebooks survive the round trip untouched.
 
@@ -109,10 +109,10 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
   table('PROJECT', ['proj_id', 'fy_start_month_num', 'rsrc_self_add_flag', 'allow_complete_flag', 'rsrc_multi_assign_flag', 'checkout_flag', 'project_flag', 'step_complete_flag', 'cost_qty_recalc_flag', 'batch_sum_flag', 'name_sep_char', 'def_complete_pct_type', 'proj_short_name', 'acct_id', 'orig_proj_id', 'source_proj_id', 'base_type_id', 'clndr_id', 'sum_base_proj_id', 'task_code_base', 'task_code_step', 'priority_num', 'wbs_max_sum_level', 'strgy_priority_num', 'last_checksum', 'critical_drtn_hr_cnt', 'def_cost_per_qty', 'last_recalc_date', 'plan_start_date', 'plan_end_date', 'scd_end_date', 'add_date', 'last_tasksum_date', 'fcst_start_date', 'def_duration_type', 'task_code_prefix', 'guid', 'def_qty_type', 'add_by_name', 'web_local_root_path', 'proj_url', 'def_rate_type', 'add_act_remain_flag', 'act_this_per_link_flag', 'def_task_type', 'act_pct_link_flag', 'critical_path_type', 'task_code_prefix_flag', 'def_rollup_dates_flag', 'use_project_baseline_flag', 'rem_target_link_flag', 'reset_planned_flag', 'allow_neg_act_flag', 'sum_assign_level', 'last_fin_dates_id', 'last_baseline_update_date', 'cr_external_key', 'apply_actuals_date', 'location_id', 'loaded_scope_level', 'export_flag', 'new_fin_dates_id', 'baselines_to_export', 'baseline_names_to_export', 'next_data_date', 'close_period_flag', 'sum_refresh_date', 'trsrcsum_loaded'],
     [[PROJ, 1, 'Y', 'Y', 'Y', 'N', 'Y', 'N', 'N', 'Y', '.', 'CP_Drtn', projShortName(opts.projectShortName || projectName), '', '', '', '', calId.get(s.defaultCalendarId)!, '', 1000, 10, 10, 2, 500, '', 0, 0,
       // last_recalc_date = data date; plan_end_date = P6 "Must Finish By" (the required finish, so float after F9 matches); scd_end_date = forecast
-      dt(s.dataDate || s.projectStart, '08:00'), dt(s.projectStart, '08:00'), s.mustFinishBy ? dt(s.mustFinishBy, finishTime(hoursOf())) : '', dt(s.cpm?.projectFinish, finishTime(hoursOf())), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Planora'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', dt(s.dataDate || s.projectStart, '08:00'), 'N', '', 'N']])
+      dt(s.dataDate || s.projectStart, '08:00'), dt(s.projectStart, '08:00'), s.mustFinishBy ? dt(s.mustFinishBy, finishTime(hoursOf())) : '', dt(s.cpm?.projectFinish, finishTime(hoursOf())), dt(today, '00:00'), '', '', 'DT_FixedDUR2', 'A', '', 'QT_Hour', xerText(opts.exportedBy || 'Hoshmand Schedule'), '', '', 'COST_PER_QTY', 'Y', 'Y', 'TT_Task', 'N', 'CT_TotFloat', 'Y', 'Y', 'Y', 'Y', 'N', 'N', 'SL_Taskrsrc', '', '', '', '', '', 7, 'Y', '', '', '', dt(s.dataDate || s.projectStart, '08:00'), 'N', '', 'N']])
 
   // Scheduling options: how out-of-sequence progress is scheduled (P6 Retained Logic / Progress Override),
-  // so P6 recalculates the file the way Planora did.
+  // so P6 recalculates the file the way Hoshmand Schedule did.
   const mode = opts.progressMode ?? 'retained'
   table('SCHEDOPTIONS', ['schedoptions_id', 'proj_id', 'sched_retained_logic', 'sched_progress_override'], [[1, PROJ, mode === 'retained' ? 'Y' : 'N', mode === 'override' ? 'Y' : 'N']])
 
@@ -194,10 +194,10 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
     if (id === undefined || !reasons.length) continue
     const esc = (v: string) => v.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!))
     const text = reasons.map(o => `${o.field}${o.from !== undefined || o.to !== undefined ? ` ${String(o.from ?? '')} -> ${String(o.to ?? '')}` : ''}: ${o.reason} (${o.by}, ${String(o.at).slice(0, 10)})`)
-    memoRows.push([nextMemo++, id, 1, PROJ, `<HTML><BODY><P>Planora overrides</P>${text.map(x => `<P>${esc(x)}</P>`).join('')}</BODY></HTML>`])
+    memoRows.push([nextMemo++, id, 1, PROJ, `<HTML><BODY><P>Hoshmand Schedule overrides</P>${text.map(x => `<P>${esc(x)}</P>`).join('')}</BODY></HTML>`])
   }
   if (memoRows.length) {
-    table('MEMOTYPE', ['memo_type_id', 'seq_num', 'eps_flag', 'proj_flag', 'wbs_flag', 'task_flag', 'memo_type'], [[1, 1, 'N', 'N', 'N', 'Y', 'Planora overrides']])
+    table('MEMOTYPE', ['memo_type_id', 'seq_num', 'eps_flag', 'proj_flag', 'wbs_flag', 'task_flag', 'memo_type'], [[1, 1, 'N', 'N', 'N', 'Y', 'Hoshmand Schedule overrides']])
     table('TASKMEMO', ['memo_id', 'task_id', 'memo_type_id', 'proj_id', 'task_memo'], memoRows)
   }
 
@@ -207,7 +207,7 @@ export function exportXer(s: GeneratedSchedule, projectName: string, opts: { exp
 
 /* ─── Uploaded P6 files: pass the original through ─────── */
 
-/** Planora's recalculated values for one P6 activity (dates ISO yyyy-mm-dd, float in work days). */
+/** Hoshmand Schedule's recalculated values for one P6 activity (dates ISO yyyy-mm-dd, float in work days). */
 export interface XerTaskUpdate {
   earlyStart: string
   earlyFinish: string
@@ -218,7 +218,7 @@ export interface XerTaskUpdate {
   driving: boolean
 }
 
-/** Recalculated values keyed by P6 task_id, from an uploaded schedule's activities and Planora's CPM. */
+/** Recalculated values keyed by P6 task_id, from an uploaded schedule's activities and Hoshmand Schedule's CPM. */
 export function xerUpdatesFrom(activities: { id: string; sourceId?: string | null }[], cpm: CpmResult): Map<string, XerTaskUpdate> {
   const driving = new Set(cpm.longestPath)
   const out = new Map<string, XerTaskUpdate>()
@@ -230,7 +230,7 @@ export function xerUpdatesFrom(activities: { id: string; sourceId?: string | nul
   return out
 }
 
-/** Edits made in Planora, keyed by P6 task_id, to write into the original XER (durations in work days). */
+/** Edits made in Hoshmand Schedule, keyed by P6 task_id, to write into the original XER (durations in work days). */
 export interface XerEdits {
   tasks: Map<string, { remainingDays?: number; originalDays?: number; constraint?: { type: ConstraintType; date: string } | null }>
   setLinks: { pred: string; succ: string; type: LinkType; lagDays: number }[]
@@ -270,10 +270,10 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
 }
 
 /**
- * Re-emit an uploaded XER with Planora's recalculated early/late dates, float and driving-path flag on
- * open activities, and Planora's forecast as the project's scheduled finish. Every other table, row
+ * Re-emit an uploaded XER with Hoshmand Schedule's recalculated early/late dates, float and driving-path flag on
+ * open activities, and Hoshmand Schedule's forecast as the project's scheduled finish. Every other table, row
  * and field (including the file's own time of day on unchanged dates) is written back exactly as read.
- * With `opts.edits`, the edits made in Planora are written in too: durations (target/remaining hours),
+ * With `opts.edits`, the edits made in Hoshmand Schedule are written in too: durations (target/remaining hours),
  * primary constraints, and TASKPRED rows changed, removed or added.
  */
 export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null; edits?: XerEdits | null; progressMode?: ProgressMode | null } = {}): string {
@@ -304,7 +304,7 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
   const pendingAdds = new Map(setLinks)
   let nextPredId = Math.max(0, ...(tables['TASKPRED'] || []).map(p => Number(p['task_pred_id']) || 0)) + 1
   const predFields = ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt']
-  /** New TASKPRED rows for the relationships added in Planora, in the table's own column order. */
+  /** New TASKPRED rows for the relationships added in Hoshmand Schedule, in the table's own column order. */
   const addRows = (fieldIdx: Map<string, number>) => {
     const rows: string[] = []
     const width = Math.max(0, ...fieldIdx.values()) + 1
@@ -332,7 +332,7 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
   const out = lines.flatMap((line): string[] => {
     const cols = line.split('\t')
     const tag = cols[0].trim()
-    // Relationships added in Planora go at the end of the TASKPRED table (or a new one before %E).
+    // Relationships added in Hoshmand Schedule go at the end of the TASKPRED table (or a new one before %E).
     const flushAdds = (): string[] => (table === 'TASKPRED' && pendingAdds.size ? addRows(idx) : [])
     if (tag === '%T') { const added = flushAdds(); table = (cols[1] || '').trim(); if (table === 'TASKPRED') sawPredTable = true; return [...added, line] }
     if (tag === '%E') {
@@ -389,7 +389,7 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
       set('driving_path_flag', u.driving ? 'Y' : 'N')
       return [cols.join('\t')]
     }
-    // The progress option Planora scheduled with, when it was changed from the file's own.
+    // The progress option Hoshmand Schedule scheduled with, when it was changed from the file's own.
     if (table === 'SCHEDOPTIONS' && opts.progressMode && (!projOfTasks.size || !get('proj_id').trim() || projOfTasks.has(get('proj_id').trim()))) {
       const retained = opts.progressMode === 'retained' ? 'Y' : 'N', override = opts.progressMode === 'override' ? 'Y' : 'N'
       if (get('sched_retained_logic').trim() === retained && get('sched_progress_override').trim() === override) return [line]

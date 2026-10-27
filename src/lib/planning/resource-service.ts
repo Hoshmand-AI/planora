@@ -96,7 +96,7 @@ export function availabilityFrom(raw: unknown, data: ResourceData | null): Recor
 export const isLevelingEdit = (e: Pick<AppliedEdit, 'source'>) => e.source === 'leveling'
 
 /**
- * The network a leveling run works on: the schedule as submitted plus the active Planora edits that
+ * The network a leveling run works on: the schedule as submitted plus the active Hoshmand Schedule edits that
  * are NOT from an earlier leveling run (a new run replaces the previous leveled scenario).
  */
 export function levelingNetworkOf(data: Loaded, resources: ResourceData | null): LevelingNetwork {
@@ -117,7 +117,7 @@ export function levelingNetworkOf(data: Loaded, resources: ResourceData | null):
   return uploadedLevelingNetwork(net, resources, milestones)
 }
 
-/** Activities of loaded schedule data as resource loading needs them (Planora's recalculated dates; the file's without logic). */
+/** Activities of loaded schedule data as resource loading needs them (Hoshmand Schedule's recalculated dates; the file's without logic). */
 export function loadActivitiesOfData(data: Pick<Loaded, 'activities'>): LoadActivity[] {
   return data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({
     id: a.id, code: a.activityId, name: a.name, isMilestone: a.activityType === 'milestone', calendarId: a.calendarId ?? null,

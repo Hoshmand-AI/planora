@@ -1,7 +1,7 @@
-// Edits a scheduler makes to an uploaded schedule inside Planora, each with a reason.
+// Edits a scheduler makes to an uploaded schedule inside Hoshmand Schedule, each with a reason.
 //
 // The imported activities and relationships are never changed: edits are stored as an override layer
-// (table schedule_edits, migration 7) and applied in order on every read, before Planora's CPM
+// (table schedule_edits, migration 7) and applied in order on every read, before Hoshmand Schedule's CPM
 // recalculation. So the original file stays the record of what the contractor submitted, every edit
 // can be listed, exported and reverted, and the audit log holds who changed what and why.
 //
@@ -131,7 +131,7 @@ function reaches(rels: Relationship[], from: string, to: string): boolean {
 
 /**
  * Validate a requested change against the current (already edited) network. Activities may be given
- * by Planora id or by activity code. Returns the normalized change or a message for the scheduler.
+ * by Hoshmand Schedule id or by activity code. Returns the normalized change or a message for the scheduler.
  */
 export function validateEditChange(raw: unknown, activities: Activity[], relationships: Relationship[]): { change: ScheduleEditChange } | { error: string } {
   if (!raw || typeof raw !== 'object') return { error: 'Each edit needs a kind: duration, link_set, link_remove or constraint.' }
@@ -144,7 +144,7 @@ export function validateEditChange(raw: unknown, activities: Activity[], relatio
   const work = (v: unknown, role: string): Activity | string => {
     const a = find(v)
     if (!a) return `No activity "${String(v ?? '')}" in this schedule (${role}).`
-    if (!isWork(a)) return `${a.activityId} is a ${a.activityType === 'loe' ? 'level-of-effort' : 'summary'} activity; Planora does not schedule it.`
+    if (!isWork(a)) return `${a.activityId} is a ${a.activityType === 'loe' ? 'level-of-effort' : 'summary'} activity; Hoshmand Schedule does not schedule it.`
     return a
   }
   switch (b.kind) {

@@ -1,6 +1,6 @@
 /**
- * Planora wordmark — text-only, no icon mark.
- * "Plan" in DM Sans weight 700 + "ora" in DM Serif Display weight 400
+ * Hoshmand Schedule wordmark — text-only, no icon mark.
+ * "Hoshmand" in DM Sans weight 700 + "Schedule" in DM Serif Display weight 400
  * Creates a refined typographic identity without any icon dependency.
  */
 
@@ -16,9 +16,9 @@ export function Logo({ variant = 'light', size = 'text-[18px]' }: LogoProps) {
   const serifColor  = variant === 'light' ? 'text-accent-400'     : 'text-accent-600'
 
   return (
-    <span className={`inline-flex items-baseline gap-0 tracking-[-0.02em] leading-none select-none ${size}`}>
-      <span className={`font-sans font-bold ${sansColor}`}>Plan</span>
-      <span className={`font-display font-normal ${serifColor}`}>ora</span>
+    <span className={`inline-flex items-baseline gap-[0.28em] whitespace-nowrap tracking-[-0.02em] leading-none select-none ${size}`}>
+      <span className={`font-sans font-bold ${sansColor}`}>Hoshmand</span>
+      <span className={`font-display font-normal ${serifColor}`}>Schedule</span>
     </span>
   )
 }

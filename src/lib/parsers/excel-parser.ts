@@ -414,7 +414,7 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const relAll = isCsv ? [] : sheets.map(x => ({ x, rows: readRelationshipSheet(x) })).filter((r): r is { x: { name: string; grid: Cell[][] }; rows: RelRow[] } => !!r.rows && r.rows.length > 0)
   const candidates = sheets.map(x => ({ x, h: detectHeader(x.grid) })).filter((c): c is { x: { name: string; grid: Cell[][] }; h: HeaderInfo } => !!c.h && !relAll.some(r => r.x === c.x))
   // With a relationship sheet, the activity sheet is the one whose activity IDs it refers to (a
-  // workbook can also carry an MS Project sheet numbered by row, as Planora's own export does).
+  // workbook can also carry an MS Project sheet numbered by row, as Hoshmand Schedule's own export does).
   let pick = candidates[0]
   if (relAll.length && candidates.length > 1) {
     const refs = new Set(relAll.flatMap(r => r.rows.flatMap(x => [x.pred.toLowerCase(), x.succ.toLowerCase()])))

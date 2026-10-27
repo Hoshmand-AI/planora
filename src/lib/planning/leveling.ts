@@ -1,6 +1,6 @@
 // Resource leveling and smoothing as a labelled what-if scenario.
 //
-// Deterministic serial heuristic. Repeatedly: recalculate the network (Planora's CPM, every calendar,
+// Deterministic serial heuristic. Repeatedly: recalculate the network (Hoshmand Schedule's CPM, every calendar,
 // lag, constraint and the data date), load the resources, take the EARLIEST over-allocated day (ties:
 // resource code) and resolve it by delaying ONE not-started activity working on that resource that
 // day. Who waits is decided by priority: the activity with the least total float keeps the resource,
@@ -131,7 +131,7 @@ export function levelResources(net: LevelingNetwork, opts: LevelingOptions = {})
   const label = LEVELED_SCENARIO_LABEL
   const fail = (error: string): LevelingResult => ({ ok: false, error, label, mode, allowFinishExtension: allowExtend, availability, before: emptySide(), after: emptySide(), finishChangeDays: 0, delays: [], knockOn: [], remaining: [], unresolved: [], changes: [], iterations: 0, stoppedEarly: false, assumptions: [] })
   const base = net.run(new Map())
-  if (!base || !base.finish) return fail('Planora could not recalculate this schedule (no activity relationships), so it cannot be leveled.')
+  if (!base || !base.finish) return fail('Hoshmand Schedule could not recalculate this schedule (no activity relationships), so it cannot be leveled.')
   const cals = net.calendars.length ? net.calendars : [defaultCalendar()]
   const calById = new Map(cals.map(c => [c.id, c]))
   const defCal = (net.defaultCalendarId && calById.get(net.defaultCalendarId)) || cals[0]
@@ -280,7 +280,7 @@ export function levelResources(net: LevelingNetwork, opts: LevelingOptions = {})
   const assumptions = [...after.assumptions]
   if (stoppedEarly) assumptions.push(`Leveling stopped after ${iterations} conflicts and ${runs} recalculations (its work limit); over-allocations after that point are listed as remaining.`)
   if (Number.isFinite(dataDay)) assumptions.push('Only work after the data date is leveled; actuals and in-progress work keep their dates.')
-  assumptions.push('Leveling delays are written as Start On or After (SNET) dates, one per delayed activity, so the scenario can be exported and reverted like any Planora edit.')
+  assumptions.push('Leveling delays are written as Start On or After (SNET) dates, one per delayed activity, so the scenario can be exported and reverted like any Hoshmand Schedule edit.')
   return {
     ok: true, label, mode, allowFinishExtension: allowExtend, availability,
     before: side(base), after: side(run),
@@ -338,7 +338,7 @@ function runUploaded(activities: Activity[], relationships: Relationship[], net:
   return { finish: cpm.logicFinish, times, milestoneDates }
 }
 
-/** Leveling network for a plan built in Planora (its generated schedule and milestone targets). */
+/** Leveling network for a plan built in Hoshmand Schedule (its generated schedule and milestone targets). */
 export function planLevelingNetwork(g: GeneratedSchedule): LevelingNetwork {
   const milestones = (g.milestoneTargets ?? []).map(m => {
     const a = g.activities.find(x => x.id === m.activityId)

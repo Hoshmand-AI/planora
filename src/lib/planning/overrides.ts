@@ -39,7 +39,7 @@ const LINK_TYPES: LinkType[] = ['FS', 'SS', 'FF', 'SF']
  * Activity ID for an added activity that follows the schedule's own numbering: the dominant
  * prefix + numeric width series (e.g. A1000, A1010, … → step 10) continues with the next free number
  * after the highest one (A1000, A1010 → A1020). Only when the IDs show no such series (fewer than two
- * codes sharing a prefix and width) does it fall back to Planora's U0001-style codes.
+ * codes sharing a prefix and width) does it fall back to Hoshmand Schedule's U0001-style codes.
  */
 export function nextActivityCode(existing: string[]): string {
   const used = new Set(existing)

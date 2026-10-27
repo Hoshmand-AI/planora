@@ -1,6 +1,6 @@
 # Control matrix
 
-Maps Planora's controls to common frameworks, with the evidence an assessor can check. Status: **Implemented** (in code and tested), **Partial**, or **Owner action** (needs a business decision, contract or third party). This document is also the skeleton of a System Security Plan; open items are tracked in [POAM.md](POAM.md).
+Maps Hoshmand Schedule's controls to common frameworks, with the evidence an assessor can check. Status: **Implemented** (in code and tested), **Partial**, or **Owner action** (needs a business decision, contract or third party). This document is also the skeleton of a System Security Plan; open items are tracked in [POAM.md](POAM.md).
 
 ## OWASP Top 10:2025 / ASVS
 
@@ -20,7 +20,7 @@ Maps Planora's controls to common frameworks, with the evidence an assessor can 
 
 ## NIST Cybersecurity Framework 2.0
 
-| Function | What Planora does | Evidence |
+| Function | What Hoshmand Schedule does | Evidence |
 |---|---|---|
 | Govern | Policies, risk register, change management, vendor list | `docs/governance/*`, `docs/operations/CHANGE-MANAGEMENT.md`, `docs/privacy/SUBPROCESSORS.md` |
 | Identify | Data map and classification; SBOM; capacity envelope | `docs/privacy/DATA-MAP.md`, CI SBOM, `docs/operations/CAPACITY.md` |
@@ -31,7 +31,7 @@ Maps Planora's controls to common frameworks, with the evidence an assessor can 
 
 ## NIST SP 800-171 Rev. 3 (for CUI deployments)
 
-Planora's cloud service is **not** offered for Controlled Unclassified Information. For CUI, Planora runs on-premises / air-gapped inside the customer's assessed boundary (`PLANORA_AIRGAPPED=true`, on-prem model or no model, on-prem PostgreSQL). The application then provides these controls; the hosting environment provides the rest. On the commercial cloud, the app warns against entering CUI and refuses to send projects marked CUI or classified to a cloud model ([CUI-HANDLING.md](CUI-HANDLING.md)).
+Hoshmand Schedule's cloud service is **not** offered for Controlled Unclassified Information. For CUI, Hoshmand Schedule runs on-premises / air-gapped inside the customer's assessed boundary (`PLANORA_AIRGAPPED=true`, on-prem model or no model, on-prem PostgreSQL). The application then provides these controls; the hosting environment provides the rest. On the commercial cloud, the app warns against entering CUI and refuses to send projects marked CUI or classified to a cloud model ([CUI-HANDLING.md](CUI-HANDLING.md)).
 
 | Family | Application control | Status |
 |---|---|---|

@@ -1,4 +1,4 @@
-// Planora's reading of an uploaded schedule: the numbers a dashboard, portfolio and report show
+// Hoshmand Schedule's reading of an uploaded schedule: the numbers a dashboard, portfolio and report show
 // first. Everything comes from the recalculated network, never from header dates in the file:
 //   - forecast finish = the latest finish logic produces (a mandatory constraint can't hide a slip)
 //   - variance = forecast vs baseline of the finish milestone (calendar days), with the basis stated;
@@ -17,7 +17,7 @@ import { applyBaseline, summarizeBaseline, type BaselineSummary, type ResolvedBa
 
 /**
  * 'no_baseline': nothing is wrong with the network, but there is no baseline and no required finish
- * to be on track against, so Planora does not claim "on track".
+ * to be on track against, so Hoshmand Schedule does not claim "on track".
  */
 export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline'
 
@@ -57,7 +57,7 @@ export const FINISH_LABELS = {
 } as const
 
 /**
- * One open activity whose file dates/float differ from Planora's recalculation. The early start and
+ * One open activity whose file dates/float differ from Hoshmand Schedule's recalculation. The early start and
  * late dates were added later: differences stored before then carry only finish and float.
  */
 export interface RecalcDifference {
@@ -71,7 +71,7 @@ export interface RecalcDifference {
 
 /**
  * The contractor file's own forecast for an open activity that sits before the data date (DCMA #9
- * Invalid Dates is judged on the file's dates, which Planora's recalculation replaces).
+ * Invalid Dates is judged on the file's dates, which Hoshmand Schedule's recalculation replaces).
  */
 export interface FileForecastBeforeDataDate { id: string; code: string; earlyStart: string | null; earlyFinish: string | null; notStarted: boolean }
 
@@ -137,7 +137,7 @@ export interface ScheduleAnalysis {
   status: ScheduleStatus
   statusReasons: string[]
   /**
-   * How the file's own dates/float compare with Planora's recalculation (null when the file had none).
+   * How the file's own dates/float compare with Hoshmand Schedule's recalculation (null when the file had none).
    * `samples` lists EVERY differing activity (the name is kept for stored analyses, which were capped
    * at 10). `fileForecastsBeforeDataDate`: open activities whose file early dates fall before the data date.
    */
@@ -285,7 +285,7 @@ export function analyzeSchedule(input: {
     const diff = varianceDays
     varianceDays = null
     if (finishMilestone) finishMilestone.varianceDays = null
-    varianceBasis = `No work has started${input.dataDate ? ` (data date ${fmtDate(input.dataDate)})` : ''}, so the file's baseline (target) dates are planned dates, not a statused baseline, and no slip is reported. ${varianceBasis.replace(/\.$/, '')}: ${Math.abs(diff)} calendar days ${diff > 0 ? 'later' : 'earlier'} by Planora's recalculation, a difference between the file's dates and its logic. Mark an upload of this project as Baseline to measure variance against it.`
+    varianceBasis = `No work has started${input.dataDate ? ` (data date ${fmtDate(input.dataDate)})` : ''}, so the file's baseline (target) dates are planned dates, not a statused baseline, and no slip is reported. ${varianceBasis.replace(/\.$/, '')}: ${Math.abs(diff)} calendar days ${diff > 0 ? 'later' : 'earlier'} by Hoshmand Schedule's recalculation, a difference between the file's dates and its logic. Mark an upload of this project as Baseline to measure variance against it.`
   }
 
   // State the basis when an overruled mandatory constraint holds the milestone's scheduled date.

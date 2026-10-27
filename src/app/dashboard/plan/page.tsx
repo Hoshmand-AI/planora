@@ -49,7 +49,7 @@ export default function PlansPage() {
       <div className="mb-6">
         <h1 className="font-display text-[28px] md:text-[34px] text-navy-950 leading-tight">Build a schedule</h1>
         <p className="text-[15px] text-warm-600 mt-2 max-w-2xl leading-relaxed">
-          Name your project and Planora interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.
+          Name your project and Hoshmand Schedule interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.
           It asks about what it doesn&apos;t know instead of guessing, and shows the reason for every duration and link.
         </p>
       </div>
@@ -74,7 +74,7 @@ export default function PlansPage() {
           <Robot mood="idle" size={80} className="mx-auto mb-3" />
           <p className="text-[16px] font-semibold text-navy-950">No plans yet</p>
           <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview.</p>
-          <p className="text-[14px] text-warm-600 mt-4 max-w-md mx-auto">New to Planora? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
+          <p className="text-[14px] text-warm-600 mt-4 max-w-md mx-auto">New to Hoshmand Schedule? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
           <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:border-navy-900 px-4 py-2 text-[13.5px] font-medium disabled:opacity-50">
             {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />} Open a sample project
           </button>

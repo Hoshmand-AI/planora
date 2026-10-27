@@ -258,7 +258,7 @@ export interface Schedule {
   criticalCount: number; percentComplete: number
   calendars: WorkCalendar[]; defaultCalendarId: string | null; warnings: string[]
   planId: string | null; projectType: string | null; region: string | null; grossSqft: number | null
-  /** Planora's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
+  /** Hoshmand Schedule's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
   analysis?: ScheduleAnalysis | null
   /** Groups uploads of the same project into an update series */
   projectKey?: string | null
@@ -272,7 +272,7 @@ export interface Schedule {
   uploadOrigin?: 'own' | 'third_party' | null
   /** Included in firm history although not as-built (explicit override) */
   historyOverride?: boolean
-  /** The file is a re-imported Planora export */
+  /** The file is a re-imported Hoshmand Schedule export */
   planoraExport?: boolean
   /** Matter / engagement workspace; null = organization-wide */
   workspaceId?: string | null
@@ -341,7 +341,7 @@ export async function createSchedule(s: Schedule): Promise<Schedule> {
   return s
 }
 
-/** Store Planora's analysis (and the numbers lists show) after a recalculation. */
+/** Store Hoshmand Schedule's analysis (and the numbers lists show) after a recalculation. */
 export async function updateScheduleAnalysis(id: string, orgId: string, a: { analysis: ScheduleAnalysis; projectFinish: string | null; varianceDays: number | null; criticalCount: number }): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
@@ -377,7 +377,7 @@ export async function setScheduleInHistory(id: string, orgId: string, inHistory:
   await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
 }
 
-/** Upload metadata set after the row is created (origin, classification, Planora re-import, history override). */
+/** Upload metadata set after the row is created (origin, classification, Hoshmand Schedule re-import, history override). */
 export async function updateScheduleMeta(id: string, orgId: string, m: { classification?: Schedule['classification']; uploadOrigin?: Schedule['uploadOrigin']; planoraExport?: boolean; historyOverride?: boolean }): Promise<void> {
   await initSchema()
   const sets: string[] = []
@@ -398,8 +398,8 @@ export async function setScheduleVersion(id: string, orgId: string, version: str
 }
 
 /**
- * True when a file with this SHA-256 was exported by Planora for this organization (the export audit
- * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of Planora output.
+ * True when a file with this SHA-256 was exported by Hoshmand Schedule for this organization (the export audit
+ * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of Hoshmand Schedule output.
  */
 export async function isPlanoraExportSha(orgId: string, sha256: string): Promise<boolean> {
   await initSchema()
@@ -622,7 +622,7 @@ export interface HistoryRow {
 /**
  * Activities from the firm's OWN past schedules, used to ground durations.
  * The org_id filter is the privacy boundary: competitors' data is never read.
- * Only uploads selectHistorySchedules accepts count (as-built, one per project, no Planora re-imports,
+ * Only uploads selectHistorySchedules accepts count (as-built, one per project, no Hoshmand Schedule re-imports,
  * no third-party schedules), and none when the organization turned firm history off for its uploads.
  * Workspace walls apply too: a member never gets durations from a matter they are walled off from.
  */
@@ -863,7 +863,7 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
   return res.rows.map(row => ({ id: row.id, scheduleId: row.schedule_id, userId: row.user_id, role: row.role, content: row.content, createdAt: row.created_at }))
 }
 
-/** Everything the organization has stored in Planora, as one JSON document (data portability). */
+/** Everything the organization has stored in Hoshmand Schedule, as one JSON document (data portability). */
 export async function exportOrganization(orgId: string) {
   await initSchema()
   const org = await getOrganization(orgId)

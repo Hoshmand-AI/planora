@@ -214,7 +214,7 @@ export async function exportEvmXlsx(e: EvmAnalysis, prov: Provenance, title: str
   const cur = e.currency.code || e.currency.symbol || 'currency'
   addSheet(wb, 'Earned value', [{ header: 'Measure', key: 'k', width: 42 }, { header: `Value (${cur}, index or days)`, key: 'v', width: 20 }, { header: 'Meaning', key: 'm', width: 70 }], [
     { k: 'Status', v: e.status === 'available' ? 'Available' : e.status === 'partial' ? 'Partial' : 'Not available', m: [...e.labels, ...e.missing.map(x => x.message)].join(' ') },
-    { k: 'Baseline', v: e.baseline.header.replace(/^Baseline:\s*/, ''), m: 'The one baseline every Planora surface measures against' },
+    { k: 'Baseline', v: e.baseline.header.replace(/^Baseline:\s*/, ''), m: 'The one baseline every Hoshmand Schedule surface measures against' },
     { k: 'Data date', v: e.dataDate, m: 'Planned value counts the work planned before this date' },
     { k: 'BAC (budget at completion)', v: m?.bac ?? null, m: 'Total baseline budget' },
     { k: 'PV (planned value, BCWS)', v: m?.pv ?? null, m: 'Budget of the work planned by the data date' },
