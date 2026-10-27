@@ -20,6 +20,6 @@ export function passwordProblem(password: unknown, context: { email?: string; na
   if (/^(0123456789|1234567890|abcdefghij|qwertyuiop)/.test(lower) && new Set(lower).size < 8) return 'That password is too predictable.'
   const local = context.email?.split('@')[0]?.toLowerCase()
   if (local && local.length >= 4 && lower.includes(local)) return "Don't include your email address in your password."
-  if (lower.includes('runf9') && password.length < 16) return "Don't base your password on the product name."
+  if (['runf9', 'planora', 'hoshmand'].some(n => lower.includes(n)) && password.length < 16) return "Don't base your password on the product name."
   return null
 }

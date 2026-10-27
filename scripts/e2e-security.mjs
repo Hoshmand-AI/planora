@@ -122,7 +122,7 @@ async function main() {
     ok(r.status === 403 && r.data.code === 'email_unverified', 'Inviting people waits for a confirmed email')
     const link = await mailLink(email('owner'), /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/)
     const mail = await lastMail(email('owner'))
-    ok(/^RunF9 <[^>]+@[^>]+>$/.test(mail?.from || '') && !/runf9/i.test(`${mail?.subject}${mail?.text}${mail?.html}`) && /border-radius:999px/.test(mail?.html || '') && mail?.html.includes(link.replace(/&/g, '&amp;')),
+    ok(/^RunF9 <[^>]+@[^>]+>$/.test(mail?.from || '') && !/planora/i.test(`${mail?.subject}${mail?.text}${mail?.html}`) && /border-radius:999px/.test(mail?.html || '') && mail?.html.includes(link.replace(/&/g, '&amp;')),
       'Emails come from "RunF9" with the branded HTML design and the same link in the plain-text part')
     r = await new Client().get(new URL(link).pathname + '?token=nope')
     ok(r.status === 303 && r.headers.get('location').includes('verified=0'), 'A bad confirmation token is refused')
