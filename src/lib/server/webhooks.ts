@@ -1,6 +1,7 @@
 // Outbound webhooks: an organization subscribes an HTTPS endpoint to events (a plan generated,
 // published or reviewed; a schedule uploaded...). Each delivery is a JSON POST signed with the
-// endpoint's secret:  X-Planora-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>.
+// endpoint's secret:  X-RunF9-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")> (also sent as
+// X-Planora-Signature, with X-Planora-Event/-Delivery, for receivers built before the rename).
 // Receivers should check the signature and reject timestamps older than 5 minutes.
 //
 // Endpoints must be public HTTPS URLs; addresses that resolve to private, loopback or link-local
@@ -75,7 +76,7 @@ export function isPrivateAddress(ip: string): boolean {
 /** Returns a problem with the URL, or null if it is an acceptable webhook destination. */
 export async function urlProblem(raw: string): Promise<string | null> {
   let u: URL
-  try { u = new URL(raw) } catch { return 'Enter a full URL, e.g. https://hooks.example.com/planora.' }
+  try { u = new URL(raw) } catch { return 'Enter a full URL, e.g. https://hooks.example.com/runf9.' }
   if (u.username || u.password) return 'Remove the user name and password from the URL; use the signing secret instead.'
   if (raw.length > 500) return 'The URL is too long.'
   if (allowInsecure()) return u.protocol === 'https:' || u.protocol === 'http:' ? null : 'Use an http(s) URL.'
@@ -122,7 +123,7 @@ async function post(url: string, body: string, headers: Record<string, string>):
   const problem = await urlProblem(url)
   if (problem) return { ok: false, status: `blocked: ${problem}` }
   try {
-    const res = await fetch(url, { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': 'Planora-Webhooks/1', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) })
+    const res = await fetch(url, { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': 'RunF9-Webhooks/1', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) })
     return { ok: res.status >= 200 && res.status < 300, status: String(res.status) }
   } catch (err) {
     return { ok: false, status: (err as Error).name === 'TimeoutError' ? 'timeout' : 'network error' }
@@ -133,7 +134,12 @@ export interface OutboundEvent { id: string; action: string; at: string; targetT
 
 export async function deliverToWebhook(h: Webhook & { secret: string }, orgId: string, e: OutboundEvent): Promise<{ ok: boolean; status: string }> {
   const body = JSON.stringify({ id: e.id, event: e.action, occurredAt: e.at, organizationId: orgId, data: { targetType: e.targetType, targetId: e.targetId, detail: e.detail, actor: e.actorEmail } })
-  const r = await post(h.url, body, { 'x-planora-event': e.action, 'x-planora-delivery': e.id, 'x-planora-signature': sign(h.secret, body) })
+  // X-RunF9-* headers, plus the original X-Planora-* names for receivers built before the rename
+  const signature = sign(h.secret, body)
+  const r = await post(h.url, body, {
+    'x-runf9-event': e.action, 'x-runf9-delivery': e.id, 'x-runf9-signature': signature,
+    'x-planora-event': e.action, 'x-planora-delivery': e.id, 'x-planora-signature': signature,
+  })
   await query(`UPDATE webhooks SET last_delivery_at=NOW(), last_status=$2,
       consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures + 1 END,
       disabled_at = CASE WHEN NOT $3 AND consecutive_failures + 1 >= $4 THEN NOW() ELSE disabled_at END

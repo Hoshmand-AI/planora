@@ -5,6 +5,7 @@
 import { initSchema, query } from '@/lib/db'
 import { randomToken, sha256 } from './crypto'
 import { emailConfigured, sendEmail } from './email'
+import { verificationEmail } from './emails'
 import { ApiError } from './api'
 import type { AuthContext } from '@/lib/auth'
 
@@ -23,10 +24,7 @@ export async function sendVerificationEmail(user: { id: string; email: string; n
   await query('DELETE FROM email_tokens WHERE user_id=$1 AND purpose=$2', [user.id, PURPOSE])
   await query(`INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES ($1,$2,$3, NOW() + make_interval(hours => $4))`, [sha256(token), user.id, PURPOSE, VALID_HOURS])
   const link = `${origin}/api/auth/verify?token=${encodeURIComponent(token)}`
-  const r = await sendEmail({
-    to: user.email, subject: 'Confirm your email for RunF9',
-    text: `Hi ${user.name},\n\nConfirm that this is your email address for RunF9:\n\n${link}\n\nThe link works once and expires in ${VALID_HOURS} hours. If you didn't create a RunF9 account, ignore this message.\n\n— RunF9 by Hoshmand AI`,
-  })
+  const r = await sendEmail({ to: user.email, ...verificationEmail(user.name, link, VALID_HOURS, origin) })
   return r.sent
 }
 

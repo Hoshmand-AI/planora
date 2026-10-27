@@ -2,7 +2,10 @@
 //   RESEND_API_KEY      → Resend (https://resend.com)
 //   POSTMARK_TOKEN      → Postmark (https://postmarkapp.com)
 //   PLANORA_EMAIL_OUTBOX=<dir>  → writes each message as JSON to a folder (tests/CI only)
-// EMAIL_FROM sets the sender (default "RunF9 <no-reply@hoshmand.ai>"). With no provider, nothing is
+// EMAIL_FROM sets the sending address (default no-reply@hoshmand.ai); the display name is always
+// "RunF9", whatever name EMAIL_FROM carries, so the brand can't drift. Replies go to EMAIL_REPLY_TO
+// (default support@hoshmand.ai). Messages carry the branded HTML (email-template.ts) and a plain-text
+// part with the same words. With no provider, nothing is
 // sent and the app keeps working: invitation links are shown to the admin and email verification
 // is reported as unavailable instead of blocking anyone. Message bodies are never logged.
 
@@ -11,7 +14,7 @@ import path from 'path'
 import { randomUUID } from 'crypto'
 import { log } from './log'
 
-export interface Email { to: string; subject: string; text: string }
+export interface Email { to: string; subject: string; text: string; html?: string }
 
 export function emailProvider(): 'resend' | 'postmark' | 'outbox' | null {
   if (process.env.RESEND_API_KEY) return 'resend'
@@ -20,7 +23,16 @@ export function emailProvider(): 'resend' | 'postmark' | 'outbox' | null {
   return null
 }
 export const emailConfigured = () => emailProvider() !== null
-const FROM = () => process.env.EMAIL_FROM || 'RunF9 <no-reply@hoshmand.ai>'
+export const SENDER_NAME = 'RunF9'
+
+/** "RunF9 <address>", taking only the address from EMAIL_FROM ("Name <a@b>" or "a@b"). */
+export function fromHeader(env: string | undefined = process.env.EMAIL_FROM): string {
+  const raw = (env || '').trim()
+  const addr = (/<([^>]+)>/.exec(raw)?.[1] ?? raw).trim()
+  return `${SENDER_NAME} <${/^[^\s@<>]+@[^\s@<>]+$/.test(addr) ? addr : 'no-reply@hoshmand.ai'}>`
+}
+const FROM = () => fromHeader()
+const REPLY_TO = () => process.env.EMAIL_REPLY_TO || 'support@hoshmand.ai'
 
 export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: string | null }> {
   const provider = emailProvider()
@@ -30,20 +42,20 @@ export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: st
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST', signal: AbortSignal.timeout(8000),
         headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: FROM(), to: [m.to], subject: m.subject, text: m.text }),
+        body: JSON.stringify({ from: FROM(), to: [m.to], reply_to: REPLY_TO(), subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) }),
       })
       if (!res.ok) throw new Error(`Resend responded ${res.status}`)
     } else if (provider === 'postmark') {
       const res = await fetch('https://api.postmarkapp.com/email', {
         method: 'POST', signal: AbortSignal.timeout(8000),
         headers: { 'x-postmark-server-token': process.env.POSTMARK_TOKEN!, 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ From: FROM(), To: m.to, Subject: m.subject, TextBody: m.text, MessageStream: 'outbound' }),
+        body: JSON.stringify({ From: FROM(), To: m.to, ReplyTo: REPLY_TO(), Subject: m.subject, TextBody: m.text, ...(m.html ? { HtmlBody: m.html } : {}), MessageStream: 'outbound' }),
       })
       if (!res.ok) throw new Error(`Postmark responded ${res.status}`)
     } else if (provider === 'outbox') {
       const dir = process.env.PLANORA_EMAIL_OUTBOX!
       await fs.mkdir(dir, { recursive: true })
-      await fs.writeFile(path.join(dir, `${Date.now()}-${randomUUID()}.json`), JSON.stringify({ from: FROM(), ...m }, null, 2))
+      await fs.writeFile(path.join(dir, `${Date.now()}-${randomUUID()}.json`), JSON.stringify({ from: FROM(), replyTo: REPLY_TO(), ...m }, null, 2))
     } else {
       return { sent: false, provider: null }
     }

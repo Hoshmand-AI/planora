@@ -326,13 +326,14 @@ export function progressModeFromSchedOptions(opt: Row | undefined | null): Progr
 }
 
 /**
- * True when the XER was written by Planora's own exporter (its ERMHDR names Planora as the exporting
- * application), so a re-import is recognized as RunF9's output rather than the project's record.
+ * True when the XER was written by RunF9's own exporter (its ERMHDR names RunF9, or Planora for files
+ * exported before the rename, as the exporting application), so a re-import is recognized as RunF9's
+ * output rather than the project's record.
  */
 export function isPlanoraXer(content: string): boolean {
   const first = content.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/, 1)[0] || ''
   const cols = first.split('\t')
-  return cols[0].trim() === 'ERMHDR' && cols[5]?.trim() === 'Planora'
+  return cols[0].trim() === 'ERMHDR' && ['RunF9', 'Planora'].includes(cols[5]?.trim() ?? '')
 }
 
 /** Tables earned value reads from the stored original file (./costs.ts); the schedule import does not carry them. */

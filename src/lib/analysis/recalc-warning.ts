@@ -31,7 +31,7 @@ const DIFF_NOTE = /open activities have (a finish (date )?or total float|dates o
 /**
  * The import notes shown for a stored schedule: the notes recorded at upload, plus the calculation
  * note from this read only when upload recorded none (and, once RunF9 has analyzed the file, never
- * one that would describe RunF9's stored dates as "the file's"). The file-vs-Planora comparison is
+ * one that would describe RunF9's stored dates as "the file's"). The file-vs-RunF9 comparison is
  * rebuilt from the stored samples so older uploads lose the misleading wording. No duplicates.
  */
 export function importNotes(stored: string[], loadNote: string | null, analyzedBefore: boolean, recalc: Parameters<typeof recalcWarning>[0]): string[] {

@@ -120,5 +120,5 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   }
   const exSummary = summarizeExceptions(exceptions)
   await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, activities: g.activities.length, basis, editsInPlanora: editsApplied, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), exportExceptions: { records: exceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, 'X-RunF9-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-RunF9-Export-Exceptions': exceptionHeader(exceptions), 'X-Planora-Basis': editsApplied ? `scenario; ${editsApplied} edits` : 'as-submitted', 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } })
 })
