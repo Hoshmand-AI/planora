@@ -70,7 +70,7 @@ export default function PlansPage() {
       {plans === null ? (
         <div className="text-warm-500 text-[14px] flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</div>
       ) : plans.length === 0 ? (
-        <div className="mood-tile grain rounded-3xl border px-6 py-10 text-center" data-mood="idle">
+        <div className="mood-tile rounded-3xl border px-6 py-10 text-center" data-mood="idle">
           <Robot mood="idle" size={80} className="mx-auto mb-3" />
           <p className="text-[16px] font-semibold text-navy-950">No plans yet</p>
           <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview.</p>

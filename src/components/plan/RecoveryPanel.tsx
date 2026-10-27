@@ -1,6 +1,6 @@
 'use client'
 
-// "The plan finishes after the required date — what now?" Leads with a worried Nora and one
+// "The plan finishes after the required date — what now?" Leads with a worried status mark and one
 // sentence, highlights the option that does the most, and keeps every number one click away:
 // the full explanation sits under "Why is it late?", and each option's trade-off, resources and
 // costs sit under its own "Details" toggle.
@@ -70,7 +70,7 @@ export function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: Recovery
   const rest = r.options.filter(o => o !== best)
   const meeting = r.options.filter(o => o.id !== 'move_date' && o.meetsDate).length
   return (
-    <section id="recovery" aria-labelledby="recovery-title" data-mood="worried" className="mood-tile grain rounded-2xl border p-4 md:p-6 mb-5">
+    <section id="recovery" aria-labelledby="recovery-title" data-mood="worried" className="mood-tile rounded-2xl border p-4 md:p-6 mb-5">
       <div className="flex items-start gap-4">
         <Robot mood="worried" size={52} className="flex-shrink-0 -ml-1" />
         <div className="flex-1 min-w-0">

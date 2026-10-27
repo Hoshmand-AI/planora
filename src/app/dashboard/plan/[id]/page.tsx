@@ -261,7 +261,7 @@ export default function PlanPage() {
             </button>}
           </div>
         </div>
-        <div data-mood={status.mood} className="mood-tile grain mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div data-mood={status.mood} className="mood-tile mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
           <div className="flex-1 min-w-[180px] text-[14px] font-medium text-navy-950 leading-snug py-1">
             {status.onClick

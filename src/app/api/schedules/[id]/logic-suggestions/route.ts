@@ -4,7 +4,7 @@ import { loadScheduleData } from '@/lib/planning/service'
 import { suggestLogic } from '@/lib/logic-assist'
 
 /**
- * Nora's logic suggestions for one schedule (read-only; deterministic and offline, no AI call):
+ * Logic suggestions for one schedule (read-only; deterministic and offline, no AI call):
  * loose ends (missing predecessors / successors), work tied only to the finish, links against the
  * usual trade order and links implied by others, with a proposed finish-to-start link for each loose
  * end. Computed on the network with the RunF9 edits applied, so an applied suggestion disappears;

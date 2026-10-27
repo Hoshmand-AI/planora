@@ -88,12 +88,12 @@ export default function DashboardPage() {
   const isBaselineUpload = /baseline/i.test(selectedSchedule.version || '')
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
-  // Nora's one-sentence read of the schedule's health (same status and variance as the badge).
+  // A one-sentence read of the schedule's health (same status and variance as the badge).
   const MOOD: Record<typeof status, RobotMood> = { on_track: 'done', complete: 'done', attention: 'waiting', at_risk: 'worried', no_baseline: 'idle' }
   const mood: RobotMood = m ? MOOD[status] : 'working'
   const behind = varianceDays != null && varianceDays > 0 ? ` ${varianceDays} ${varianceDays === 1 ? 'day' : 'days'} behind the baseline.` : ''
   const finishNote = forecastFinish ? ` Forecast finish ${fmtDate(forecastFinish)}.` : ''
-  const healthLine = !m ? 'Nora is reading this schedule…'
+  const healthLine = !m ? 'Reading this schedule…'
     : status === 'complete' ? 'This project is complete.'
     : status === 'on_track' ? `On track.${finishNote}`
     : status === 'no_baseline' ? `No baseline yet.${finishNote}`
@@ -137,7 +137,7 @@ export default function DashboardPage() {
       <div role={selectedSchedule.sourceType !== 'generated' ? 'tabpanel' : undefined} id="tabpanel-overview" aria-labelledby={selectedSchedule.sourceType !== 'generated' ? 'tab-overview' : undefined}
         hidden={tab !== 'overview' && selectedSchedule.sourceType !== 'generated'} className="space-y-6">
 
-      {/* Glance: Nora's one-line read, then four big numbers */}
+      {/* Glance: a one-line read, then four big numbers */}
       <section aria-label="Schedule health" className="space-y-3">
         <MoodTile mood={mood} className="flex items-center gap-4">
           <Robot mood={mood} size={72} />

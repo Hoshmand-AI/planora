@@ -135,7 +135,7 @@ export default function QualityPage() {
       </div>
 
       <div className="max-w-5xl space-y-6 mt-5">
-        {/* Nora sums up the grade in one sentence; the key numbers sit underneath */}
+        {/* One sentence sums up the grade in one sentence; the key numbers sit underneath */}
         <MoodTile mood={grade.mood} as="section" className="space-y-3">
           <div className="flex items-start gap-3.5">
             <Robot mood={grade.mood} size={64} className="flex-shrink-0 -mt-1" />
@@ -269,7 +269,7 @@ export default function QualityPage() {
   )
 }
 
-/** Nora's one-sentence read of the DCMA grade: all good, a few things to fix, or needs work. */
+/** A one-sentence read of the DCMA grade: all good, a few things to fix, or needs work. */
 function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; title: string; sub: string } {
   const fail = dcma.checks.filter(c => c.result === 'fail').length
   const warn = dcma.checks.filter(c => c.result === 'warn').length
@@ -282,7 +282,7 @@ function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; ti
   return { mood: 'worried', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with the first item under “What to fix”; each says what it means and how to fix it. ${questions}` }
 }
 
-/** No schedule yet: an idle Nora and one clear next step. */
+/** No schedule yet: an idle status and one clear next step. */
 function EmptyState<S extends { id: string; name: string }>({ schedules, onPick, canUpload, onUpload }: { schedules: S[]; onPick: (s: S) => void; canUpload: boolean; onUpload: () => void }) {
   const latest = schedules[0]
   return (
@@ -291,7 +291,7 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
         <Robot mood="idle" size={80} className="mx-auto" />
         <h1 className="font-display text-[22px] text-navy-950 mt-3">Schedule quality</h1>
         <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
-        <p className="text-[12.5px] text-warm-600 mt-1">Nora checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
+        <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
           {latest ? (
             <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>

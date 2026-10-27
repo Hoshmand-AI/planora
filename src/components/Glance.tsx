@@ -1,7 +1,7 @@
 'use client'
 
 // Glanceable tiles in the spirit of home-screen widgets: a progress ring and a big counter,
-// each on a mood tile with soft grain. Every value is also written out as text.
+// each on a tinted status tile. Every value is also written out as text.
 
 import { MoodTile, type RobotMood } from '@/components/Robot'
 

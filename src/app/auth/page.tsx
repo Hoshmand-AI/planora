@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
-import { Robot } from '@/components/Robot'
 
 function AuthForm() {
   const router = useRouter()
@@ -117,7 +116,6 @@ function AuthForm() {
 
   const openForgot = () => { setForgot(true); setError(''); setErrorCode(''); setResetNote(''); setPassword('') }
   const closeForgot = () => { setForgot(false); setError(''); setResetNote('') }
-  const noraMood = challenge ? 'waiting' : forgot ? (resetNote ? 'done' : 'waiting') : mode === 'signin' ? 'done' : 'working'
 
   const handleCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -141,9 +139,9 @@ function AuthForm() {
 
   return (
     <div className="min-h-screen bg-warm-50 flex flex-col">
-      <nav className="bg-navy-900 h-14 flex items-center px-6">
-        <Link href="/">
-          <Logo variant="light" size="text-[18px]" />
+      <nav className="h-16 flex items-center px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
+        <Link href="/" aria-label="RunF9 home">
+          <Logo variant="dark" size="text-[22px]" />
         </Link>
       </nav>
 
@@ -152,11 +150,6 @@ function AuthForm() {
           <Link href="/" className="inline-flex items-center gap-1.5 text-warm-400 text-[13px] font-medium hover:text-warm-700 transition-colors mb-8">
             <ArrowLeft size={14} /> Back to home
           </Link>
-
-          {/* Nora greets you; the heading below says the same thing in words */}
-          <div className="mood-tile grain flex w-fit items-center border rounded-[24px] px-4 pt-3 pb-2 mb-5" data-mood={noraMood}>
-            <Robot mood={noraMood} size={64} />
-          </div>
           <h1 className="font-display text-[32px] text-navy-950 mb-2">
             {challenge ? 'Two-step verification' : forgot ? 'Reset your password' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the RunF9 beta' : 'Create your account'}
           </h1>
