@@ -12,7 +12,7 @@ import type { ParsedSchedule } from '@/lib/parsers/types'
 import { exportXer } from './xer'
 import { exportMspXml } from './msp-xml'
 
-// Resources and assignments survive P6 → Hoshmand Schedule → P6 / MS Project → Hoshmand Schedule: the exporters write
+// Resources and assignments survive P6 → RunF9 → P6 / MS Project → RunF9: the exporters write
 // RSRC / RSRCRATE / TASKRSRC and <Resources> / <Assignments>, the parsers read them back.
 
 const sample = fs.readFileSync(path.join(__dirname, '../parsers/__fixtures__/sample.xer'), 'latin1')
@@ -100,7 +100,7 @@ describe('resource parsing', () => {
 })
 
 describe('resource round trip', () => {
-  it('P6 → Hoshmand Schedule → P6 (.xer rebuilt from Hoshmand Schedule\'s model) keeps resources and assignments', () => {
+  it('P6 → RunF9 → P6 (.xer rebuilt from RunF9\'s model) keeps resources and assignments', () => {
     const p = parseXER(xerWithResources(), 'x')
     const g = generated(p, p.resources)
     expect(g.resources!.assignments).toHaveLength(5)
@@ -111,14 +111,14 @@ describe('resource round trip', () => {
     expect(view(back)).toEqual(view(p))
   })
 
-  it('P6 → Hoshmand Schedule → MS Project XML → Hoshmand Schedule keeps resources and assignments', () => {
+  it('P6 → RunF9 → MS Project XML → RunF9 keeps resources and assignments', () => {
     const p = parseXER(xerWithResources(), 'x')
     const xml = exportMspXml(generated(p, p.resources), 'Riverside Warehouse')
     expect(xml).toContain('<Resources>')
     expect(xml).toContain('<Assignments>')
     const back = parseMSProjectXML(xml, 'z')
     expect(view(back)).toEqual(view(p))
-    // MS Project → Hoshmand Schedule → P6 as well.
+    // MS Project → RunF9 → P6 as well.
     const again = parseXER(exportXer(generated(back, back.resources), 'Riverside Warehouse'), 'w')
     expect(view(again)).toEqual(view(p))
   })

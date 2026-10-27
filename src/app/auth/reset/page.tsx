@@ -7,7 +7,7 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { Robot } from '@/components/Robot'
 
-/** Target of the emailed "Reset your Hoshmand Schedule password" link: /auth/reset?token=… */
+/** Target of the emailed "Reset your RunF9 password" link: /auth/reset?token=… */
 function ResetForm() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token') || ''

@@ -60,9 +60,9 @@ describe('XER import checks', () => {
     expect(p.warnings.some(w => /A1030: percent complete -15 is outside 0–100; set to 0/.test(w))).toBe(true)
   })
 
-  it('names the tables Hoshmand Schedule does not model and counts resource assignments', () => {
+  it('names the tables RunF9 does not model and counts resource assignments', () => {
     const p = parseXER(richXer(), 'r')
-    const w = p.warnings.find(x => x.startsWith('Not used in Hoshmand Schedule'))!
+    const w = p.warnings.find(x => x.startsWith('Not used in RunF9'))!
     for (const t of ['ACTVTYPE', 'ACTVCODE', 'TASKACTV', 'UDFTYPE', 'UDFVALUE']) expect(w).toContain(t)
     // Resources and assignments are read (resource analysis), so they are not listed as unused.
     for (const t of ['RSRC', 'TASKRSRC']) expect(w).not.toMatch(new RegExp(`\\b${t} \\(`))
@@ -116,7 +116,7 @@ describe('XER export of an uploaded P6 file (original passed through)', () => {
     for (const t of ['ACTVTYPE', 'ACTVCODE', 'TASKACTV', 'UDFTYPE', 'UDFVALUE', 'RSRC', 'TASKRSRC']) expect(outT[t]).toEqual(inT[t])
   })
 
-  it('writes Hoshmand Schedule dates and float on open activities, keeps the file times, flags the driving path', () => {
+  it('writes RunF9 dates and float on open activities, keeps the file times, flags the driving path', () => {
     const cpm = a.done.cpm!
     const byCode = new Map(a.done.activities.map(x => [x.activityId, x]))
     const row = (code: string) => outT['TASK'].find(t => t['task_code'] === code)!
@@ -143,7 +143,7 @@ describe('XER export of an uploaded P6 file (original passed through)', () => {
   })
 })
 
-describe('XER export built from Hoshmand Schedule\'s model', () => {
+describe('XER export built from RunF9\'s model', () => {
   it('keeps numeric calendar ids, does not invent baselines, truncates long names, flags the driving path', () => {
     const a = load(sample, 'm', 'sample.xer')
     const g = uploadedToGenerated(a.schedule, a.done.activities, a.p.relationships, a.done.cpm, a.analysis)

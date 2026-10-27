@@ -217,7 +217,7 @@ describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name ru
     const ctx = { history: null, catalog: new Map(), nameRules: true }
     expect(distributionFor(steel, ctx)!.basis).toMatch(/procurement/i)
     expect(distributionFor(cure, ctx)).toBeNull()
-    // Without name rules (plans built in Hoshmand Schedule) the old behavior stays.
+    // Without name rules (plans built in RunF9) the old behavior stays.
     expect(distributionFor(cure, { history: null, catalog: new Map() })).not.toBeNull()
   })
 
@@ -257,9 +257,9 @@ describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name ru
 })
 
 describe('reports and quality guidance for uploads', () => {
-  it('lists the edits made in Hoshmand Schedule with before/after and reasons', () => {
+  it('lists the edits made in RunF9 with before/after and reasons', () => {
     const md = editsSection([{ label: 'A1050 Erect Structural Steel: remaining duration', before: '15d', after: '12d', reason: 'Second crew', by: 'u1', byName: 'Ana', at: '2026-10-05T10:00:00.000Z', status: 'applied', source: 'recovery' }])
-    expect(md).toMatch(/^## Edits made in Hoshmand Schedule/)
+    expect(md).toMatch(/^## Edits made in RunF9/)
     expect(md).toContain('| 10/05/2026 | Ana | A1050 Erect Structural Steel: remaining duration | 15d | 12d | Second crew | Recovery option |')
     expect(editsSection([])).toBe('')
   })

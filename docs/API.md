@@ -1,6 +1,6 @@
-# Hoshmand Schedule API and webhooks
+# RunF9 API and webhooks
 
-For integrating Hoshmand Schedule with BI dashboards, data warehouses and your own tools. Available on the Pro and Enterprise plans. Admins manage keys and webhooks under **Organization → Integrations: API and webhooks**.
+For integrating RunF9 with BI dashboards, data warehouses and your own tools. Available on the Pro and Enterprise plans. Admins manage keys and webhooks under **Organization → Integrations: API and webhooks**.
 
 ## API keys
 
@@ -8,11 +8,11 @@ For integrating Hoshmand Schedule with BI dashboards, data warehouses and your o
   - **Read-only** (viewer role)
   - **Scheduler** (can also answer interview questions and generate schedules)
 - Keys never have admin rights.
-- The key is shown **once**. Hoshmand Schedule stores only its SHA-256 hash, so a lost key can't be recovered: revoke it and create another.
+- The key is shown **once**. RunF9 stores only its SHA-256 hash, so a lost key can't be recovered: revoke it and create another.
 - Send the key as a bearer token:
 
 ```bash
-curl -H "Authorization: Bearer pk_live_…" https://schedule.hoshmand.ai/api/portfolio
+curl -H "Authorization: Bearer pk_live_…" https://runf9.ai/api/portfolio
 ```
 
 - Each key is limited to 600 requests per minute.
@@ -28,12 +28,12 @@ curl -H "Authorization: Bearer pk_live_…" https://schedule.hoshmand.ai/api/por
 | GET | `/api/plans/{id}` | read-only | Full plan: answers, generated schedule (activities, logic, CPM dates and float), evaluation, recovery options |
 | GET | `/api/plans/{id}/risk` | read-only | Monte Carlo schedule risk analysis (P50/P80, criticality, sensitivity) |
 | GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes). XER, XML, CSV and XLSX carry an export exception report in the `X-Planora-Export-Exceptions` header (XLSX also in the Provenance sheet); `&exceptions=json` returns it as JSON |
-| GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics. `schedule.importExceptions` is the import exception report: every table, field or element the file carried that Hoshmand Schedule did not map, and every value it converted or defaulted (`{direction, format, records: [{severity, entity, field, count, examples, disposition, message}]}`); the list carries `importExceptionSummary` counts. Uploads accept P6 XER, P6 XML (PMXML), MS Project XML, XLSX/CSV and PDF |
+| GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics. `schedule.importExceptions` is the import exception report: every table, field or element the file carried that RunF9 did not map, and every value it converted or defaulted (`{direction, format, records: [{severity, entity, field, count, examples, disposition, message}]}`); the list carries `importExceptionSummary` counts. Uploads accept P6 XER, P6 XML (PMXML), MS Project XML, XLSX/CSV and PDF |
 | GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions, plus the reviewer dispositions (`review`) |
 | GET | `/api/schedules/{id}/standards` | read-only | Standards rules engine (`?frameworks=PLANORA_COMPOSITE,GAO_SCHEDULE_GUIDE,DCMA_14`, default: the organization's): results by framework → characteristic/category → rule, each with ruleId, source citation, threshold and its source, evidence and recommendation; threshold conflicts between frameworks (composite); stored runs (`runs`) and one stored run (`?run=`). Recording a run (`POST { frameworks }`, signed-in scheduler) stores the results with the rules version hash and is audited (`standards.run`). The same endpoints exist for plans at `/api/plans/{id}/standards`. An automated scan is not a GAO compliance determination |
 | GET | `/api/schedules/{id}/review` | read-only | Reviewer dispositions of an uploaded submission: per DCMA finding / data question and overall |
-| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|lookahead-xlsx\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with Hoshmand Schedule's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER. `lookahead-xlsx` is the 3-week look-ahead (work in progress or starting within 21 days of the data date). XLSX files carry a Provenance sheet (source file, SHA-256, basis, release, progress mode, settings, data date). Exports are the schedule as submitted; `&basis=scenario` (or `&scenario=1`) exports the what-if scenario with the Hoshmand Schedule edits, whose provenance reads "derived from <sha> with N edits". Every download carries an export exception report (what the format could not write or had to convert) in the `X-Planora-Export-Exceptions` header (compact JSON) and, for XLSX, in the Provenance sheet; `&exceptions=json` returns the full report as JSON instead of the file |
-| GET | `/api/schedules/{id}/edits` | read-only | Edits made in Hoshmand Schedule to an uploaded schedule (duration, relationship, constraint), each with before/after, reason, author and date. Adding (`POST`, reason required) and reverting (`DELETE ?editId=&reason=`) need a signed-in owner, admin or scheduler. Edits form the "With Hoshmand Schedule edits" scenario: every other view, analysis and export is as submitted unless it is asked for `basis=scenario` (`GET /api/schedules?id=`, `/quality`, `/recovery`, `/risk`, `/export`, `/api/schedules/compare`, `/api/schedules/windows`, and `{ basis: 'scenario' }` in `POST /api/reports`); status, variance and the portfolio are always as submitted |
+| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|lookahead-xlsx\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with RunF9's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER. `lookahead-xlsx` is the 3-week look-ahead (work in progress or starting within 21 days of the data date). XLSX files carry a Provenance sheet (source file, SHA-256, basis, release, progress mode, settings, data date). Exports are the schedule as submitted; `&basis=scenario` (or `&scenario=1`) exports the what-if scenario with the RunF9 edits, whose provenance reads "derived from <sha> with N edits". Every download carries an export exception report (what the format could not write or had to convert) in the `X-Planora-Export-Exceptions` header (compact JSON) and, for XLSX, in the Provenance sheet; `&exceptions=json` returns the full report as JSON instead of the file |
+| GET | `/api/schedules/{id}/edits` | read-only | Edits made in RunF9 to an uploaded schedule (duration, relationship, constraint), each with before/after, reason, author and date. Adding (`POST`, reason required) and reverting (`DELETE ?editId=&reason=`) need a signed-in owner, admin or scheduler. Edits form the "With RunF9 edits" scenario: every other view, analysis and export is as submitted unless it is asked for `basis=scenario` (`GET /api/schedules?id=`, `/quality`, `/recovery`, `/risk`, `/export`, `/api/schedules/compare`, `/api/schedules/windows`, and `{ basis: 'scenario' }` in `POST /api/reports`); status, variance and the portfolio are always as submitted |
 | GET | `/api/schedules/{id}/recovery` | read-only | What-if / recovery options modeled on the schedule's own network (crash, overlap FS→SS+lag, expedite), targeting the contract milestone and its date (FNLT / FO / MFO date, else Must Finish By), each with the milestone's new date, whether it meets the date, the float effect and the edits that apply it. Work by others, fixed-duration work (cure, seeding / acclimation, agency review, inspection, lab turnaround) and work after the milestone are never crashed or overlapped. A schedule that cannot have options (no logic, a network that could not be recalculated, no open work) returns 200 with `available: false` and a `reason` |
 | GET | `/api/schedules/{id}/risk` | read-only | Monte Carlo risk analysis of an uploaded schedule, using the scheduler's three-point ranges, risk events (on a task or a milestone) and committed delivery dates (`PUT`, signed-in scheduler) over the rule-based ranges; `contract` and `milestones` give P50 / P80 and the probability of meeting the date for the contract milestone and every milestone with a finish constraint |
 | GET | `/api/schedules/compare?id=…&base=…[&format=csv\|xlsx]` | read-only | Update-to-update comparison; without `base`, the latest upload of the project with an earlier data date. `format=csv` downloads the activity-level differences, `format=xlsx` a workbook with a sheet per change category. Comparing a schedule with itself (same id or identical file) is `400` (`same_schedule`) |
@@ -88,7 +88,7 @@ return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restric
 
 - Add an HTTPS endpoint and pick the events you want (`GET /api/org/integrations` lists them).
 - Endpoints that resolve to private or internal network addresses are refused.
-- Hoshmand Schedule `POST`s JSON within seconds of the event and does not follow redirects.
+- RunF9 `POST`s JSON within seconds of the event and does not follow redirects.
 - After 20 consecutive failed deliveries the endpoint is disabled; re-enable it from the same screen.
 - "Send test" sends a `webhook.test` event.
 

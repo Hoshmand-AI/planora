@@ -1,7 +1,7 @@
 // Single sign-on with SAML 2.0 (Microsoft Entra ID, Okta, Ping, ADFS, Google Workspace, OneLogin…),
 // alongside OpenID Connect (sso.ts).
 //
-// Hoshmand Schedule is the service provider (SP). Each organization has one SAML connection with its own
+// RunF9 is the service provider (SP). Each organization has one SAML connection with its own
 // SP entity ID and assertion consumer service (ACS) URL:
 //   metadata  /api/auth/saml/<connectionId>/metadata
 //   login     /api/auth/saml/<connectionId>/login       (SP-initiated, HTTP-Redirect binding)
@@ -60,7 +60,7 @@ export interface SamlConfig {
   /** Attribute names; empty = use the common names (see EMAIL_ATTRS, NAME_ATTRS, GROUP_ATTRS) */
   attributes: { email: string; name: string; groups: string }
   defaultRole: Role
-  /** IdP group → Hoshmand Schedule role. Applied on every sign-in (never to owners). */
+  /** IdP group → RunF9 role. Applied on every sign-in (never to owners). */
   groupRoles: GroupRole[]
   domains: string[]
   /** Members (other than owners) must sign in with SSO */

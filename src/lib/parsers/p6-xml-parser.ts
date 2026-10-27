@@ -8,7 +8,7 @@
 //   PhysicalPercentComplete (else PercentComplete) is the progress, as XER phys_complete_pct.
 // Resources, resource rates and assignments are read for resource analysis (./resources.ts), and
 // assignment / expense costs for earned value (./costs.ts), with the XER semantics. Everything the file
-// carries that Hoshmand Schedule does not use (activity codes, UDFs, roles, resource curves, notes, other
+// carries that RunF9 does not use (activity codes, UDFs, roles, resource curves, notes, other
 // projects, baselines, unmapped fields) is listed in the import exception report.
 
 import type { Activity, Relationship } from '@/lib/db'
@@ -108,7 +108,7 @@ function parseCalendar(c: XNode, warnings: string[], ex: ExceptionCollector): { 
     } else if (!workDays.includes(wd as Weekday)) {
       extraWorkDays.push(iso)
     } else if (Math.abs(hoursOf(p) - (dayHours.get(wd) ?? 0)) > 0.01) {
-      ex.add({ severity: 'info', entity: 'calendar', field: 'Calendar.HolidayException.WorkTime', disposition: 'converted', example: `${name} ${iso}`, message: 'Exception changes the work hours of a work day; Hoshmand Schedule counts it as a normal work day' })
+      ex.add({ severity: 'info', entity: 'calendar', field: 'Calendar.HolidayException.WorkTime', disposition: 'converted', example: `${name} ${iso}`, message: 'Exception changes the work hours of a work day; RunF9 counts it as a normal work day' })
     }
   }
   holidays.sort()
@@ -170,9 +170,9 @@ const ROOT_ENTITY: Record<string, [ExceptionEntity, ExceptionSeverity, string]> 
 }
 /** Root elements the import reads (resources, rates, units of measure and assignments: resource analysis). */
 const READ_ROOT = new Set(['Project', 'Calendar', 'Relationship', 'Resource', 'ResourceRate', 'UnitOfMeasure', 'ResourceAssignment'])
-/** Elements earned value reads from the stored file; the schedule import and Hoshmand Schedule's exports do not carry them. */
+/** Elements earned value reads from the stored file; the schedule import and RunF9's exports do not carry them. */
 const EV_ONLY = new Set(['ActivityExpense', 'ProjectExpense', 'Currency'])
-const ORIGINAL_ONLY = 'The original file is kept with the upload; this data is not used by Hoshmand Schedule and is not written by its exports'
+const ORIGINAL_ONLY = 'The original file is kept with the upload; this data is not used by RunF9 and is not written by its exports'
 
 /* ─── main ──────────────────────────────────────────────── */
 
@@ -339,7 +339,7 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
       ex.add({ severity: 'loss', entity: 'constraint', field: 'Activity.SecondaryConstraintType', disposition: 'dropped', example: `${code} (${cstr2})`, message: 'Secondary constraints are not modeled; only the primary constraint is used' })
     }
 
-    // Activity codes, UDF values and fields Hoshmand Schedule does not map.
+    // Activity codes, UDF values and fields RunF9 does not map.
     const codes = children(t, 'Code').length
     if (codes) ex.add({ severity: 'warning', entity: 'code', field: 'Activity.Code', disposition: 'dropped', count: codes, example: code, message: `Activity code assignments are not modeled; ${ORIGINAL_ONLY.toLowerCase()}` })
     const udfs = children(t, 'UDF').length
@@ -382,7 +382,7 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     return a
   })
   for (const [f, ids] of unmappedFields) {
-    ex.add({ severity: 'info', entity: 'activity', field: `Activity.${f}`, disposition: 'dropped', count: ids.length, examples: ids, message: `Field not mapped by Hoshmand Schedule; ${ORIGINAL_ONLY.toLowerCase()}` })
+    ex.add({ severity: 'info', entity: 'activity', field: `Activity.${f}`, disposition: 'dropped', count: ids.length, examples: ids, message: `Field not mapped by RunF9; ${ORIGINAL_ONLY.toLowerCase()}` })
   }
 
   /* ── Relationships ───────────────────────────────────── */
@@ -407,7 +407,7 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     for (const f of r.children) if (!READ_RELATIONSHIP.has(f.name) && !EMPTYISH.test(f.text.trim())) relFields.set(f.name, (relFields.get(f.name) ?? 0) + 1)
     relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
   }
-  for (const [f, n] of relFields) ex.add({ severity: 'info', entity: 'relationship', field: `Relationship.${f}`, disposition: 'dropped', count: n, message: `Field not mapped by Hoshmand Schedule; ${ORIGINAL_ONLY.toLowerCase()}` })
+  for (const [f, n] of relFields) ex.add({ severity: 'info', entity: 'relationship', field: `Relationship.${f}`, disposition: 'dropped', count: n, message: `Field not mapped by RunF9; ${ORIGINAL_ONLY.toLowerCase()}` })
 
   /* ── Resources and assignments (resource analysis; counts for the DCMA resource check) ─ */
   const assignments = [...children(project, 'ResourceAssignment'), ...children(root, 'ResourceAssignment')].filter(r => byObjectId.has(childText(r, 'ActivityObjectId')))
@@ -431,7 +431,7 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     if (oos === 'progressoverride') progressMode = 'override'
     else if (oos === 'retainedlogic') progressMode = 'retained'
     else if (oos) {
-      warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which Hoshmand Schedule does not model; Hoshmand Schedule uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
+      warnings.push('The file schedules out-of-sequence progress with P6 "Actual Dates", which RunF9 does not model; RunF9 uses Retained Logic. Choose Progress Override for this upload if that matches your P6 settings better.')
       ex.add({ severity: 'warning', entity: 'project', field: 'ScheduleOptions.OutOfSequenceScheduleType', disposition: 'converted', example: childText(so, 'OutOfSequenceScheduleType'), message: 'Out-of-sequence progress "Actual Dates" is not modeled; Retained Logic is used' })
     }
     const lagCal = childText(so, 'RelationshipLagCalendar')
@@ -467,11 +467,11 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     count(n.name, n)
   }
   for (const [name, t] of tally) {
-    const [entity, severity, message] = ROOT_ENTITY[name] ?? (name.startsWith('Project.') ? ['project', 'info', 'Project field not mapped by Hoshmand Schedule'] : ['other', 'info', `Element <${name}> is not used by Hoshmand Schedule`])
-    ex.add({ severity, entity, field: name, disposition: 'dropped', count: t.n, examples: t.examples, message: `${message}; ${EV_ONLY.has(name) ? 'the original file is kept with the upload; Hoshmand Schedule\'s exports do not write it' : ORIGINAL_ONLY.toLowerCase()}` })
+    const [entity, severity, message] = ROOT_ENTITY[name] ?? (name.startsWith('Project.') ? ['project', 'info', 'Project field not mapped by RunF9'] : ['other', 'info', `Element <${name}> is not used by RunF9`])
+    ex.add({ severity, entity, field: name, disposition: 'dropped', count: t.n, examples: t.examples, message: `${message}; ${EV_ONLY.has(name) ? 'the original file is kept with the upload; RunF9\'s exports do not write it' : ORIGINAL_ONLY.toLowerCase()}` })
   }
   const notUsed = Array.from(tally.entries()).filter(([n]) => !n.startsWith('Project.') && !EV_ONLY.has(n))
-  if (notUsed.length) warnings.push(`Not used in Hoshmand Schedule's analysis: ${notUsed.map(([n, t]) => `${n} (${t.n})`).join('; ')}. They are kept in the original file but not in Hoshmand Schedule's exports.`)
+  if (notUsed.length) warnings.push(`Not used in RunF9's analysis: ${notUsed.map(([n, t]) => `${n} (${t.n})`).join('; ')}. They are kept in the original file but not in RunF9's exports.`)
 
   return {
     projectName, dataDate, projectStart, projectFinish, mustFinishBy, projectKey, progressMode,

@@ -161,7 +161,7 @@ export function buildLoading(input: ResourceLoadInput): Loading {
       if (one && one > 0) { L.availablePerDay = r2(one); L.availabilitySource = 'assumed_one_crew'; assumedOneCrew.push(r.code) }
     }
   }
-  if (assumedOneCrew.length) assumptions.push(`No maximum units in the file for ${assumedOneCrew.length} resource${assumedOneCrew.length === 1 ? '' : 's'} (${assumedOneCrew.slice(0, 8).join(', ')}${assumedOneCrew.length > 8 ? ', …' : ''}): Hoshmand Schedule assumed one crew each, i.e. the most units any single assignment uses per day. Set the real availability in the staffing what-if.`)
+  if (assumedOneCrew.length) assumptions.push(`No maximum units in the file for ${assumedOneCrew.length} resource${assumedOneCrew.length === 1 ? '' : 's'} (${assumedOneCrew.slice(0, 8).join(', ')}${assumedOneCrew.length > 8 ? ', …' : ''}): RunF9 assumed one crew each, i.e. the most units any single assignment uses per day. Set the real availability in the staffing what-if.`)
   if (data.resources.some(r => !r.calendarId || !calById.has(r.calendarId))) assumptions.push('Resources without a calendar of their own are available on the project default calendar\'s work days and on any day their activities\' calendars schedule work.')
   if (data.resources.some(r => r.kind === 'material')) assumptions.push('Material resources are shown but not limited, so they are never over-allocated.')
   assumptions.push('Units are spread evenly over each activity\'s work days (linear curve); actual units fall before the data date, remaining units from the data date on.')
@@ -256,7 +256,7 @@ export interface ResourceAnalysis {
   unscheduled: string[]
 }
 
-export const NO_RESOURCE_MESSAGE = 'This schedule has no resources loaded, so there is no crew or equipment loading to show. Hoshmand Schedule does not invent resources: load them in P6, MS Project or the spreadsheet (resources and their assignments to activities) and upload the file again.'
+export const NO_RESOURCE_MESSAGE = 'This schedule has no resources loaded, so there is no crew or equipment loading to show. RunF9 does not invent resources: load them in P6, MS Project or the spreadsheet (resources and their assignments to activities) and upload the file again.'
 
 const bucketStart = (day: number, bucket: HistogramBucket): number => {
   if (bucket === 'day') return day

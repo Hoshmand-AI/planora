@@ -312,7 +312,7 @@ describe('DCMA adapter parity with dcma.ts', () => {
   }
 })
 
-describe('Hoshmand Schedule Composite', () => {
+describe('RunF9 Composite', () => {
   const r = runStandards(clean(), ['PLANORA_COMPOSITE']).frameworks[0]
   const rules = r.groups.flatMap(g => g.rules)
   it('applies GAO and DCMA rules, each keeping its own source', () => {
@@ -404,7 +404,7 @@ describe('AI explanation context', () => {
 })
 
 describe('organization settings', () => {
-  it('defaults to Hoshmand Schedule Composite and normalizes input', () => {
+  it('defaults to RunF9 Composite and normalizes input', () => {
     expect(normalizeSettings({}).standards.defaultFrameworks).toEqual(['PLANORA_COMPOSITE'])
     expect(normalizeStandardsSettings({ defaultFrameworks: ['DCMA_14', 'bogus', 'DCMA_14'], gao: { highFloatDays: 9999, lagsMaxPct: 'x' } }))
       .toEqual({ defaultFrameworks: ['DCMA_14'], gao: { ...DEFAULT_GAO_THRESHOLDS, highFloatDays: 260 } })

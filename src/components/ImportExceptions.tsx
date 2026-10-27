@@ -1,6 +1,6 @@
 'use client'
 
-// "Import exceptions": what the uploaded file carried that Hoshmand Schedule did not map, and what it converted
+// "Import exceptions": what the uploaded file carried that RunF9 did not map, and what it converted
 // or defaulted on the way (src/lib/parsers/exceptions.ts). Counts by entity and by disposition, then
 // every record with its message and example ids behind an expandable row.
 

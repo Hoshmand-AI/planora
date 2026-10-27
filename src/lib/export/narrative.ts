@@ -32,7 +32,7 @@ export function basisOfSchedule(opts: {
   const L: string[] = []
 
   L.push(`# Basis of Schedule — ${planName}`, '')
-  L.push(`Prepared ${new Date().toISOString().slice(0, 10)} by ${opts.generatedBy} with Hoshmand Schedule (AI mode: ${opts.aiMode}).`, '')
+  L.push(`Prepared ${new Date().toISOString().slice(0, 10)} by ${opts.generatedBy} with RunF9 (AI mode: ${opts.aiMode}).`, '')
 
   L.push('## 1. Project description', '')
   L.push(`| Item | Value |`, `|---|---|`)
@@ -79,7 +79,7 @@ export function basisOfSchedule(opts: {
   L.push('## 4. Sources of durations and logic', '')
   const counts: Record<string, number> = {}
   for (const a of s.activities) for (const src of a.rationale.sources) counts[src.kind] = (counts[src.kind] || 0) + 1
-  const labels: Record<string, string> = { user: 'Project team answers', file: 'Uploaded files', catalog: 'Regional permit / regulation / lead-time catalog', firm_history: "Firm's own completed projects (private)", template: 'Hoshmand Schedule activity templates', model: 'AI model suggestions', override: 'Scheduler overrides', assumption: 'Stated assumptions' }
+  const labels: Record<string, string> = { user: 'Project team answers', file: 'Uploaded files', catalog: 'Regional permit / regulation / lead-time catalog', firm_history: "Firm's own completed projects (private)", template: 'RunF9 activity templates', model: 'AI model suggestions', override: 'Scheduler overrides', assumption: 'Stated assumptions' }
   for (const [k, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) L.push(`- ${labels[k] || k}: cited by ${n} activities`)
   L.push('', ...((s.notes || []).map(n => `> ${n}`)), '')
 

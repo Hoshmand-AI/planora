@@ -5,7 +5,7 @@ export function LegalPage({ title, effective, children }: { title: string; effec
   return (
     <div className="min-h-screen bg-warm-50">
       <nav className="bg-navy-900 h-14 flex items-center px-6">
-        <Link href="/" aria-label="Hoshmand Schedule home"><Logo variant="light" size="text-[18px]" /></Link>
+        <Link href="/" aria-label="RunF9 home"><Logo variant="light" size="text-[18px]" /></Link>
       </nav>
       <main className="max-w-[760px] mx-auto px-6 py-12">
         <h1 className="font-display text-[32px] text-navy-950 mb-2">{title}</h1>

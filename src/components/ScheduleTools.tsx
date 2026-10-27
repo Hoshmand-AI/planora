@@ -1,8 +1,8 @@
 'use client'
 
-// Tools for an uploaded schedule: compare with the previous update, edits made in Hoshmand Schedule (with
+// Tools for an uploaded schedule: compare with the previous update, edits made in RunF9 (with
 // reasons), what-if / recovery options, Monte Carlo risk with the scheduler's own ranges and risk
-// events, exports back to P6 / MS Project / Excel, the original file, and how Hoshmand Schedule schedules it.
+// events, exports back to P6 / MS Project / Excel, the original file, and how RunF9 schedules it.
 
 import { useEffect, useState } from 'react'
 import { Disclosure } from './Disclosure'
@@ -98,16 +98,16 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         <fieldset className="text-[13px] text-warm-700 mb-2">
           <legend className="font-semibold text-navy-950 mb-1">Basis for recovery, comparison, risk and exports</legend>
           <label className="mr-4"><input type="radio" name="basis" checked={basis === 'submitted'} onChange={() => setBasis('submitted')} /> As submitted</label>
-          <label><input type="radio" name="basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With Hoshmand Schedule edits ({editsCount})</label>
-          <p className="text-[12px] text-warm-600 mt-1">{basis === 'scenario' ? `A what-if scenario: the ${editsCount} edit${editsCount === 1 ? '' : 's'} made in Hoshmand Schedule are applied. Outputs say so, and exports say they are derived from the original file.` : 'The schedule exactly as submitted. Status, variance, quality and the portfolio always use it.'}</p>
+          <label><input type="radio" name="basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With RunF9 edits ({editsCount})</label>
+          <p className="text-[12px] text-warm-600 mt-1">{basis === 'scenario' ? `A what-if scenario: the ${editsCount} edit${editsCount === 1 ? '' : 's'} made in RunF9 are applied. Outputs say so, and exports say they are derived from the original file.` : 'The schedule exactly as submitted. Status, variance, quality and the portfolio always use it.'}</p>
         </fieldset>
       )}
 
-      <Disclosure title="Edits made in Hoshmand Schedule" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
+      <Disclosure title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
         <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
       </Disclosure>
 
-      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with Hoshmand Schedule edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
+      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with RunF9 edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
         <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
       </Disclosure>
 
@@ -187,11 +187,11 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>
-        <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} Hoshmand Schedule edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no Hoshmand Schedule edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
+        <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
         {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 
-      <Disclosure title="How Hoshmand Schedule schedules this file">
+      <Disclosure title="How RunF9 schedules this file">
         <div className="text-[13px] text-warm-700 space-y-3">
           <fieldset>
             <legend className="font-semibold text-navy-950 mb-1">Out-of-sequence progress</legend>

@@ -69,7 +69,7 @@ function AuthForm() {
   }, [invite, betaToken])
 
   // Same fallback as the landing page, so "Request access" is never a dead end.
-  const requestHref = `mailto:${requestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('Hoshmand Schedule private beta: access request')}`
+  const requestHref = `mailto:${requestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 private beta: access request')}`
   const betaInvited = !!betaInvitation?.email
 
   const post = async (body: Record<string, unknown>) => {
@@ -158,7 +158,7 @@ function AuthForm() {
             <Robot mood={noraMood} size={64} />
           </div>
           <h1 className="font-display text-[32px] text-navy-950 mb-2">
-            {challenge ? 'Two-step verification' : forgot ? 'Reset your password' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the Hoshmand Schedule beta' : 'Create your account'}
+            {challenge ? 'Two-step verification' : forgot ? 'Reset your password' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the RunF9 beta' : 'Create your account'}
           </h1>
           <p className="text-warm-500 text-[15px] mb-8">
             {challenge
@@ -171,12 +171,12 @@ function AuthForm() {
                   ? `You've been invited as ${invitation.role === 'admin' ? 'an' : 'a'} ${invitation.role}. Create your account with ${invitation.email}.`
                   : betaInvited
                     ? `You're invited to the private beta. Create your firm's account with ${betaInvitation?.email}; you'll be its owner and can invite colleagues.`
-                    : 'Start analyzing construction schedules with Hoshmand Schedule.'}
+                    : 'Start analyzing construction schedules with RunF9.'}
           </p>
 
           {inviteOnly && !challenge && !ssoMode && !forgot && !invitation?.orgName && !betaInvited && (
             <div role="note" aria-label="Private beta" className="bg-warm-100 border border-warm-200 border-l-2 border-l-accent-500 text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
-              <strong className="font-semibold text-navy-950">Hoshmand Schedule is in private beta</strong> — sign up with your invitation link.
+              <strong className="font-semibold text-navy-950">RunF9 is in private beta</strong> — sign up with your invitation link.
               {mode === 'signup' && ' No link yet? Ask your organization admin to invite you.'}
               {requestHref && <> <a href={requestHref} className="text-accent-600 font-medium underline hover:text-navy-950">Request access</a></>}
             </div>

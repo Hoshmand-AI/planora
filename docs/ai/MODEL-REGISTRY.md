@@ -1,8 +1,8 @@
 # Approved model registry
 
-Hoshmand Schedule only calls models on this list. In code, the list is `MODEL_REGISTRY` in `src/lib/llm/gateway.ts`; `PLANORA_APPROVED_MODELS` overrides it. Any other `LLM_MODEL` is refused, and Hoshmand Schedule runs rules-only. A model that belongs to a different provider than the selected one (`PLANORA_AI_PROVIDER`) is also refused.
+RunF9 only calls models on this list. In code, the list is `MODEL_REGISTRY` in `src/lib/llm/gateway.ts`; `PLANORA_APPROVED_MODELS` overrides it. Any other `LLM_MODEL` is refused, and RunF9 runs rules-only. A model that belongs to a different provider than the selected one (`PLANORA_AI_PROVIDER`) is also refused.
 
-Every model is either **certified** (evaluated with the golden prompts in [AI-GOVERNANCE.md](AI-GOVERNANCE.md)) or an **approved alternate** (allowed, but Hoshmand Schedule does not promise equivalent quality on it). Models approved only through `PLANORA_APPROVED_MODELS` are approved alternates. The AI status (`/api/system`) and the settings panel show the provider, the model and whether it is certified.
+Every model is either **certified** (evaluated with the golden prompts in [AI-GOVERNANCE.md](AI-GOVERNANCE.md)) or an **approved alternate** (allowed, but RunF9 does not promise equivalent quality on it). Models approved only through `PLANORA_APPROVED_MODELS` are approved alternates. The AI status (`/api/system`) and the settings panel show the provider, the model and whether it is certified.
 
 | Model | Provider | Status | Approved for | Evaluated | Price (per 1M tokens, in / out) | Notes |
 |---|---|---|---|---|---|---|

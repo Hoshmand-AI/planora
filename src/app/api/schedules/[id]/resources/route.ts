@@ -12,9 +12,9 @@ import { availabilityFrom, bucketFrom, isLevelingEdit, levelingNetworkOf, loadAc
  * RSRC / TASKRSRC, MS Project Resources / Assignments, spreadsheet resource columns); a file without
  * them gives state "no_resource_data" (nothing is invented).
  *   GET ?bucket=day|week|month (week) &resource=<id> (histogram of one resource; all for week / month)
- *       &availability={"<resourceId>": unitsPerDay} (what-if staffing) &basis=scenario (with Hoshmand Schedule edits)
+ *       &availability={"<resourceId>": unitsPerDay} (what-if staffing) &basis=scenario (with RunF9 edits)
  *   POST { mode: 'level'|'smooth', allowFinishExtension?, availability?, resource?, bucket? }
- *       → a leveling PREVIEW on the schedule as submitted plus the non-leveling Hoshmand Schedule edits: before /
+ *       → a leveling PREVIEW on the schedule as submitted plus the non-leveling RunF9 edits: before /
  *         after finish and contract milestones, the delays it would introduce, what remains
  *         over-allocated, and the leveled loading. Nothing is stored; save it with
  *         POST /api/schedules/{id}/resources/level.
@@ -41,7 +41,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 export const POST = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
   const data = await loadScheduleData(params.id, auth.orgId)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships, so Hoshmand Schedule cannot recalculate it to level resources.', code: 'no_logic' }, { status: 400 })
+  if (!data.cpm) return NextResponse.json({ error: 'This schedule has no activity relationships, so RunF9 cannot recalculate it to level resources.', code: 'no_logic' }, { status: 400 })
   const b = await readBody<Record<string, unknown>>(req)
   const resources = await loadScheduleResources(data.schedule, auth.orgId, data.activities)
   const net = levelingNetworkOf(data, resources)

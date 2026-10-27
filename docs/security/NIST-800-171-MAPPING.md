@@ -2,26 +2,26 @@
 
 _Last updated 10/06/2026._
 
-**Status: self-assessment by the vendor, not an assessment.** Hoshmand Schedule has no CMMC assessment, no
+**Status: self-assessment by the vendor, not an assessment.** RunF9 has no CMMC assessment, no
 FedRAMP authorization and no third-party attestation of any kind (see [POAM.md](POAM.md)). This
 document helps a customer's assessor and system security plan (SSP) author see, for each of the 110
-security requirements of NIST SP 800-171 Rev. 2 (the revision CMMC Level 2 uses), what the Hoshmand Schedule
+security requirements of NIST SP 800-171 Rev. 2 (the revision CMMC Level 2 uses), what the RunF9
 application provides, what the customer's environment must provide, and where there are gaps. The
 Rev. 3 family view is in [CONTROL-MATRIX.md](CONTROL-MATRIX.md).
 
-**Scope.** It applies only to an **on-premises or air-gapped** Hoshmand Schedule instance inside the
+**Scope.** It applies only to an **on-premises or air-gapped** RunF9 instance inside the
 customer's assessed boundary ([../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)).
-Hoshmand Schedule's hosted commercial cloud is not offered for CUI ([CUI-HANDLING.md](CUI-HANDLING.md)).
+RunF9's hosted commercial cloud is not offered for CUI ([CUI-HANDLING.md](CUI-HANDLING.md)).
 Requirement titles below are paraphrased; use the NIST publication for the authoritative text.
 
 **Responsibility key**
 
 | Code | Meaning |
 |---|---|
-| **App** | The Hoshmand Schedule application implements it; the customer configures and uses it. |
-| **Shared** | Hoshmand Schedule provides part of it; the customer's environment, configuration or procedures must provide the rest. |
-| **Customer** | Provided by the customer's environment, organization or procedures. Hoshmand Schedule is not involved, or only supplies information. |
-| **Gap** | Hoshmand Schedule does not meet its share today. A compensating measure is suggested. |
+| **App** | The RunF9 application implements it; the customer configures and uses it. |
+| **Shared** | RunF9 provides part of it; the customer's environment, configuration or procedures must provide the rest. |
+| **Customer** | Provided by the customer's environment, organization or procedures. RunF9 is not involved, or only supplies information. |
+| **Gap** | RunF9 does not meet its share today. A compensating measure is suggested. |
 
 **Summary**
 
@@ -50,7 +50,7 @@ scanning of uploaded files (3.14.2). Each has a compensating measure below.
 
 ## 3.1 Access control
 
-| Req | Requirement (paraphrased) | Resp. | Hoshmand Schedule implementation / customer action | Evidence |
+| Req | Requirement (paraphrased) | Resp. | RunF9 implementation / customer action | Evidence |
 |---|---|---|---|---|
 | 3.1.1 | Limit access to authorized users, processes, devices | Shared | Every API route requires an authenticated session or API key (`api()`); a test fails the build if a route skips it. Accounts come from invitations (organization invitations, or platform-operator beta invitations for new firms), SSO/SCIM into DNS-verified domains, or the bootstrapping owner; invite-only is the default, and sign-in also requires beta access (`PLANORA_SIGNUP=open` re-opens self sign-up). Network access to the instance: customer | `src/lib/server/api.ts`, `src/lib/server/routes.test.ts`, `src/lib/server/signup-policy.ts` |
 | 3.1.2 | Limit access to permitted transactions and functions | App | Five roles with a fixed permission matrix; each route declares its permission. Workspaces restrict which schedules and plans a member can see | `src/lib/server/permissions.ts`, `src/lib/server/workspaces.ts` |
@@ -70,10 +70,10 @@ scanning of uploaded files (3.14.2). Each has a compensating measure below.
 | 3.1.16 | Authorize wireless access | Customer | — | — |
 | 3.1.17 | Protect wireless access | Customer | — | — |
 | 3.1.18 | Control mobile device connections | Customer | — | — |
-| 3.1.19 | Encrypt CUI on mobile devices | Customer | Hoshmand Schedule stores nothing on devices beyond files a user downloads | — |
+| 3.1.19 | Encrypt CUI on mobile devices | Customer | RunF9 stores nothing on devices beyond files a user downloads | — |
 | 3.1.20 | Verify and control connections to external systems | Shared | Air-gapped mode refuses any model host outside the private network; the instance makes no outbound calls by default (no telemetry, no licence check); webhooks and the alert channel accept only public HTTPS destinations and are admin-configured and audited; API keys are scoped and revocable. Firewall egress rules: customer | `src/lib/llm/provider.ts`, `src/lib/server/webhooks.ts`, [ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md) section 8 |
 | 3.1.21 | Limit portable storage on external systems | Customer | Exports and downloads are audited (`schedule.export`, `plan.export`, `schedule.download_original`); device control is the customer's | `src/lib/server/audit.ts` |
-| 3.1.22 | Control CUI on publicly accessible systems | Shared | Hoshmand Schedule has no public sharing or anonymous links; the instance should not be internet-facing | — |
+| 3.1.22 | Control CUI on publicly accessible systems | Shared | RunF9 has no public sharing or anonymous links; the instance should not be internet-facing | — |
 
 ### Workspaces (ethical walls)
 
@@ -95,13 +95,13 @@ for all workspaces) and the organization data export (owners and admins only).
 
 | Req | Requirement (paraphrased) | Resp. | Notes |
 |---|---|---|---|
-| 3.2.1 | Security awareness for users and managers | Customer | Hoshmand Schedule supplies user-facing documentation; training is the customer's |
+| 3.2.1 | Security awareness for users and managers | Customer | RunF9 supplies user-facing documentation; training is the customer's |
 | 3.2.2 | Role-based security training | Customer | Admin guidance: [ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md) |
 | 3.2.3 | Insider-threat awareness | Customer | — |
 
 ## 3.3 Audit and accountability
 
-| Req | Requirement (paraphrased) | Resp. | Hoshmand Schedule implementation / customer action | Evidence |
+| Req | Requirement (paraphrased) | Resp. | RunF9 implementation / customer action | Evidence |
 |---|---|---|---|---|
 | 3.3.1 | Create and retain audit records | Shared | `audit_events` records sign-ins (and failures), member, role, policy, SSO and workspace changes, plan edits, reviews, publishing, uploads, exports, AI requests (metadata and prompt hash, never content) and privacy actions. Kept until the organization is deleted. Retention policy and capacity: customer | `src/lib/server/audit.ts` |
 | 3.3.2 | Trace actions to individual users | App | Each record carries actor id and email, time, IP, user agent and request id; API-key actions are attributed to the named key | `src/lib/server/audit.ts`, `src/lib/server/context.ts` |
@@ -115,7 +115,7 @@ for all workspaces) and the organization data export (owners and admins only).
 
 ## 3.4 Configuration management
 
-| Req | Requirement (paraphrased) | Resp. | Hoshmand Schedule implementation / customer action |
+| Req | Requirement (paraphrased) | Resp. | RunF9 implementation / customer action |
 |---|---|---|---|
 | 3.4.1 | Baseline configurations and inventories | Shared | Container image pinned by digest; CycloneDX SBOM (`npm run sbom`, also `/app/sbom.cdx.json` in the image); every setting is listed in [ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md). Host and network inventory: customer |
 | 3.4.2 | Security configuration settings | Shared | Secure defaults in the image and Compose file (AI offline, air-gapped, invite-only sign-up, non-root, read-only filesystem, no capabilities); hardening guide section 8. Enforcement on hosts: customer |
@@ -125,18 +125,18 @@ for all workspaces) and the organization data export (owners and admins only).
 | 3.4.6 | Least functionality | Shared | The image contains only the standalone server; no shell access is needed; telemetry is disabled. Host minimization: customer |
 | 3.4.7 | Restrict nonessential programs, ports, protocols | Shared | One HTTP port (3000), published on loopback only; the database is on an internal network. Host ports and services: customer |
 | 3.4.8 | Application allowlisting / denylisting | Customer | — |
-| 3.4.9 | Control user-installed software | Customer | Hoshmand Schedule has no plug-ins or user-installed code |
+| 3.4.9 | Control user-installed software | Customer | RunF9 has no plug-ins or user-installed code |
 
 ## 3.5 Identification and authentication
 
-| Req | Requirement (paraphrased) | Resp. | Hoshmand Schedule implementation / customer action | Evidence |
+| Req | Requirement (paraphrased) | Resp. | RunF9 implementation / customer action | Evidence |
 |---|---|---|---|---|
 | 3.5.1 | Identify users, processes, devices | App | Unique accounts (one email per account); API keys are named service identities | `src/lib/db.ts`, `src/lib/server/api-keys.ts` |
 | 3.5.2 | Authenticate before access | App | Password (bcrypt) or OpenID Connect SSO; API keys by SHA-256-hashed bearer secret | `src/lib/auth.ts`, `src/lib/server/sso.ts` |
 | 3.5.3 | Multifactor authentication | Shared | TOTP two-step verification with single-use recovery codes; an organization can require it for every member. SSO sessions rely on the identity provider's MFA (customer IdP policy). API keys are single-factor service credentials: limit them to integrations and set expiry | `src/lib/server/mfa.ts`, `src/lib/server/totp.ts` |
 | 3.5.4 | Replay-resistant authentication | Shared | Each TOTP step is accepted once; SSO uses PKCE, state and nonce; sessions are bound to a server-side record. Transport protection (TLS): customer | `src/lib/server/totp.ts`, `src/lib/server/sso.ts` |
 | 3.5.5 | Prevent reuse of identifiers | Shared | Emails are unique; user ids are random UUIDs; removed members are disabled, not deleted, so their address can't be re-registered in the meantime. Identifier policy: customer | `src/lib/server/org.ts` |
-| 3.5.6 | Disable identifiers after inactivity | **Gap** | No automatic disabling of inactive accounts in Hoshmand Schedule itself. Compensate: provision with SCIM 2.0 so accounts disabled in the identity provider (for example by its inactivity policy) are disabled in Hoshmand Schedule and signed out at once, with SSO enforced; or review members periodically and remove inactive ones (removal is immediate and audited) | — |
+| 3.5.6 | Disable identifiers after inactivity | **Gap** | No automatic disabling of inactive accounts in RunF9 itself. Compensate: provision with SCIM 2.0 so accounts disabled in the identity provider (for example by its inactivity policy) are disabled in RunF9 and signed out at once, with SSO enforced; or review members periodically and remove inactive ones (removal is immediate and audited) | — |
 | 3.5.7 | Password complexity | App | Minimum 12 characters, maximum 128, common, repetitive and personal passwords blocked (NIST SP 800-63B approach: length over composition rules). If the customer's policy demands composition rules, enforce SSO | `src/lib/server/password.ts` |
 | 3.5.8 | Prohibit password reuse | **Gap** | No password history. Compensate: enforce SSO, so the IdP's password history applies | — |
 | 3.5.9 | Temporary passwords with immediate change | App | No temporary passwords exist: people join through single-use, email-bound invitation links (7-day expiry) and set their own password | `src/lib/server/org.ts` |
@@ -147,7 +147,7 @@ for all workspaces) and the organization data export (owners and admins only).
 
 | Req | Requirement (paraphrased) | Resp. | Notes |
 |---|---|---|---|
-| 3.6.1 | Incident-handling capability | Shared | The app supplies the audit log, security-alert log lines and integrity verification; Hoshmand Schedule's own process is [../operations/INCIDENT-RESPONSE.md](../operations/INCIDENT-RESPONSE.md). The customer's capability covers its instance |
+| 3.6.1 | Incident-handling capability | Shared | The app supplies the audit log, security-alert log lines and integrity verification; RunF9's own process is [../operations/INCIDENT-RESPONSE.md](../operations/INCIDENT-RESPONSE.md). The customer's capability covers its instance |
 | 3.6.2 | Track, document and report incidents | Customer | Including DFARS 252.204-7012 reporting where applicable |
 | 3.6.3 | Test incident response | Customer | — |
 
@@ -159,7 +159,7 @@ for all workspaces) and the organization data export (owners and admins only).
 | 3.7.2 | Control maintenance tools and personnel | Customer | — |
 | 3.7.3 | Sanitize equipment removed for maintenance | Customer | — |
 | 3.7.4 | Check media with diagnostic programs | Customer | — |
-| 3.7.5 | MFA for nonlocal maintenance | Customer | Hoshmand Schedule staff have no access to on-prem instances unless the customer grants it |
+| 3.7.5 | MFA for nonlocal maintenance | Customer | RunF9 staff have no access to on-prem instances unless the customer grants it |
 | 3.7.6 | Supervise maintenance personnel | Customer | — |
 
 ## 3.8 Media protection
@@ -198,7 +198,7 @@ for all workspaces) and the organization data export (owners and admins only).
 
 | Req | Requirement (paraphrased) | Resp. | Notes |
 |---|---|---|---|
-| 3.11.1 | Assess risk | Customer | Hoshmand Schedule supplies [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md), this mapping and its own [../governance/RISK-REGISTER.md](../governance/RISK-REGISTER.md) |
+| 3.11.1 | Assess risk | Customer | RunF9 supplies [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md), this mapping and its own [../governance/RISK-REGISTER.md](../governance/RISK-REGISTER.md) |
 | 3.11.2 | Scan for vulnerabilities | Shared | Vendor: `npm audit` gate, Dependabot, Semgrep, CodeQL on every change; no third-party penetration test yet (POA&M #1). Customer: scan the hosts and images (use the SBOM) |
 | 3.11.3 | Remediate vulnerabilities | Shared | Vendor targets in [VULNERABILITY-MANAGEMENT.md](VULNERABILITY-MANAGEMENT.md); the customer applies new images |
 
@@ -207,13 +207,13 @@ for all workspaces) and the organization data export (owners and admins only).
 | Req | Requirement (paraphrased) | Resp. | Notes |
 |---|---|---|---|
 | 3.12.1 | Periodically assess controls | Customer | — |
-| 3.12.2 | Plans of action | Customer | Hoshmand Schedule's own open items: [POAM.md](POAM.md) |
+| 3.12.2 | Plans of action | Customer | RunF9's own open items: [POAM.md](POAM.md) |
 | 3.12.3 | Monitor controls continuously | Customer | `/api/health`, audit-chain verification and logs support it |
 | 3.12.4 | System security plan | Shared | This mapping and the install guide are inputs to the customer's SSP; the SSP is the customer's |
 
 ## 3.13 System and communications protection
 
-| Req | Requirement (paraphrased) | Resp. | Hoshmand Schedule implementation / customer action | Evidence |
+| Req | Requirement (paraphrased) | Resp. | RunF9 implementation / customer action | Evidence |
 |---|---|---|---|---|
 | 3.13.1 | Monitor and protect communications at boundaries | Shared | No outbound calls by default; model hosts limited to the private network in air-gapped mode; the database on an internal Docker network. Boundary devices: customer | `src/lib/llm/provider.ts`, `docker-compose.yml` |
 | 3.13.2 | Secure architecture and engineering | Shared | Deterministic engine independent of AI; single enforcement points for access (`api()`, scoped reads in `db.ts`); defense-in-depth headers. Overall system architecture: customer | [SECURITY-OVERVIEW.md](SECURITY-OVERVIEW.md) |
@@ -225,8 +225,8 @@ for all workspaces) and the organization data export (owners and admins only).
 | 3.13.8 | Cryptography for CUI in transit | Shared | Database TLS is verified (certificate and host name) whenever enabled; Compose disables it only on the single-host internal network. User-facing TLS at the proxy: customer | `src/lib/db.ts` (`databaseTlsConfig`) |
 | 3.13.9 | Terminate connections at session end or inactivity | Shared | Sessions end on idle timeout; connection timeouts at the proxy: customer | `src/lib/auth.ts` |
 | 3.13.10 | Manage cryptographic keys | Customer | `JWT_SECRET`, `PLANORA_ENCRYPTION_KEY`, TLS keys; rotation effects are documented in the install guide | — |
-| 3.13.11 | FIPS-validated cryptography | **Gap** | Hoshmand Schedule uses Node.js's bundled OpenSSL (AES-256-GCM, SHA-256, HMAC) and bcrypt for passwords; it has not been validated or tested with a FIPS 140 module, and bcrypt is not a FIPS-approved algorithm. Compensate: terminate TLS on a FIPS-validated proxy and use FIPS-validated storage encryption; use SSO so passwords are held by a FIPS-validated IdP. Running Node.js against a FIPS provider is untested | `src/lib/server/crypto.ts` |
-| 3.13.12 | Collaborative computing devices | Customer | Hoshmand Schedule uses no cameras or microphones (blocked by Permissions-Policy) | `next.config.js` |
+| 3.13.11 | FIPS-validated cryptography | **Gap** | RunF9 uses Node.js's bundled OpenSSL (AES-256-GCM, SHA-256, HMAC) and bcrypt for passwords; it has not been validated or tested with a FIPS 140 module, and bcrypt is not a FIPS-approved algorithm. Compensate: terminate TLS on a FIPS-validated proxy and use FIPS-validated storage encryption; use SSO so passwords are held by a FIPS-validated IdP. Running Node.js against a FIPS provider is untested | `src/lib/server/crypto.ts` |
+| 3.13.12 | Collaborative computing devices | Customer | RunF9 uses no cameras or microphones (blocked by Permissions-Policy) | `next.config.js` |
 | 3.13.13 | Control mobile code | App | Content Security Policy allows only same-origin scripts; no plug-ins | `next.config.js` |
 | 3.13.14 | Control VoIP | Customer | Not used | — |
 | 3.13.15 | Authenticity of communications sessions | Shared | Signed session cookies bound to server-side sessions; `HttpOnly`, `Secure`, `SameSite=Lax`; Origin / Sec-Fetch-Site checks on writes. TLS: customer | `src/lib/auth.ts`, `src/lib/server/api.ts` |
@@ -238,7 +238,7 @@ for all workspaces) and the organization data export (owners and admins only).
 |---|---|---|---|
 | 3.14.1 | Identify, report and correct flaws | Shared | Vendor: dependency gate, Dependabot, SAST, CodeQL, fix SLAs. Customer: apply new images promptly |
 | 3.14.2 | Malicious code protection | **Gap** | Uploaded files are parsed by a fixed set of parsers (XER, MS Project XML, Excel/CSV, PDF), never executed, limited to 25 MB, and kept in the database; they are not scanned for malware. Compensate: endpoint protection on user devices and the host; scan exported originals before opening them in other tools |
-| 3.14.3 | Monitor security alerts and advisories | Shared | Vendor monitors dependency advisories; customer subscribes to Hoshmand Schedule release notices and base-image advisories |
+| 3.14.3 | Monitor security alerts and advisories | Shared | Vendor monitors dependency advisories; customer subscribes to RunF9 release notices and base-image advisories |
 | 3.14.4 | Update malicious code protection | Customer | — |
 | 3.14.5 | Periodic and real-time scans | Customer | — |
 | 3.14.6 | Monitor systems and traffic for attacks | Shared | Rate limits, lockouts and security-alert log lines; structured logs with request ids. Network and host monitoring: customer |

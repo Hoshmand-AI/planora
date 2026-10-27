@@ -6,8 +6,8 @@ import { availabilityFrom, bucketFrom } from '@/lib/planning/resource-service'
 import { loadPlanContext } from '../context'
 
 /**
- * Resource analysis and leveling of a plan built in Hoshmand Schedule. A plan carries resources only when they
- * were given to it (GeneratedSchedule.resources); Hoshmand Schedule's generator does not invent crews, so most
+ * Resource analysis and leveling of a plan built in RunF9. A plan carries resources only when they
+ * were given to it (GeneratedSchedule.resources); RunF9's generator does not invent crews, so most
  * plans answer state "no_resource_data".
  *   GET ?bucket=day|week|month &resource=<id> &availability={"<resourceId>": unitsPerDay}
  *   POST { mode: 'level'|'smooth', allowFinishExtension?, availability?, resource?, bucket? }
@@ -22,7 +22,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const g = plan.generated
   const net = planLevelingNetwork(g)
   const run = net.run(new Map())
-  if (!run) throw new ApiError(400, 'Hoshmand Schedule could not recalculate this plan.')
+  if (!run) throw new ApiError(400, 'RunF9 could not recalculate this plan.')
   let raw: unknown = null
   try { raw = JSON.parse(sp.get('availability') || 'null') } catch { raw = null }
   const availability = availabilityFrom(raw, g.resources ?? null)
@@ -41,7 +41,7 @@ export const POST = api<{ id: string }>({ permission: 'read' }, async (req, { pa
   const g = plan.generated
   const net = planLevelingNetwork(g)
   const result = levelResources(net, { mode: b.mode === 'smooth' ? 'smooth' : 'level', allowFinishExtension: b.allowFinishExtension === true, availability: availabilityFrom(b.availability, g.resources ?? null) })
-  if (!result.ok) throw new ApiError(400, result.error || 'Hoshmand Schedule could not level this plan.')
+  if (!result.ok) throw new ApiError(400, result.error || 'RunF9 could not level this plan.')
   const after = net.run(new Map(result.changes.map(c => [c.activityId, c.constraint!.date])))
   const resource = typeof b.resource === 'string' ? b.resource : null
   const leveled = after ? analyzeResources({ activities: loadActivitiesOf(net, after), calendars: g.calendars, defaultCalendarId: g.defaultCalendarId, dataDate: g.dataDate, data: g.resources, availability: result.availability },

@@ -299,7 +299,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const openUpload = () => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }
-  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Hoshmand Schedule' } as Record<string, string>)[t] || t
+  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in RunF9' } as Record<string, string>)[t] || t
 
   return (
     <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
@@ -483,7 +483,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
                   {uploadSummary.dataQuestions > 0 && (
                     <div className="border-l-2 border-status-attention bg-status-attention-bg text-[13px] text-warm-700 px-3 py-2 rounded-md">
-                      Hoshmand Schedule has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
+                      RunF9 has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -511,7 +511,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <input name="region" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
                     <input name="grossSqft" type="number" min={0} placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
                   </div>
-                  <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach Hoshmand Schedule how your projects really perform. Used only for your firm.</p>
+                  <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
                 </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4 grid grid-cols-2 gap-2">
@@ -529,7 +529,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <option value="classified">Classified</option>
                     </select>
                   </label>
-                  <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and Hoshmand Schedule re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
+                  <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 <div className="mb-5">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
@@ -634,7 +634,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">About</div>
-                  <div className="text-[13px] text-warm-600">Hoshmand Schedule · Version 1.0</div>
+                  <div className="text-[13px] text-warm-600">RunF9 · Version 1.0</div>
                   <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
                   <div className="flex gap-4 mt-2">
                     <Link href="/privacy" className="text-[13px] text-accent-600 hover:underline">Privacy</Link>

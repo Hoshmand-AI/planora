@@ -3,7 +3,7 @@
 // Time Impact Analysis for the selected update: delay events, a fragnet editor (new activities and
 // their ties to existing activity codes), the run, and the results — milestone impact, driving path
 // before / after, concurrency indicators and assumptions — with downloadable reports. The results are
-// a calculation; entitlement is a contractual determination Hoshmand Schedule does not make (said on the page).
+// a calculation; entitlement is a contractual determination RunF9 does not make (said on the page).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -201,7 +201,7 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
             <select className={`${input} w-full mt-0.5`} value={form.responsibility} onChange={e => setForm({ ...form, responsibility: e.target.value as Responsibility })}>
               {RESP.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <span className="block text-[11.5px] text-warm-600 mt-0.5">A label you enter. Hoshmand Schedule does not assess responsibility.</span>
+            <span className="block text-[11.5px] text-warm-600 mt-0.5">A label you enter. RunF9 does not assess responsibility.</span>
           </label>
           <label>Notice date<input type="date" className={`${input} w-full mt-0.5`} value={form.notifiedOn} onChange={e => setForm({ ...form, notifiedOn: e.target.value })} /></label>
           <label>Event start<input type="date" className={`${input} w-full mt-0.5`} value={form.eventStart} onChange={e => setForm({ ...form, eventStart: e.target.value })} /></label>
@@ -292,7 +292,7 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
             <label className="text-[12.5px] text-warm-700">Network{' '}
               <select className={input} value={basis} onChange={e => setBasis(e.target.value as 'submitted' | 'scenario')}>
                 <option value="submitted">As submitted</option>
-                <option value="scenario">With Hoshmand Schedule edits ({overview.schedule.editsApplied})</option>
+                <option value="scenario">With RunF9 edits ({overview.schedule.editsApplied})</option>
               </select>
             </label>
           )}

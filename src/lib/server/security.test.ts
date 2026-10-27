@@ -35,7 +35,7 @@ describe('two-step verification codes (RFC 4226 / RFC 6238 test vectors)', () =>
     const codes = newRecoveryCodes()
     expect(new Set(codes).size).toBe(10)
     expect(codes.every(c => /^[a-z2-7]{5}-[a-z2-7]{5}$/.test(c))).toBe(true)
-    expect(otpauthUri(secret, 'a@b.co')).toMatch(/^otpauth:\/\/totp\/Hoshmand%20Schedule:a%40b\.co\?secret=GEZ/)
+    expect(otpauthUri(secret, 'a@b.co')).toMatch(/^otpauth:\/\/totp\/RunF9:a%40b\.co\?secret=GEZ/)
   })
 })
 

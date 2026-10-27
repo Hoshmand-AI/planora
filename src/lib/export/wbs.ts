@@ -83,7 +83,7 @@ export function buildWbs(s: GeneratedSchedule, projectName: string): { root: str
   const root = projectCode(projectName)
   const order = (a: PlanActivity, b: PlanActivity) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || '') || a.code.localeCompare(b.code)
   const nodes: WbsNode[] = []
-  // Uploaded schedules keep their own WBS (P6 PROJWBS path / MSP outline), not Hoshmand Schedule's phases.
+  // Uploaded schedules keep their own WBS (P6 PROJWBS path / MSP outline), not RunF9's phases.
   if (s.activities.some(a => a.wbs)) return buildSourceWbs(s, root, order, t)
   let pi = 0
   // Generated plans: judge by the template work packages (permits and procurement are shared by every type).

@@ -25,13 +25,13 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 //   LLM_API_KEY       key for the local endpoint if it needs one
 //   PLANORA_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
 //   PLANORA_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/ai/MODEL-REGISTRY.md)
-//   PLANORA_DEPLOYMENT  commercial (default) | onprem — where this Hoshmand Schedule instance itself runs. Air-gapped implies on-prem.
+//   PLANORA_DEPLOYMENT  commercial (default) | onprem — where this RunF9 instance itself runs. Air-gapped implies on-prem.
 //
 // Governance (enforced in chat(), the single choke point for every model call, for every provider):
 //   - organizations can switch AI off entirely (nothing is sent to any model);
 //   - per-organization daily and per-user per-minute quotas cap spend and abuse;
 //   - only approved, version-pinned models are used; each is either certified or an approved
-//     alternate (Hoshmand Schedule does not promise equivalent quality on models it has not validated);
+//     alternate (RunF9 does not promise equivalent quality on models it has not validated);
 //   - content of a project marked CUI or classified is never sent to a model outside the customer's
 //     network (cloud mode, or a public LLM_BASE_URL) — see docs/security/CUI-HANDLING.md;
 //   - every call is recorded in the audit log with provider, model, served model version, SDK
@@ -43,7 +43,7 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 
 export type AiMode = 'cloud' | 'local' | 'offline'
 
-/** Where this Hoshmand Schedule instance runs. Only an on-prem / air-gapped instance may hold CUI. */
+/** Where this RunF9 instance runs. Only an on-prem / air-gapped instance may hold CUI. */
 export type Deployment = 'commercial_cloud' | 'on_prem' | 'airgapped'
 
 export function deploymentKind(env: Record<string, string | undefined> = process.env): Deployment {
@@ -52,7 +52,7 @@ export function deploymentKind(env: Record<string, string | undefined> = process
 }
 
 /** Shown wherever project data is entered on the commercial cloud service. */
-export const CUI_CLOUD_WARNING = 'This is the commercial cloud service. Do not enter or store Controlled Unclassified Information (CUI) or classified information here: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped Hoshmand Schedule deployment for CUI and classified projects.'
+export const CUI_CLOUD_WARNING = 'This is the commercial cloud service. Do not enter or store Controlled Unclassified Information (CUI) or classified information here: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped RunF9 deployment for CUI and classified projects.'
 
 /** Returned (and audited) when a model call for a CUI/classified project would leave the customer's network. */
 export const CUI_AI_REFUSAL = 'This project is marked CUI or classified, so its content is never sent to a cloud AI model. Scheduling, quality checks and reports still work without AI. Use an on-premises / air-gapped deployment with an on-prem model for AI on controlled projects.'

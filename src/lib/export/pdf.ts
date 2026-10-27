@@ -50,7 +50,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   const mk = opts.marking ?? null
   const doc = await PDFDocument.create()
   doc.setTitle(`${projectName} — Schedule`)
-  doc.setProducer('Hoshmand Schedule')
+  doc.setProducer('RunF9')
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const t = s.cpm?.times || {}
@@ -65,7 +65,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
       p.drawText(mk.banner, { x: (W - bw) / 2, y: 27, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
     }
     p.drawLine({ start: { x: M, y: 24 }, end: { x: W - M, y: 24 }, thickness: 0.5, color: LINE })
-    p.drawText(pdfSafe(`${projectName} · Data date ${fmtDate(s.projectStart)} · Printed ${printed} · Hoshmand Schedule`), { x: M, y: 12, size: 7, font, color: GREY })
+    p.drawText(pdfSafe(`${projectName} · Data date ${fmtDate(s.projectStart)} · Printed ${printed} · RunF9`), { x: M, y: 12, size: 7, font, color: GREY })
     p.drawText(`Page ${n}`, { x: W - M - 40, y: 12, size: 7, font, color: GREY })
   }
   let pageNo = 0

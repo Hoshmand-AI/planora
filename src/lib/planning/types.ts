@@ -1,4 +1,4 @@
-// Shared contract for Hoshmand Schedule's schedule-building pipeline:
+// Shared contract for RunF9's schedule-building pipeline:
 //   elicit (interview) -> ground (catalogs + firm history) -> generate -> CPM -> evaluate -> analyze/monitor
 // Everything here is plain data so it can be stored as JSON, sent to the browser, and unit tested.
 

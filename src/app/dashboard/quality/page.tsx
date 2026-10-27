@@ -165,7 +165,7 @@ export default function QualityPage() {
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
             <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
-            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in Hoshmand Schedule (with a reason) from the schedule dashboard.</p>
+            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the schedule dashboard.</p>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
@@ -176,7 +176,7 @@ export default function QualityPage() {
 
         <section aria-labelledby="data-questions-h" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="data-questions-h" className="text-[15px] font-semibold text-navy-950">Hoshmand Schedule&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
+            <h2 id="data-questions-h" className="text-[15px] font-semibold text-navy-950">RunF9&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
             <label className="text-[12px] text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
           </div>
           {shown.length === 0 && <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[13.5px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}

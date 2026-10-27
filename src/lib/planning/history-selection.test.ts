@@ -24,7 +24,7 @@ describe('firm history: which uploads count', () => {
     expect(r.included.sort()).toEqual(['other', 'u3'])
     expect(r.excluded.filter(x => x.reason === 'superseded').map(x => x.id).sort()).toEqual(['u1', 'u2', 'u4'])
   })
-  it('excludes re-imported Hoshmand Schedule exports, third-party schedules and unmarked ones', () => {
+  it('excludes re-imported RunF9 exports, third-party schedules and unmarked ones', () => {
     const r = selectHistorySchedules([c('px', { planoraExport: true }), c('tp', { uploadOrigin: 'third_party' }), c('off', { inHistory: false }), c('own', { uploadOrigin: 'own' })])
     expect(r.included).toEqual(['own'])
     expect(Object.fromEntries(r.excluded.map(x => [x.id, x.reason]))).toEqual({ px: 'planora_export', tp: 'third_party', off: 'not_included' })
@@ -61,10 +61,10 @@ describe('upload rules: firm history defaults and warnings', () => {
     expect(over).toMatchObject({ inHistory: true, historyOverride: true })
     expect(over.warnings[0]).toMatch(/included in firm history anyway/)
   })
-  it('a Hoshmand Schedule re-import is never used', () => {
+  it('a RunF9 re-import is never used', () => {
     const r = decideHistory({ ...base, planoraExport: true, requested: true, override: true })
     expect(r).toMatchObject({ inHistory: false, historyOverride: false })
-    expect(r.warnings[0]).toMatch(/Hoshmand Schedule export re-imported/)
+    expect(r.warnings[0]).toMatch(/RunF9 export re-imported/)
   })
 })
 

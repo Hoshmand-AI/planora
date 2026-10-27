@@ -12,14 +12,14 @@ import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit 
 const SCENARIO = { basis: 'scenario' as const }
 
 /**
- * Edits made in Hoshmand Schedule to an uploaded schedule (override layer; the imported file is not changed).
+ * Edits made in RunF9 to an uploaded schedule (override layer; the imported file is not changed).
  *   GET                       → { edits (active, as applied), reverted, editedActivityIds, forecastFinish (scenario), submittedForecastFinish, minFloat }
  *   POST { change | changes[], reason, source?: 'manual'|'recovery', optionId? }
  *        change: { kind: 'duration', activityId, remaining }
  *              | { kind: 'link_set', predecessorId, successorId, type: FS|SS|FF|SF, lag }
  *              | { kind: 'link_remove', predecessorId, successorId }
  *              | { kind: 'constraint', activityId, constraint: { type, date } | null }
- *        Activities by Hoshmand Schedule id or activity code. Every edit needs a reason and is audited.
+ *        Activities by RunF9 id or activity code. Every edit needs a reason and is audited.
  *   DELETE ?editId=…&reason=… → revert one edit (kept in the record as reverted).
  * Writing needs schedule.write (owner, admin, scheduler); reviewers and viewers can read only.
  */
@@ -32,7 +32,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async (req, { params, auth }) => {
   const data = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (data.schedule.sourceType === 'generated') return NextResponse.json({ error: 'This schedule was published from a Hoshmand Schedule plan; edit the plan instead (Plan → Schedule).', code: 'edit_plan_instead' }, { status: 400 })
+  if (data.schedule.sourceType === 'generated') return NextResponse.json({ error: 'This schedule was published from a RunF9 plan; edit the plan instead (Plan → Schedule).', code: 'edit_plan_instead' }, { status: 400 })
   const b = await readBody<Record<string, unknown>>(req)
   const reasonErr = reasonError(b.reason)
   if (reasonErr) return NextResponse.json({ error: reasonErr, code: 'reason_required' }, { status: 400 })
@@ -88,7 +88,7 @@ export const DELETE = api<{ id: string }>({ permission: 'schedule.write' }, asyn
 function summary(data: NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>) {
   return {
     edits: data.edits, reverted: data.revertedEdits, editedActivityIds: data.editedActivityIds,
-    basis: 'scenario' as const, scenarioName: data.editsApplied ? `With Hoshmand Schedule edits (${data.editsApplied})` : null,
+    basis: 'scenario' as const, scenarioName: data.editsApplied ? `With RunF9 edits (${data.editsApplied})` : null,
     forecastFinish: data.analysis.forecastFinish, minFloat: data.analysis.minFloat,
     // The stored headline is the schedule as submitted.
     submittedForecastFinish: data.submittedForecastFinish,

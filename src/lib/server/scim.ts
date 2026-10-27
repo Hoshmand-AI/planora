@@ -5,11 +5,11 @@
 // keys). A token acts only on its own organization: every query below is scoped by the token's
 // org_id, and a user id from another organization is simply "not found".
 //
-// Users: the SCIM User's userName is the member's email (Hoshmand Schedule's sign-in identity). New members
+// Users: the SCIM User's userName is the member's email (RunF9's sign-in identity). New members
 // get an unusable random password and sign in through SSO. Their email must be in one of the
 // organization's verified SSO domains, so a token cannot create accounts for arbitrary addresses.
 // Roles come from the User's "roles" attribute (admin, scheduler, reviewer, viewer; never owner),
-// else the SSO default role. Owners are managed in Hoshmand Schedule: SCIM cannot deactivate them or change
+// else the SSO default role. Owners are managed in RunF9: SCIM cannot deactivate them or change
 // their role or email.
 //
 // Deprovisioning (active=false, or DELETE) disables the account and revokes all of its sessions in
@@ -320,7 +320,7 @@ export async function createScimUser(orgId: string, b: Row): Promise<{ row: Row;
   let row: Row
   if (existing) {
     // Re-provisioning someone who was deleted through SCIM: same account, so their history stays linked.
-    if (existing.role === 'owner') throw new ScimError(400, 'Owners are managed in Hoshmand Schedule, not through SCIM.', 'mutability')
+    if (existing.role === 'owner') throw new ScimError(400, 'Owners are managed in RunF9, not through SCIM.', 'mutability')
     row = (await query(`UPDATE users SET name=$3, role=$4, scim_external_id=$5, disabled_at=${d.active === false ? 'NOW()' : 'NULL'}, scim_deleted_at=NULL, scim_modified_at=NOW(), failed_logins=0, locked_until=NULL,
       beta_access_at=COALESCE(beta_access_at, NOW()), beta_access_via=COALESCE(beta_access_via, 'scim')
       WHERE id=$1 AND org_id=$2 RETURNING *`, [existing.id, orgId, name, role, d.externalId ?? null])).rows[0]
@@ -342,7 +342,7 @@ export async function updateScimUser(orgId: string, id: string, d: Desired): Pro
   const role: Role = d.role === undefined ? (cur.role as Role) : d.role ?? (cur.role === 'owner' ? 'owner' : await defaultRole(orgId))
   const active = d.active ?? !cur.disabled_at
   const owner = cur.role === 'owner'
-  if (owner && (!active || role !== 'owner' || email !== curEmail)) throw new ScimError(400, 'Owners are managed in Hoshmand Schedule: SCIM cannot deactivate them or change their role or email.', 'mutability')
+  if (owner && (!active || role !== 'owner' || email !== curEmail)) throw new ScimError(400, 'Owners are managed in RunF9: SCIM cannot deactivate them or change their role or email.', 'mutability')
   if (email !== curEmail) {
     await checkEmail(orgId, email)
     const taken = await query('SELECT id FROM users WHERE LOWER(email)=LOWER($1) AND id<>$2', [email, id])
@@ -372,7 +372,7 @@ export async function updateScimUser(orgId: string, id: string, d: Desired): Pro
 
 export async function deleteScimUser(orgId: string, id: string): Promise<void> {
   const cur = await getScimUser(orgId, id)
-  if (cur.role === 'owner') throw new ScimError(400, 'Owners are managed in Hoshmand Schedule, not through SCIM.', 'mutability')
+  if (cur.role === 'owner') throw new ScimError(400, 'Owners are managed in RunF9, not through SCIM.', 'mutability')
   const sessionsRevoked = await deactivate(orgId, id, true)
   await audit({ orgId, action: 'scim.user_deleted', targetType: 'user', targetId: id, detail: { email: cur.email, sessionsRevoked, effect: 'Account disabled and signed out everywhere; project data stays with the organization.' } })
 }

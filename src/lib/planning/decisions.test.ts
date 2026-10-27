@@ -146,7 +146,7 @@ describe('uploaded files without calculated results', () => {
     expect(r.activities.find(a => a.id === 'C')!.isCritical).toBe(false)
     expect(r.activities.find(a => a.id === 'C')!.totalFloat).toBeGreaterThan(0)
     expect(r.activities.find(a => a.id === 'B')!.isCritical).toBe(true)
-    expect(r.note).toMatch(/Hoshmand Schedule scheduled/)
+    expect(r.note).toMatch(/RunF9 scheduled/)
   })
 
   it('does not claim a critical path when the file has no logic', () => {

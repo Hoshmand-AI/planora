@@ -1,4 +1,4 @@
-// The import warning that compares the file's own finish dates and float with Hoshmand Schedule's
+// The import warning that compares the file's own finish dates and float with RunF9's
 // recalculation. Only fields that actually differ by more than one day are listed. Pure, so it is
 // unit tested.
 
@@ -12,26 +12,26 @@ const dayGap = (a: string, b: string) => Math.abs(Math.round((Date.parse(a.slice
 export function describeDifference(d: RecalcDifference): string {
   const parts: string[] = []
   const date = (label: string, f: string | null | undefined, p: string | null | undefined) => {
-    if (f && p && dayGap(f, p) > 1) parts.push(`${label} file ${fmtDate(f)} / Hoshmand Schedule ${fmtDate(p)}`)
+    if (f && p && dayGap(f, p) > 1) parts.push(`${label} file ${fmtDate(f)} / RunF9 ${fmtDate(p)}`)
   }
   date('start', d.fileStart, d.planoraStart)
   date('finish', d.fileFinish, d.planoraFinish)
   date('late start', d.fileLateStart, d.planoraLateStart)
   date('late finish', d.fileLateFinish, d.planoraLateFinish)
-  if (d.fileFloat != null && d.planoraFloat != null && Math.abs(d.fileFloat - d.planoraFloat) > 1) parts.push(`float file ${d.fileFloat}d / Hoshmand Schedule ${d.planoraFloat}d`)
+  if (d.fileFloat != null && d.planoraFloat != null && Math.abs(d.fileFloat - d.planoraFloat) > 1) parts.push(`float file ${d.fileFloat}d / RunF9 ${d.planoraFloat}d`)
   return parts.length ? `${d.code}: ${parts.join(', ')}` : ''
 }
 
-/** Notes about how Hoshmand Schedule calculated the dates (src/lib/planning/complete-schedule.ts). */
-const CALC_NOTE = /^(Hoshmand Schedule recalculated all|The file did not include calculated dates|This file has no activity relationships|Hoshmand Schedule could not recalculate)/
+/** Notes about how RunF9 calculated the dates (src/lib/planning/complete-schedule.ts). */
+const CALC_NOTE = /^(RunF9 recalculated all|The file did not include calculated dates|This file has no activity relationships|RunF9 could not recalculate)/
 /** Notes that describe the file's own dates, only true when read from the uploaded file itself. */
-const FILE_CALC_NOTE = /^(Hoshmand Schedule recalculated all|The file did not include calculated dates)/
+const FILE_CALC_NOTE = /^(RunF9 recalculated all|The file did not include calculated dates)/
 const DIFF_NOTE = /open activities have (a finish (date )?or total float|dates or total float) in the file that differs?/
 
 /**
  * The import notes shown for a stored schedule: the notes recorded at upload, plus the calculation
- * note from this read only when upload recorded none (and, once Hoshmand Schedule has analyzed the file, never
- * one that would describe Hoshmand Schedule's stored dates as "the file's"). The file-vs-Planora comparison is
+ * note from this read only when upload recorded none (and, once RunF9 has analyzed the file, never
+ * one that would describe RunF9's stored dates as "the file's"). The file-vs-Planora comparison is
  * rebuilt from the stored samples so older uploads lose the misleading wording. No duplicates.
  */
 export function importNotes(stored: string[], loadNote: string | null, analyzedBefore: boolean, recalc: Parameters<typeof recalcWarning>[0]): string[] {
@@ -47,5 +47,5 @@ export function importNotes(stored: string[], loadNote: string | null, analyzedB
 export function recalcWarning(recalc: { compared: number; differing: number; samples: RecalcDifference[] } | null | undefined): string | null {
   if (!recalc || recalc.differing <= 0) return null
   const examples = recalc.samples.map(describeDifference).filter(Boolean).slice(0, 3)
-  return `${recalc.differing} of ${recalc.compared} open activities have dates or total float in the file that differ from Hoshmand Schedule's recalculation by more than 1 day${examples.length ? ` (e.g. ${examples.join('; ')})` : ''}; the QA/QC report lists every one.`
+  return `${recalc.differing} of ${recalc.compared} open activities have dates or total float in the file that differ from RunF9's recalculation by more than 1 day${examples.length ? ` (e.g. ${examples.join('; ')})` : ''}; the QA/QC report lists every one.`
 }

@@ -157,7 +157,7 @@ describe('recalculation differences are not capped (finding 3)', () => {
   const done = completeSchedule({ activities: acts, relationships: rels, calendars: [cal], defaultCalendarId: cal.id, projectStart: '2026-03-02', projectFinish: '2026-07-07', dataDate: '2026-03-02' })
   const analysis = analyzeSchedule({ activities: done.activities, links: rels.map(r => ({ from: r.predecessorId, to: r.successorId })), cpm: done.cpm, reportedFinish: '2026-07-07', mustFinishBy: null, fileValues: done.fileValues, dataDate: '2026-03-02' })
 
-  it('keeps every differing activity with file vs Hoshmand Schedule ES/EF/LS/LF/TF', () => {
+  it('keeps every differing activity with file vs RunF9 ES/EF/LS/LF/TF', () => {
     expect(analysis.recalc!.differing).toBe(15)
     expect(analysis.recalc!.samples).toHaveLength(15)
     expect(analysis.recalc!.samples[0]).toMatchObject({ code: 'A100', fileStart: '2026-06-01', planoraStart: '2026-03-02', fileFinish: '2026-06-05', fileLateStart: '2026-07-01', fileLateFinish: '2026-07-07', fileFloat: 20 })
@@ -169,7 +169,7 @@ describe('recalculation differences are not capped (finding 3)', () => {
     const rows = md.split('\n').filter(l => /^\| A1\d\d /.test(l))
     expect(rows).toHaveLength(15)
     expect(md).toContain('File ES')
-    expect(md).toContain('Hoshmand Schedule LF')
+    expect(md).toContain('RunF9 LF')
     expect(recalcWarning(analysis.recalc)).toMatch(/^15 of 15 open activities have dates or total float/)
   })
 
@@ -187,7 +187,7 @@ describe('DCMA #9 Invalid dates on the contractor file\'s dates (finding 5)', ()
     links: activities.slice(1).map((a, i) => ({ from: activities[i].id, to: a.id, type: 'FS' as const, lag: 0 })), ...extra,
   })
   const nine = (s: AnalyzableSchedule) => runDcma(s).checks.find(c => c.id === 9)!
-  // Hoshmand Schedule's stored (recalculated) dates are all valid.
+  // RunF9's stored (recalculated) dates are all valid.
   const valid = () => [
     t('A1', { status: 'complete', actualStart: '2026-03-02', actualFinish: '2026-03-06', earlyStart: '2026-03-02', earlyFinish: '2026-03-06' }),
     t('A2', { status: 'in_progress', actualStart: '2026-03-09', earlyStart: '2026-03-09', earlyFinish: '2026-03-18', remaining: 3 }),
@@ -222,7 +222,7 @@ describe('DCMA #9 Invalid dates on the contractor file\'s dates (finding 5)', ()
     const done = completeSchedule({ activities: [a, b], relationships: rels, calendars: [cal], defaultCalendarId: cal.id, projectStart: '2026-03-02', projectFinish: '2026-03-20', dataDate: '2026-03-16' })
     const an = analyzeSchedule({ activities: done.activities, links: [{ from: a.id, to: b.id }], cpm: done.cpm, reportedFinish: null, mustFinishBy: null, fileValues: done.fileValues, dataDate: '2026-03-16' })
     expect(an.recalc!.fileForecastsBeforeDataDate).toEqual([{ id: a.id, code: 'B1', earlyStart: '2026-03-09', earlyFinish: '2026-03-13', notStarted: true }])
-    // Hoshmand Schedule's own dates are from the data date, yet #9 still fails on the file's.
+    // RunF9's own dates are from the data date, yet #9 still fails on the file's.
     const s = sched(done.activities.map(x => ({ id: x.id, code: x.activityId, name: x.name, type: 'task' as const, duration: x.duration, status: x.status, calendarId: cal.id, earlyStart: x.earlyStart, earlyFinish: x.earlyFinish })), {
       links: [{ from: a.id, to: b.id, type: 'FS', lag: 0 }],
       fileDates: Object.fromEntries(an.recalc!.fileForecastsBeforeDataDate!.map(f => [f.id, f])),

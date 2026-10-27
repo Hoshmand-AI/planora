@@ -1,6 +1,6 @@
 # Audit remediation report
 
-Response to *Hoshmand Schedule Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k` (round 1) and extended the same day (round 2: portfolio, sample project, priced recovery, API keys and webhooks, email verification, security alerting, configurable quality rules, round-trip interoperability corpus).
+Response to *RunF9 Independent QA/QC, Startup, Enterprise & Risk Audit* (120 aspects, 10/03/2026), release under review `d75f048`. Remediation was completed 10/04/2026 on branch `claude/eloquent-tesla-6gzy4k` (round 1) and extended the same day (round 2: portfolio, sample project, priced recovery, API keys and webhooks, email verification, security alerting, configurable quality rules, round-trip interoperability corpus).
 
 **Legend**
 - ✅ **Fixed:** implemented in code and covered by automated tests.
@@ -44,7 +44,7 @@ Scores are the auditor's to revise. This report lists what changed and where the
 | 5 | Explainability | ✅ | Monte Carlo drivers show the range basis for each activity; audit records show actor and reason |
 | 6 | Construction specialization | — | Unchanged strength |
 | 7 | Competitive defensibility | 👤 | Firm-history learning and backtest exist; the data moat needs customers (pilots) |
-| 8 | Brand narrative | ✅ | Legacy "Hoshmand Schedule Intelligence / HSI" naming removed from the privacy and terms pages; pricing page aligned with reality |
+| 8 | Brand narrative | ✅ | Legacy "RunF9 Intelligence / HSI" naming removed from the privacy and terms pages; pricing page aligned with reality |
 
 ## 4. Customer value & workflow
 

@@ -2,7 +2,7 @@
 
 _Last updated 10/06/2026._
 
-Hoshmand Schedule's commercial cloud service (Vercel + Neon, optional cloud AI via Anthropic or OpenAI) is **not** authorized for Controlled Unclassified Information (CUI) or classified information. CUI belongs in an on-premises or air-gapped Hoshmand Schedule deployment inside the customer's assessed boundary (see the NIST SP 800-171 section of [CONTROL-MATRIX.md](CONTROL-MATRIX.md), the requirement-by-requirement [NIST-800-171-MAPPING.md](NIST-800-171-MAPPING.md), and the install guide [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)).
+RunF9's commercial cloud service (Vercel + Neon, optional cloud AI via Anthropic or OpenAI) is **not** authorized for Controlled Unclassified Information (CUI) or classified information. CUI belongs in an on-premises or air-gapped RunF9 deployment inside the customer's assessed boundary (see the NIST SP 800-171 section of [CONTROL-MATRIX.md](CONTROL-MATRIX.md), the requirement-by-requirement [NIST-800-171-MAPPING.md](NIST-800-171-MAPPING.md), and the install guide [../operations/ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md)).
 
 ## How a deployment is identified
 

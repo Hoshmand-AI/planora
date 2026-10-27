@@ -1,4 +1,4 @@
-// Which uploads may calibrate firm history (as-built, one per project, no Hoshmand Schedule re-imports, no
+// Which uploads may calibrate firm history (as-built, one per project, no RunF9 re-imports, no
 // third-party schedules). Dependency-free so db.getOrgHistory can apply it. Pure, unit tested.
 
 /* ─── Which uploads may calibrate firm history ───────── */
@@ -19,7 +19,7 @@ export interface HistoryCandidate {
   inHistory: boolean
   /** Explicitly included although not every activity has an actual finish */
   historyOverride: boolean
-  /** The file is Hoshmand Schedule's own export re-imported, not the project's record */
+  /** The file is RunF9's own export re-imported, not the project's record */
   planoraExport: boolean
   uploadOrigin?: UploadOrigin | null
   /** Activities other than level of effort and WBS summaries */
@@ -42,7 +42,7 @@ export const isAsBuilt = (c: { workCount: number; openCount: number }) => c.work
 /**
  * Pick the uploads that calibrate firm history:
  *  - only as-built schedules, unless the scheduler explicitly overrode that for an upload;
- *  - never a re-imported Hoshmand Schedule export (it would teach Hoshmand Schedule its own durations) or a third-party schedule;
+ *  - never a re-imported RunF9 export (it would teach RunF9 its own durations) or a third-party schedule;
  *  - one project counts once across its update series: the latest as-built upload by data date
  *    (then upload time) stands for the project; earlier updates are superseded;
  *  - nothing when the organization turned firm history off for its uploads.
@@ -56,7 +56,7 @@ export function selectHistorySchedules(cands: HistoryCandidate[], opts: { orgOpt
   for (const c of cands) {
     if (!c.inHistory) excluded.push({ id: c.id, reason: 'not_included', detail: 'Not marked for firm history.' })
     else if (c.uploadOrigin === 'third_party') excluded.push({ id: c.id, reason: 'third_party', detail: 'A third-party schedule, not one of your own projects.' })
-    else if (c.planoraExport) excluded.push({ id: c.id, reason: 'planora_export', detail: 'A re-imported Hoshmand Schedule export: its durations are Hoshmand Schedule\'s own, not the project\'s record.' })
+    else if (c.planoraExport) excluded.push({ id: c.id, reason: 'planora_export', detail: 'A re-imported RunF9 export: its durations are RunF9\'s own, not the project\'s record.' })
     else if (c.workCount === 0) excluded.push({ id: c.id, reason: 'empty', detail: 'No activities to learn from.' })
     else if (!isAsBuilt(c) && !c.historyOverride) excluded.push({ id: c.id, reason: 'not_as_built', detail: `Not as-built: ${c.openCount} of ${c.workCount} activities have no actual finish.` })
     else eligible.push(c)

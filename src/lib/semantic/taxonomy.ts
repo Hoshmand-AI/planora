@@ -1,5 +1,5 @@
 // Semantic normalization across firms: maps heterogeneous activity names and calendar labels
-// (as seen in P6 / MS Project exports) onto Hoshmand Schedule's canonical categories, phases and work weeks.
+// (as seen in P6 / MS Project exports) onto RunF9's canonical categories, phases and work weeks.
 
 import type { CanonicalCategory, Classified, Phase, Weekday } from '@/lib/planning/types'
 

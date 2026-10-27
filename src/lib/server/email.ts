@@ -2,7 +2,7 @@
 //   RESEND_API_KEY      → Resend (https://resend.com)
 //   POSTMARK_TOKEN      → Postmark (https://postmarkapp.com)
 //   PLANORA_EMAIL_OUTBOX=<dir>  → writes each message as JSON to a folder (tests/CI only)
-// EMAIL_FROM sets the sender (default "Hoshmand Schedule <no-reply@hoshmand.ai>"). With no provider, nothing is
+// EMAIL_FROM sets the sender (default "RunF9 <no-reply@hoshmand.ai>"). With no provider, nothing is
 // sent and the app keeps working: invitation links are shown to the admin and email verification
 // is reported as unavailable instead of blocking anyone. Message bodies are never logged.
 
@@ -20,7 +20,7 @@ export function emailProvider(): 'resend' | 'postmark' | 'outbox' | null {
   return null
 }
 export const emailConfigured = () => emailProvider() !== null
-const FROM = () => process.env.EMAIL_FROM || 'Hoshmand Schedule <no-reply@hoshmand.ai>'
+const FROM = () => process.env.EMAIL_FROM || 'RunF9 <no-reply@hoshmand.ai>'
 
 export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: string | null }> {
   const provider = emailProvider()

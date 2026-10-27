@@ -1,7 +1,7 @@
 // Resources and resource assignments of a schedule, as the source file gives them (P6 RSRC /
 // RSRCRATE / TASKRSRC, MS Project Resources / Assignments, spreadsheet resource columns) or as a plan
 // carries them. Plain data: stored as JSON, sent to the browser and written back out by the exporters.
-// Hoshmand Schedule never invents resources: a schedule without them has `ResourceData` null / empty.
+// RunF9 never invents resources: a schedule without them has `ResourceData` null / empty.
 
 /** P6 RT_Labor / RT_Equip / RT_Mat; MS Project Work (labor) / Material. */
 export type ResourceKind = 'labor' | 'nonlabor' | 'material'
@@ -25,7 +25,7 @@ export interface ScheduleResource {
 }
 
 export interface ResourceAssignment {
-  /** Activity id in the schedule this data belongs to (Hoshmand Schedule activity id) */
+  /** Activity id in the schedule this data belongs to (RunF9 activity id) */
   activityId: string
   /** Source task key (P6 task_id, MS Project task UID, spreadsheet activity id): re-binds to stored activities */
   sourceKey?: string | null

@@ -44,7 +44,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 
   if (scheduleId) {
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
-    // As submitted by default; ?basis=scenario shows the what-if scenario with the Hoshmand Schedule edits.
+    // As submitted by default; ?basis=scenario shows the what-if scenario with the RunF9 edits.
     const data = await loadScheduleData(scheduleId, ctx.orgId, { basis: basisFrom(req.nextUrl.searchParams) })
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds, basis, editsApplied } = data
@@ -102,7 +102,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         // False when no open activity has a forecast start (an undated file without logic)
         hasForecastDates: activities.some(a => a.status !== 'complete' && !!(a.earlyStart || a.actualStart)),
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
-        // Edits made in Hoshmand Schedule (override layer on the uploaded file)
+        // Edits made in RunF9 (override layer on the uploaded file)
         editedActivityIds,
         editsCount: editsApplied,
         basis,
@@ -182,7 +182,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // missed, e.g. a P6 Excel TASKPRED sheet): import it again instead of pointing at the stale upload.
     const readsDifferently = !!prior && (prior.relationshipCount !== parsed.relationships.length || prior.activityCount !== parsed.activities.length)
     const existing = readsDifferently ? undefined : prior
-    if (readsDifferently && prior) parsed.warnings.unshift(`This file is identical to ${prior.version} uploaded ${fmtDay(prior.uploadedAt)}, but Hoshmand Schedule now reads ${parsed.activities.length} activities and ${parsed.relationships.length} relationships from it (${prior.activityCount} and ${prior.relationshipCount} then), so it was imported again. Delete the earlier upload if it is no longer needed.`)
+    if (readsDifferently && prior) parsed.warnings.unshift(`This file is identical to ${prior.version} uploaded ${fmtDay(prior.uploadedAt)}, but RunF9 now reads ${parsed.activities.length} activities and ${parsed.relationships.length} relationships from it (${prior.activityCount} and ${prior.relationshipCount} then), so it was imported again. Delete the earlier upload if it is no longer needed.`)
     if (existing) {
       const warning = `This file is identical to ${existing.version} uploaded ${fmtDay(existing.uploadedAt)} (same SHA-256); no new update was created.`
       await audit({ action: 'schedule.upload_duplicate', targetType: 'schedule', targetId: existing.id, detail: { name: existing.name, version: existing.version, fileName: file.name, sha256 } })
@@ -224,7 +224,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const { mode: progressMode, warning: modeWarning } = resolveProgressMode(chosenMode, parsed.progressMode ?? null)
     if (modeWarning) warnings.push(modeWarning)
 
-    // Baseline facts judged on the file's own dates, before Hoshmand Schedule recalculates them: the P6 project
+    // Baseline facts judged on the file's own dates, before RunF9 recalculates them: the P6 project
     // baseline exported with the file, and whether its target dates are a baseline or just the planned
     // dates of not-started work (src/lib/analysis/baseline.ts).
     const baselineMeta: BaselineMeta = { embedded: parsed.embeddedBaseline ?? null, fileTargets: assessFileTargets(parsed.activities) }
@@ -257,11 +257,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const recalcNote = recalcWarning(analysis.recalc)
     if (recalcNote) warnings.unshift(recalcNote)
     if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
-      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Hoshmand Schedule's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Hoshmand Schedule reports its own forecast.`)
+      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; RunF9's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. RunF9 reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
     const percentComplete = schedulePercentComplete(parsed.activities)
-    // Firm history: own as-built projects by default; never a Hoshmand Schedule re-import or a third-party schedule.
+    // Firm history: own as-built projects by default; never a RunF9 re-import or a third-party schedule.
     const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
     const history = decideHistory({
       requested: inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : null, override: historyOverrideInput,

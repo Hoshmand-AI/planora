@@ -21,7 +21,7 @@ function reportMethod(llm: { mode: AiMode; error?: string } | null): string {
   if (!llm) return 'Select a report type to generate a report'
   if (llm.mode === 'cloud') return 'Select a report type to generate a narrative written by the cloud AI model from the computed schedule facts'
   if (llm.mode === 'local') return 'Select a report type to generate a narrative written by your on-prem AI model from the computed schedule facts'
-  return `AI is offline${llm.error ? ` (${llm.error.replace(/\.$/, '')})` : ''}, so reports are built by Hoshmand Schedule's rules directly from the schedule data, with no AI model. Select a report type`
+  return `AI is offline${llm.error ? ` (${llm.error.replace(/\.$/, '')})` : ''}, so reports are built by RunF9's rules directly from the schedule data, with no AI model. Select a report type`
 }
 
 export default function ReportsPage() {
