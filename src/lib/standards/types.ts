@@ -15,15 +15,15 @@
 
 import type { AnalyzableSchedule, CpmResult } from '@/lib/planning/types'
 
-export const FRAMEWORKS = ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'CUSTOMER'] as const
+export const FRAMEWORKS = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'CUSTOMER'] as const
 export type Framework = typeof FRAMEWORKS[number]
 /** Frameworks a user can run today (CUSTOMER packs are reserved for contract-specific rules). */
-export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
+export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
 export const isFramework = (v: unknown): v is Framework => typeof v === 'string' && (FRAMEWORKS as readonly string[]).includes(v)
 export const isRunnableFramework = (v: unknown): v is Framework => typeof v === 'string' && (RUNNABLE_FRAMEWORKS as readonly string[]).includes(v)
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
-  PLANORA_COMPOSITE: 'RunF9 Composite',
+  RUNF9_COMPOSITE: 'RunF9 Composite',
   GAO_SCHEDULE_GUIDE: 'GAO Schedule Assessment Guide',
   DCMA_14: 'DCMA 14-point assessment',
   CUSTOMER: 'Customer contract requirements',
@@ -51,7 +51,7 @@ export type RuleSeverity = 'high' | 'medium' | 'low'
 export type RuleResultStatus = 'pass' | 'fail' | 'warning' | 'not_assessable'
 
 /** Where a threshold value came from. */
-export type ThresholdSource = 'published' | 'planora_default' | 'org_configured'
+export type ThresholdSource = 'published' | 'runf9_default' | 'org_configured'
 
 /**
  * A threshold on a named metric. `metricKey` is shared across packs when two packs measure the same
@@ -91,9 +91,9 @@ export interface RuleMeta {
   applicability: RuleApplicability
   /** Name of the deterministic calculation that produces the result */
   calculation: string
-  /** Short, Planora-written title */
+  /** Short, RunF9-written title */
   title: string
-  /** Short, Planora-written statement of what the rule looks for */
+  /** Short, RunF9-written statement of what the rule looks for */
   message: string
   /** Citation only (document, edition, section) — never quoted standard text */
   sourceReference: string

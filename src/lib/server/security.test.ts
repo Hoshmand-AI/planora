@@ -105,14 +105,14 @@ describe('sign-in rate limits', () => {
 })
 
 describe('cross-site request forgery defence', () => {
-  const req = (method: string, headers: Record<string, string>) => new Request('https://app.planora.test/api/plans', { method, headers })
+  const req = (method: string, headers: Record<string, string>) => new Request('https://app.runf9.test/api/plans', { method, headers })
   it('blocks writes from other sites and allows same-origin and non-browser clients', () => {
-    expect(crossSiteWrite(req('POST', { origin: 'https://evil.test', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { 'sec-fetch-site': 'cross-site', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { origin: 'null', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { origin: 'https://app.planora.test', host: 'app.planora.test' }))).toBe(false)
-    expect(crossSiteWrite(req('POST', { host: 'app.planora.test' }))).toBe(false)
-    expect(crossSiteWrite(req('GET', { origin: 'https://evil.test', host: 'app.planora.test' }))).toBe(false)
+    expect(crossSiteWrite(req('POST', { origin: 'https://evil.test', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { 'sec-fetch-site': 'cross-site', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { origin: 'null', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { origin: 'https://app.runf9.test', host: 'app.runf9.test' }))).toBe(false)
+    expect(crossSiteWrite(req('POST', { host: 'app.runf9.test' }))).toBe(false)
+    expect(crossSiteWrite(req('GET', { origin: 'https://evil.test', host: 'app.runf9.test' }))).toBe(false)
   })
 })
 
@@ -190,7 +190,7 @@ describe('withheld answers never reach a model', () => {
 
 describe('webhooks and API keys', () => {
   it('refuses private, loopback, link-local and metadata destinations', async () => {
-    delete process.env.PLANORA_ALLOW_INSECURE_WEBHOOKS // a test-only escape hatch must not leak into this check
+    delete process.env.RUNF9_ALLOW_INSECURE_WEBHOOKS // a test-only escape hatch must not leak into this check
     const { isPrivateAddress, urlProblem } = await import('./webhooks')
     for (const ip of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.5.4', '192.168.1.1', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '224.0.0.1'])
       expect(isPrivateAddress(ip), ip).toBe(true)

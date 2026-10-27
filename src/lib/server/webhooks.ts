@@ -8,7 +8,7 @@
 // networks are refused (server-side request forgery). Redirects are not followed. After 20
 // consecutive failures the endpoint is disabled and shown as such to admins.
 //
-// The same delivery path sends security alerts to PLANORA_ALERT_WEBHOOK_URL (operator-level, e.g. a
+// The same delivery path sends security alerts to RUNF9_ALERT_WEBHOOK_URL (operator-level, e.g. a
 // Slack or Teams incoming webhook) for events such as account lockouts and audit-chain failures.
 
 import { createHmac, randomUUID } from 'crypto'
@@ -54,8 +54,8 @@ const rowToHook = (r: Record<string, unknown>): Webhook => ({
 
 /* ─── Destination safety ─────────────────────────────── */
 
-/** Test environments only (CI points webhooks at a local receiver); like PLANORA_ALLOW_INSECURE_OIDC. */
-const allowInsecure = () => process.env.PLANORA_ALLOW_INSECURE_WEBHOOKS === '1'
+/** Test environments only (CI points webhooks at a local receiver); like RUNF9_ALLOW_INSECURE_OIDC. */
+const allowInsecure = () => process.env.RUNF9_ALLOW_INSECURE_WEBHOOKS === '1'
 
 /** True for addresses a webhook must never reach: private, loopback, link-local, CGNAT, multicast, metadata. */
 export function isPrivateAddress(ip: string): boolean {
@@ -156,7 +156,7 @@ async function dispatchNow(orgId: string, events: OutboundEvent[]) {
       for (const e of wanted) if (h.events.includes(e.action as WebhookEvent)) await deliverToWebhook(h, orgId, e)
     }
   }
-  const alertUrl = process.env.PLANORA_ALERT_WEBHOOK_URL
+  const alertUrl = process.env.RUNF9_ALERT_WEBHOOK_URL
   for (const e of events.filter(x => SECURITY_ALERT_EVENTS.has(x.action))) {
     if (!alertUrl) { log('warn', 'security alert', { action: e.action, orgId, targetType: e.targetType, targetId: e.targetId }); continue }
     // Slack/Teams-compatible "text" plus structured fields; no secrets or content.

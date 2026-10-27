@@ -44,27 +44,28 @@ export function normalizeSso(raw: unknown): SsoConfig {
   }
 }
 
-export const TXT_PREFIX = 'planora-domain-verification='
-export const txtHost = (domain: string) => `_planora-challenge.${domain}`
+export const TXT_PREFIX = 'runf9-domain-verification='
+export const txtHost = (domain: string) => `_runf9-challenge.${domain}`
+// Records created before the RunF9 rename keep verifying
+const LEGACY_TXT_PREFIX = 'planora-domain-verification='
+const legacyTxtHost = (domain: string) => `_planora-challenge.${domain}`
 
-/** Domain ownership: _planora-challenge.<domain> must have a TXT record planora-domain-verification=<token>. */
+/** Domain ownership: _runf9-challenge.<domain> must have a TXT record runf9-domain-verification=<token>. */
 export async function verifyDomain(domain: string, token: string): Promise<boolean> {
   if (insecureAllowed() && /\.(example|test|invalid|localhost)$/.test(domain)) return true
-  try {
-    const records = await resolveTxt(txtHost(domain))
-    return records.some(parts => parts.join('') === `${TXT_PREFIX}${token}`)
-  } catch {
-    return false
+  const has = async (host: string, value: string) => {
+    try { return (await resolveTxt(host)).some(parts => parts.join('') === value) } catch { return false }
   }
+  return await has(txtHost(domain), `${TXT_PREFIX}${token}`) || await has(legacyTxtHost(domain), `${LEGACY_TXT_PREFIX}${token}`)
 }
 
 /** What admins see: everything except the secret. */
 export const publicSso = (c: SsoConfig) => ({
   enabled: c.enabled, issuer: c.issuer, clientId: c.clientId, hasSecret: !!c.clientSecretEnc, domains: c.domains, defaultRole: c.defaultRole, enforce: c.enforce,
-  verification: c.verificationToken ? { host: '_planora-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
+  verification: c.verificationToken ? { host: '_runf9-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
 })
 
-export const insecureAllowed = () => /^(1|true)$/i.test(process.env.PLANORA_ALLOW_INSECURE_OIDC || '')
+export const insecureAllowed = () => /^(1|true)$/i.test(process.env.RUNF9_ALLOW_INSECURE_OIDC || '')
 
 export function validateIssuer(issuer: string): void {
   let u: URL
@@ -144,7 +145,7 @@ export async function startSso(orgId: string, config: SsoConfig, email: string, 
 function cookieSecret() {
   const s = process.env.JWT_SECRET
   if (!s && process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be set in production')
-  return `sso:${s || 'planora-dev-secret-change-in-production-2026'}`
+  return `sso:${s || 'runf9-dev-secret-change-in-production-2026'}`
 }
 
 export interface SsoIdentity { orgId: string; email: string; name: string; subject: string; config: SsoConfig }

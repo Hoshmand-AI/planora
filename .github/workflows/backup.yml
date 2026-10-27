@@ -64,6 +64,6 @@ jobs:
       - if: env.HAS_SECRETS == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: planora-backup-${{ github.run_id }}
+          name: runf9-backup-${{ github.run_id }}
           path: backups/
           retention-days: 35

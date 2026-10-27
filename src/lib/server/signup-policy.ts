@@ -1,6 +1,6 @@
 // Sign-up and sign-in policy (private beta).
 //
-// PLANORA_SIGNUP selects the mode:
+// RUNF9_SIGNUP selects the mode:
 //   • invite_only (the DEFAULT, also any value other than "open"): new accounts come only from an
 //     organization invitation, a beta invitation for a new firm (created by a platform operator),
 //     single sign-on / SCIM provisioning that an organization admin configured, a platform operator's
@@ -9,8 +9,8 @@
 //     operators always pass.
 //   • open: anyone may create an organization, and the beta sign-in gate is off.
 //
-// PLANORA_PLATFORM_ADMINS lists the platform operators' emails (comma-separated, case-insensitive).
-// PLANORA_ACCESS_REQUEST_EMAIL is where "Request access" links point (hidden when unset).
+// RUNF9_PLATFORM_ADMINS lists the platform operators' emails (comma-separated, case-insensitive).
+// RUNF9_ACCESS_REQUEST_EMAIL is where "Request access" links point (hidden when unset).
 //
 // Pure functions only (no database), so the policy is unit-tested in signup-policy.test.ts.
 
@@ -18,9 +18,9 @@ type Env = Record<string, string | undefined>
 
 export type SignupMode = 'open' | 'invite_only'
 
-/** Invite-only unless PLANORA_SIGNUP is exactly "open" (fails closed on typos). */
+/** Invite-only unless RUNF9_SIGNUP is exactly "open" (fails closed on typos). */
 export function signupMode(env: Env = process.env): SignupMode {
-  return /^open$/i.test((env.PLANORA_SIGNUP || '').trim()) ? 'open' : 'invite_only'
+  return /^open$/i.test((env.RUNF9_SIGNUP || '').trim()) ? 'open' : 'invite_only'
 }
 
 /** Whether a sign-up WITHOUT an invitation may create a new organization. */
@@ -30,18 +30,18 @@ export function selfSignupAllowed(mode: SignupMode, existingOrganizations: numbe
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
-/** Platform operators (PLANORA_PLATFORM_ADMINS): lower-cased, de-duplicated, malformed entries dropped. */
+/** Platform operators (RUNF9_PLATFORM_ADMINS): lower-cased, de-duplicated, malformed entries dropped. */
 export function platformAdmins(env: Env = process.env): Set<string> {
-  return new Set((env.PLANORA_PLATFORM_ADMINS || '').split(/[,;\s]+/).map(e => e.trim().toLowerCase()).filter(e => EMAIL_RE.test(e)))
+  return new Set((env.RUNF9_PLATFORM_ADMINS || '').split(/[,;\s]+/).map(e => e.trim().toLowerCase()).filter(e => EMAIL_RE.test(e)))
 }
 
 export function isPlatformAdmin(email: string | null | undefined, env: Env = process.env): boolean {
   return !!email && platformAdmins(env).has(email.trim().toLowerCase())
 }
 
-/** Address for "Request access" (PLANORA_ACCESS_REQUEST_EMAIL), or null when unset or malformed. */
+/** Address for "Request access" (RUNF9_ACCESS_REQUEST_EMAIL), or null when unset or malformed. */
 export function accessRequestEmail(env: Env = process.env): string | null {
-  const v = (env.PLANORA_ACCESS_REQUEST_EMAIL || '').trim()
+  const v = (env.RUNF9_ACCESS_REQUEST_EMAIL || '').trim()
   return EMAIL_RE.test(v) ? v : null
 }
 
@@ -55,7 +55,7 @@ export interface BetaState { email: string; betaAccessAt: string | null; betaRev
 export const hasBetaAccess = (u: Pick<BetaState, 'betaAccessAt' | 'betaRevokedAt'>) => !!u.betaAccessAt && !u.betaRevokedAt
 
 /** The sign-in gate: open mode lets everyone in; invite-only needs beta access (platform operators always pass). */
-export function mayUsePlanora(u: BetaState, env: Env = process.env): boolean {
+export function mayUseRunF9(u: BetaState, env: Env = process.env): boolean {
   return signupMode(env) === 'open' || isPlatformAdmin(u.email, env) || hasBetaAccess(u)
 }
 

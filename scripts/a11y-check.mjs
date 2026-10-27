@@ -5,17 +5,17 @@
 //   BASE_URL=http://localhost:3200 node scripts/a11y-check.mjs
 // Fails on any "serious" or "critical" violation. SCREENSHOTS=dir also saves a screenshot per page.
 // With BETA_BASE_URL (a server in the default invite-only mode) and BETA_ADMIN_EMAIL (one of its
-// PLANORA_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
+// RUNF9_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
-// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
 // as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
 if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
-  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
   process.exit(1)
 }
 const shots = process.env.SCREENSHOTS
@@ -106,8 +106,8 @@ if (process.env.BETA_BASE_URL) {
   const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'RunF9 Operations' }, headers: { origin: betaOrigin } })
   if (res.status() === 409) await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signin', email: adminEmail, password: pw }, headers: { origin: betaOrigin } })
   const me = await (await admin.request.get(`${betaBase}/api/auth`)).json()
-  if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.PLANORA_EMAIL_OUTBOX) {
-    const dir = process.env.PLANORA_EMAIL_OUTBOX
+  if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.RUNF9_EMAIL_OUTBOX) {
+    const dir = process.env.RUNF9_EMAIL_OUTBOX
     for (const f of fs.readdirSync(dir).sort().reverse()) {
       const m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
       const link = m.to === adminEmail && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)

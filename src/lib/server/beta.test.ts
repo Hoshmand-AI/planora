@@ -120,7 +120,7 @@ vi.mock('./org', () => ({
 vi.mock('./email-verification', () => ({ markEmailVerified: async () => {}, sendVerificationEmail: async () => false, requireVerifiedEmail: () => {} }))
 vi.mock('./email', () => ({
   emailConfigured: () => false,
-  appOrigin: () => 'http://planora.test',
+  appOrigin: () => 'http://runf9.test',
   sendEmail: async (m: { to: string; text: string }) => { state.emails.push(m); return { sent: false, provider: null } },
 }))
 vi.mock('./saml', () => ({ ssoEnforced: async () => false }))
@@ -153,7 +153,7 @@ vi.mock('@/lib/auth', async importOriginal => {
 
 type Handler = (req: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) => Promise<Response>
 async function call(handler: Handler, url: string, b?: unknown) {
-  const req = new NextRequest(`http://planora.test${url}`, {
+  const req = new NextRequest(`http://runf9.test${url}`, {
     method: b === undefined ? 'GET' : 'POST',
     ...(b !== undefined ? { body: JSON.stringify(b), headers: { 'content-type': 'application/json' } } : {}),
   })
@@ -162,7 +162,7 @@ async function call(handler: Handler, url: string, b?: unknown) {
 }
 
 const PW = 'correct horse battery staple'
-const ADMIN = 'ops@planora.test'
+const ADMIN = 'ops@runf9.test'
 let authRoute: typeof import('@/app/api/auth/route')
 let betaRoute: typeof import('@/app/api/platform/beta/route')
 let auth: typeof import('@/lib/auth')
@@ -189,8 +189,8 @@ async function betaInvite(email: string, company = 'New Firm LLC'): Promise<stri
 
 beforeEach(async () => {
 
-  delete process.env.PLANORA_SIGNUP
-  process.env.PLANORA_PLATFORM_ADMINS = `${ADMIN}, Second-Ops@Planora.test`
+  delete process.env.RUNF9_SIGNUP
+  process.env.RUNF9_PLATFORM_ADMINS = `${ADMIN}, Second-Ops@RunF9.test`
   authRoute ??= await import('@/app/api/auth/route')
   betaRoute ??= await import('@/app/api/platform/beta/route')
   auth ??= await import('@/lib/auth')
@@ -271,26 +271,26 @@ describe('private beta sign-up (invite-only by default)', () => {
     expect(state.users[0].betaAccessVia).toBe('bootstrap')
     const second = await signup('second@onprem.test')
     expect(second.status).toBe(403)
-    const ops = await signup('second-ops@planora.test')
+    const ops = await signup('second-ops@runf9.test')
     expect(ops.status, JSON.stringify(ops.data)).toBe(200)
-    expect(state.users.find(u => u.email === 'second-ops@planora.test')?.betaAccessVia).toBe('platform_admin')
+    expect(state.users.find(u => u.email === 'second-ops@runf9.test')?.betaAccessVia).toBe('platform_admin')
   })
 
-  it('PLANORA_SIGNUP=open re-opens self sign-up', async () => {
-    process.env.PLANORA_SIGNUP = 'open'
+  it('RUNF9_SIGNUP=open re-opens self sign-up', async () => {
+    process.env.RUNF9_SIGNUP = 'open'
     const r = await signup('anyone@open.test')
     expect(r.status).toBe(200)
     expect(state.users.find(u => u.email === 'anyone@open.test')?.betaAccessVia).toBe('open_signup')
   })
 
   it('GET /api/auth tells the sign-up page about the mode and a beta invitation', async () => {
-    process.env.PLANORA_ACCESS_REQUEST_EMAIL = 'beta@planora.test'
+    process.env.RUNF9_ACCESS_REQUEST_EMAIL = 'beta@runf9.test'
     const token = await betaInvite('visitor@firm.test', 'Visitor Builders')
     const r = await call(authRoute.GET, `/api/auth?beta=${encodeURIComponent(token)}`)
-    expect(r.data.signup).toEqual({ mode: 'invite_only', accessRequestEmail: 'beta@planora.test' })
+    expect(r.data.signup).toEqual({ mode: 'invite_only', accessRequestEmail: 'beta@runf9.test' })
     expect(r.data.betaInvitation).toEqual({ email: 'visitor@firm.test', company: 'Visitor Builders' })
     expect((await call(authRoute.GET, '/api/auth?beta=nope')).data.betaInvitation).toEqual({ invalid: true })
-    delete process.env.PLANORA_ACCESS_REQUEST_EMAIL
+    delete process.env.RUNF9_ACCESS_REQUEST_EMAIL
   })
 })
 
@@ -303,7 +303,7 @@ describe('private beta sign-in gate', () => {
     expect(r.status).toBe(403)
     expect(r.data.code).toBe('beta_access_required')
     expect(r.data.error).toBe('RunF9 is in private beta. You need an invitation to sign in — ask your organization admin or request access.')
-    expect(r.cookie).not.toContain('planora-token=')
+    expect(r.cookie).not.toContain('runf9-token=')
     const refused = state.audit.find(a => a.action === 'auth.login_refused_beta')!
     expect(refused.orgId).toBe('org_a')
   })
@@ -315,7 +315,7 @@ describe('private beta sign-in gate', () => {
   })
 
   it('the gate is off when sign-up is open', async () => {
-    process.env.PLANORA_SIGNUP = 'open'
+    process.env.RUNF9_SIGNUP = 'open'
     addUser({ id: 'u_nobeta2', email: 'nobeta2@firm-a.test', orgId: 'org_a', role: 'viewer', passwordHash: bcryptHash, betaAccessAt: null })
     expect((await signin('nobeta2@firm-a.test')).status).toBe(200)
   })
@@ -370,7 +370,7 @@ describe('platform operator endpoints', () => {
     signedInAs = ADMIN
     const r = await call(betaRoute.POST, '/api/platform/beta', { action: 'invite', email: 'Lead@Builder.test', company: 'Builder Co' })
     expect(r.status).toBe(200)
-    expect(String(r.data.link)).toMatch(/^http:\/\/planora\.test\/auth\?beta=[A-Za-z0-9_-]{20,}$/)
+    expect(String(r.data.link)).toMatch(/^http:\/\/runf9\.test\/auth\?beta=[A-Za-z0-9_-]{20,}$/)
     expect(r.data.expiresInDays).toBe(14)
     const token = new URL(String(r.data.link)).searchParams.get('beta')!
     expect(state.invites[0].token_hash).toBe(sha(token))

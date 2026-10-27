@@ -306,7 +306,7 @@ export function uploadedLevelingNetwork(net: NetworkInput, data: ResourceData | 
   const run = (delays: ReadonlyMap<string, string>): ScheduleRun | null => {
     const changes: ScheduleEditChange[] = [...delays].map(([id, date]) => ({ kind: 'constraint', activityId: id, constraint: { type: 'SNET', date: later(byId.get(id)?.constraintType === 'SNET' ? byId.get(id)?.constraintDate : null, date) } }))
     const edited = changes.length
-      ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `level-${i}`, change, reason: 'leveling', by: 'planora', at: '' })))
+      ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `level-${i}`, change, reason: 'leveling', by: 'runf9', at: '' })))
       : { activities: net.activities, relationships: net.relationships }
     return runUploaded(edited.activities, edited.relationships, net, milestones)
   }

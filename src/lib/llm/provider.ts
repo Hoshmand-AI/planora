@@ -12,20 +12,20 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 // One place decides where model calls go (the AI gateway). Adapters in ./anthropic-adapter.ts and
 // ./openai-adapter.ts only translate a call to one provider's API; everything here is provider-agnostic.
 //
-//   PLANORA_AI_MODE   cloud | local | offline   (default: cloud if ANTHROPIC_API_KEY or OPENAI_API_KEY is set, else offline)
-//   PLANORA_AI_PROVIDER  anthropic | openai — the cloud provider (default: anthropic when ANTHROPIC_API_KEY is set,
+//   RUNF9_AI_MODE   cloud | local | offline   (default: cloud if ANTHROPIC_API_KEY or OPENAI_API_KEY is set, else offline)
+//   RUNF9_AI_PROVIDER  anthropic | openai — the cloud provider (default: anthropic when ANTHROPIC_API_KEY is set,
 //                     otherwise openai when OPENAI_API_KEY is set). Cloud calls send request content to this provider.
 //   ANTHROPIC_API_KEY key for the Anthropic (Claude) API — the default cloud provider
 //   OPENAI_API_KEY    key for the OpenAI API — approved alternate cloud provider
-//   PLANORA_AI_FALLBACK  off → disable Anthropic's server-side refusal fallback (on by default: a declined request is
+//   RUNF9_AI_FALLBACK  off → disable Anthropic's server-side refusal fallback (on by default: a declined request is
 //                     re-run on a fallback model inside the same call; the audit records fallbackUsed + served model)
-//   PLANORA_AIRGAPPED true → only loopback/private-network hosts are allowed; cloud mode is refused.
+//   RUNF9_AIRGAPPED true → only loopback/private-network hosts are allowed; cloud mode is refused.
 //   LLM_BASE_URL      OpenAI-compatible endpoint for local mode (Ollama: http://localhost:11434/v1, vLLM: http://host:8000/v1)
 //   LLM_MODEL         model name (defaults: claude-opus-5-5 for anthropic, gpt-4o-2024-11-20 for openai, llama3.1:8b for local)
 //   LLM_API_KEY       key for the local endpoint if it needs one
-//   PLANORA_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
-//   PLANORA_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/ai/MODEL-REGISTRY.md)
-//   PLANORA_DEPLOYMENT  commercial (default) | onprem — where this RunF9 instance itself runs. Air-gapped implies on-prem.
+//   RUNF9_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
+//   RUNF9_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/ai/MODEL-REGISTRY.md)
+//   RUNF9_DEPLOYMENT  commercial (default) | onprem — where this RunF9 instance itself runs. Air-gapped implies on-prem.
 //
 // Governance (enforced in chat(), the single choke point for every model call, for every provider):
 //   - organizations can switch AI off entirely (nothing is sent to any model);
@@ -47,8 +47,8 @@ export type AiMode = 'cloud' | 'local' | 'offline'
 export type Deployment = 'commercial_cloud' | 'on_prem' | 'airgapped'
 
 export function deploymentKind(env: Record<string, string | undefined> = process.env): Deployment {
-  if (/^(1|true|yes)$/i.test(env.PLANORA_AIRGAPPED || '')) return 'airgapped'
-  return /^(on-?prem(ises)?|on_prem|self-?hosted)$/i.test((env.PLANORA_DEPLOYMENT || '').trim()) ? 'on_prem' : 'commercial_cloud'
+  if (/^(1|true|yes)$/i.test(env.RUNF9_AIRGAPPED || '')) return 'airgapped'
+  return /^(on-?prem(ises)?|on_prem|self-?hosted)$/i.test((env.RUNF9_DEPLOYMENT || '').trim()) ? 'on_prem' : 'commercial_cloud'
 }
 
 /** Shown wherever project data is entered on the commercial cloud service. */
@@ -97,23 +97,23 @@ const CLOUD: Record<CloudProvider, { keyVar: 'ANTHROPIC_API_KEY' | 'OPENAI_API_K
 }
 
 export function approvedModels(env: Record<string, string | undefined> = process.env): string[] {
-  const list = (env.PLANORA_APPROVED_MODELS || '').split(',').map(x => x.trim()).filter(Boolean)
+  const list = (env.RUNF9_APPROVED_MODELS || '').split(',').map(x => x.trim()).filter(Boolean)
   return list.length ? list : DEFAULT_APPROVED_MODELS
 }
 
-/** The cloud provider: PLANORA_AI_PROVIDER if set, else anthropic with an Anthropic key, else openai with an OpenAI key. */
+/** The cloud provider: RUNF9_AI_PROVIDER if set, else anthropic with an Anthropic key, else openai with an OpenAI key. */
 export function selectCloudProvider(env: Record<string, string | undefined> = process.env): { provider: CloudProvider | null; error?: string } {
-  const requested = (env.PLANORA_AI_PROVIDER || '').trim().toLowerCase()
+  const requested = (env.RUNF9_AI_PROVIDER || '').trim().toLowerCase()
   if (requested) {
     if (requested === 'anthropic' || requested === 'openai') return { provider: requested }
-    return { provider: null, error: `Unknown PLANORA_AI_PROVIDER "${requested}" (use anthropic or openai).` }
+    return { provider: null, error: `Unknown RUNF9_AI_PROVIDER "${requested}" (use anthropic or openai).` }
   }
   if (env.ANTHROPIC_API_KEY) return { provider: 'anthropic' }
   if (env.OPENAI_API_KEY) return { provider: 'openai' }
   return { provider: null }
 }
 
-/** Certified models are listed as such in the registry; anything else (incl. models approved only via PLANORA_APPROVED_MODELS) is an approved alternate. */
+/** Certified models are listed as such in the registry; anything else (incl. models approved only via RUNF9_APPROVED_MODELS) is an approved alternate. */
 export function isCertifiedModel(model: string): boolean {
   return registryEntry(model)?.certified ?? false
 }
@@ -124,8 +124,8 @@ export function isAllowedAirgapHost(host: string, extra: string[] = []): boolean
 }
 
 export function resolveLlmConfig(env: Record<string, string | undefined> = process.env): LlmStatus & { baseURL?: string; apiKey?: string } {
-  const airgapped = /^(1|true|yes)$/i.test(env.PLANORA_AIRGAPPED || '')
-  const requested = (env.PLANORA_AI_MODE || '').toLowerCase() as AiMode | ''
+  const airgapped = /^(1|true|yes)$/i.test(env.RUNF9_AIRGAPPED || '')
+  const requested = (env.RUNF9_AI_MODE || '').toLowerCase() as AiMode | ''
   const hasCloudKey = !!(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
   let mode: AiMode = requested || (airgapped ? (env.LLM_BASE_URL ? 'local' : 'offline') : hasCloudKey ? 'cloud' : env.LLM_BASE_URL ? 'local' : 'offline')
   const off = (error: string, host: string | null = null) => ({ mode: 'offline' as const, airgapped, provider: null, model: null, host, smallModel: true, error })
@@ -139,9 +139,9 @@ export function resolveLlmConfig(env: Record<string, string | undefined> = proce
     const apiKey = env[keyVar]
     if (!apiKey) return off(`${keyVar} is not set.`)
     const model = env.LLM_MODEL || DEFAULT_MODEL[sel.provider]
-    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (PLANORA_APPROVED_MODELS).`)
+    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`)
     const known = registryEntry(model)
-    if (known && known.provider !== sel.provider) return off(`Model ${model} is served by ${known.provider}, not the selected provider ${sel.provider} (PLANORA_AI_PROVIDER).`)
+    if (known && known.provider !== sel.provider) return off(`Model ${model} is served by ${known.provider}, not the selected provider ${sel.provider} (RUNF9_AI_PROVIDER).`)
     return { mode, airgapped, provider: sel.provider, model, certified: isCertifiedModel(model), host, smallModel: false, apiKey }
   }
   if (mode === 'local') {
@@ -149,11 +149,11 @@ export function resolveLlmConfig(env: Record<string, string | undefined> = proce
     if (!base) return off('LLM_BASE_URL is not set.')
     let host: string
     try { host = new URL(base).hostname } catch { return off(`Invalid LLM_BASE_URL: ${base}`) }
-    if (airgapped && !isAllowedAirgapHost(host, (env.PLANORA_ALLOWED_HOSTS || '').split(','))) {
+    if (airgapped && !isAllowedAirgapHost(host, (env.RUNF9_ALLOWED_HOSTS || '').split(','))) {
       return off(`Host ${host} is not a private/on-prem address; refused in air-gapped mode.`, host)
     }
     const model = env.LLM_MODEL || DEFAULT_LOCAL_MODEL
-    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (PLANORA_APPROVED_MODELS).`, host)
+    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`, host)
     const smallModel = !/(70b|72b|405b|gpt-4|claude|large)/i.test(model)
     return { mode, airgapped, provider: 'local', model, certified: isCertifiedModel(model), host, smallModel, baseURL: base, apiKey: env.LLM_API_KEY || 'not-needed' }
   }
@@ -180,7 +180,7 @@ export function llmStatus(): LlmStatus {
  */
 export function isExternalModel(cfg: Pick<LlmStatus, 'mode' | 'host'>, env: Record<string, string | undefined> = process.env): boolean {
   if (cfg.mode === 'cloud') return true
-  if (cfg.mode === 'local') return !cfg.host || !isAllowedAirgapHost(cfg.host, (env.PLANORA_ALLOWED_HOSTS || '').split(','))
+  if (cfg.mode === 'local') return !cfg.host || !isAllowedAirgapHost(cfg.host, (env.RUNF9_ALLOWED_HOSTS || '').split(','))
   return false
 }
 

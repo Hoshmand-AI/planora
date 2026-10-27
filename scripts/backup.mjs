@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Logical backup of the RunF9 database with an integrity manifest.
 //   DATABASE_URL=postgres://… node scripts/backup.mjs [out-dir]
-// Writes planora-<timestamp>.dump (pg_dump custom format, compressed) and a .manifest.json with
+// Writes runf9-<timestamp>.dump (pg_dump custom format, compressed) and a .manifest.json with
 // the SHA-256 of the dump, per-table row counts and the latest migration, which the restore drill
 // (scripts/restore-drill.mjs) checks against. Requires pg_dump (PostgreSQL client tools)
 // of the server's major version or newer; PG_BIN=/usr/lib/postgresql/17/bin picks a specific one.
@@ -17,7 +17,7 @@ if (!url) { console.error('DATABASE_URL is required'); process.exit(2) }
 const outDir = process.argv[2] || 'backups'
 fs.mkdirSync(outDir, { recursive: true })
 const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-const dump = path.join(outDir, `planora-${stamp}.dump`)
+const dump = path.join(outDir, `runf9-${stamp}.dump`)
 
 const started = Date.now()
 execFileSync(process.env.PG_BIN ? path.join(process.env.PG_BIN, 'pg_dump') : 'pg_dump', ['--format=custom', '--no-owner', '--no-privileges', '--compress=6', `--file=${dump}`, url], { stdio: 'inherit' })

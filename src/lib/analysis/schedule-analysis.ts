@@ -62,11 +62,11 @@ export const FINISH_LABELS = {
  */
 export interface RecalcDifference {
   code: string; name: string
-  fileStart?: string | null; planoraStart?: string | null
-  fileFinish: string | null; planoraFinish: string | null
-  fileLateStart?: string | null; planoraLateStart?: string | null
-  fileLateFinish?: string | null; planoraLateFinish?: string | null
-  fileFloat: number | null; planoraFloat: number | null
+  fileStart?: string | null; runf9Start?: string | null
+  fileFinish: string | null; runf9Finish: string | null
+  fileLateStart?: string | null; runf9LateStart?: string | null
+  fileLateFinish?: string | null; runf9LateFinish?: string | null
+  fileFloat: number | null; runf9Float: number | null
 }
 
 /**
@@ -399,9 +399,9 @@ export function analyzeSchedule(input: {
         differing++
         samples.push({
           code: a.activityId, name: a.name,
-          fileStart: f.earlyStart ?? null, planoraStart: a.earlyStart, fileFinish: f.earlyFinish, planoraFinish: a.earlyFinish,
-          fileLateStart: f.lateStart ?? null, planoraLateStart: a.lateStart, fileLateFinish: f.lateFinish ?? null, planoraLateFinish: a.lateFinish,
-          fileFloat: f.totalFloat, planoraFloat: a.totalFloat,
+          fileStart: f.earlyStart ?? null, runf9Start: a.earlyStart, fileFinish: f.earlyFinish, runf9Finish: a.earlyFinish,
+          fileLateStart: f.lateStart ?? null, runf9LateStart: a.lateStart, fileLateFinish: f.lateFinish ?? null, runf9LateFinish: a.lateFinish,
+          fileFloat: f.totalFloat, runf9Float: a.totalFloat,
         })
       }
     }

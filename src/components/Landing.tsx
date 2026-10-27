@@ -17,13 +17,13 @@ const primaryBtn = 'pressable inline-flex items-center justify-center rounded-fu
 const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-full text-accent-600 font-semibold hover:bg-accent-100 transition-colors'
 
 /**
- * Marketing page. While RunF9 is in private beta (PLANORA_SIGNUP not "open") the sign-up calls to
+ * Marketing page. While RunF9 is in private beta (RUNF9_SIGNUP not "open") the sign-up calls to
  * action become "Request access" / "Sign in" and the page says access is by invitation.
  */
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  // Request access: email the beta team (PLANORA_ACCESS_REQUEST_EMAIL, else the support address this page
+  // Request access: email the beta team (RUNF9_ACCESS_REQUEST_EMAIL, else the support address this page
   // already lists). Never the sign-up page: without an invitation it is a dead end for a prospect.
   const requestHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 private beta: access request')}`
   const primaryHref = inviteOnly ? requestHref : '/auth?mode=signup'

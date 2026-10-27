@@ -51,24 +51,24 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: planora
-          POSTGRES_PASSWORD: planora
-          POSTGRES_DB: planora
+          POSTGRES_USER: runf9
+          POSTGRES_PASSWORD: runf9
+          POSTGRES_DB: runf9
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U planora" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U runf9" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://planora:planora@localhost:5432/planora
+      DATABASE_URL: postgres://runf9:runf9@localhost:5432/runf9
       JWT_SECRET: ci-only-secret
-      PLANORA_AI_MODE: offline
-      PLANORA_DEFAULT_PLAN: pro
+      RUNF9_AI_MODE: offline
+      RUNF9_DEFAULT_PLAN: pro
       # The suites below create their own firms, so the main test server re-opens self sign-up. The
       # private beta gate (the default, invite-only) is tested against a second server further down.
-      PLANORA_SIGNUP: open
-      PLANORA_ALLOW_INSECURE_OIDC: '1'
+      RUNF9_SIGNUP: open
+      RUNF9_ALLOW_INSECURE_OIDC: '1'
       # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
-      PLANORA_ALLOW_INSECURE_WEBHOOKS: '1'
-      PLANORA_EMAIL_OUTBOX: /tmp/planora-outbox
+      RUNF9_ALLOW_INSECURE_WEBHOOKS: '1'
+      RUNF9_EMAIL_OUTBOX: /tmp/runf9-outbox
       WEBHOOK_RECEIVER_PORT: '4020'
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
@@ -102,7 +102,7 @@ jobs:
       - name: Backup and restore drill
         run: |
           node scripts/backup.mjs backups
-          ADMIN_DATABASE_URL=postgres://planora:planora@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
+          ADMIN_DATABASE_URL=postgres://runf9:runf9@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
       - name: Security and governance checks
         run: node scripts/e2e-security.mjs
       - name: Cross-tenant isolation checks
@@ -111,7 +111,7 @@ jobs:
         run: node scripts/e2e-scim.mjs
       - name: Private beta gate (second server in the default invite-only mode)
         run: |
-          PLANORA_SIGNUP= PLANORA_PLATFORM_ADMINS=ops@beta.test nohup npx next start -p 3001 > app-beta.log 2>&1 &
+          RUNF9_SIGNUP= RUNF9_PLATFORM_ADMINS=ops@beta.test nohup npx next start -p 3001 > app-beta.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://localhost:3001/api/health && break; sleep 2; done
           curl -sf http://localhost:3001/api/health
           BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/e2e-beta.mjs

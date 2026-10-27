@@ -29,8 +29,8 @@ describe('password reset tokens (pure)', () => {
     expect(plausibleResetToken('a'.repeat(43))).toBe(true)
   })
   it('builds the emailed link and text (30-minute expiry, ignore if not requested)', () => {
-    const link = resetLink('https://planora.example', 'tok_en-1')
-    expect(link).toBe('https://planora.example/auth/reset?token=tok_en-1')
+    const link = resetLink('https://runf9.example', 'tok_en-1')
+    expect(link).toBe('https://runf9.example/auth/reset?token=tok_en-1')
     const text = resetEmailText('Ada', link)
     expect(RESET_VALID_MINUTES).toBe(30)
     expect(text).toContain(link)
@@ -49,7 +49,7 @@ describe.skipIf(!URL_)('password reset tokens on Postgres', () => {
   const tokenRow = async (token: string) => (await db.query('SELECT * FROM email_tokens WHERE token_hash=$1', [pr.resetTokenHash(token)])).rows[0]
 
   beforeAll(async () => {
-    delete process.env.RESEND_API_KEY; delete process.env.POSTMARK_TOKEN; delete process.env.PLANORA_EMAIL_OUTBOX
+    delete process.env.RESEND_API_KEY; delete process.env.POSTMARK_TOKEN; delete process.env.RUNF9_EMAIL_OUTBOX
     db = await import('@/lib/db')
     pr = await import('./password-reset')
     await db.initSchema()

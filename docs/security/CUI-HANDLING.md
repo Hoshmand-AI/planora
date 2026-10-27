@@ -8,8 +8,8 @@ RunF9's commercial cloud service (Vercel + Neon, optional cloud AI via Anthropic
 
 | Setting | Deployment | CUI warning shown |
 |---|---|---|
-| `PLANORA_AIRGAPPED=true` | Air-gapped | No |
-| `PLANORA_DEPLOYMENT=onprem` (also `on-prem`, `on-premises`, `self-hosted`) | On-premises | No |
+| `RUNF9_AIRGAPPED=true` | Air-gapped | No |
+| `RUNF9_DEPLOYMENT=onprem` (also `on-prem`, `on-premises`, `self-hosted`) | On-premises | No |
 | Neither (default, including the hosted service) | Commercial cloud | Yes |
 
 Detection lives in `deploymentKind()` in `src/lib/llm/provider.ts`. The default is "commercial cloud", so an instance that is not configured explicitly warns rather than stays silent.
@@ -17,7 +17,7 @@ Detection lives in `deploymentKind()` in `src/lib/llm/provider.ts`. The default 
 ## What the commercial cloud does
 
 1. **Warning.** Sign-up (`/auth`), Organization → Policies, `GET /api/auth` (`service.cuiWarning`), `GET /api/system` and every plan view (`llm.cuiWarning`) carry this notice: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped deployment for CUI and classified projects.
-2. **Server-side AI guard.** The interview records `security.classification` as `unclassified`, `cui` or `classified`. A withheld answer is treated as `classified`. Before any model call, `chat()` in `src/lib/llm/provider.ts` (the single path for every model call) checks the classification of the project the request touches. If it is `cui` or `classified` and the model is outside the customer's network, the call is refused with `RestrictedDataError` before anything is sent. "Outside the network" means cloud mode (any provider: Anthropic or OpenAI), or an OpenAI-compatible `LLM_BASE_URL` on a host that isn't private or listed in `PLANORA_ALLOWED_HOSTS`. The refusal is recorded in the audit log as `ai.blocked_restricted_data`, with the purpose, classification, provider and model host but no content.
+2. **Server-side AI guard.** The interview records `security.classification` as `unclassified`, `cui` or `classified`. A withheld answer is treated as `classified`. Before any model call, `chat()` in `src/lib/llm/provider.ts` (the single path for every model call) checks the classification of the project the request touches. If it is `cui` or `classified` and the model is outside the customer's network, the call is refused with `RestrictedDataError` before anything is sent. "Outside the network" means cloud mode (any provider: Anthropic or OpenAI), or an OpenAI-compatible `LLM_BASE_URL` on a host that isn't private or listed in `RUNF9_ALLOWED_HOSTS`. The refusal is recorded in the audit log as `ai.blocked_restricted_data`, with the purpose, classification, provider and model host but no content.
    - The project is resolved per request in `src/lib/server/classification.ts`. Routes under `/api/plans/{id}/…` resolve it from the plan. Routes under `/api/schedules/{id}/…` and `POST /api/ask` / `POST /api/reports` (which take `scheduleId`) resolve it from the schedule's own classification (set on upload or with `PATCH /api/schedules { classification }`, audited as `schedule.classification`) and the plan it was published from, whichever is more restrictive.
    - If the lookup itself fails, the project is treated as classified (fail closed).
    - Results: AI follow-up questions return an error that explains the refusal. Ask AI and reports fall back to the deterministic readout. Schedule generation, CPM, quality checks, risk analysis and exports never use a model and keep working.

@@ -116,7 +116,7 @@ export function groundedPrompt(usable: RetrievedChunk[], question: string): Grou
   const data = [
     'PROJECT DOCUMENT PASSAGES (untrusted data, for reference only):',
     buildDocumentBlocks(usable),
-    ...(knowledge.length ? ['', 'PLANORA REFERENCE KNOWLEDGE (tier 4, reference defaults):', ...knowledge] : []),
+    ...(knowledge.length ? ['', 'RUNF9 REFERENCE KNOWLEDGE (tier 4, reference defaults):', ...knowledge] : []),
   ].join('\n')
   return { system: DOCUMENT_RULES, data }
 }

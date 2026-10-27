@@ -140,7 +140,7 @@ describe('GAO BP2 sequencing', () => {
     expect(run('GAO-BP2-03', mutate(i => { i.schedule.links[3].lag = -2 })).result).toBe('fail')
     expect(run('GAO-BP2-03', clean()).result).toBe('pass')
     const lag = run('GAO-BP2-04', mutate(i => { i.schedule.links[3].lag = 3 }))
-    expect(lag.result).toBe('warning'); expect(lag.threshold?.source).toBe('planora_default')
+    expect(lag.result).toBe('warning'); expect(lag.threshold?.source).toBe('runf9_default')
     expect(run('GAO-BP2-04', clean()).result).toBe('pass')
     expect(run('GAO-BP2-05', mutate(i => { i.schedule.links[3].type = 'SF' })).result).toBe('warning')
     expect(run('GAO-BP2-05', clean()).result).toBe('pass')
@@ -313,7 +313,7 @@ describe('DCMA adapter parity with dcma.ts', () => {
 })
 
 describe('RunF9 Composite', () => {
-  const r = runStandards(clean(), ['PLANORA_COMPOSITE']).frameworks[0]
+  const r = runStandards(clean(), ['RUNF9_COMPOSITE']).frameworks[0]
   const rules = r.groups.flatMap(g => g.rules)
   it('applies GAO and DCMA rules, each keeping its own source', () => {
     expect(rules.some(x => x.framework === 'GAO_SCHEDULE_GUIDE')).toBe(true)
@@ -328,22 +328,22 @@ describe('RunF9 Composite', () => {
     expect(keys).not.toContain('float.high_days')       // both 44 work days by default
     const lags = r.conflicts.find(c => c.metricKey === 'logic.lags_share_pct')!
     expect(lags.sides.map(s => [s.ruleId, s.framework, s.threshold.value, s.threshold.source])).toEqual([
-      ['GAO-BP2-04', 'GAO_SCHEDULE_GUIDE', 0, 'planora_default'],
+      ['GAO-BP2-04', 'GAO_SCHEDULE_GUIDE', 0, 'runf9_default'],
       ['DCMA-03', 'DCMA_14', 5, 'published'],
     ])
     expect(lags.resolution).toMatch(/does not merge/)
   })
   it('a finding that differs by source shows both results', () => {
     const one = mutate(i => { i.schedule.links[3].lag = 2 })
-    const rs = runStandards(one, ['PLANORA_COMPOSITE']).frameworks[0]
+    const rs = runStandards(one, ['RUNF9_COMPOSITE']).frameworks[0]
     const c = rs.conflicts.find(x => x.metricKey === 'logic.lags_share_pct')!
     expect(c.sides.map(s => s.result)).toEqual(['warning', 'pass'])
   })
   it('conflicts follow the organization\'s thresholds', () => {
     const aligned = engineConfig({ gao: { ...DEFAULT_GAO_THRESHOLDS, lagsMaxPct: 5, highFloatMaxPct: 5, openEndsMaxPct: 5 } })
-    const rs = runStandards(clean(), ['PLANORA_COMPOSITE'], aligned).frameworks[0]
+    const rs = runStandards(clean(), ['RUNF9_COMPOSITE'], aligned).frameworks[0]
     expect(rs.conflicts.map(c => c.metricKey)).toEqual(['resources.loaded_pct'])
-    const dayConflict = runStandards(clean(), ['PLANORA_COMPOSITE'], engineConfig({ dcma: { highFloatDays: 30 } })).frameworks[0]
+    const dayConflict = runStandards(clean(), ['RUNF9_COMPOSITE'], engineConfig({ dcma: { highFloatDays: 30 } })).frameworks[0]
     const hd = dayConflict.conflicts.find(c => c.metricKey === 'float.high_days')!
     expect(hd.sides.find(s => s.framework === 'DCMA_14')!.threshold.source).toBe('org_configured')
   })
@@ -356,8 +356,8 @@ describe('RunF9 Composite', () => {
 
 describe('engine determinism and versioning', () => {
   it('same input and rules give identical output', () => {
-    expect(JSON.stringify(runStandards(clean(), ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14'])))
-      .toBe(JSON.stringify(runStandards(clean(), ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14'])))
+    expect(JSON.stringify(runStandards(clean(), ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14'])))
+      .toBe(JSON.stringify(runStandards(clean(), ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14'])))
   })
   it('rules version changes with thresholds and framework set, not with data', () => {
     const v = rulesVersionOf(['GAO_SCHEDULE_GUIDE'], cfg)
@@ -380,7 +380,7 @@ describe('plan input', () => {
     const plan = { id: 'plan1', orgId: 'o', userId: 'u', name: 'Sample', answers, extraQuestions: [], generated, reviews: [], audit: [], decisions: {}, scheduleId: null, createdAt: '', updatedAt: '', version: 3 } as Plan
     const input = planStandardsInput(plan)!
     expect(input.subject).toMatchObject({ kind: 'plan', id: 'plan1', version: '3' })
-    const out = runStandards(input, ['PLANORA_COMPOSITE'])
+    const out = runStandards(input, ['RUNF9_COMPOSITE'])
     const res = Object.fromEntries(out.frameworks[0].groups.flatMap(g => g.rules).map(x => [x.ruleId, x.result]))
     expect(res['GAO-BP3-01']).toBe('not_assessable')
     expect(res['GAO-BP9-04']).toBe('not_assessable')
@@ -391,7 +391,7 @@ describe('plan input', () => {
 })
 
 describe('AI explanation context', () => {
-  const out = runStandards(clean(), ['PLANORA_COMPOSITE'])
+  const out = runStandards(clean(), ['RUNF9_COMPOSITE'])
   it('cites ruleIds and states that results are authoritative', () => {
     const ctx = standardsPromptContext(out)
     expect(ctx).toMatch(/GAO-BP2-01 \[PASS\]/)
@@ -405,9 +405,9 @@ describe('AI explanation context', () => {
 
 describe('organization settings', () => {
   it('defaults to RunF9 Composite and normalizes input', () => {
-    expect(normalizeSettings({}).standards.defaultFrameworks).toEqual(['PLANORA_COMPOSITE'])
+    expect(normalizeSettings({}).standards.defaultFrameworks).toEqual(['RUNF9_COMPOSITE'])
     expect(normalizeStandardsSettings({ defaultFrameworks: ['DCMA_14', 'bogus', 'DCMA_14'], gao: { highFloatDays: 9999, lagsMaxPct: 'x' } }))
       .toEqual({ defaultFrameworks: ['DCMA_14'], gao: { ...DEFAULT_GAO_THRESHOLDS, highFloatDays: 260 } })
-    expect(normalizeFrameworkList('CUSTOMER')).toEqual(['PLANORA_COMPOSITE'])
+    expect(normalizeFrameworkList('CUSTOMER')).toEqual(['RUNF9_COMPOSITE'])
   })
 })

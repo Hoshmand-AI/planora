@@ -12,14 +12,14 @@ Aligned with the NIST AI Risk Management Framework (Govern, Map, Measure, Manage
 **Enforcement:**
 - The schedule engine (`src/lib/planning/*`) has no model dependency.
 - Model output is used only as text or as validated question objects (`validateSuggestions`: schema, length, de-duplication, at most 3).
-- Everything works with AI switched off; this is tested in CI (`PLANORA_AI_MODE=offline`).
+- Everything works with AI switched off; this is tested in CI (`RUNF9_AI_MODE=offline`).
 
 ## Data controls
 - **Organization switch:** AI on or off. When off, nothing is sent to any model.
 - **"Can't share" answers:** never sent. Tested in `src/lib/server/security.test.ts` (brief, generated schedule, coercion).
 - **Air-gapped deployments:** only private or allowlisted model hosts are allowed (`isAllowedAirgapHost`).
 - **Provider gateway:** every model call goes through `chat()` in `src/lib/llm/provider.ts`, whichever provider serves it: Anthropic (Claude, the default cloud provider), OpenAI (approved alternate) or an on-prem OpenAI-compatible endpoint. Cloud AI calls send request-relevant content to the selected provider; the organization switch, "Can't share" rule, CUI guard, air-gap rule and quotas apply identically to every provider.
-- **Request logging:** every request is logged as `ai.request` with provider, model, the model version the provider reports, SDK version, certified/alternate status, purpose, character counts, token usage, estimated cost, latency, success, refusal/truncation flags, whether Anthropic's server-side refusal fallback served the turn (`fallbackUsed`, with the served model in `modelVersion`; on by default, `PLANORA_AI_FALLBACK=off` disables it) and SHA-256 of the prompt. The content itself is never logged.
+- **Request logging:** every request is logged as `ai.request` with provider, model, the model version the provider reports, SDK version, certified/alternate status, purpose, character counts, token usage, estimated cost, latency, success, refusal/truncation flags, whether Anthropic's server-side refusal fallback served the turn (`fallbackUsed`, with the served model in `modelVersion`; on by default, `RUNF9_AI_FALLBACK=off` disables it) and SHA-256 of the prompt. The content itself is never logged.
 - **Equivalent quality is not promised across unvalidated models:** each approved model is certified or an approved alternate ([MODEL-REGISTRY.md](MODEL-REGISTRY.md)); the UI says when an alternate is in use.
 - **Project documents (retrieval-augmented answers):** passages from customer documents are sent only as delimited, untrusted data with provenance; passages flagged for prompt-injection text are never sent; every citation in an answer is checked against the passages actually retrieved and invented ones are removed; CUI/classified passages never go to an external model. Retrieval is scoped in SQL to the caller's organization, project and workspaces, and logged with ids and a query hash only. Candidate requirements extracted from documents are rule-based and never applied automatically. See [../privacy/PROJECT-DOCUMENTS.md](../privacy/PROJECT-DOCUMENTS.md).
 
@@ -43,4 +43,4 @@ Aligned with the NIST AI Risk Management Framework (Govern, Map, Measure, Manage
 - Calibration against completed projects uses the firm-history backtest.
 
 ## Incidents
-A harmful, wrong or leaking AI output is handled as an incident (docs/operations/INCIDENT-RESPONSE.md). Containment: switch AI off for the organization or globally (`PLANORA_AI_MODE=offline`).
+A harmful, wrong or leaking AI output is handled as an incident (docs/operations/INCIDENT-RESPONSE.md). Containment: switch AI off for the organization or globally (`RUNF9_AI_MODE=offline`).

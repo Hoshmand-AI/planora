@@ -168,7 +168,7 @@ describe('SCIM 2.0 endpoints', () => {
 
   it('requires a valid, unrevoked SCIM token; session cookies and API keys are not accepted', async () => {
     const { GET } = await users()
-    const none = await call(GET, '/api/scim/v2/Users', { token: null, headers: { cookie: 'planora-token=whatever' } })
+    const none = await call(GET, '/api/scim/v2/Users', { token: null, headers: { cookie: 'runf9-token=whatever' } })
     expectScimError(none, 401)
     expect(none.headers.get('www-authenticate')).toMatch(/Bearer/)
     expectScimError(await call(GET, '/api/scim/v2/Users', { token: 'scim_' + 'z'.repeat(43) }), 401)

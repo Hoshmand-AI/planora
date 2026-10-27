@@ -1,6 +1,6 @@
 // Export exception reports: what RunF9 could not write (or had to change) in a given export format,
 // so nothing is dropped silently. Each export carries its report where provenance already goes: the
-// XLSX Provenance sheet, an X-Planora-Export-Exceptions response header on every download, and the
+// XLSX Provenance sheet, an X-RunF9-Export-Exceptions response header (also sent as X-Planora-…) on every download, and the
 // JSON report itself on request (?format=...&exceptions=json).
 //
 // The report lists (1) what the source file carried that RunF9 never imported (from the upload's
@@ -26,7 +26,7 @@ const WRITES_RESOURCES = new Set<ExportExceptionFormat>(['xer', 'xml'])
 export type ExportExceptionFormat = 'xer' | 'xer-original' | 'xml' | 'csv' | 'xlsx-import' | 'xlsx-p6'
 
 export interface ExportExceptionContext {
-  /** The upload's import exception report (null for Planora-built plans and older uploads) */
+  /** The upload's import exception report (null for RunF9-built plans and older uploads) */
   importReport?: ExceptionReport | null
   /** Activities of the upload that the export model leaves out */
   excluded?: { code: string; type: 'summary' | 'loe' }[]
@@ -44,7 +44,7 @@ function xerWorkTimes(c: WorkCalendar): string {
   return h > 6 ? `08:00-12:00,13:00-${hhmm(9 + h)}` : `08:00-${hhmm(8 + h)}`
 }
 
-const isPlanoraRationale = (a: PlanActivity) => !!a.rationale?.summary && !a.rationale.summary.startsWith('From the uploaded file')
+const isRunF9Rationale = (a: PlanActivity) => !!a.rationale?.summary && !a.rationale.summary.startsWith('From the uploaded file')
 
 export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFormat, ctx: ExportExceptionContext = {}): ExceptionReport {
   const ex = new ExceptionCollector('export', format)
@@ -86,7 +86,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
   const withBaseline = acts.filter(a => a.baselineStart || a.baselineFinish)
   const calById = new Map(s.calendars.map(c => [c.id, c]))
   const nonDefaultCal = acts.filter(a => a.calendarId && a.calendarId !== s.defaultCalendarId)
-  const planoraRationale = acts.filter(isPlanoraRationale)
+  const runf9Rationale = acts.filter(isRunF9Rationale)
   const lossOfCalendars = () => {
     if (s.calendars.length) ex.add({ severity: 'loss', entity: 'calendar', field: 'Calendars', disposition: 'dropped', count: s.calendars.length, examples: s.calendars.map(c => c.name), message: `Calendar definitions (work week, hours per day, holidays) are not written to the ${label} export; durations are work days of each activity's calendar` })
   }
@@ -108,7 +108,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
       if (renamed.length) ex.add({ severity: 'info', entity: 'activity', field: 'TASK.task_name (characters)', disposition: 'converted', count: renamed.length, examples: renamed.map(a => a.code), message: 'Characters P6 cannot store in an XER (outside Windows-1252) were replaced' })
       const long = acts.filter(a => xerText(a.name).length > P6_NAME_MAX)
       if (long.length) ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.task_name (length)', disposition: 'converted', count: long.length, examples: long.map(a => a.code), message: `Names longer than P6's ${P6_NAME_MAX} characters were shortened` })
-      if (planoraRationale.length) ex.add({ severity: 'info', entity: 'activity', field: 'Rationale', disposition: 'dropped', count: planoraRationale.length, examples: planoraRationale.map(a => a.code), message: 'Why each activity exists (rationale and sources) is not written; overrides with reasons go into the notebook' })
+      if (runf9Rationale.length) ex.add({ severity: 'info', entity: 'activity', field: 'Rationale', disposition: 'dropped', count: runf9Rationale.length, examples: runf9Rationale.map(a => a.code), message: 'Why each activity exists (rationale and sources) is not written; overrides with reasons go into the notebook' })
       assumptions()
       break
     }

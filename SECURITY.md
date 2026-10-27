@@ -12,6 +12,6 @@ Email **security@hoshmand.ai** with a description, the steps to reproduce and th
 
 Only the current production release (the `main` branch, deployed continuously) receives security fixes.
 
-## How Planora is secured
+## How RunF9 is secured
 
 See [docs/security/SECURITY-OVERVIEW.md](docs/security/SECURITY-OVERVIEW.md) for the architecture and controls, and [docs/security/CONTROL-MATRIX.md](docs/security/CONTROL-MATRIX.md) for the mapping to OWASP ASVS, NIST CSF 2.0 and NIST SP 800-171.

@@ -10,10 +10,10 @@ import { createHmac } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
-// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
 // as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
 if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
-  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
   process.exit(1)
 }
 const ORIGIN = new URL(BASE).origin
@@ -33,7 +33,7 @@ class Client {
     if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body) }
     const res = await fetch(BASE + url, { method, headers, body: payload, redirect: 'manual' })
     const set = res.headers.get('set-cookie')
-    if (set && set.startsWith('planora-token=')) this.cookie = set.split(';')[0]
+    if (set && set.startsWith('runf9-token=')) this.cookie = set.split(';')[0]
     const text = await res.text()
     let data = {}
     try { data = JSON.parse(text) } catch { data = { raw: text } }
@@ -60,7 +60,7 @@ function totp(secret, offsetSteps = 0) {
 }
 
 const PW = 'correct horse battery staple'
-const OUTBOX = process.env.PLANORA_EMAIL_OUTBOX
+const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
 
 /** Latest link matching re in the test outbox for this recipient. */
 async function mailLink(to, re) {
@@ -114,7 +114,7 @@ async function main() {
   r = await owner.post('/api/auth', { action: 'signup', email: email('owner'), password: PW, name: 'Olive Owner', company: 'Gamma Builders' })
   ok(r.status === 200 && r.data.user.role === 'owner', 'Founder becomes the organization owner')
 
-  /* ── Email verification (needs PLANORA_EMAIL_OUTBOX on the server and here) ── */
+  /* ── Email verification (needs RUNF9_EMAIL_OUTBOX on the server and here) ── */
   if (OUTBOX) {
     r = await owner.get('/api/auth')
     ok(r.data.security.emailDelivery === true && r.data.security.emailVerified === false, 'Self sign-up starts with an unconfirmed email')
@@ -468,7 +468,7 @@ async function main() {
     if (process.env.OIDC_ISSUER) {
       const domain = `sso${stamp}.example`
       setPlan(email('owner'), 'enterprise')
-      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'planora-test', clientSecret: 'test-secret', domains: [domain], defaultRole: 'scheduler', enforce: false } })
+      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'runf9-test', clientSecret: 'test-secret', domains: [domain], defaultRole: 'scheduler', enforce: false } })
       ok(r.status === 200 && r.data.sso.enabled && r.data.sso.hasSecret && !JSON.stringify(r.data).includes('test-secret'), 'Admin configures SSO (secret never returned)')
       const ssoLogin = async (who, bad) => {
         const start = await fetch(`${BASE}/api/auth/sso`, { method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN }, body: JSON.stringify({ email: who }) })
@@ -477,7 +477,7 @@ async function main() {
         const stateCookie = start.headers.get('set-cookie').split(';')[0]
         const idp = await fetch(sdata.url + (bad ? `&bad=${bad}` : ''), { redirect: 'manual' })
         const cb = await fetch(idp.headers.get('location'), { redirect: 'manual', headers: { cookie: stateCookie } })
-        const session = (cb.headers.get('set-cookie') || '').split(/,(?=\s*planora)/).find(c => c.trim().startsWith('planora-token=') && !c.includes('planora-token=;'))
+        const session = (cb.headers.get('set-cookie') || '').split(/,(?=\s*runf9)/).find(c => c.trim().startsWith('runf9-token=') && !c.includes('runf9-token=;'))
         return { status: cb.status, location: cb.headers.get('location') || '', cookie: session ? session.trim().split(';')[0] : null }
       }
       r = await ssoLogin(`jane@${domain}`)
@@ -502,7 +502,7 @@ async function main() {
       r = await owner2.post('/api/org', { action: 'invite', email: `pw@${domain}`, role: 'viewer' })
       const pw = new Client()
       await pw.post('/api/auth', { action: 'signup', email: `pw@${domain}`, password: PW, name: 'Pat Password', invite: new URL(r.data.link).searchParams.get('invite') })
-      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'planora-test', domains: [domain], defaultRole: 'scheduler', enforce: true } })
+      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'runf9-test', domains: [domain], defaultRole: 'scheduler', enforce: true } })
       ok(r.status === 200 && r.data.sso.enforce, 'Admin enforces SSO')
       r = await new Client().post('/api/auth', { action: 'signin', email: `pw@${domain}`, password: PW })
       ok(r.status === 403 && r.data.code === 'sso_required', 'With SSO enforced, members cannot use a password', r)
@@ -593,7 +593,7 @@ async function main() {
   r = await reviewer.post('/api/account', { action: 'export_my_data' })
   ok(r.status === 200 && r.data.account.email === email('rev') && Array.isArray(r.data.activity), 'Personal data export')
   const exp = await owner2.req('POST', '/api/org', { action: 'export_data' })
-  ok(exp.status === 200 && exp.data.format === 'planora-org-export' && exp.data.plans.length >= 1 && exp.data.auditEvents.length > 0 && !JSON.stringify(exp.data.members).includes('password'), 'Organization export (no secrets)')
+  ok(exp.status === 200 && exp.data.format === 'runf9-org-export' && exp.data.plans.length >= 1 && exp.data.auditEvents.length > 0 && !JSON.stringify(exp.data.members).includes('password'), 'Organization export (no secrets)')
 
   const solo = new Client()
   r = await solo.post('/api/auth', { action: 'signup', email: email('solo'), password: PW, name: 'Solo', company: 'Delta Temp' })

@@ -20,7 +20,7 @@ export interface HistoryCandidate {
   /** Explicitly included although not every activity has an actual finish */
   historyOverride: boolean
   /** The file is RunF9's own export re-imported, not the project's record */
-  planoraExport: boolean
+  runf9Export: boolean
   uploadOrigin?: UploadOrigin | null
   /** Activities other than level of effort and WBS summaries */
   workCount: number
@@ -28,7 +28,7 @@ export interface HistoryCandidate {
   openCount: number
 }
 
-export type HistoryExclusion = 'not_included' | 'third_party' | 'not_as_built' | 'planora_export' | 'superseded' | 'org_opt_out' | 'empty'
+export type HistoryExclusion = 'not_included' | 'third_party' | 'not_as_built' | 'runf9_export' | 'superseded' | 'org_opt_out' | 'empty'
 
 export interface HistorySelection {
   /** Upload ids whose actuals calibrate firm history (one per project) */
@@ -56,7 +56,7 @@ export function selectHistorySchedules(cands: HistoryCandidate[], opts: { orgOpt
   for (const c of cands) {
     if (!c.inHistory) excluded.push({ id: c.id, reason: 'not_included', detail: 'Not marked for firm history.' })
     else if (c.uploadOrigin === 'third_party') excluded.push({ id: c.id, reason: 'third_party', detail: 'A third-party schedule, not one of your own projects.' })
-    else if (c.planoraExport) excluded.push({ id: c.id, reason: 'planora_export', detail: 'A re-imported RunF9 export: its durations are RunF9\'s own, not the project\'s record.' })
+    else if (c.runf9Export) excluded.push({ id: c.id, reason: 'runf9_export', detail: 'A re-imported RunF9 export: its durations are RunF9\'s own, not the project\'s record.' })
     else if (c.workCount === 0) excluded.push({ id: c.id, reason: 'empty', detail: 'No activities to learn from.' })
     else if (!isAsBuilt(c) && !c.historyOverride) excluded.push({ id: c.id, reason: 'not_as_built', detail: `Not as-built: ${c.openCount} of ${c.workCount} activities have no actual finish.` })
     else eligible.push(c)

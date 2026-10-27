@@ -8,23 +8,23 @@ describe('LLM provider routing', () => {
   })
 
   it('refuses cloud AI in air-gapped mode', () => {
-    const c = resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', PLANORA_AI_MODE: 'cloud', OPENAI_API_KEY: 'sk-x' })
+    const c = resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', RUNF9_AI_MODE: 'cloud', OPENAI_API_KEY: 'sk-x' })
     expect(c.mode).toBe('offline')
     expect(c.error).toMatch(/air-gapped/)
   })
 
   it('refuses a public model host in air-gapped mode', () => {
-    const c = resolveLlmConfig({ PLANORA_AIRGAPPED: '1', LLM_BASE_URL: 'https://api.example.com/v1' })
+    const c = resolveLlmConfig({ RUNF9_AIRGAPPED: '1', LLM_BASE_URL: 'https://api.example.com/v1' })
     expect(c.mode).toBe('offline')
     expect(c.error).toMatch(/not a private/)
   })
 
   it('allows on-prem hosts and flags small models', () => {
-    const c = resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://10.20.0.5:11434/v1', LLM_MODEL: 'llama3.1:8b' })
+    const c = resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', LLM_BASE_URL: 'http://10.20.0.5:11434/v1', LLM_MODEL: 'llama3.1:8b' })
     expect(c.mode).toBe('local')
     expect(c.smallModel).toBe(true)
-    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://gpu01.scif.internal:8000/v1', LLM_MODEL: 'llama-3.3-70b', PLANORA_APPROVED_MODELS: 'llama-3.3-70b' }).smallModel).toBe(false)
-    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', LLM_BASE_URL: 'http://llm.corp/v1', PLANORA_ALLOWED_HOSTS: 'llm.corp' }).mode).toBe('local')
+    expect(resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', LLM_BASE_URL: 'http://gpu01.scif.internal:8000/v1', LLM_MODEL: 'llama-3.3-70b', RUNF9_APPROVED_MODELS: 'llama-3.3-70b' }).smallModel).toBe(false)
+    expect(resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', LLM_BASE_URL: 'http://llm.corp/v1', RUNF9_ALLOWED_HOSTS: 'llm.corp' }).mode).toBe('local')
   })
 
   it('only uses models in the approved registry, pinned by default', () => {
@@ -33,8 +33,8 @@ describe('LLM provider routing', () => {
     const refused = resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'some-unreviewed-model' })
     expect(refused.mode).toBe('offline')
     expect(refused.error).toMatch(/approved model registry/)
-    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'gpt-4o-mini', PLANORA_APPROVED_MODELS: 'gpt-4o-mini' }).mode).toBe('cloud')
-    expect(resolveLlmConfig({ LLM_BASE_URL: 'http://localhost:11434/v1', LLM_MODEL: 'llama3.1:8b', PLANORA_APPROVED_MODELS: 'qwen2.5:14b' }).mode).toBe('offline')
+    expect(resolveLlmConfig({ OPENAI_API_KEY: 'k', LLM_MODEL: 'gpt-4o-mini', RUNF9_APPROVED_MODELS: 'gpt-4o-mini' }).mode).toBe('cloud')
+    expect(resolveLlmConfig({ LLM_BASE_URL: 'http://localhost:11434/v1', LLM_MODEL: 'llama3.1:8b', RUNF9_APPROVED_MODELS: 'qwen2.5:14b' }).mode).toBe('offline')
   })
 
   it('classifies hosts', () => {

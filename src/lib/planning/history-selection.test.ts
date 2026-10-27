@@ -4,7 +4,7 @@ import { decideHistory, inheritSeriesProfile, seriesDataDateWarning } from './up
 
 const c = (id: string, f: Partial<HistoryCandidate> = {}): HistoryCandidate => ({
   id, name: id, version: 'Baseline', projectKey: null, dataDate: '2025-06-30', uploadedAt: '2026-01-01T00:00:00Z',
-  inHistory: true, historyOverride: false, planoraExport: false, uploadOrigin: null, workCount: 20, openCount: 0, ...f,
+  inHistory: true, historyOverride: false, runf9Export: false, uploadOrigin: null, workCount: 20, openCount: 0, ...f,
 })
 
 describe('firm history: which uploads count', () => {
@@ -25,9 +25,9 @@ describe('firm history: which uploads count', () => {
     expect(r.excluded.filter(x => x.reason === 'superseded').map(x => x.id).sort()).toEqual(['u1', 'u2', 'u4'])
   })
   it('excludes re-imported RunF9 exports, third-party schedules and unmarked ones', () => {
-    const r = selectHistorySchedules([c('px', { planoraExport: true }), c('tp', { uploadOrigin: 'third_party' }), c('off', { inHistory: false }), c('own', { uploadOrigin: 'own' })])
+    const r = selectHistorySchedules([c('px', { runf9Export: true }), c('tp', { uploadOrigin: 'third_party' }), c('off', { inHistory: false }), c('own', { uploadOrigin: 'own' })])
     expect(r.included).toEqual(['own'])
-    expect(Object.fromEntries(r.excluded.map(x => [x.id, x.reason]))).toEqual({ px: 'planora_export', tp: 'third_party', off: 'not_included' })
+    expect(Object.fromEntries(r.excluded.map(x => [x.id, x.reason]))).toEqual({ px: 'runf9_export', tp: 'third_party', off: 'not_included' })
   })
   it('the organization setting turns it all off', () => {
     const r = selectHistorySchedules([c('a'), c('b')], { orgOptOut: true })
@@ -42,7 +42,7 @@ describe('firm history: which uploads count', () => {
 })
 
 describe('upload rules: firm history defaults and warnings', () => {
-  const base = { requested: null, origin: null, planoraExport: false, workCount: 10, openCount: 0 } as const
+  const base = { requested: null, origin: null, runf9Export: false, workCount: 10, openCount: 0 } as const
   it('own as-built uploads default in; incomplete ones default out', () => {
     expect(decideHistory({ ...base })).toEqual({ inHistory: true, historyOverride: false, warnings: [] })
     expect(decideHistory({ ...base, openCount: 4 }).inHistory).toBe(false)
@@ -62,7 +62,7 @@ describe('upload rules: firm history defaults and warnings', () => {
     expect(over.warnings[0]).toMatch(/included in firm history anyway/)
   })
   it('a RunF9 re-import is never used', () => {
-    const r = decideHistory({ ...base, planoraExport: true, requested: true, override: true })
+    const r = decideHistory({ ...base, runf9Export: true, requested: true, override: true })
     expect(r).toMatchObject({ inHistory: false, historyOverride: false })
     expect(r.warnings[0]).toMatch(/RunF9 export re-imported/)
   })

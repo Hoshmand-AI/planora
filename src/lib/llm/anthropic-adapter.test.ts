@@ -12,7 +12,7 @@ const sdk = vi.hoisted(() => {
   class InternalServerError extends APIError { constructor() { super(529) } }
   class APIConnectionError extends APIError { constructor() { super(undefined) } }
   const create = vi.fn() // beta endpoint: server-side refusal fallback on (the default)
-  const plainCreate = vi.fn() // regular endpoint: PLANORA_AI_FALLBACK=off
+  const plainCreate = vi.fn() // regular endpoint: RUNF9_AI_FALLBACK=off
   const constructed: unknown[] = []
   class Anthropic {
     static APIError = APIError
@@ -98,10 +98,10 @@ describe('Anthropic adapter: request shape', () => {
     expect(r.fallbackUsed).toBe(false)
   })
 
-  it('PLANORA_AI_FALLBACK=off disables the fallback; anything else leaves it on', () => {
+  it('RUNF9_AI_FALLBACK=off disables the fallback; anything else leaves it on', () => {
     expect(aiFallbackEnabled({})).toBe(true)
-    expect(aiFallbackEnabled({ PLANORA_AI_FALLBACK: 'on' })).toBe(true)
-    for (const v of ['off', 'OFF', 'false', '0', 'no', 'disabled']) expect(aiFallbackEnabled({ PLANORA_AI_FALLBACK: v })).toBe(false)
+    expect(aiFallbackEnabled({ RUNF9_AI_FALLBACK: 'on' })).toBe(true)
+    for (const v of ['off', 'OFF', 'false', '0', 'no', 'disabled']) expect(aiFallbackEnabled({ RUNF9_AI_FALLBACK: v })).toBe(false)
   })
 })
 
@@ -171,12 +171,12 @@ describe('Provider selection from env', () => {
     expect(resolveLlmConfig({}).mode).toBe('offline')
   })
 
-  it('PLANORA_AI_PROVIDER picks the provider explicitly', () => {
-    expect(resolveLlmConfig({ PLANORA_AI_PROVIDER: 'openai', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o' })).toMatchObject({ provider: 'openai', model: 'gpt-4o-2024-11-20', host: 'api.openai.com' })
-    const missing = resolveLlmConfig({ PLANORA_AI_PROVIDER: 'anthropic', OPENAI_API_KEY: 'o' })
+  it('RUNF9_AI_PROVIDER picks the provider explicitly', () => {
+    expect(resolveLlmConfig({ RUNF9_AI_PROVIDER: 'openai', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o' })).toMatchObject({ provider: 'openai', model: 'gpt-4o-2024-11-20', host: 'api.openai.com' })
+    const missing = resolveLlmConfig({ RUNF9_AI_PROVIDER: 'anthropic', OPENAI_API_KEY: 'o' })
     expect(missing).toMatchObject({ mode: 'offline', provider: null })
     expect(missing.error).toMatch(/ANTHROPIC_API_KEY is not set/)
-    expect(resolveLlmConfig({ PLANORA_AI_PROVIDER: 'acme', ANTHROPIC_API_KEY: 'a' }).error).toMatch(/Unknown PLANORA_AI_PROVIDER/)
+    expect(resolveLlmConfig({ RUNF9_AI_PROVIDER: 'acme', ANTHROPIC_API_KEY: 'a' }).error).toMatch(/Unknown RUNF9_AI_PROVIDER/)
   })
 
   it('approves the Claude models with exact ids and refuses a model from another provider', () => {
@@ -190,13 +190,13 @@ describe('Provider selection from env', () => {
 
   it('marks certified models and approved alternates', () => {
     expect(MODEL_REGISTRY.filter(m => m.provider === 'anthropic').every(m => m.certified)).toBe(true)
-    expect(resolveLlmConfig({ PLANORA_AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).certified).toBe(true)
-    expect(resolveLlmConfig({ PLANORA_AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o', LLM_MODEL: 'gpt-4o' }).certified).toBe(false)
+    expect(resolveLlmConfig({ RUNF9_AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).certified).toBe(true)
+    expect(resolveLlmConfig({ RUNF9_AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o', LLM_MODEL: 'gpt-4o' }).certified).toBe(false)
   })
 
   it('still refuses cloud AI in air-gapped mode for every provider', () => {
-    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', PLANORA_AI_MODE: 'cloud', ANTHROPIC_API_KEY: 'a' })).toMatchObject({ mode: 'offline', provider: null })
-    expect(resolveLlmConfig({ PLANORA_AIRGAPPED: 'true', ANTHROPIC_API_KEY: 'a' }).mode).toBe('offline')
+    expect(resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', RUNF9_AI_MODE: 'cloud', ANTHROPIC_API_KEY: 'a' })).toMatchObject({ mode: 'offline', provider: null })
+    expect(resolveLlmConfig({ RUNF9_AIRGAPPED: 'true', ANTHROPIC_API_KEY: 'a' }).mode).toBe('offline')
   })
 
   it('estimates spend from the published per-1M-token prices', () => {
@@ -209,25 +209,25 @@ describe('Provider selection from env', () => {
 
 describe('Gateway with the Anthropic provider', () => {
   it('exposes the provider and certification in the LLM status', () => {
-    vi.stubEnv('PLANORA_AI_MODE', '')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_MODE', '')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
     const s = llmStatus()
     expect(s).toMatchObject({ mode: 'cloud', provider: 'anthropic', model: 'claude-opus-5-5', certified: true })
     expect(s).not.toHaveProperty('apiKey')
   })
 
   it('audits provider, model, served version and usage — never the prompt or the answer', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
-    vi.stubEnv('PLANORA_AI_FALLBACK', '')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_AI_FALLBACK', '')
     sdk.create.mockResolvedValue(reply())
     const out = await runWithRequest(req(), () => chat([{ role: 'system', content: 'SECRET-SYSTEM' }, { role: 'user', content: 'SECRET-QUESTION' }], { purpose: 'ask_ai' }))
     expect(out).toBe('Hello there')
@@ -240,26 +240,26 @@ describe('Gateway with the Anthropic provider', () => {
   })
 
   it('audits that a fallback served the turn and the served model', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
-    vi.stubEnv('PLANORA_AI_FALLBACK', '')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_AI_FALLBACK', '')
     sdk.create.mockResolvedValue(reply({ model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5, iterations: [{ type: 'fallback_message' }] } }))
     await runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))
     expect(audits.find(a => a.action === 'ai.request')!.detail).toMatchObject({ model: 'claude-opus-5-5', modelVersion: 'claude-opus-4-8', fallbackUsed: true, ok: true })
   })
 
-  it('PLANORA_AI_FALLBACK=off routes Claude calls to the regular endpoint', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+  it('RUNF9_AI_FALLBACK=off routes Claude calls to the regular endpoint', async () => {
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
-    vi.stubEnv('PLANORA_AI_FALLBACK', 'off')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_AI_FALLBACK', 'off')
     sdk.plainCreate.mockResolvedValue(reply())
     await expect(runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))).resolves.toBe('Hello there')
     expect(sdk.create).not.toHaveBeenCalled()
@@ -268,13 +268,13 @@ describe('Gateway with the Anthropic provider', () => {
   })
 
   it('records a refusal and surfaces it as a typed error; structured calls degrade to null', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
-    vi.stubEnv('PLANORA_AI_FALLBACK', '')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_AI_FALLBACK', '')
     sdk.create.mockResolvedValue(reply({ stop_reason: 'refusal', stop_details: { type: 'refusal', category: null, explanation: null } }))
     await expect(runWithRequest(req(), () => chat([{ role: 'user', content: 'x' }]))).rejects.toBeInstanceOf(AiRefusalError)
     expect(audits.find(a => a.action === 'ai.request')!.detail).toMatchObject({ provider: 'anthropic', ok: false, refused: true })
@@ -282,12 +282,12 @@ describe('Gateway with the Anthropic provider', () => {
   })
 
   it('CUI guard still blocks a Claude call before anything is sent', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
     vi.stubEnv('LLM_MODEL', '')
-    vi.stubEnv('PLANORA_APPROVED_MODELS', '')
+    vi.stubEnv('RUNF9_APPROVED_MODELS', '')
     for (const c of ['cui', 'classified']) {
       const r = req({ dataClassification: async () => c })
       await expect(runWithRequest(r, () => chat([{ role: 'user', content: 'secret project details' }]))).rejects.toBeInstanceOf(RestrictedDataError)
@@ -299,9 +299,9 @@ describe('Gateway with the Anthropic provider', () => {
   })
 
   it('sends nothing when the organization has turned AI off', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test')
-    vi.stubEnv('PLANORA_AI_PROVIDER', 'anthropic')
+    vi.stubEnv('RUNF9_AI_PROVIDER', 'anthropic')
     await expect(runWithRequest(req({ aiEnabled: false }), () => chat([{ role: 'user', content: 'x' }]))).resolves.toBeNull()
     expect(sdk.create).not.toHaveBeenCalled()
     expect(sdk.plainCreate).not.toHaveBeenCalled()

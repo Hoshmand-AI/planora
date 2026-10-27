@@ -1,9 +1,10 @@
 // Organization-level configuration of the standards engine: which framework(s) run by default and
 // the GAO screening thresholds. GAO's guide states best practices, not numeric pass marks, so every
-// GAO threshold here is a RunF9 screening default (source 'planora_default') that an organization
+// GAO threshold here is a RunF9 screening default (source 'runf9_default') that an organization
 // may tune; DCMA thresholds stay in OrgSettings.quality (the DCMA 14-point rules).
 
 import { isRunnableFramework, type Framework } from './types'
+import { currentName } from '@/lib/legacy-data'
 
 export interface GaoThresholds {
   /** BP1: minimum share of work activities carrying a WBS code (%) */
@@ -59,7 +60,7 @@ export interface StandardsSettings {
   gao: GaoThresholds
 }
 
-export const DEFAULT_STANDARDS_SETTINGS: StandardsSettings = { defaultFrameworks: ['PLANORA_COMPOSITE'], gao: DEFAULT_GAO_THRESHOLDS }
+export const DEFAULT_STANDARDS_SETTINGS: StandardsSettings = { defaultFrameworks: ['RUNF9_COMPOSITE'], gao: DEFAULT_GAO_THRESHOLDS }
 
 export function normalizeGaoThresholds(raw: unknown): GaoThresholds {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
@@ -73,7 +74,7 @@ export function normalizeGaoThresholds(raw: unknown): GaoThresholds {
 
 export function normalizeFrameworkList(raw: unknown, fallback: Framework[] = DEFAULT_STANDARDS_SETTINGS.defaultFrameworks): Framework[] {
   const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : []
-  const out = Array.from(new Set(list.map(x => String(x).trim()).filter(isRunnableFramework)))
+  const out = Array.from(new Set(list.map(x => currentName(String(x).trim())).filter(isRunnableFramework)))
   return out.length ? out : [...fallback]
 }
 

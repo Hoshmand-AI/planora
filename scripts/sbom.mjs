@@ -103,9 +103,9 @@ export function buildSbom(lock, { includeDev = false, timestamp = new Date().toI
     version: 1,
     metadata: {
       timestamp,
-      tools: { components: [{ type: 'application', name: 'planora-sbom', version: toolVersion, description: 'scripts/sbom.mjs (offline, from package-lock.json)' }] },
+      tools: { components: [{ type: 'application', name: 'runf9-sbom', version: toolVersion, description: 'scripts/sbom.mjs (offline, from package-lock.json)' }] },
       component: { type: 'application', 'bom-ref': rootRef, name: rootName, version: rootVersion, purl: rootRef, ...(root.license ? { licenses: cdxLicenses(root.license) } : {}) },
-      properties: [{ name: 'planora:sbom:scope', value: includeDev ? 'runtime+development' : 'runtime' }],
+      properties: [{ name: 'runf9:sbom:scope', value: includeDev ? 'runtime+development' : 'runtime' }],
     },
     components,
     // Direct dependencies of the application (the full tree is in the lockfile).

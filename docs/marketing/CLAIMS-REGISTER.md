@@ -35,7 +35,7 @@ Every public claim about RunF9 (website, sales decks, proposals) must be listed 
 | "See the DCMA 14-Point results in seconds" | ✅ | Upload, parse and DCMA run in one request (`src/app/api/schedules/route.ts`); the e2e smoke test measures uploads in well under a second locally. Re-measure on production before quoting a number |
 | Pricing: Free 3 uploaded schedules, Executive Summary, 10 AI requests/day, P6/MSP/CSV export; Pro all 4 reports, 1,000 AI/day, PDF and Excel export, integrations; Enterprise SSO | ✅ | `src/lib/server/entitlements.ts` (enforced server-side; e2e tests in `scripts/e2e-security.mjs`) |
 | Pro "$49/month" | 👤 | A price is an offer, not a fact claim, but there is no checkout yet: upgrades go through sales@ (Organization page). Market research suggests $149/mo (`docs/strategy/MARKET-RESEARCH.md`); founder decides |
-| Enterprise "On-premises / air-gapped deployment" | ✅ | `PLANORA_AIRGAPPED` mode in `src/lib/llm/provider.ts`, README "Air-gapped deployment" |
+| Enterprise "On-premises / air-gapped deployment" | ✅ | `RUNF9_AIRGAPPED` mode in `src/lib/llm/provider.ts`, README "Air-gapped deployment" |
 | Enterprise "Support by email from the founder" | ✅ | Replaces "Dedicated support", which implied a staffed team |
 
 ## Rules for new claims

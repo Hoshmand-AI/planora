@@ -22,7 +22,7 @@ function AuthForm() {
   const [cuiWarning, setCuiWarning] = useState('')
   const [invitation, setInvitation] = useState<{ email?: string; role?: string; orgName?: string; invalid?: boolean } | null>(null)
   const [betaInvitation, setBetaInvitation] = useState<{ email?: string; company?: string | null; invalid?: boolean } | null>(null)
-  // Private beta: invite-only unless the instance re-opened self sign-up (PLANORA_SIGNUP=open).
+  // Private beta: invite-only unless the instance re-opened self sign-up (RUNF9_SIGNUP=open).
   const [inviteOnly, setInviteOnly] = useState(false)
   const [requestEmail, setRequestEmail] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState('')

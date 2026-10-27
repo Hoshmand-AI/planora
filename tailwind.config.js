@@ -10,7 +10,7 @@ module.exports = {
           800: '#162D54',
           700: '#1E3A6A',
         },
-        // Planora accent (steel blue) per Hoshmand AI brand standard
+        // RunF9 accent (steel blue) per Hoshmand AI brand standard
         accent: {
           600: '#2563eb',
           500: '#3b82f6',

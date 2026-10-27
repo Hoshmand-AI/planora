@@ -57,8 +57,8 @@ export interface Provenance {
 }
 
 /** The running release: the same rule as GET /api/health. */
-export function planoraRelease(env: Record<string, string | undefined> = process.env): string {
-  return env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || env.PLANORA_RELEASE || 'local'
+export function runf9Release(env: Record<string, string | undefined> = process.env): string {
+  return env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || env.RUNF9_RELEASE || 'local'
 }
 
 const MODE_TEXT: Record<ProgressMode, string> = { retained: 'Retained logic', override: 'Progress override' }
@@ -148,5 +148,5 @@ export async function loadProvenance(
     })
   }
   const first = items[0]
-  return { sources, release: planoraRelease(), settings: first ? calculationSettings(first.schedule, first.analysis, rules) : [], generatedAt: new Date().toISOString() }
+  return { sources, release: runf9Release(), settings: first ? calculationSettings(first.schedule, first.analysis, rules) : [], generatedAt: new Date().toISOString() }
 }
