@@ -12,7 +12,7 @@
 1. **Primary: Neon point-in-time recovery.** Neon keeps a write-ahead log history; restore to any second inside the plan's history window, as a new branch. Confirm the window in the Neon console (Settings → Storage).
 2. **Secondary: nightly logical backup** (`.github/workflows/backup.yml`). It runs `scripts/backup.mjs` (pg_dump with a SHA-256 manifest, row counts and audit-chain heads), **restores it into a scratch database and verifies it** (`scripts/restore-drill.mjs`), then encrypts it (AES-256) and keeps it for 35 days.
    - To enable it, add the repository secrets `BACKUP_DATABASE_URL` (a read-only role) and `BACKUP_PASSPHRASE`.
-   - Production runs on Neon **PostgreSQL 17** (project `planora-db`, region us-east-1 / iad1, created through the Vercel Neon integration under support@hoshmand.ai on 10/04/2026). `pg_dump` refuses to dump a newer server than itself, so the workflow installs the PostgreSQL 17 client tools (`PG_BIN`) and restores into a `postgres:17` scratch server. CI uses the same version.
+   - Production runs on Neon **PostgreSQL 18** (project `planora-db`, region us-east-1 / iad1, created through the Vercel Neon integration under support@hoshmand.ai on 10/04/2026). `pg_dump` refuses to dump a newer server than itself, so the workflow installs the PostgreSQL 18 client tools (`PG_BIN`) and restores into a `postgres:18` scratch server. CI's backup drill runs against its own PostgreSQL 17 test database. When Neon moves to a new major version, bump both numbers in `.github/workflows/backup.yml`.
    - Create the read-only role in the Neon SQL Editor (replace the password; never commit it):
      ```sql
      CREATE ROLE backup_reader WITH LOGIN PASSWORD '<long random password>';
