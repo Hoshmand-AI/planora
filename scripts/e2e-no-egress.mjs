@@ -83,8 +83,8 @@ console.log(`· in-network model stand-in on 127.0.0.1:${MODEL_PORT}`)
 {
   const probeLog = path.join(TMP, 'probe.log')
   const r = spawnSync(process.execPath, ['--require', GUARD, '-e', "fetch('https://example.com/').then(() => process.exit(0), () => process.exit(3))"], { env: { ...process.env, EGRESS_LOG: probeLog }, encoding: 'utf8', timeout: 30000 })
-  const logged = fs.existsSync(probeLog) ? fs.readFileSync(probeLog, 'utf8') : ''
-  ok(r.status === 3 && /example\.com/.test(logged), 'The egress guard blocks and records a request to a public host (control)', { status: r.status, logged, stderr: r.stderr })
+  const logged = (fs.existsSync(probeLog) ? fs.readFileSync(probeLog, 'utf8') : '').split('\n').filter(Boolean).map(l => JSON.parse(l))
+  ok(r.status === 3 && logged.length === 1 && logged[0].host === 'example.com' && logged[0].port === 443, 'The egress guard blocks and records a request to a public host (control)', { status: r.status, logged, stderr: r.stderr })
 }
 
 // ── 2. RunF9, air-gapped, with the guard preloaded ──
@@ -168,10 +168,10 @@ ok(r.status === 200, 'Sign up (the confirmation email goes to the local outbox, 
 {
   const dir = env.RUNF9_EMAIL_OUTBOX
   const mail = fs.readdirSync(dir).filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))).find(m => /verify\?token=/.test(m.text))
-  const link = /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(mail?.text || '')?.[0]
-  ok(!!link, 'The confirmation email is in the local outbox')
-  const u = new URL(link)
-  await fetch(`${BASE}${u.pathname}${u.search}`, { headers: { cookie: A.cookie }, redirect: 'manual' })
+  // Only the token is taken from the message; the request always goes to the local test server.
+  const token = /\/api\/auth\/verify\?token=([A-Za-z0-9_-]{20,200})(?![A-Za-z0-9_-])/.exec(mail?.text || '')?.[1]
+  ok(!!token, 'The confirmation email is in the local outbox')
+  await fetch(`${BASE}/api/auth/verify?token=${encodeURIComponent(token)}`, { headers: { cookie: A.cookie }, redirect: 'manual' })
   ok((await A.get('/api/auth')).data.security?.emailVerified === true, 'Email confirmed from the outbox link')
 }
 
