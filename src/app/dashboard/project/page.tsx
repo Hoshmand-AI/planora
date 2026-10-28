@@ -2,7 +2,7 @@
 
 import { useApp } from '../layout'
 import { StickyBar } from '@/components/StickyBar'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Upload } from 'lucide-react'
 import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
 import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
   useEffect(() => {
@@ -113,7 +113,15 @@ export default function ProjectPage() {
         </span>
       </div>
       </StickyBar>
-      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline"><ArrowLeft size={14} aria-hidden /> All projects</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline"><ArrowLeft size={14} aria-hidden /> All projects</Link>
+        {/* A new monthly update belongs to this project: upload it from here (Home has the button for new projects) */}
+        {selectedSchedule.sourceType !== 'generated' && can('schedule.write') && (
+          <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-3.5 py-1.5 text-[13px] font-semibold hover:bg-warm-100">
+            <Upload size={14} aria-hidden /> Upload an update
+          </button>
+        )}
+      </div>
 
       {selectedSchedule.sourceType !== 'generated' && <ScheduleTabs tab={tab} onChange={setTab} />}
       {selectedSchedule.sourceType !== 'generated' && (
