@@ -1,7 +1,8 @@
 'use client'
 
 import { useApp } from '../layout'
-import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
+import { type RobotMood } from '@/components/Robot'
+import { FinishHero } from '@/components/FinishHero'
 import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates } from '@/lib/format'
@@ -24,6 +25,17 @@ export default function ProjectPage() {
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
   }, [selectedSchedule?.id])
+  // DCMA pass count for the Quality tile (the Quality tab has the detail).
+  const [quality, setQuality] = useState<{ passed: number; applicable: number; failing: number } | null>(null)
+  useEffect(() => {
+    setQuality(null)
+    if (!selectedSchedule || selectedSchedule.sourceType === 'generated') return
+    let live = true
+    fetch(`/api/schedules/${selectedSchedule.id}/quality`).then(r => r.ok ? r.json() : null).then(d => {
+      if (live && d?.dcma) setQuality({ passed: d.dcma.passed, applicable: d.dcma.applicable, failing: d.dcma.checks.filter((c: { result: string }) => c.result === 'fail').length })
+    }).catch(() => {})
+    return () => { live = false }
+  }, [selectedSchedule])
 
   if (!selectedSchedule) {
     return (
@@ -70,17 +82,7 @@ export default function ProjectPage() {
   const isBaselineUpload = /baseline/i.test(selectedSchedule.version || '')
   const warnings = [...new Set((((m as Record<string, unknown> | null)?.warnings as string[]) ?? []).filter(w => /calculat|relationships/i.test(w)))]
 
-  // A one-sentence read of the schedule's health (same status and variance as the badge).
-  const MOOD: Record<typeof status, RobotMood> = { on_track: 'done', complete: 'done', attention: 'waiting', at_risk: 'worried', no_baseline: 'idle' }
-  const mood: RobotMood = m ? MOOD[status] : 'working'
-  const behind = varianceDays != null && varianceDays > 0 ? ` ${varianceDays} ${varianceDays === 1 ? 'day' : 'days'} behind the baseline.` : ''
-  const finishNote = forecastFinish ? ` Forecast finish ${fmtDate(forecastFinish)}.` : ''
-  const healthLine = !m ? 'Reading this schedule…'
-    : status === 'complete' ? 'This project is complete.'
-    : status === 'on_track' ? `On track.${finishNote}`
-    : status === 'no_baseline' ? `No baseline yet.${finishNote}`
-    : status === 'attention' ? `Needs a look.${behind || finishNote}`
-    : `At risk.${behind || finishNote}`
+  // Whether "Why this status" has anything to explain.
   const hasWhy = statusReasons.length > 0 || twoFinishes || (reportedFinish && forecastFinish && reportedFinish !== forecastFinish) || !!baselineHeader || !!varianceBasis
   const varianceTone: RobotMood = varianceDays == null ? 'idle' : varianceDays > 14 ? 'worried' : varianceDays > 0 ? 'waiting' : 'done'
 
@@ -94,30 +96,31 @@ export default function ProjectPage() {
       <div role={selectedSchedule.sourceType !== 'generated' ? 'tabpanel' : undefined} id="tabpanel-overview" aria-labelledby={selectedSchedule.sourceType !== 'generated' ? 'tab-overview' : undefined}
         hidden={tab !== 'overview' && selectedSchedule.sourceType !== 'generated'} className="space-y-6">
 
-      {/* Glance: a one-line read, then four big numbers */}
-      <section aria-label="Schedule health" className="space-y-3">
-        <MoodTile mood={mood} className="flex items-center gap-4">
-          <Robot mood={mood} size={72} />
-          <div className="min-w-0">
-            <div role="status" className="text-[18px] font-semibold text-navy-950 leading-snug tracking-[-0.01em]">{healthLine}</div>
-            {statusReasons[0] && <p className="text-[13px] text-warm-600 mt-1">{fmtDates(statusReasons[0])}{statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : ''}</p>}
-            {!statusReasons[0] && status === 'no_baseline' && <p className="text-[13px] text-warm-600 mt-1">{isBaselineUpload
+      {/* The first answer: will we finish on time? Then four numbers that explain it. */}
+      <section aria-label="Schedule health" className="space-y-4">
+        <FinishHero status={status} forecastFinish={forecastFinish}
+          mustFinishBy={(mx.mustFinishBy as string) || null} baselineFinish={(mx.baselineFinish as string) || null}
+          projectStart={(mx.projectStart as string) || null} dataDate={selectedSchedule.dataDate ?? null}
+          reason={!m ? 'Reading this schedule…' : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : '')
+            : status === 'no_baseline' ? (isBaselineUpload
               ? 'This upload is the baseline. Upload a status update of the same project and RunF9 measures variance against it.'
-              : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.'}</p>}
-            {undatedNote && <p className="text-[13px] text-warm-600 mt-1">{undatedNote}</p>}
-          </div>
-        </MoodTile>
+              : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')
+            : null}
+          note={undatedNote} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
           <CounterTile mood={varianceTone}
             value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Schedule variance"
             sub={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
-          <CounterTile mood="idle" value={String(nearTerm?.startingCount ?? 0)} label="Near-term starts"
-            sub={nearTerm && mx.hasForecastDates !== false ? `starting by ${fmtDate(nearTerm.windowEnd)} · ${nearTerm.inProgressCount} in progress` : 'no forecast dates'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
             value={criticalPath && !criticalPath.determined ? '—' : String(criticalCount)} label="Critical activities"
             sub={criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
+          <Link href={`/dashboard/quality?schedule=${selectedSchedule.id}`} className="block rounded-2xl card-lift">
+            <CounterTile mood={!quality ? 'idle' : quality.failing ? 'waiting' : 'done'}
+              value={quality ? `${quality.passed}/${quality.applicable}` : '—'} label="Quality checks pass"
+              sub={!quality ? 'DCMA 14-point' : quality.failing ? `${quality.failing} to fix · open Quality` : 'all applicable checks pass'} />
+          </Link>
         </div>
         {criticalPath?.detail && (
           <p role="note" className="text-[13px] text-warm-700 bg-white/70 border border-warm-200 rounded-xl px-4 py-2.5">
@@ -238,7 +241,7 @@ export default function ProjectPage() {
 }
 
 /* ─── Tabs ───────────────────────────────────────── */
-const TABS = [{ id: 'overview', label: 'Overview' }, { id: 'evm', label: 'Earned value' }] as const
+const TABS = [{ id: 'overview', label: 'Summary' }, { id: 'evm', label: 'Earned value' }] as const
 function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t: 'overview' | 'evm') => void }) {
   const select = (t: 'overview' | 'evm') => {
     onChange(t)

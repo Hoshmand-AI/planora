@@ -93,6 +93,9 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 .pressable:active { transform: scale(0.985); }
 
 .meter-fill { transition: width 600ms var(--ease-out); }
+/* A bar that draws itself from the left (the overview's timeline ribbon) */
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.grow-x { transform-origin: left; animation: grow-x 900ms var(--ease-out) 150ms both; }
 
 /* ── Status mark (src/components/Robot.tsx): a slow sweep and a soft pulse, nothing else ── */
 @keyframes status-sweep { to { transform: rotate(360deg); } }
