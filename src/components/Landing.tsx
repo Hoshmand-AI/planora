@@ -21,6 +21,9 @@ const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-
  * Marketing page. While RunF9 is in private beta (RUNF9_SIGNUP not "open") the sign-up calls to
  * action become "Request access" / "Sign in" and the page says access is by invitation.
  */
+// Hero chips: id matches an option in src/components/landing/Deployment.tsx.
+const DEPLOY_CHIPS: [string, string][] = [['cloud', 'RunF9 Cloud'], ['aws', 'AWS'], ['azure', 'Microsoft Azure'], ['gcp', 'Google Cloud'], ['mixed', 'A different cloud per client'], ['onprem', 'Your servers']]
+
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -37,7 +40,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const nav = [['#features', 'Features'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
+  const nav = [['#features', 'Features'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
 
   return (
     <div className="min-h-screen bg-[#FBFBFD] text-warm-600">
@@ -82,6 +85,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               ? <Link href="/auth" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>Sign in</Link>
               : <a href="#how-it-works" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See how it works</a>}
           </div>
+          {/* Where it runs, up front: each chip opens that option in "Run it where your data lives" */}
+          <nav aria-label="Where RunF9 runs" className="hero-rise [animation-delay:280ms] mt-8 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[14px] text-warm-600 mr-1">Runs where your data lives:</span>
+            {DEPLOY_CHIPS.map(([id, label]) => (
+              <a key={id} href={`#deployment-${id}`} className="pressable rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900">{label}</a>
+            ))}
+          </nav>
         </div>
         <div className="hero-rise [animation-delay:340ms] max-w-[760px] mx-auto mt-16 md:mt-20 px-2 md:px-0">
           <F9Demo />
@@ -105,6 +115,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </div>
         <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[14px] text-accent-600 hover:underline">Where these numbers come from</a></div>
       </section>
+
+      {/* Choose the cloud: RunF9 Cloud, the firm's own AWS / Azure / Google account, a different cloud per client, or air-gapped */}
+      <div className="pt-24 md:pt-36">
+        <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} contactEmail="support@hoshmand.ai" />
+      </div>
 
       {/* Build. Check. Forecast. */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36">
@@ -212,7 +227,6 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </section>
 
       {/* Where RunF9 runs: our cloud, the customer's cloud account, or their own servers */}
-      <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} contactEmail="support@hoshmand.ai" />
 
       {/* Evidence: how each figure on this page can be checked */}
       <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32">

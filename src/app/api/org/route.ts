@@ -1,4 +1,5 @@
 import { api, json, body, ApiError } from '@/lib/server/api'
+import { dataLocation } from '@/lib/server/data-location'
 import { getOrganization, listMembers, query, exportOrganization, deleteOrganization, getUserById, countUploadedSchedules } from '@/lib/db'
 import { verifyPassword, clearSessionCookie } from '@/lib/auth'
 import { audit } from '@/lib/server/audit'
@@ -36,7 +37,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
       sso: publicSso(normalizeSso(org.sso)),
     } : {}),
     plan: { id: org.plan, ...entitlementsFor(org.plan), uploadedSchedules: await countUploadedSchedules(auth.orgId) },
-    service: { deployment: deploymentKind(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
+    service: { deployment: deploymentKind(), dataLocation: dataLocation(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
   })
 })
 
