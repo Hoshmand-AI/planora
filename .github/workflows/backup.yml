@@ -32,7 +32,7 @@ jobs:
       - if: env.HAS_SECRETS != 'true'
         run: echo "::notice::Set BACKUP_DATABASE_URL and BACKUP_PASSPHRASE repository secrets to enable off-provider backups (see docs/operations/BACKUP-AND-RECOVERY.md)."
       - if: env.HAS_SECRETS == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: env.HAS_SECRETS == 'true'
         uses: actions/setup-node@v4
         with:
