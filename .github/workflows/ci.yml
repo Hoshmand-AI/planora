@@ -114,9 +114,12 @@ jobs:
       - name: Cloud storage connections (S3 and Azure Blob emulators)
         run: |
           mkdir -p /tmp/s3 /tmp/az
-          nohup npx -y s3rver@3.7.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e > s3.log 2>&1 &
+          # Bind both to 127.0.0.1 ("localhost" can resolve to IPv6 only on the runner).
+          nohup npx -y s3rver@3.7.1 -a 127.0.0.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e > s3.log 2>&1 &
           nohup npx -y -p azurite@3.37.0 azurite-blob --blobHost 127.0.0.1 --blobPort 10000 -l /tmp/az --skipApiVersionCheck --disableTelemetry > azurite.log 2>&1 &
-          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:4569 && curl -s -o /dev/null http://127.0.0.1:10000 && break; sleep 2; done
+          up=0
+          for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4569 && curl -s -o /dev/null http://127.0.0.1:10000 && up=1 && break; sleep 2; done
+          if [ "$up" != 1 ]; then echo "Storage emulators did not start"; tail -n 50 s3.log azurite.log; exit 1; fi
           node scripts/e2e-cloud-storage.mjs
       - name: Private beta gate (second server in the default invite-only mode)
         run: |

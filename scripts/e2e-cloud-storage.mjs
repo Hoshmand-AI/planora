@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // End-to-end checks for cloud storage connections (Organization > Cloud storage) against a running
 // server and two local storage emulators:
-//   npx -y s3rver@3.7.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e &        (S3 protocol)
+//   npx -y s3rver@3.7.1 -a 127.0.0.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e &        (S3 protocol)
 //   npx -y -p azurite@3.37.0 azurite-blob --blobPort 10000 -l /tmp/az --skipApiVersionCheck --disableTelemetry &   (Azure Blob)
 //   RUNF9_STORAGE_CUSTOM_ENDPOINTS=true RUNF9_SIGNUP=open … next start
 //   BASE_URL=http://localhost:3000 node scripts/e2e-cloud-storage.mjs
