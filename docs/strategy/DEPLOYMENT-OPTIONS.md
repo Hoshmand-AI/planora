@@ -29,6 +29,45 @@ This choice is on the website now: the "Run it where your data lives" section
 Google Cloud account, or their own servers, shows where the data lives and which AI is used for each,
 labels each option "Available now" or "On request", and routes the request with the cloud named.
 
+## A different cloud for each client (10/28/2026)
+
+Some firms need several clouds at once: one owner mandates Azure, another AWS, a third Google Cloud.
+RunF9 handles this as **one deployment per cloud**, not one database spread across clouds:
+
+- each client's projects run in a RunF9 deployment inside the cloud that client requires (the firm's
+  account or the client's), with its own PostgreSQL;
+- schedules, project documents and the **document-search (RAG) index stay in that deployment's
+  database**, so nothing about one client's project is stored in another client's cloud;
+- each deployment uses the AI in its own cloud (Azure OpenAI, Bedrock, Vertex AI) or none;
+- the firm's people sign in to every deployment with the same company login (SSO, already built).
+
+Shown on the website ("A different cloud per client" chip and tab, labelled "On request") and in the
+app (Home shows where data is stored; Organization > "Where your data lives" lists the clouds with a
+request link). Each deployment can name itself with `RUNF9_DATA_LOCATION`.
+
+**Next step if customers ask for it: one portfolio across deployments.** A read-only "portfolio
+summary" that each deployment publishes (status, finish, variance; no files or documents), pulled
+into one view with the firm's SSO. Build it when a paying firm runs two or more deployments. Routing
+individual projects to different databases inside one deployment is *not* recommended: every query,
+the audit log, backups and the security boundary would have to span clouds.
+
+### Where the RAG data should live
+
+In **the same database as the project it describes**, i.e. the client's cloud when the project runs
+in the client's cloud, and RunF9 Cloud only for projects hosted there. Reasons:
+
+1. **The index is the documents.** Passages and their vectors can be read back into contract and spec
+   text, so a central copy in RunF9's (or another cloud's) database would move the client's data out
+   of the cloud the client chose.
+2. **Access rules stay in one place.** Workspace walls, document approval, CUI flags and deletion
+   apply to the passages because they sit in the same database as the project.
+3. **Deletion and retention are simple.** Delete the project or end the contract and the index goes
+   with it; there is no second copy to chase.
+4. **It already works this way.** Keyword and construction-vocabulary search run inside Postgres;
+   meaning-based search stores vectors in the same database and is computed only by a model inside
+   the customer's network (`RUNF9_EMBEDDINGS_MODEL`). On RunF9 Cloud no outside embedding service is
+   used.
+
 ## Why this is feasible for RunF9 specifically
 
 RunF9 already avoids cloud-specific services. It is:

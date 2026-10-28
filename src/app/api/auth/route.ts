@@ -1,4 +1,5 @@
 import { randomUUID as uuid } from 'crypto'
+import { dataLocation } from '@/lib/server/data-location'
 import { after } from 'next/server'
 import { getUserByEmail, getUserById, getOrganization, createUser, query } from '@/lib/db'
 import {
@@ -225,7 +226,7 @@ export const GET = publicApi(async req => {
   return json({
     // Organization's subscription plan (from the session's organization row), not the legacy users.plan.
     user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: ctx.plan, role: ctx.role },
-    org: { id: ctx.orgId, name: ctx.orgName },
+    org: { id: ctx.orgId, name: ctx.orgName, dataLocation: dataLocation() },
     permissions: isRole(ctx.role) ? permissionsOf(ctx.role) : [],
     security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired, emailVerified: !!ctx.emailVerified, emailDelivery: emailConfigured() },
     service,

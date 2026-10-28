@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense } from 'react'
+import type { DataLocation } from '@/lib/server/data-location'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
@@ -39,7 +40,7 @@ interface AppContextType {
   metrics: Record<string, unknown> | null
   refreshMetrics: () => Promise<void>
   /** Organization the user belongs to */
-  org: { id: string; name: string } | null
+  org: { id: string; name: string; dataLocation?: DataLocation } | null
   /** What the user's role allows (read, plan.write, schedule.write, plan.review, …) */
   can: (permission: string) => boolean
   /** Opens the upload dialog (empty states use it as their one action); without upload rights it opens Build */
@@ -135,7 +136,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [uploadError,      setUploadError]      = useState('')
   const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[]; importExceptions?: ExceptionReport | null } | null>(null)
   const [llm,              setLlm]              = useState<LlmStatus | null>(null)
-  const [org,              setOrg]              = useState<{ id: string; name: string } | null>(null)
+  const [org,              setOrg]              = useState<{ id: string; name: string; dataLocation?: DataLocation } | null>(null)
   const [permissions,      setPermissions]      = useState<string[]>([])
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
