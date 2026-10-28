@@ -8,6 +8,7 @@ import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getAc
 import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
+import { addDaysIso } from '@/lib/parsers/types'
 import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { emptyReport, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -95,6 +96,10 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         scheduledFinish: analysis.scheduledFinish ?? null,
         logicFinish: analysis.logicFinish ?? null,
         reportedFinish: analysis.reportedFinish,
+        // For the overview's timeline ribbon: first start, the required finish (if any) and the finish milestone's baseline.
+        projectStart: activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()[0] ?? null,
+        mustFinishBy: analysis.mustFinishBy ?? null,
+        baselineFinish: analysis.varianceDays != null && analysis.forecastFinish ? (analysis.finishMilestone?.baselineFinish ?? addDaysIso(analysis.forecastFinish, -analysis.varianceDays)) : null,
         status: analysis.status,
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,
