@@ -66,6 +66,7 @@ const PAGES = [
   ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
   ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
   ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]'); await page.waitForSelector('text=Driving Tasks') }],
+  ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
 ]
 
 let failed = 0
