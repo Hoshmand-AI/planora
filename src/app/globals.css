@@ -32,6 +32,9 @@ body {
   color: var(--warm-600);
 }
 
+/* One typeface: headings use DM Sans, set heavier and tighter. */
+.font-display { font-weight: 700; letter-spacing: -0.025em; }
+
 ::selection {
   background: var(--accent-100);
   color: var(--navy-950);

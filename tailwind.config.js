@@ -57,7 +57,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['var(--font-dm-serif)', 'Georgia', 'serif'],
+        display: ['var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
         sans:    ['var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
     },

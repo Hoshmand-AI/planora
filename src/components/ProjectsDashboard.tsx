@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Star, LayoutGrid, Rows3, Upload, Sparkles, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { Search, Star, LayoutGrid, Rows3, Plus, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { useApp } from '@/app/dashboard/layout'
 import { fmtDate, fmtDay } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
@@ -153,16 +153,9 @@ export function ProjectsDashboard() {
         <p className="text-[13px] font-medium text-warm-600">{first ? `Hi ${first}` : 'Welcome'}</p>
         <h1 className="text-[30px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">Projects</h1>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 py-2 text-[13.5px] font-semibold hover:bg-warm-100">
-          <Sparkles size={15} aria-hidden /> Build with interview
-        </Link>
-        {can('schedule.write') && (
-          <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold shadow-sm">
-            <Upload size={15} aria-hidden /> Upload schedule
-          </button>
-        )}
-      </div>
+      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold shadow-sm">
+        <Plus size={15} aria-hidden /> New project
+      </Link>
     </div>
   )
 
