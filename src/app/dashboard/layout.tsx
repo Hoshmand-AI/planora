@@ -71,7 +71,7 @@ const MORE_TABS = [
   { href: '/dashboard/history',     icon: Database,   label: 'Firm data',   hint: 'What your past projects teach' },
 ]
 
-const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href || pathname.startsWith('/dashboard/portfolio') : pathname.startsWith(href)
+const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href || pathname.startsWith('/dashboard/project') || pathname.startsWith('/dashboard/portfolio') : pathname.startsWith(href)
 
 /**
  * "More" navigation menu: a disclosure button (aria-expanded) over a list of links. Arrow keys move
@@ -155,9 +155,9 @@ interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; p
 const modelLine = (l: LlmStatus) => `${l.model}${l.provider ? ` · ${PROVIDER_LABEL[l.provider]}` : ''}${l.certified === false ? ' · approved alternate (not certified; quality may differ)' : ''}`
 const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
 
-/** Schedule id a deep link asks for: /dashboard?schedule=<id> (portfolio links) or /dashboard?id=<id>. */
+/** Schedule id a deep link asks for: /dashboard/project?schedule=<id> (Home links) or ?id=<id>; old /dashboard?schedule= links too. */
 function deepLinkedScheduleId(pathname: string, params: { get(name: string): string | null }): string | null {
-  if (pathname !== '/dashboard') return null
+  if (pathname !== '/dashboard' && pathname !== '/dashboard/project') return null
   return params.get('schedule') || params.get('id') || null
 }
 
@@ -265,6 +265,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       await refreshSchedules()
       setSelectedSchedule(data.schedule)
       setUploadSummary(data.summary)
+      // From Home, open the new project (other pages keep working on the newly selected schedule).
+      if (pathname === '/dashboard') router.push('/dashboard/project')
     } catch {
       setUploadError('Upload failed. Please try again.')
     } finally {
@@ -333,7 +335,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Center (desktop): schedule selector */}
             <button
               onClick={() => setShowScheduleList(true)}
-              className="hidden md:flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[260px]"
+              // Home lists every project, so the one-project picker stays out of the way there
+              className={`hidden md:flex ${pathname === '/dashboard' ? 'md:invisible' : ''} items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[260px]`}
             >
               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
               <span className="text-white/65 text-[12px] font-medium truncate">
@@ -347,7 +350,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Mobile: schedule pill (compact) */}
               <button
                 onClick={() => setShowScheduleList(true)}
-                className="md:hidden flex items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5"
+                className={`md:hidden ${pathname === '/dashboard' ? 'hidden' : 'flex'} items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5`}
               >
                 <div className={`w-1.5 h-1.5 rounded-full ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
                 <span className="text-white/60 text-[11px] font-medium max-w-[100px] truncate">
@@ -560,7 +563,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {schedules.map(s => (
                     <button
                       key={s.id}
-                      onClick={() => { setSelectedSchedule(s); setShowScheduleList(false) }}
+                      onClick={() => { setSelectedSchedule(s); setShowScheduleList(false); if (pathname === '/dashboard') router.push('/dashboard/project') }}
                       className={`w-full text-left p-3.5 rounded-md border transition-colors ${
                         selectedSchedule?.id === s.id
                           ? 'border-accent-500 bg-accent-100'

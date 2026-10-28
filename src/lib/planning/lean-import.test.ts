@@ -2,7 +2,7 @@
 // "The goal is Substantial Completion by —" on a lean P6 import workbook (Metra CREATE P2 – P6 Import
 // LEAN): the P6 Excel format keeps the logic on a TASKPRED sheet, which the spreadsheet importer did
 // not read, so the network had no relationships, no dates and no critical path, yet looked healthy.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import ExcelJS from 'exceljs'
 import { parseScheduleFile } from '@/lib/parsers'
 import type { ParsedSchedule } from '@/lib/parsers/types'
@@ -11,10 +11,17 @@ import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { applyBaseline, assessFileTargets, resolveBaseline } from '@/lib/analysis/baseline'
 import { projectBrief } from '@/lib/analysis/brief'
 import { criticalPathStatus } from '@/lib/analysis/critical-status'
-import { leanP6Workbook, leanP6Xml, leanSchedule, leanXer } from '@/lib/parsers/__fixtures__/lean-schedule'
+import { LEAN_START, leanP6Workbook, leanP6Xml, leanSchedule, leanXer } from '@/lib/parsers/__fixtures__/lean-schedule'
 import type { Schedule } from '@/lib/db'
 
 const FILE = 'Metra CREATE P2 – P6 Import LEAN (Rev SOQ Jul-26, R1).xlsx'
+
+// The workbook has no dates, so it is scheduled from "today". Which weekday that is changes the float:
+// an SS+5 lag on the 7-day site calendar that lands on a weekend gives the 5-day path before it real
+// calendar float (as P6 computes it), so the start milestone is critical only for some start days.
+// Schedule from the fixture's own start date so every check below is about logic, not the calendar.
+beforeAll(() => { vi.useFakeTimers({ now: new Date(`${LEAN_START}T12:00:00Z`), toFake: ['Date'] }) })
+afterAll(() => { vi.useRealTimers() })
 
 /** The upload pipeline (route.ts POST), minus the database. */
 function pipeline(parsed: ParsedSchedule, opts: { mustFinishBy?: string | null } = {}) {

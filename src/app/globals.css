@@ -144,3 +144,7 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 .tab-mark { position: relative; }
 .tab-mark::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent-400); transform: scaleX(0); transition: transform 320ms var(--ease-out); }
 .tab-mark[aria-current='page']::after { transform: scaleX(1); }
+
+/* Loading placeholder: a soft sheen moving across */
+@keyframes skeleton-sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton { background: linear-gradient(90deg, var(--warm-100) 25%, var(--warm-200) 50%, var(--warm-100) 75%); background-size: 200% 100%; animation: skeleton-sheen 1.4s ease-in-out infinite; }

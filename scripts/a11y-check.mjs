@@ -45,8 +45,8 @@ const PAGES = [
   ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
-  ['Overview', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
-  ['Portfolio', '/dashboard/portfolio'], ['Time impact', '/dashboard/time-impact'],
+  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
+  ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
   // Last, so the pages above keep their no-upload state: an uploaded schedule with a project document,
   // a search with a flagged passage and the candidate requirements.
@@ -62,6 +62,10 @@ const PAGES = [
     await page.getByRole('button', { name: 'Search' }).click()
     await page.waitForSelector('text=Caution:')
   }],
+  // With an uploaded schedule: Home lists both projects (cards, then the table view) and the project page opens.
+  ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
+  ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
+  ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('text=All projects') }],
 ]
 
 let failed = 0
