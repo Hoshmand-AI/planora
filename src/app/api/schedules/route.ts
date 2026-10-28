@@ -9,6 +9,7 @@ import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } 
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
 import { addDaysIso } from '@/lib/parsers/types'
+import { keepInTarget, keepOriginal, readUploadSource } from '@/lib/storage/upload-source'
 import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { emptyReport, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
@@ -135,7 +136,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   if (!quota.ok) throw new ApiError(429, 'Your organization has uploaded a lot of files in the last hour. Try again later.', 'rate_limited', { retryAfterSec: quota.retryAfterSec })
   {
     const formData = await req.formData()
-    const file = formData.get('file') as File | null
+    const picked = formData.get('file')
+    const requestedName = (picked && typeof picked !== 'string' ? picked.name : String(formData.get('sourceKey') || '').split('/').pop()) || null
     const versionInput = ((formData.get('version') as string) || '').trim().slice(0, 40)
     const progressInput = formData.get('progressMode')
     const chosenMode = progressInput === 'override' || progressInput === 'retained' ? progressInput : null
@@ -146,7 +148,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // The commercial cloud does not take classified schedules (nothing is parsed or stored).
     const classifiedRefusal = classifiedCloudRefusal(classificationInput, deploymentKind())
     if (classifiedRefusal) {
-      await audit({ action: 'schedule.upload_refused', detail: { reason: CLASSIFIED_CLOUD_CODE, fileName: file?.name ?? null, deployment: deploymentKind() } })
+      await audit({ action: 'schedule.upload_refused', detail: { reason: CLASSIFIED_CLOUD_CODE, fileName: requestedName, deployment: deploymentKind() } })
       return NextResponse.json({ error: classifiedRefusal, code: CLASSIFIED_CLOUD_CODE }, { status: 409 })
     }
     const originInput = formData.get('origin') || null
@@ -161,13 +163,16 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const typeErr = projectTypeError(projectType)
     if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
 
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    // The file: from the user's computer, or imported from the firm's connected cloud storage.
     const maxBytes = effectiveUploadLimit(MAX_UPLOAD_BYTES)
-    if (file.size > maxBytes) return NextResponse.json({ error: tooLargeMessage('schedule', maxBytes), code: 'too_large' }, { status: 413 })
+    const keepTarget = await keepInTarget(formData, ctx.orgId)
+    const source = await readUploadSource(formData, ctx.orgId, maxBytes, tooLargeMessage('schedule', maxBytes))
+    if (!source) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    const file = { name: source.fileName, size: source.bytes.length }
 
     const scheduleId = uuid()
     let parsed
-    const bytes = Buffer.from(await file.arrayBuffer())
+    const bytes = source.bytes
     const sha256 = createHash('sha256').update(bytes).digest('hex')
     try {
       parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
@@ -283,6 +288,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const orderWarning = seriesDataDateWarning(series, parsed.dataDate, versionLabel)
     if (orderWarning) warnings.unshift(orderWarning)
 
+    // The original file in the firm's own storage (when chosen), saved before anything is recorded so a
+    // storage failure leaves nothing half-created.
+    const kept = keepTarget ? await keepOriginal(keepTarget, 'schedules', file.name, sha256, bytes) : null
+
     const schedule = await createSchedule({
       id: scheduleId,
       userId: ctx.userId,
@@ -324,10 +333,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
     // Keep the original file for chain of custody (its SHA-256 is also in the audit log).
-    await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
+    await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes, kept, from: source.from })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, runf9Export, progressMode, workspaceId, importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, runf9Export, progressMode, workspaceId, importedFrom: source.from ? { connectionId: source.from.connectionId, key: source.from.key } : null, originalKeptIn: kept ? { connectionId: kept.connectionId, key: kept.objectKey } : 'runf9', importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
 
     return NextResponse.json({
       success: true, schedule,

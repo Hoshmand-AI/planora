@@ -5,6 +5,7 @@ import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleFile } from '@/lib/db'
+import { KeptFileUnavailable } from '@/lib/storage/kept'
 import { basisFrom, loadScheduleData } from '@/lib/planning/service'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import { exportXer, exportXerFromOriginal, xerEditsFrom, xerUpdatesFrom } from '@/lib/export/xer'
@@ -58,7 +59,11 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
 
   if (format === 'original') {
-    const f = await getScheduleFile(schedule.id, auth.orgId)
+    let f
+    try { f = await getScheduleFile(schedule.id, auth.orgId) } catch (e) {
+      if (e instanceof KeptFileUnavailable) return NextResponse.json({ error: e.message, code: 'kept_file_unavailable' }, { status: 409 })
+      throw e
+    }
     if (!f) return NextResponse.json({ error: 'The original file was not kept for this upload (uploaded before files were retained).' }, { status: 404 })
     await audit({ action: 'schedule.download_original', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, file: f.fileName, sha256: f.sha256 } })
     return new NextResponse(f.content as unknown as BodyInit, { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${f.fileName.replace(/"/g, '')}"`, 'X-Content-SHA256': f.sha256 } })
@@ -90,7 +95,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 
   // What this format cannot carry: the file's own unmapped data, activities the export model leaves
   // out (WBS summaries; level of effort outside MS Project XML), and the format's own limits.
-  const original = format === 'xer' && schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId) : undefined
+  const original = format === 'xer' && schedule.sourceType === 'p6_xer' && req.nextUrl.searchParams.get('rebuild') !== '1' ? await getScheduleFile(schedule.id, auth.orgId).catch(e => { if (e instanceof KeptFileUnavailable) return undefined; throw e }) : undefined
   const exKey: ExportExceptionFormat = original ? 'xer-original' : format === 'xlsx-import' || format === 'xlsx-p6' || format === 'xml' || format === 'csv' ? format : format === 'xer' ? 'xer' : 'xlsx-p6'
   const mspG = format === 'xml' ? uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, data.edits, { includeLoe: true, resources }) : null
   const exceptions = exportExceptions(mspG ?? g, exKey, {

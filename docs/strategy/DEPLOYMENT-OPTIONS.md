@@ -51,6 +51,26 @@ into one view with the firm's SSO. Build it when a paying firm runs two or more 
 individual projects to different databases inside one deployment is *not* recommended: every query,
 the audit log, backups and the security boundary would have to span clouds.
 
+### Built: cloud storage connections (10/29/2026)
+
+The self-serve part of "link RunF9 to our AWS / Azure / Google" is now in the product:
+
+- **Organization > Cloud storage**: an admin connects an Amazon S3 bucket (access key, IAM policy
+  shown), an Azure Blob container (SAS token) or a Google Cloud Storage bucket (HMAC key). RunF9
+  lists the folder and writes, then deletes, a check file before saving the connection; secrets are
+  encrypted and never returned. Private deployments can also connect S3-compatible storage (MinIO).
+- **Every upload** (schedules and documents) asks *Upload from* (this computer or a connected
+  storage, with a folder browser) and *Keep the original file in* (RunF9 or a connected storage).
+  A kept original is read back with a SHA-256 check, so a file changed in the bucket is refused.
+- Several connections can coexist, one per client, which covers "some projects on Azure, some on
+  AWS" for files.
+
+What it does not do: schedules, analysis and the document-search index still live in the
+deployment's database. Moving those into a client's cloud is the private deployment above.
+Next steps when customers ask: role-based sign-in instead of keys (AWS IAM role with external ID,
+Azure app registration, Google workload identity federation), limiting a connection to a
+workspace, and import from SharePoint / OneDrive.
+
 ### Where the RAG data should live
 
 In **the same database as the project it describes**, i.e. the client's cloud when the project runs

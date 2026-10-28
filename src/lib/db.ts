@@ -417,10 +417,12 @@ export async function getScheduleSeries(orgId: string, projectKey: string): Prom
   return res.rows.map(rowToSchedule)
 }
 
-export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer }): Promise<void> {
+export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer; kept?: { connectionId: string; objectKey: string } | null; from?: { connectionId: string; key: string } | null }): Promise<void> {
   await initSchema()
-  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content) VALUES ($1,$2,$3,$4,$5,$6)
-    ON CONFLICT (schedule_id) DO NOTHING`, [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.content])
+  // Kept in the firm's own storage: RunF9 records only where it is (content left empty).
+  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content, storage_connection_id, object_key, source_connection_id, source_key)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (schedule_id) DO NOTHING`,
+  [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.kept ? Buffer.alloc(0) : f.content, f.kept?.connectionId ?? null, f.kept?.objectKey ?? null, f.from?.connectionId ?? null, f.from?.key ?? null])
 }
 
 /** Uploads among `scheduleIds` whose stored original file has this SHA-256 (identical bytes). */
@@ -434,10 +436,17 @@ export async function findScheduleFilesBySha(orgId: string, sha256: string, sche
 export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
   await initSchema()
   const ws = await workspaceScope('s.workspace_id', 3)
-  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
+  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at, f.size_bytes, f.storage_connection_id, f.object_key FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
     WHERE f.schedule_id=$1 AND f.org_id=$2${ws.and}`, [scheduleId, orgId, ...ws.params])
   const r = res.rows[0]
-  return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
+  if (!r) return undefined
+  let content = r.content as Buffer
+  if (r.storage_connection_id && r.object_key && content.length === 0) {
+    // Kept in the firm's own cloud storage: read it back and make sure it is the file that was uploaded.
+    const { fetchKeptOriginal } = await import('@/lib/storage/kept')
+    content = await fetchKeptOriginal(orgId, String(r.storage_connection_id), String(r.object_key), String(r.sha256), Number(r.size_bytes))
+  }
+  return { fileName: r.file_name, sha256: r.sha256, content, createdAt: String(r.created_at) }
 }
 
 /** File name and SHA-256 of the stored original (no content), for provenance headers. */

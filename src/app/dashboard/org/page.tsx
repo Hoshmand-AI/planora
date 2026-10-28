@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { DataLocation } from '@/lib/server/data-location'
+import { CloudStorage } from '@/components/CloudStorage'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
@@ -130,7 +131,8 @@ export default function OrgPage() {
         </dl>
       </Section>
 
-      {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} orgName={data.org.name} />}
+      {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} />}
+      <CloudStorage manage={manage} />
 
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
@@ -393,41 +395,18 @@ export default function OrgPage() {
   )
 }
 
-const CLOUDS = [
-  { id: 'Microsoft Azure', what: 'Azure Database for PostgreSQL in the client’s (or your) subscription, including Azure Government; AI through Azure OpenAI or none.' },
-  { id: 'AWS', what: 'Amazon RDS or Aurora PostgreSQL in the account, including GovCloud; AI through Amazon Bedrock or none.' },
-  { id: 'Google Cloud', what: 'Cloud SQL for PostgreSQL in the project; AI through Vertex AI or none.' },
-  { id: 'Your servers', what: 'Air-gapped, for CUI and classified work; AI on your own hardware or none.' },
-]
-
-/** Where this deployment keeps the firm's data, and how to put a client's projects in another cloud. */
-function DataLocationSection({ loc, orgName }: { loc: DataLocation; orgName: string }) {
+/** Where this deployment keeps the firm's data. */
+function DataLocationSection({ loc }: { loc: DataLocation }) {
   return (
-    <Section id="data-location" title="Where your data lives" description="Project files, schedules and the document-search index are stored together, in one database per deployment.">
+    <Section id="data-location" title="Where your data lives" description="Schedules, analysis and the document-search index are stored in this deployment's database. Original files can be kept in your own cloud storage (below).">
       <dl className="grid gap-4 md:grid-cols-3 text-[13.5px]">
         <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-navy-950">{loc.label}</dd></div>
         <div><dt className="text-warm-600">Database</dt><dd className="mt-1 text-warm-700">{loc.database}</dd></div>
         <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
       </dl>
-      <div className="mt-5 border-t border-warm-200 pt-4">
-        <h3 className="text-[14px] font-semibold text-navy-950">A client requires a different cloud?</h3>
-        <p className="text-[13px] text-warm-600 mt-1 max-w-3xl">
-          RunF9 is installed as its own deployment in that cloud, so the client&apos;s projects, documents and search index stay there and are never copied here.
-          Your team signs in to each deployment with the same company login (SSO). Mix as many as your clients need.
-        </p>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-          {CLOUDS.map(c => (
-            <li key={c.id} className="rounded-xl border border-warm-200 bg-warm-50 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[13.5px] font-semibold text-navy-950">{c.id}</span>
-                <a className="text-[13px] font-semibold text-accent-600 hover:underline whitespace-nowrap"
-                  href={`mailto:support@hoshmand.ai?subject=${encodeURIComponent(`RunF9 deployment for a client: ${c.id}`)}&body=${encodeURIComponent(`Organization: ${orgName}\nClient / project(s):\nRegion:\n`)}`}>Request</a>
-              </div>
-              <p className="text-[12.5px] text-warm-600 mt-1">{c.what}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
+        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? RunF9 can be installed there as its own deployment, with the same company sign-in (SSO). Contact support@hoshmand.ai.
+      </p>
     </Section>
   )
 }

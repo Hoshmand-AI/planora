@@ -10,10 +10,14 @@ import { DocumentRejected, MAX_DOCUMENT_BYTES } from '@/lib/rag/extract'
 import { DOC_TYPES, DOC_TYPE_LABELS, isDocType } from '@/lib/rag/types'
 import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { auditTarget } from '@/lib/rag/scope'
+import { createHash } from 'crypto'
+import { keepInTarget, keepOriginal, readUploadSource } from '@/lib/storage/upload-source'
+import { recordDocumentStorage } from '@/lib/rag/store'
 
 // Project documents (contracts, scheduling specifications, owner requirements) used to ground Ask AI
 // and AI reports. Documents belong to the project: the upload they were added to and every other
-// upload of the same series. Only the extracted text is stored, never the original file.
+// upload of the same series. RunF9 stores only the extracted text; the original file is kept only if the uploader chooses the
+// firm's own cloud storage (src/lib/storage/*).
 
 /** Documents visible to the caller for this project, plus organization standards. */
 export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { params, auth }) => {
@@ -40,10 +44,12 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
 
   let form: FormData
   try { form = await req.formData() } catch { throw new ApiError(400, 'Send the document as multipart form data with a "file" field.') }
-  const file = form.get('file')
-  if (!file || typeof file === 'string') throw new ApiError(400, 'Choose a file to upload.')
+  // From the user's computer or the firm's connected cloud storage; optionally keep the original there.
   const maxBytes = effectiveUploadLimit(MAX_DOCUMENT_BYTES)
-  if (file.size > maxBytes) throw new ApiError(413, tooLargeMessage('document', maxBytes), 'too_large')
+  const keepTarget = await keepInTarget(form, auth.orgId)
+  const source = await readUploadSource(form, auth.orgId, maxBytes, tooLargeMessage('document', maxBytes))
+  if (!source) throw new ApiError(400, 'Choose a file to upload.')
+  const file = { name: source.fileName }
   const docType = form.get('docType')
   if (!isDocType(docType)) throw new ApiError(400, `Pick a document type: ${DOC_TYPES.join(', ')}.`)
   const scope = form.get('scope') === 'org' ? 'org' : 'project'
@@ -56,21 +62,27 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
   const refusal = classifiedCloudRefusal(classification, deploymentKind())
   if (refusal) throw new ApiError(409, refusal, CLASSIFIED_CLOUD_CODE)
 
+  const sha256 = createHash('sha256').update(source.bytes).digest('hex')
+  const kept = keepTarget ? await keepOriginal(keepTarget, 'documents', file.name || 'document', sha256, source.bytes) : null
   try {
     const r = await ingestDocument({
       orgId: auth.orgId, scope, scheduleId: scope === 'project' ? schedule.id : null, title, fileName: file.name || 'document',
-      docType, classification, uploadedBy: auth.userId, content: Buffer.from(await file.arrayBuffer()),
+      docType, classification, uploadedBy: auth.userId, content: source.bytes,
     })
     const d = r.document
+    if (kept || source.from) await recordDocumentStorage(auth.orgId, d.id, kept, source.from)
     await audit({ action: 'document.uploaded', ...auditTarget(d), detail: {
       documentId: d.id, scope: d.scope, title: d.title, docType: d.docType, format: d.format, sha256: d.sha256, sizeBytes: d.sizeBytes,
-      pages: d.pageCount, passages: d.chunkCount, flaggedPassages: d.flaggedCount, classification: d.classification, storesOriginalFile: false,
+      pages: d.pageCount, passages: d.chunkCount, flaggedPassages: d.flaggedCount, classification: d.classification, storesOriginalFile: kept ? { connectionId: kept.connectionId, key: kept.objectKey } : false,
+      importedFrom: source.from ? { connectionId: source.from.connectionId, key: source.from.key } : null,
     } })
     return json({
       document: d, flaggedChunks: r.flaggedChunks,
       ...(r.flaggedChunks.length ? { warning: `${r.flaggedChunks.length} passage${r.flaggedChunks.length === 1 ? '' : 's'} contain${r.flaggedChunks.length === 1 ? 's' : ''} text that reads like instructions to an AI. ${r.flaggedChunks.length === 1 ? 'It is' : 'They are'} never sent to a model and ${r.flaggedChunks.length === 1 ? 'is' : 'are'} shown with a warning in search results.` } : {}),
     })
   } catch (err) {
+    // Not added (duplicate, unreadable…): take back the copy just saved in the firm's storage.
+    if (kept && keepTarget) await keepTarget.client.del(kept.objectKey).catch(() => {})
     if (err instanceof DocumentRejected) throw new ApiError(err.code === 'duplicate' ? 409 : err.code === 'too_large' ? 413 : 400, err.message, err.code)
     throw err
   }

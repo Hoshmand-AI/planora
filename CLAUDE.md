@@ -10,7 +10,7 @@ The owner has asked Claude to ship without waiting on them:
 Rollback: Vercel → Deployments → Instant Rollback.
 
 ## Checks
-`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/e2e-tenant-isolation.mjs`, `scripts/e2e-scim.mjs`, `scripts/e2e-rag.mjs`, `scripts/e2e-no-egress.mjs` (starts its own air-gapped server and in-network model stand-in), `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (these run with `RUNF9_SIGNUP=open`), and `scripts/e2e-beta.mjs` against a second server in the default invite-only mode with `RUNF9_PLATFORM_ADMINS` set (CI runs all of them — see `.github/workflows/ci.yml` for the env).
+`npm run typecheck`, `npm test`, `npm run build`; end-to-end against a running server with Postgres: `scripts/e2e-smoke.mjs`, `scripts/e2e-security.mjs`, `scripts/e2e-tenant-isolation.mjs`, `scripts/e2e-scim.mjs`, `scripts/e2e-rag.mjs`, `scripts/e2e-cloud-storage.mjs` (needs the S3 and Azure emulators started as in ci.yml), `scripts/e2e-no-egress.mjs` (starts its own air-gapped server and in-network model stand-in), `scripts/a11y-check.mjs`, backup + `scripts/restore-drill.mjs` (these run with `RUNF9_SIGNUP=open`), and `scripts/e2e-beta.mjs` against a second server in the default invite-only mode with `RUNF9_PLATFORM_ADMINS` set (CI runs all of them — see `.github/workflows/ci.yml` for the env).
 
 ## Security rules for changes
 - Every API handler uses `api({ permission })` or `publicApi()` from `src/lib/server/api.ts` (enforced by `src/lib/server/routes.test.ts`); SCIM provisioning routes (`/api/scim/v2/...`) use `scimApi()` instead (organization SCIM bearer token; also enforced by `routes.test.ts`).

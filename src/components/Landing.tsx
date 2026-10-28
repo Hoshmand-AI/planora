@@ -118,7 +118,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Choose the cloud: RunF9 Cloud, the firm's own AWS / Azure / Google account, a different cloud per client, or air-gapped */}
       <div className="pt-24 md:pt-36">
-        <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} contactEmail="support@hoshmand.ai" />
+        <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} />
       </div>
 
       {/* Build. Check. Forecast. */}

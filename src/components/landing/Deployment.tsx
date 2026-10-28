@@ -1,8 +1,8 @@
 'use client'
 
-// "Run it where your data lives": the visitor picks where RunF9 should run (RunF9 Cloud, their own
-// AWS / Azure / Google Cloud account, or their own servers) and sees what that means for their data
-// and AI, honestly labelled as available now or on request. The plan behind it:
+// "Run it where your data lives": information only. The visitor picks RunF9 Cloud, their AWS / Azure /
+// Google Cloud storage (connected in the app: src/components/CloudStorage.tsx), a cloud per client,
+// or their own servers, and sees what that means for their data and AI. The plan behind it:
 // docs/strategy/DEPLOYMENT-OPTIONS.md; claims: docs/marketing/CLAIMS-REGISTER.md.
 
 import Link from 'next/link'
@@ -18,7 +18,6 @@ interface Option {
   data: string
   ai: string
   fit: string
-  cta: string
 }
 
 const OPTIONS: Option[] = [
@@ -27,42 +26,36 @@ const OPTIONS: Option[] = [
     data: 'Hosted by RunF9 (Vercel and Neon, United States). Your firm’s data is kept separate from every other firm’s.',
     ai: 'Off until your admin turns it on; then Anthropic Claude. Projects marked CUI or classified are never sent to it.',
     fit: 'Teams that want to start today.',
-    cta: '',
   },
   {
-    id: 'aws', tab: 'Your AWS', title: 'In your AWS account', status: 'On request',
-    data: 'Your AWS account: RunF9’s container and your own PostgreSQL (Amazon RDS or Aurora), including AWS GovCloud.',
-    ai: 'None, or a model you host in your account. An Amazon Bedrock connector is built with your deployment.',
-    fit: 'Firms whose data must stay in their AWS tenant.',
-    cta: 'Ask about AWS',
+    id: 'aws', tab: 'AWS', title: 'Connect your Amazon S3', status: 'Available now',
+    data: 'Connect an S3 bucket in your AWS account (GovCloud included). Import schedules and documents straight from it, and keep the original files there instead of in RunF9. Running all of RunF9 inside your AWS account is available on request.',
+    ai: 'The same AI choice as RunF9 Cloud. Inside your own AWS account: none, or a model you host; an Amazon Bedrock connector is built with that deployment.',
+    fit: 'Firms whose files must stay in their AWS account.',
   },
   {
-    id: 'azure', tab: 'Your Azure', title: 'In your Microsoft Azure subscription', status: 'On request',
-    data: 'Your Azure subscription: RunF9’s container and Azure Database for PostgreSQL, including Azure Government.',
-    ai: 'None, or a model you host in your subscription. An Azure OpenAI connector is built with your deployment.',
+    id: 'azure', tab: 'Azure', title: 'Connect your Azure Blob Storage', status: 'Available now',
+    data: 'Connect a container in your Azure storage account. Import schedules and documents straight from it, and keep the original files there. Running all of RunF9 in your Azure subscription (Azure Government included) is available on request.',
+    ai: 'The same AI choice as RunF9 Cloud. Inside your own subscription: none, or a model you host; an Azure OpenAI connector is built with that deployment.',
     fit: 'Firms that run on Microsoft 365 and Azure.',
-    cta: 'Ask about Azure',
   },
   {
-    id: 'gcp', tab: 'Your Google Cloud', title: 'In your Google Cloud project', status: 'On request',
-    data: 'Your Google Cloud project: RunF9’s container and Cloud SQL for PostgreSQL.',
-    ai: 'None, or a model you host in your project. A Vertex AI connector is built with your deployment.',
+    id: 'gcp', tab: 'Google Cloud', title: 'Connect your Google Cloud Storage', status: 'Available now',
+    data: 'Connect a Cloud Storage bucket in your Google Cloud project. Import schedules and documents straight from it, and keep the original files there. Running all of RunF9 in your project is available on request.',
+    ai: 'The same AI choice as RunF9 Cloud. Inside your own project: none, or a model you host; a Vertex AI connector is built with that deployment.',
     fit: 'Firms standardized on Google Cloud.',
-    cta: 'Ask about Google Cloud',
   },
   {
-    id: 'mixed', tab: 'Per client', title: 'A different cloud for each client', status: 'On request',
-    data: 'Each client’s projects run in a RunF9 deployment inside the cloud that client requires: Azure for one, AWS or Google Cloud for another. Schedules, documents and the document-search index stay in that cloud’s own database; nothing is copied between them.',
-    ai: 'Each deployment uses the AI in its own cloud (Azure OpenAI, Amazon Bedrock or Google Vertex AI) or none, so a client’s data never reaches another client’s cloud.',
-    fit: 'Firms whose owners and clients each mandate a cloud. Your team signs in to every deployment with the same company login (SSO).',
-    cta: 'Ask about multi-cloud',
+    id: 'mixed', tab: 'Per client', title: 'A different cloud for each client', status: 'Available now',
+    data: 'Connect as many storages as your clients require, for example the owner’s Azure for one project and AWS for another. On every upload your team picks where the file comes from and where the original is kept.',
+    ai: 'Follows your organization’s AI setting. Projects marked CUI or classified are never sent to a cloud model.',
+    fit: 'Firms whose owners and clients each mandate a cloud. For a whole RunF9 per client cloud (database included), ask us.',
   },
   {
     id: 'onprem', tab: 'Your servers', title: 'On your own servers, air-gapped', status: 'Available now',
     data: 'Your servers, with no internet connection needed. Built for projects marked CUI or classified (your security office accredits the system).',
     ai: 'None, or a model on your own hardware (for example Ollama or vLLM). Every release is checked to send nothing outside your network.',
     fit: 'Defense, government and owners with the strictest rules.',
-    cta: 'Ask about on-premises',
   },
 ]
 
@@ -72,7 +65,7 @@ const ROW = [
   { key: 'fit' as const, label: 'Best for', icon: ShieldCheck },
 ]
 
-export default function Deployment({ primaryHref, primaryLabel, contactEmail }: { primaryHref: string; primaryLabel: string; contactEmail: string }) {
+export default function Deployment({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel: string }) {
   const [active, setActive] = useState(0)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   const o = OPTIONS[active]
@@ -96,15 +89,13 @@ export default function Deployment({ primaryHref, primaryLabel, contactEmail }: 
     else if (e.key === 'Home') { e.preventDefault(); select(0) }
     else if (e.key === 'End') { e.preventDefault(); select(OPTIONS.length - 1) }
   }
-  const href = o.id === 'cloud' ? primaryHref : `mailto:${contactEmail}?subject=${encodeURIComponent(`RunF9 private deployment: ${o.id === 'mixed' ? 'a different cloud per client' : o.tab.replace(/^Your /, '')}`)}`
-  const cta = o.id === 'cloud' ? primaryLabel : o.cta
   const btn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors px-7 py-3 text-[15px]'
 
   return (
     <section id="deployment" aria-labelledby="deployment-h" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-20">
       <Reveal className="text-center mb-10 md:mb-12">
         <h2 id="deployment-h" className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Run it where your data lives.</h2>
-        <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Choose our cloud, your own AWS, Azure or Google Cloud account, a different cloud for each client, or your own servers.</p>
+        <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>
       </Reveal>
       <Reveal className="max-w-[880px] mx-auto">
         <div role="tablist" aria-label="Where RunF9 runs" onKeyDown={onKey} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-warm-100 border border-warm-200 w-fit max-w-full mx-auto">
@@ -133,8 +124,8 @@ export default function Deployment({ primaryHref, primaryLabel, contactEmail }: 
               ))}
             </dl>
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              {href.startsWith('mailto:') ? <a href={href} className={btn}>{cta}</a> : <Link href={href} className={btn}>{cta}</Link>}
-              {o.status === 'On request' && <p className="text-[13.5px] text-warm-600">Installed from the same container we run, in your account. Your data never passes through RunF9.</p>}
+              <Link href={primaryHref} className={btn}>{primaryLabel}</Link>
+              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : 'Connect it after you sign up, under Organization > Cloud storage.'}</p>
             </div>
           </div>
         </div>
