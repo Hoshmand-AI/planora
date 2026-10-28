@@ -1,12 +1,10 @@
 'use client'
 
 import { useApp } from '../layout'
-import { StickyBar } from '@/components/StickyBar'
-import { ArrowLeft, Upload } from 'lucide-react'
 import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
 import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
-import { fmtDate, fmtDates, fmtDay } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
 import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
 import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
@@ -16,7 +14,7 @@ import { useEffect, useState } from 'react'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
   useEffect(() => {
@@ -52,7 +50,6 @@ export default function ProjectPage() {
   const scheduledFinish = (mx.scheduledFinish as string) || null
   const logicFinish = (mx.logicFinish as string) || null
   const twoFinishes = mx.forecastBasis === 'logic' && !!scheduledFinish && !!logicFinish && scheduledFinish !== logicFinish
-  const STATUS_LABEL = { on_track: 'On Track', attention: 'Attention', at_risk: 'At Risk', complete: 'Complete', no_baseline: 'No Baseline Yet' } as const
 
   const criticalCount = Number(m?.criticalCount ?? 0)
   // Whether a critical path exists at all (src/lib/analysis/critical-status.ts): never a confident 0 without logic.
@@ -89,39 +86,6 @@ export default function ProjectPage() {
 
   return (
     <div className="p-5 md:p-6 space-y-6">
-
-      {/* Schedule summary strip — frozen while scrolling */}
-      <StickyBar className="-mx-5 md:-mx-6 -mt-5 md:-mt-6 px-5 md:px-6 py-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[17px] font-semibold text-navy-950">{selectedSchedule.name}</div>
-          <div className="text-[12px] text-warm-400 mt-0.5">
-            {selectedSchedule.version} · {selectedSchedule.activityCount} activities · uploaded {fmtDay(selectedSchedule.uploadedAt)}
-            {selectedSchedule.dataDate && ` · data date ${fmtDate(selectedSchedule.dataDate)}`}
-          </div>
-        </div>
-        <span title={statusReasons.join(' ')} className={`text-[12px] font-semibold px-3 py-1 rounded-full whitespace-nowrap ${
-          status === 'at_risk'
-            ? 'text-status-at-risk bg-status-at-risk-bg'
-            : status === 'attention'
-            ? 'text-status-attention bg-status-attention-bg'
-            : status === 'no_baseline'
-            ? 'text-warm-700 bg-warm-100'
-            : 'text-status-on-track bg-status-on-track-bg'
-        }`}>
-          {STATUS_LABEL[status]}
-        </span>
-      </div>
-      </StickyBar>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline"><ArrowLeft size={14} aria-hidden /> All projects</Link>
-        {/* A new monthly update belongs to this project: upload it from here (Home has the button for new projects) */}
-        {selectedSchedule.sourceType !== 'generated' && can('schedule.write') && (
-          <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-3.5 py-1.5 text-[13px] font-semibold hover:bg-warm-100">
-            <Upload size={14} aria-hidden /> Upload an update
-          </button>
-        )}
-      </div>
 
       {selectedSchedule.sourceType !== 'generated' && <ScheduleTabs tab={tab} onChange={setTab} />}
       {selectedSchedule.sourceType !== 'generated' && (
