@@ -125,7 +125,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
             </dl>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link href={primaryHref} className={btn}>{primaryLabel}</Link>
-              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'No credit card needed.' : o.id === 'onprem' ? 'Installed from the same container we run.' : 'Connect it after you sign up, under Organization > Cloud storage.'}</p>
+              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : 'Connect it after you sign up, under Organization > Cloud storage.'}</p>
             </div>
           </div>
         </div>
