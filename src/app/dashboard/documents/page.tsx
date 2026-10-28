@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Loader2, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
+import { FileSourcePicker } from '@/components/FileSourcePicker'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
 import { fmtDay } from '@/lib/format'
@@ -137,7 +138,6 @@ export default function DocumentsPage() {
 }
 
 function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listing; canOrg: boolean; onDone: (n: { tone: 'success' | 'warning' | 'error'; text: string }) => void }) {
-  const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [docType, setDocType] = useState('scheduling_spec')
   const [orgStandard, setOrgStandard] = useState(false)
@@ -145,22 +145,21 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   const [formKey, setFormKey] = useState(0)
   const orgId = useId()
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!file) return
     setBusy(true)
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('title', title)
-    fd.append('docType', docType)
-    if (orgStandard) fd.append('scope', 'org')
+    // file or sourceConnectionId + sourceKey, and keepIn, come from FileSourcePicker's fields.
+    const fd = new FormData(e.currentTarget)
+    fd.set('title', title)
+    fd.set('docType', docType)
+    if (orgStandard) fd.set('scope', 'org')
     try {
       const res = await fetch(base, { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) onDone({ tone: 'error', text: d.error || (res.status === 413 ? tooLargeMessage('document', data.limits.maxBytes) : 'Upload failed.') })
       else {
         onDone(d.warning ? { tone: 'warning', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). ${d.warning}` } : { tone: 'success', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). It is unreviewed until an admin or reviewer approves it.` })
-        setFile(null); setTitle(''); setOrgStandard(false); setFormKey(k => k + 1)
+        setTitle(''); setOrgStandard(false); setFormKey(k => k + 1)
       }
     } catch { onDone({ tone: 'error', text: 'Network error. Check your connection and try again.' }) }
     setBusy(false)
@@ -169,7 +168,9 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   return (
     <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
       <form key={formKey} onSubmit={submit} className="grid md:grid-cols-2 gap-3">
-        <Field label="File">{p => <input {...p} type="file" required accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" onChange={e => setFile(e.target.files?.[0] ?? null)} className="text-[13px] text-warm-700 file:mr-3 file:rounded-md file:border file:border-warm-300 file:bg-warm-50 file:px-3 file:py-1.5 file:text-[13px] file:text-navy-950" />}</Field>
+        <div className="md:col-span-2">
+          <FileSourcePicker accept=".pdf,.docx,.txt,.md" canManage={canOrg} keepValue="none" keepLabel="Not kept (RunF9 keeps only the extracted text)" inputClassName={inputClass} />
+        </div>
         <Field label="Title" hint="Defaults to the file name.">{p => <input {...p} value={title} maxLength={160} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. Section 01 32 16 Construction Progress Schedule" />}</Field>
         <Field label="Document type">{p => (
           <select {...p} value={docType} onChange={e => setDocType(e.target.value)} className={inputClass}>
@@ -185,7 +186,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
           </div>
         )}
         <div className="md:col-span-2">
-          <Button type="submit" disabled={!file || busy}>{busy ? <><Loader2 size={13} className="inline animate-spin -mt-0.5" aria-hidden="true" /> Reading the document…</> : <><Upload size={13} className="inline -mt-0.5" aria-hidden="true" /> Upload</>}</Button>
+          <Button type="submit" disabled={busy}>{busy ? <><Loader2 size={13} className="inline animate-spin -mt-0.5" aria-hidden="true" /> Reading the document…</> : <><Upload size={13} className="inline -mt-0.5" aria-hidden="true" /> Upload</>}</Button>
         </div>
       </form>
     </Section>

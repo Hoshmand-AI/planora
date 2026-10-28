@@ -69,6 +69,8 @@ jobs:
       # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
       RUNF9_ALLOW_INSECURE_WEBHOOKS: '1'
       RUNF9_EMAIL_OUTBOX: /tmp/runf9-outbox
+      # Test-only: cloud storage connections may use the local S3 and Azure Blob emulators.
+      RUNF9_STORAGE_CUSTOM_ENDPOINTS: 'true'
       WEBHOOK_RECEIVER_PORT: '4020'
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
@@ -109,6 +111,13 @@ jobs:
         run: node scripts/e2e-tenant-isolation.mjs
       - name: SAML single sign-on and SCIM provisioning checks
         run: node scripts/e2e-scim.mjs
+      - name: Cloud storage connections (S3 and Azure Blob emulators)
+        run: |
+          mkdir -p /tmp/s3 /tmp/az
+          nohup npx -y s3rver@3.7.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e > s3.log 2>&1 &
+          nohup npx -y -p azurite@3.37.0 azurite-blob --blobHost 127.0.0.1 --blobPort 10000 -l /tmp/az --skipApiVersionCheck --disableTelemetry > azurite.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:4569 && curl -s -o /dev/null http://127.0.0.1:10000 && break; sleep 2; done
+          node scripts/e2e-cloud-storage.mjs
       - name: Private beta gate (second server in the default invite-only mode)
         run: |
           RUNF9_SIGNUP= RUNF9_PLATFORM_ADMINS=ops@beta.test nohup npx next start -p 3001 > app-beta.log 2>&1 &
@@ -123,7 +132,7 @@ jobs:
           BETA_BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/a11y-check.mjs
       - name: App log
         if: failure()
-        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log || true
+        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log; tail -n 30 s3.log azurite.log || true
 
   # Static analysis for common vulnerability classes (OWASP Top 10) and committed secrets.
   sast:

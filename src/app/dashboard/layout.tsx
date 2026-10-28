@@ -2,6 +2,7 @@
 
 import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense } from 'react'
 import type { DataLocation } from '@/lib/server/data-location'
+import { FileSourcePicker } from '@/components/FileSourcePicker'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
@@ -458,12 +459,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               ) : (
               <form onSubmit={handleUpload}>
                 <div className="mb-4">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Schedule File</label>
-                  <input
-                    type="file" name="file" accept=".xer,.xml,.pdf,.xlsx,.csv" required
-                    className="w-full border border-warm-300 bg-warm-100 rounded-md px-3 py-2 text-[13.5px] text-warm-700 file:mr-3 file:bg-navy-900 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:text-[12px] file:font-medium"
-                  />
-                  <p className="text-[11px] text-warm-400 mt-1.5">Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF</p>
+                  <FileSourcePicker accept=".xer,.xml,.pdf,.xlsx,.csv" canManage={can('org.manage')}
+                    hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
                 <div className="mb-4">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></label>

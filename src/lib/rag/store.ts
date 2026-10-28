@@ -197,3 +197,9 @@ export async function exportDocuments(orgId: string) {
     requirementReviews: reviews.filter(r => r.document_id === d.id).map(r => ({ key: r.requirement_key, kind: r.kind, status: r.status, userId: r.user_id, at: iso(r.created_at) })),
   }))
 }
+
+/** Where a document's original file is kept (the firm's cloud storage) and where it was imported from. */
+export async function recordDocumentStorage(orgId: string, documentId: string, kept: { connectionId: string; objectKey: string } | null, from: { connectionId: string; key: string } | null): Promise<void> {
+  await query(`UPDATE project_documents SET storage_connection_id=$3, object_key=$4, source_connection_id=$5, source_key=$6 WHERE org_id=$1 AND id=$2`,
+    [orgId, documentId, kept?.connectionId ?? null, kept?.objectKey ?? null, from?.connectionId ?? null, from?.key ?? null])
+}

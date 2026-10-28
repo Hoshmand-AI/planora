@@ -153,9 +153,9 @@ export function ProjectsDashboard() {
         <p className="text-[13px] font-medium text-warm-600">{first ? `Hi ${first}` : 'Welcome'}</p>
         <h1 className="text-[30px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">Projects</h1>
         {org?.dataLocation && (
-          <Link href="/dashboard/org#data-location" className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] text-warm-600 hover:text-navy-950">
+          <Link href="/dashboard/org#cloud-storage" className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] text-warm-600 hover:text-navy-950">
             <Cloud size={14} aria-hidden /> Data stored in <span className="font-semibold text-navy-950">{org.dataLocation.label}</span>
-            <span className="text-accent-600 font-medium">· Other clouds</span>
+            <span className="text-accent-600 font-medium">· Connect AWS, Azure or Google Cloud</span>
           </Link>
         )}
       </div>
