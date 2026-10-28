@@ -77,6 +77,13 @@ export function ProjectsDashboard() {
   const [pins, setPins] = useStored<string[]>('pins', [])
   const [col, setCol] = useState<{ c: Col; dir: 1 | -1 } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const sync = () => setNarrow(mq.matches)
+    sync(); mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => {
     fetch('/api/portfolio').then(async r => {
@@ -129,7 +136,8 @@ export function ProjectsDashboard() {
     })
   }, [rows, q, filter, sort, pins, col])
 
-  const view: View = viewPref ?? (rows.length > 12 ? 'table' : 'cards')
+  // Phones always get cards: a 9-column table can't be read on a narrow screen
+  const view: View = narrow ? 'cards' : viewPref ?? (rows.length > 12 ? 'table' : 'cards')
   const open = (r: PortfolioRow) => {
     if (r.kind === 'schedule') { const s = schedules.find(x => x.id === r.id); if (s) setSelectedSchedule(s) }
     router.push(r.href)
@@ -194,15 +202,15 @@ export function ProjectsDashboard() {
       {header}
 
       {/* Summary strip: each number is a filter */}
-      <div role="group" aria-label="Filter projects by status" className="grid gap-2.5 grid-cols-2 md:grid-cols-5">
+      <div role="group" aria-label="Filter projects by status" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 md:mx-0 md:px-0 md:pb-0 md:grid md:gap-2.5 md:grid-cols-5">
         {FILTERS.map(f => {
           const on = filter === f.id
           const n = counts[f.id]
           return (
             <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
-              className={`card-lift text-left rounded-2xl border px-4 py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'} ${f.id === 'all' ? 'col-span-2 md:col-span-1' : ''}`}>
-              <div className={`text-[26px] font-semibold tracking-[-0.03em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
-              <div className="text-[12.5px] font-medium text-warm-600 mt-1.5">{f.label}</div>
+              className={`card-lift flex-shrink-0 text-left rounded-2xl border px-3.5 py-2.5 md:px-4 md:py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'}`}>
+              <div className={`text-[20px] md:text-[26px] font-semibold tracking-[-0.03em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
+              <div className="text-[12px] md:text-[12.5px] font-medium text-warm-600 mt-1 md:mt-1.5 whitespace-nowrap">{f.label}</div>
             </button>
           )
         })}
@@ -228,7 +236,7 @@ export function ProjectsDashboard() {
             <option value="name">Name</option>
           </select>
         </div>
-        <div role="group" aria-label="View" className="inline-flex rounded-full border border-warm-300 bg-white p-0.5">
+        <div role="group" aria-label="View" className="hidden md:inline-flex rounded-full border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-navy-950 text-white' : 'text-warm-600 hover:text-navy-950'}`}>

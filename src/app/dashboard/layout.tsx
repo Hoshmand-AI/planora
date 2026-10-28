@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   Home, MessageSquare, FileText, Clock,
-  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen, KeyRound,
+  LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2, Users, FolderOpen, KeyRound,
   MoreHorizontal, Timer, MailCheck,
 } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
@@ -177,6 +177,9 @@ function ScheduleDeepLink({ schedules, select }: { schedules: Schedule[]; select
   return null
 }
 
+/** Pages that work on one uploaded schedule: only these show the project picker in the header. */
+const SCHEDULE_PAGES = ['/dashboard/project', '/dashboard/quality', '/dashboard/ask', '/dashboard/reports', '/dashboard/resources', '/dashboard/documents', '/dashboard/time-impact', '/dashboard/timeline']
+
 /* ─── Layout ─────────────────────────────────────────── */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
@@ -202,6 +205,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [emailWhy,         setEmailWhy]         = useState(false)
   const [resend,           setResend]           = useState<{ busy: boolean; note: string; ok: boolean }>({ busy: false, note: '', ok: false })
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
+  const showPicker = SCHEDULE_PAGES.some(p => pathname.startsWith(p))
 
   /* ── Auth ── */
   useEffect(() => {
@@ -332,15 +336,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Logo variant="light" size="text-[22px]" />
             </Link>
 
-            {/* Center (desktop): schedule selector */}
+            {/* Center (desktop): the project the page works on; only on pages about one uploaded schedule */}
             <button
               onClick={() => setShowScheduleList(true)}
-              // Home lists every project, so the one-project picker stays out of the way there
-              className={`hidden md:flex ${pathname === '/dashboard' ? 'md:invisible' : ''} items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[260px]`}
+              aria-label={`Project: ${selectedSchedule ? selectedSchedule.name : 'none selected'}. Change project`}
+              className={`hidden md:flex ${showPicker ? '' : 'md:invisible'} items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[300px]`}
             >
               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
               <span className="text-white/65 text-[12px] font-medium truncate">
-                {selectedSchedule ? selectedSchedule.name : 'No schedule selected'}
+                <span className="font-normal">Project:</span> {selectedSchedule ? selectedSchedule.name : 'none selected'}
               </span>
               <ChevronDown size={11} className="text-white/60 flex-shrink-0" />
             </button>
@@ -350,7 +354,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Mobile: schedule pill (compact) */}
               <button
                 onClick={() => setShowScheduleList(true)}
-                className={`md:hidden ${pathname === '/dashboard' ? 'hidden' : 'flex'} items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5`}
+                aria-label={`Project: ${selectedSchedule ? selectedSchedule.name : 'none selected'}. Change project`}
+                className={`md:hidden ${showPicker ? 'flex' : 'hidden'} items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5`}
               >
                 <div className={`w-1.5 h-1.5 rounded-full ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
                 <span className="text-white/60 text-[11px] font-medium max-w-[100px] truncate">
@@ -364,16 +369,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {llm.airgapped ? <Lock size={10} aria-hidden="true" /> : <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${llm.mode === 'offline' ? 'bg-warm-300' : 'bg-emerald-400'}`} />}
                   {aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
                 </span>
-              )}
-              {can('schedule.write') && (
-              <button
-                onClick={openUpload}
-                className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors pressable shadow-sm"
-              >
-                <Upload size={12} aria-hidden="true" />
-                <span className="hidden sm:inline">Upload</span>
-                <span className="sr-only sm:hidden">Upload schedule</span>
-              </button>
               )}
 
               <button
