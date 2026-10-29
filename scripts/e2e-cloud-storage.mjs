@@ -32,14 +32,18 @@ function ok(cond, msg, extra) {
 }
 
 class Client {
-  constructor() { this.cookie = '' }
-  async raw(method, url, body) {
+  constructor() { this.jar = new Map() }
+  get cookie() { return [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ') }
+  async raw(method, url, body, opts = {}) {
     const headers = { cookie: this.cookie, origin: BASE }
     let payload = body
     if (body && !(body instanceof FormData)) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body) }
-    const res = await fetch(BASE + url, { method, headers, body: payload })
-    const set = res.headers.get('set-cookie')
-    if (set) this.cookie = set.split(';')[0]
+    const res = await fetch(url.startsWith('http') ? url : BASE + url, { method, headers, body: payload, ...opts })
+    for (const c of res.headers.getSetCookie?.() ?? []) {
+      const [pair] = c.split(';'); const i = pair.indexOf('=')
+      const k = pair.slice(0, i), v = pair.slice(i + 1)
+      if (v) this.jar.set(k, v); else this.jar.delete(k)
+    }
     return res
   }
   async req(method, url, body) {
@@ -187,5 +191,73 @@ r = { status: res.status, data: await res.json().catch(() => ({})) }
 ok(r.status === 409 && /no longer connected/.test(r.data.error), 'an original kept in a disconnected storage says where it is', r.data)
 r = await admin.get('/api/storage')
 ok(r.data.connections.every(c => c.id !== az.id), 'the disconnected storage is no longer offered')
+
+// ── Sign-in instead of keys (Microsoft, Google, AWS role), against scripts/mock-cloud.mjs ──
+const MOCK = process.env.MOCK_CLOUD_URL
+if (MOCK) {
+  r = await admin.get('/api/storage')
+  ok(r.data.signIn?.azure && r.data.signIn?.gcp && r.data.signIn?.aws && /^runf9-[0-9a-f]{32}$/.test(r.data.aws?.externalId), 'sign-in with Microsoft, Google and AWS is offered, with this firm\'s AWS external ID', r.data)
+
+  /** Starts a sign-in, follows the provider's redirect back to RunF9, returns RunF9's final redirect. */
+  async function signIn(provider, name, config, hint) {
+    const s = await admin.post('/api/storage', { action: 'oauth_start', provider, name, config })
+    if (s.status !== 200) { console.error('oauth_start failed', s.status, s.data); return { start: s } }
+    const authorize = new URL(s.data.url)
+    if (hint) authorize.searchParams.set('login_hint', hint)
+    const idp = await fetch(authorize, { redirect: 'manual' })
+    const callback = new URL(idp.headers.get('location'))
+    const done = await admin.raw('GET', callback.pathname + callback.search, undefined, { redirect: 'manual' })
+    return { start: s, authorize, location: done.headers.get('location') || '', status: done.status }
+  }
+
+  let x = await signIn('azure', 'Client C (Microsoft sign-in)', { account: 'clientc', container: 'schedules', endpoint: `${MOCK}/blob` })
+  ok(x.authorize.searchParams.get('code_challenge_method') === 'S256' && x.authorize.searchParams.get('scope') === 'https://storage.azure.com/user_impersonation offline_access' && !x.authorize.searchParams.has('client_secret'), 'Microsoft sign-in uses PKCE and asks only for storage access')
+  ok(x.status === 303 && /storage=connected/.test(x.location), 'signing in with Microsoft connects the Azure container', x)
+  x = await signIn('gcp', 'Client D (Google sign-in)', { bucket: 'client-d', endpoint: `${MOCK}/gcs` })
+  ok(x.status === 303 && /storage=connected/.test(x.location) && x.authorize.searchParams.get('access_type') === 'offline', 'signing in with Google connects the Cloud Storage bucket', x)
+  x = await signIn('azure', 'Cancelled', { account: 'clientc', container: 'schedules', endpoint: `${MOCK}/blob` }, 'deny@example.com')
+  ok(/storage_error=/.test(x.location) && /cancelled/i.test(decodeURIComponent(x.location)), 'a cancelled sign-in says so and saves nothing', x)
+
+  // A forged callback without the sign-in cookie is refused.
+  const forged = await new Client().raw('GET', '/api/storage/oauth/callback?code=x&state=y', undefined, { redirect: 'manual' })
+  ok(forged.status === 401 || forged.status === 403 || /storage_error=/.test(forged.headers.get('location') || ''), 'a callback without a signed-in admin and the sign-in cookie is refused')
+
+  r = await admin.get('/api/storage')
+  const ms = r.data.connections.find(c => c.name === 'Client C (Microsoft sign-in)')
+  const goog = r.data.connections.find(c => c.name === 'Client D (Google sign-in)')
+  ok(ms?.canRead && ms?.canWrite && goog?.canRead && goog?.canWrite && !JSON.stringify(r.data).includes('refresh'), 'signed-in storages can import and keep originals; refresh tokens are never returned', r.data)
+
+  // AWS: the one-click role, then connect with the role ARN.
+  r = await admin.post('/api/storage', { action: 'aws_launch', provider: 'aws', config: { bucket: 'client-e', region: 'us-east-1', prefix: 'projects/' } })
+  const launch = r.data.launchUrl && new URLSearchParams(r.data.launchUrl.split('#/stacks/quickcreate?')[1])
+  ok(r.status === 200 && launch?.get('param_ExternalId') === r.data.externalId && launch.get('param_BucketName') === 'client-e' && launch.get('templateURL'), 'AWS: the one-click link opens CloudFormation with the bucket and this firm\'s external ID filled in', r.data)
+  r = await admin.post('/api/storage', { action: 'connect_role', provider: 'aws', name: 'Client E (AWS role)', config: { bucket: 'client-e', region: 'us-east-1', prefix: 'projects/', endpoint: `${MOCK}/s3`, roleArn: 'arn:aws:iam::111122223333:role/RunF9-Storage-client-e' } })
+  ok(r.status === 200 && r.data.connection?.canRead && r.data.connection?.canWrite, 'AWS: RunF9 assumes the role (no keys) and connects the bucket', r.data)
+  const role = r.data.connection
+  r = await admin.post('/api/storage', { action: 'connect_role', provider: 'aws', name: 'Denied', config: { bucket: 'client-e', region: 'us-east-1', endpoint: `${MOCK}/s3`, roleArn: 'arn:aws:iam::111122223333:role/denied' } })
+  ok(r.status === 400 && /refused|could not use/i.test(r.data.error), 'AWS: a role RunF9 may not assume is refused', r.data)
+  r = await admin.post('/api/storage', { action: 'connect_role', provider: 'aws', name: 'Bad', config: { bucket: 'client-e', region: 'us-east-1', roleArn: 'not-an-arn' } })
+  ok(r.status === 400 && /role ARN/.test(r.data.error), 'AWS: a malformed role ARN is refused', r.data)
+
+  // Use each: keep an original there, read it back (tokens refresh; Microsoft's rotate and are saved).
+  const before = await (await fetch(`${MOCK}/stats`)).json()
+  for (const c of [ms, goog, role]) {
+    fd = new FormData()
+    fd.append('file', new Blob([xer]), 'sample.xer')
+    fd.append('keepIn', c.id)
+    fd.append('allowDuplicate', 'true')
+    r = await admin.post('/api/schedules', fd)
+    ok(r.status === 200, `upload keeps its original in ${c.name}`, r.data)
+    for (let i = 0; i < 2; i++) {
+      res = await admin.raw('GET', `/api/schedules/${r.data.schedule.id}/export?format=original`)
+      body = Buffer.from(await res.arrayBuffer())
+      ok(res.status === 200 && sha(body) === sha(xer), `${c.name}: the original reads back intact (${i + 1})`)
+    }
+  }
+  const after = await (await fetch(`${MOCK}/stats`)).json()
+  ok(after.refreshes.azure > before.refreshes.azure && after.refreshes.gcp > before.refreshes.gcp && after.assumeRole >= before.assumeRole, 'access tokens were refreshed; rotated Microsoft refresh tokens were saved (later reads still work)', { before, after })
+  r = await admin.get('/api/audit?action=storage.')
+  ok(!/-rt-|refresh_token|session-/.test(JSON.stringify(r.data)) && /"auth":"oauth"/.test(JSON.stringify(r.data)) && /"auth":"role"/.test(JSON.stringify(r.data)), 'sign-ins are audited without tokens', r.data)
+}
 
 console.log(`\n${passed} cloud storage checks passed.`)

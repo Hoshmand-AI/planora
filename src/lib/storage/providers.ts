@@ -10,6 +10,7 @@
 import { egressProblem } from '@/lib/server/egress'
 import { deploymentKind } from '@/lib/llm/provider'
 import { signV4, uriEncode } from './sigv4'
+import type { CredentialSource } from './cloud-auth'
 
 type Env = Record<string, string | undefined>
 
@@ -24,8 +25,13 @@ export interface StorageConfig {
   container?: string   // azure
   endpoint?: string    // s3 (and azure in tests): https://host[:port]
   prefix?: string      // folder inside the bucket/container, e.g. "runf9/"
+  /** How RunF9 authenticates: a pasted key or SAS (default), a sign-in (Azure, Google), or an AWS role */
+  auth?: 'key' | 'oauth' | 'role'
+  roleArn?: string     // aws role
+  externalId?: string  // aws role: this organization's external ID
+  signedInAs?: string  // oauth: who signed in, for display
 }
-export interface StorageSecret { accessKeyId?: string; secretAccessKey?: string; sas?: string }
+export interface StorageSecret { accessKeyId?: string; secretAccessKey?: string; sas?: string; refreshToken?: string }
 
 export interface ObjectEntry { key: string; size: number; modified: string | null }
 export interface Listing { folders: string[]; files: ObjectEntry[] }
@@ -56,8 +62,9 @@ function normalizeEndpoint(raw: string, env: Env): string {
   let u: URL
   try { u = new URL(raw) } catch { throw new StorageError('The storage address must be a URL such as https://storage.example.internal:9000.') }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new StorageError('The storage address must start with https://.')
-  if (u.username || u.password || u.search || u.hash || (u.pathname && u.pathname !== '/')) throw new StorageError('Give only the address (scheme, host and port), without a path or credentials.')
-  return `${u.protocol}//${u.host}`
+  if (u.username || u.password || u.search || u.hash) throw new StorageError('Give only the address (scheme, host, port and an optional path), without credentials.')
+  if (/\.\.|[^\w\/.~-]/.test(u.pathname)) throw new StorageError('The address path may contain only letters, numbers, / . _ ~ and -.')
+  return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}`
 }
 
 /** Validates what an admin entered; returns the normalized config and secret, or throws StorageError. */
@@ -90,6 +97,29 @@ export function validateConnection(provider: string, config: Record<string, unkn
   return { provider: p, config: { bucket, region, prefix }, secret: { accessKeyId, secretAccessKey } }
 }
 
+/**
+ * Validates the location for a sign-in (Azure, Google) or AWS role connection: the same names as a
+ * key-based connection, without the secret, plus the role ARN for AWS.
+ */
+export function validateSignInLocation(provider: string, config: Record<string, unknown>, env: Env = process.env): { provider: 'azure' | 'gcp' | 'aws'; config: StorageConfig } {
+  if (provider !== 'azure' && provider !== 'gcp' && provider !== 'aws') throw new StorageError('Sign-in is available for Azure, Google Cloud and AWS.')
+  const prefix = normalizePrefix(clean(config.prefix, 200))
+  const endpoint = clean(config.endpoint, 200)
+  const ep = endpoint ? { endpoint: normalizeEndpoint(endpoint, env) } : {}
+  if (provider === 'azure') {
+    const account = clean(config.account, 24).toLowerCase(), container = clean(config.container, 63).toLowerCase()
+    if (!ACCOUNT.test(account)) throw new StorageError('Storage account name: 3 to 24 lowercase letters and numbers.')
+    if (!CONTAINER.test(container)) throw new StorageError('Container name: 3 to 63 lowercase letters, numbers and hyphens.')
+    return { provider, config: { account, container, prefix, auth: 'oauth', ...ep } }
+  }
+  const bucket = clean(config.bucket, 222)
+  if (!(provider === 'gcp' ? GCS_BUCKET : BUCKET).test(bucket)) throw new StorageError('Bucket name: lowercase letters, numbers, dots and hyphens.')
+  if (provider === 'gcp') return { provider, config: { bucket, prefix, auth: 'oauth', ...ep } }
+  const region = clean(config.region, 30) || 'us-east-1'
+  if (!REGION.test(region)) throw new StorageError('Region, for example us-east-1 or us-gov-west-1.')
+  return { provider, config: { bucket, region, prefix, auth: 'role', ...ep } }
+}
+
 /** Where a connection's objects live, in words (no secrets). */
 export function describeLocation(provider: StorageProvider, c: StorageConfig): string {
   const folder = c.prefix ? `/${c.prefix}` : ''
@@ -116,7 +146,7 @@ export function checkKey(key: string): string {
   return key
 }
 
-async function send(url: string, init: RequestInit, env: Env): Promise<Response> {
+async function sendRaw(url: string, init: RequestInit, env: Env): Promise<Response> {
   const problem = egressProblem(url, env)
   if (problem) throw new StorageError(problem, 403)
   let res: Response
@@ -157,19 +187,23 @@ async function readLimited(res: Response, maxBytes: number): Promise<Buffer> {
 const xmlText = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
 const all = (xml: string, re: RegExp) => [...xml.matchAll(re)].map(m => m[1])
 
-function s3Client(provider: 'aws' | 'gcp' | 's3', c: StorageConfig, s: StorageSecret, env: Env): StorageClient {
+function s3Client(provider: 'aws' | 'gcp' | 's3', c: StorageConfig, creds: CredentialSource, env: Env): StorageClient {
   const region = provider === 'gcp' ? 'auto' : c.region || 'us-east-1'
   // Path-style for GCS, S3-compatible stores and bucket names with dots; virtual-hosted otherwise.
-  const base = provider === 'gcp' ? `https://storage.googleapis.com/${c.bucket}`
-    : provider === 's3' ? `${c.endpoint}/${c.bucket}`
+  const base = provider === 's3' || c.endpoint ? `${c.endpoint}/${c.bucket}`
+    : provider === 'gcp' ? `https://storage.googleapis.com/${c.bucket}`
     : c.bucket!.includes('.') ? `https://s3.${region}.amazonaws.com/${c.bucket}` : `https://${c.bucket}.s3.${region}.amazonaws.com`
   const req = async (method: string, key: string, query: Record<string, string> = {}, body?: Buffer, headers: Record<string, string> = {}) => {
     const url = new URL(`${base}/${uriEncode(key, true)}`)
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
     // Keep the signed query encoding identical to what is sent.
     const qs = [...url.searchParams.entries()].map(([k, v]) => `${uriEncode(k)}=${uriEncode(v)}`).join('&')
-    const signed = signV4({ method, url, region, accessKeyId: s.accessKeyId!, secretAccessKey: s.secretAccessKey!, body, headers })
-    return send(`${url.origin}${url.pathname}${qs ? `?${qs}` : ''}`, { method, headers: signed, body: body ? new Uint8Array(body) : undefined }, env)
+    const cr = await creds()
+    // Keys (and AWS role credentials, with their session token) sign the request; a Google sign-in sends its token.
+    const sent = cr.kind === 'bearer' ? { ...headers, authorization: `Bearer ${cr.token}` }
+      : cr.kind === 'keys' ? signV4({ method, url, region, accessKeyId: cr.accessKeyId, secretAccessKey: cr.secretAccessKey, body, headers: { ...headers, ...(cr.sessionToken ? { 'x-amz-security-token': cr.sessionToken } : {}) } })
+      : (() => { throw new StorageError('This storage needs a key or a sign-in.', 400) })()
+    return sendRaw(`${url.origin}${url.pathname}${qs ? `?${qs}` : ''}`, { method, headers: sent, body: body ? new Uint8Array(body) : undefined }, env)
   }
   return {
     async list(prefix = c.prefix ?? '') {
@@ -203,9 +237,19 @@ function s3Client(provider: 'aws' | 'gcp' | 's3', c: StorageConfig, s: StorageSe
 
 const AZURE_VERSION = '2021-08-06'
 
-function azureClient(c: StorageConfig, s: StorageSecret, env: Env): StorageClient {
+function azureClient(c: StorageConfig, creds: CredentialSource, env: Env): StorageClient {
   const base = c.endpoint ? `${c.endpoint}/${c.account || 'devstoreaccount1'}/${c.container}` : `https://${c.account}.blob.core.windows.net/${c.container}`
-  const url = (key: string, extra = '') => `${base}${key ? `/${uriEncode(key, true)}` : ''}?${extra ? `${extra}&` : ''}${s.sas}`
+  // A SAS goes in the query string; a Microsoft sign-in sends its token as a header.
+  const send = async (target: (sas: string) => string, init: RequestInit, env2: Env) => {
+    const cr = await creds()
+    if (cr.kind === 'keys') throw new StorageError('Azure storage needs a SAS token or a Microsoft sign-in.', 400)
+    const headers = { ...(init.headers as Record<string, string>), ...(cr.kind === 'bearer' ? { authorization: `Bearer ${cr.token}` } : {}) }
+    return sendRaw(target(cr.kind === 'sas' ? cr.sas : ''), { ...init, headers }, env2)
+  }
+  const url = (key: string, extra = '') => (sas: string) => {
+    const q = [extra, sas].filter(Boolean).join('&')
+    return `${base}${key ? `/${uriEncode(key, true)}` : ''}${q ? `?${q}` : ''}`
+  }
   const h = (more: Record<string, string> = {}) => ({ 'x-ms-version': AZURE_VERSION, ...more })
   return {
     async list(prefix = c.prefix ?? '') {
@@ -236,8 +280,10 @@ function azureClient(c: StorageConfig, s: StorageSecret, env: Env): StorageClien
   }
 }
 
-export function storageClient(provider: StorageProvider, config: StorageConfig, secret: StorageSecret, env: Env = process.env): StorageClient {
-  return provider === 'azure' ? azureClient(config, secret, env) : s3Client(provider, config, secret, env)
+/** A client for a connection. `creds` supplies sign-in or role credentials; without it the pasted key or SAS is used. */
+export function storageClient(provider: StorageProvider, config: StorageConfig, secret: StorageSecret, env: Env = process.env, creds?: CredentialSource): StorageClient {
+  const source: CredentialSource = creds ?? (async () => provider === 'azure' ? { kind: 'sas', sas: secret.sas ?? '' } : { kind: 'keys', accessKeyId: secret.accessKeyId ?? '', secretAccessKey: secret.secretAccessKey ?? '' })
+  return provider === 'azure' ? azureClient(config, source, env) : s3Client(provider, config, source, env)
 }
 
 /** Can RunF9 list (import) and write (keep originals) here? Writes and removes one small probe file. */

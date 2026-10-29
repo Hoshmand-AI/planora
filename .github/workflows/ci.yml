@@ -71,6 +71,20 @@ jobs:
       RUNF9_EMAIL_OUTBOX: /tmp/runf9-outbox
       # Test-only: cloud storage connections may use the local S3 and Azure Blob emulators.
       RUNF9_STORAGE_CUSTOM_ENDPOINTS: 'true'
+      # Test-only RunF9 cloud identities, pointed at scripts/mock-cloud.mjs (sign-in instead of keys).
+      RUNF9_AZURE_CLIENT_ID: azure-test-client
+      RUNF9_AZURE_CLIENT_SECRET: azure-test-secret
+      RUNF9_AZURE_AUTHORITY: http://127.0.0.1:4040/ms
+      RUNF9_GOOGLE_CLIENT_ID: google-test-client
+      RUNF9_GOOGLE_CLIENT_SECRET: google-test-secret
+      RUNF9_GOOGLE_AUTH_URL: http://127.0.0.1:4040/google/auth
+      RUNF9_GOOGLE_TOKEN_URL: http://127.0.0.1:4040/google/token
+      RUNF9_AWS_ACCOUNT_ID: '999988887777'
+      RUNF9_AWS_ACCESS_KEY_ID: AKIARUNF9TESTKEY0001
+      RUNF9_AWS_SECRET_ACCESS_KEY: test-secret-for-runf9-sts-calls
+      RUNF9_AWS_STS_ENDPOINT: http://127.0.0.1:4040/sts
+      RUNF9_AWS_TEMPLATE_URL: https://runf9-public.s3.amazonaws.com/aws-storage-role.yaml
+      MOCK_CLOUD_URL: http://127.0.0.1:4040
       WEBHOOK_RECEIVER_PORT: '4020'
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
@@ -90,6 +104,7 @@ jobs:
       - name: Start test identity provider and app
         run: |
           PORT=4010 nohup node scripts/mock-oidc.mjs > oidc.log 2>&1 &
+          MOCK_ACCESS_TTL=30 PORT=4040 nohup node scripts/mock-cloud.mjs > mock-cloud.log 2>&1 &
           nohup npm start > app.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://localhost:3000/api/health && break; sleep 2; done
           curl -sf http://localhost:3000/api/health
@@ -135,7 +150,7 @@ jobs:
           BETA_BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/a11y-check.mjs
       - name: App log
         if: failure()
-        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log; tail -n 30 s3.log azurite.log || true
+        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log; tail -n 30 s3.log azurite.log mock-cloud.log || true
 
   # Static analysis for common vulnerability classes (OWASP Top 10) and committed secrets.
   sast:

@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Lets RunF9 use one S3 bucket (one folder, if you give one) in this AWS account. Creates an IAM role
+  that only RunF9's AWS account can assume, and only with your organization's external ID.
+  RunF9 can list the folder and read, write and delete objects in it; nothing else.
+
+Parameters:
+  RunF9AccountId:
+    Type: String
+    AllowedPattern: '^\d{12}$'
+    Description: RunF9's AWS account ID (filled in by RunF9).
+  ExternalId:
+    Type: String
+    MinLength: 8
+    AllowedPattern: '^[A-Za-z0-9_+=,.@:/-]+$'
+    Description: Your organization's external ID (filled in by RunF9). Keeps other RunF9 customers from using this role.
+  BucketName:
+    Type: String
+    AllowedPattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+    Description: The existing S3 bucket RunF9 may use.
+  FolderPrefix:
+    Type: String
+    Default: ''
+    AllowedPattern: '^([A-Za-z0-9!_.*()\x27 -]+/)*$'
+    Description: Optional folder inside the bucket, ending in / (for example projects/). Empty = the whole bucket.
+
+Conditions:
+  WholeBucket: !Equals [!Ref FolderPrefix, '']
+
+Resources:
+  RunF9StorageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: RunF9 access to one S3 bucket (created by the RunF9 storage stack)
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${RunF9AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: RunF9BucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListTheFolder
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${BucketName}'
+                Condition: !If
+                  - WholeBucket
+                  - !Ref AWS::NoValue
+                  - StringLike:
+                      s3:prefix:
+                        - !Sub '${FolderPrefix}*'
+                        - ''
+              - Sid: ReadWriteObjectsInTheFolder
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${BucketName}/${FolderPrefix}*'
+
+Outputs:
+  RoleArn:
+    Description: Paste this into RunF9 (Organization > Cloud storage).
+    Value: !GetAtt RunF9StorageRole.Arn

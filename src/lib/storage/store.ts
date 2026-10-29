@@ -5,6 +5,7 @@
 import { randomUUID } from 'crypto'
 import { initSchema, query } from '@/lib/db'
 import { decrypt, encrypt } from '@/lib/server/crypto'
+import { credentialSource, forgetCredentials } from './cloud-auth'
 import { describeLocation, PROVIDER_LABEL, storageClient, type StorageClient, type StorageConfig, type StorageProvider, type StorageSecret } from './providers'
 
 export interface StorageConnection {
@@ -48,7 +49,9 @@ export async function openStorageConnection(orgId: string, id: string): Promise<
   if (!r) return undefined
   const connection = toConnection(r)
   const secret = JSON.parse(decrypt(String(r.secret))) as StorageSecret
-  return { connection, client: storageClient(connection.provider, connection.config, secret) }
+  // Sign-in and role connections get short-lived credentials; a rotated refresh token is saved back.
+  const creds = credentialSource(connection.id, connection.provider, connection.config, secret, next => updateStorageSecret(orgId, connection.id, next))
+  return { connection, client: storageClient(connection.provider, connection.config, secret, process.env, creds) }
 }
 
 /** Name and location of a connection, removed or not (for "kept in …" labels). */
@@ -61,11 +64,11 @@ export async function storageConnectionLabel(orgId: string, id: string): Promise
   return { name: c.name, location: c.location, removed: !!r.deleted_at }
 }
 
-export async function createStorageConnection(c: { orgId: string; provider: StorageProvider; name: string; config: StorageConfig; secret: StorageSecret; canRead: boolean; canWrite: boolean; statusDetail: string; createdBy: string }): Promise<StorageConnection> {
+export async function createStorageConnection(c: { id?: string; orgId: string; provider: StorageProvider; name: string; config: StorageConfig; secret: StorageSecret; canRead: boolean; canWrite: boolean; statusDetail: string; createdBy: string }): Promise<StorageConnection> {
   await initSchema()
   const res = await query(`INSERT INTO storage_connections (id, org_id, provider, name, config, secret, can_read, can_write, status_detail, checked_at, created_by)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),$10) RETURNING *`,
-  [randomUUID(), c.orgId, c.provider, c.name, JSON.stringify(c.config), encrypt(JSON.stringify(c.secret)), c.canRead, c.canWrite, c.statusDetail, c.createdBy])
+  [c.id ?? randomUUID(), c.orgId, c.provider, c.name, JSON.stringify(c.config), encrypt(JSON.stringify(c.secret)), c.canRead, c.canWrite, c.statusDetail, c.createdBy])
   return toConnection(res.rows[0])
 }
 
@@ -75,7 +78,12 @@ export async function updateStorageStatus(orgId: string, id: string, s: { canRea
 }
 
 /** Removes a connection: the secret is wiped; files already kept there stay in the firm's storage. */
+export async function updateStorageSecret(orgId: string, id: string, secret: StorageSecret): Promise<void> {
+  await query('UPDATE storage_connections SET secret=$3 WHERE org_id=$1 AND id=$2 AND deleted_at IS NULL', [orgId, id, encrypt(JSON.stringify(secret))])
+}
+
 export async function removeStorageConnection(orgId: string, id: string): Promise<boolean> {
+  forgetCredentials(id)
   const res = await query(`UPDATE storage_connections SET deleted_at=NOW(), secret='' WHERE org_id=$1 AND id=$2 AND deleted_at IS NULL`, [orgId, id])
   return (res.rowCount ?? 0) > 0
 }
