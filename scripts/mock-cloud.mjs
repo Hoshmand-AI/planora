@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Stand-ins for the cloud sign-in services and storage, for automated tests only (never production).
-//   PORT=4030 node scripts/mock-cloud.mjs
+//   PORT=4040 node scripts/mock-cloud.mjs
 // Point RunF9 at it with the test-only overrides (honoured only where RUNF9_STORAGE_CUSTOM_ENDPOINTS
 // or a private deployment allows custom storage addresses):
-//   RUNF9_AZURE_AUTHORITY=http://127.0.0.1:4030/ms        Microsoft identity platform (authorize, token)
-//   RUNF9_GOOGLE_AUTH_URL=http://127.0.0.1:4030/google/auth   RUNF9_GOOGLE_TOKEN_URL=…/google/token
-//   RUNF9_AWS_STS_ENDPOINT=http://127.0.0.1:4030/sts      AWS STS AssumeRole
+//   RUNF9_AZURE_AUTHORITY=http://127.0.0.1:4040/ms        Microsoft identity platform (authorize, token)
+//   RUNF9_GOOGLE_AUTH_URL=http://127.0.0.1:4040/google/auth   RUNF9_GOOGLE_TOKEN_URL=…/google/token
+//   RUNF9_AWS_STS_ENDPOINT=http://127.0.0.1:4040/sts      AWS STS AssumeRole
 // and connections at endpoints …/blob (Azure Blob), …/gcs (Cloud Storage XML API), …/s3 (S3).
 // Like the real services: authorization codes need the PKCE verifier; Microsoft rotates refresh
 // tokens (an old one stops working); access tokens are short-lived; storage accepts only valid tokens.
@@ -13,7 +13,7 @@
 import http from 'node:http'
 import { createHash, randomBytes } from 'node:crypto'
 
-const PORT = Number(process.env.PORT || 4030)
+const PORT = Number(process.env.PORT || 4040)
 const CLIENT = { azure: { id: process.env.MOCK_AZURE_CLIENT_ID || 'azure-test-client', secret: process.env.MOCK_AZURE_CLIENT_SECRET || 'azure-test-secret' }, gcp: { id: process.env.MOCK_GOOGLE_CLIENT_ID || 'google-test-client', secret: process.env.MOCK_GOOGLE_CLIENT_SECRET || 'google-test-secret' } }
 const RUNF9_AWS_KEY = process.env.MOCK_RUNF9_AWS_ACCESS_KEY_ID || 'AKIARUNF9TESTKEY0001'
 // Access tokens expire in 61 s by default; MOCK_ACCESS_TTL=30 makes RunF9 refresh on every call (exercises rotation).
@@ -147,5 +147,5 @@ http.createServer(async (req, res) => {
       return storage(req, res, 's3', parts.slice(1), url)
     }
     res.writeHead(404); res.end()
-  } catch (e) { res.writeHead(500); res.end(String(e)) }
+  } catch (e) { console.error(e); res.writeHead(500, { 'content-type': 'text/plain' }); res.end('internal error') }
 }).listen(PORT, '127.0.0.1', () => console.log(`mock cloud on http://127.0.0.1:${PORT}`))
