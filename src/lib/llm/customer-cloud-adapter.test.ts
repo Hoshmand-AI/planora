@@ -8,6 +8,7 @@ import { resolveLlmConfig } from './provider'
 // A stand-in for Azure OpenAI, Bedrock, Vertex AI, the ECS credentials endpoint and Google's token endpoint.
 const seen: { method: string; url: string; headers: http.IncomingHttpHeaders; body: string }[] = []
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+const jwtClaims: { iss?: string; scope?: string; aud?: string }[] = []
 let base = ''
 const server = http.createServer((req, res) => {
   let body = ''
@@ -24,9 +25,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/token') {
       const assertion = new URLSearchParams(body).get('assertion') || ''
       const [h, p, s] = assertion.split('.')
+      // Only the signature decides here; the test checks the claims it recorded.
       const valid = createVerify('RSA-SHA256').update(`${h}.${p}`).verify(publicKey, Buffer.from(s, 'base64url'))
-      const claims = JSON.parse(Buffer.from(p, 'base64url').toString())
-      if (!valid || claims.iss !== 'runf9@proj.iam.gserviceaccount.com' || !/cloud-platform/.test(claims.scope)) return send(400, { error: 'invalid_grant' })
+      if (!valid) return send(400, { error: 'invalid_grant' })
+      jwtClaims.push(JSON.parse(Buffer.from(p, 'base64url').toString()))
       return send(200, { access_token: 'vertex-token', expires_in: 3600 })
     }
     if (req.url!.includes(':rawPredict')) {
@@ -88,6 +90,7 @@ describe('Google Vertex AI', () => {
     const e = { ...env(), VERTEX_MODEL: 'claude-sonnet-5-5' }
     const r = await createCustomerCloudAdapter(cfgOf('vertex', e), e).complete({ model: e.VERTEX_MODEL, messages: msgs, maxTokens: 50, temperature: 0 })
     expect(r).toMatchObject({ text: 'claude on vertex', truncated: true, usage: { inputTokens: 9, outputTokens: 2 } })
+    expect(jwtClaims.at(-1)).toMatchObject({ iss: 'runf9@proj.iam.gserviceaccount.com', scope: 'https://www.googleapis.com/auth/cloud-platform', aud: `${base}/token` })
     const call = seen.find(s => s.url.includes(':rawPredict'))!
     expect(call.url).toBe('/v1/projects/runf9-proj/locations/us-east5/publishers/anthropic/models/claude-sonnet-5-5:rawPredict')
     expect(JSON.parse(call.body)).toMatchObject({ anthropic_version: 'vertex-2023-10-16', system: 'You are RunF9.', max_tokens: 50, temperature: 0 })
