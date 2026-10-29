@@ -1,0 +1,306 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  RunF9 in your own AWS account: the RunF9 container on ECS Fargate behind a load balancer, Amazon
+  RDS for PostgreSQL (encrypted, private subnets, automated backups), secrets in AWS Secrets
+  Manager, and optionally Amazon Bedrock for AI. Schedules, analysis, documents and the
+  document-search index all stay in this account. Guide: https://runf9.ai/deploy
+
+Parameters:
+  ImageUri:
+    Type: String
+    Default: ghcr.io/hoshmand-ai/runf9:latest
+    Description: RunF9 container image (the version your RunF9 contact gives you).
+  RegistryCredentialsArn:
+    Type: String
+    Default: ''
+    Description: Optional Secrets Manager ARN with {"username","password"} if the image registry is private.
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: Optional ACM certificate ARN for HTTPS on your own domain. Empty = HTTP on the load balancer address (testing only).
+  AppUrl:
+    Type: String
+    Default: ''
+    Description: Optional public address, e.g. https://runf9.yourfirm.com (used in email links). Empty = the load balancer address.
+  AiProvider:
+    Type: String
+    AllowedValues: [none, bedrock]
+    Default: none
+    Description: none = no AI (rules only); bedrock = Amazon Bedrock in this account.
+  BedrockModelId:
+    Type: String
+    Default: ''
+    Description: Bedrock model or inference profile id (needed when AiProvider is bedrock; enable model access in the Bedrock console first).
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.small
+    Description: RDS instance size.
+  DbMultiAz:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: true = a standby database in a second zone (recommended for production).
+  SignupMode:
+    Type: String
+    AllowedValues: [open, invite_only]
+    Default: open
+    Description: open lets the first person create the organization; switch to invite_only afterwards.
+
+Conditions:
+  UseHttps: !Not [!Equals [!Ref CertificateArn, '']]
+  UseRegistryCreds: !Not [!Equals [!Ref RegistryCredentialsArn, '']]
+  UseBedrock: !Equals [!Ref AiProvider, bedrock]
+  HasAppUrl: !Not [!Equals [!Ref AppUrl, '']]
+  OpenSignup: !Equals [!Ref SignupMode, open]
+
+Resources:
+  # ── Network: public subnets for the load balancer and app, private subnets for the database ──
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.40.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{ Key: Name, Value: !Sub '${AWS::StackName}-vpc' }]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway }
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.40.0.0/24, AvailabilityZone: !Select [0, !GetAZs ''], MapPublicIpOnLaunch: true }
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.40.1.0/24, AvailabilityZone: !Select [1, !GetAZs ''], MapPublicIpOnLaunch: true }
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.40.10.0/24, AvailabilityZone: !Select [0, !GetAZs ''] }
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.40.11.0/24, AvailabilityZone: !Select [1, !GetAZs ''] }
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties: { RouteTableId: !Ref PublicRouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway }
+  PublicSubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable }
+  PublicSubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable }
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RunF9 load balancer
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RunF9 app (only from the load balancer)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 3000, ToPort: 3000, SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup }
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RunF9 database (only from the app)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref AppSecurityGroup }
+
+  # ── Database ──
+  DatabaseSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: RunF9 database subnets (private)
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      EngineVersion: '17.6'
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: '20'
+      MaxAllocatedStorage: 200
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: runf9
+      MasterUsername: runf9
+      ManageMasterUserPassword: true
+      MultiAZ: !Ref DbMultiAz
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DatabaseSubnets
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+      BackupRetentionPeriod: 14
+      DeletionProtection: true
+      CopyTagsToSnapshot: true
+      CACertificateIdentifier: rds-ca-rsa2048-g1
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: RunF9 session signing secret
+      GenerateSecretString: { PasswordLength: 48, ExcludePunctuation: true }
+  EncryptionKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: RunF9 field encryption key (MFA seeds, storage keys); keep it with your backups
+      GenerateSecretString: { PasswordLength: 48, ExcludePunctuation: true }
+
+  # ── App ──
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterSettings: [{ Name: containerInsights, Value: enabled }]
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/runf9/${AWS::StackName}', RetentionInDays: 90 }
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: ecs-tasks.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy']
+      Policies:
+        - PolicyName: ReadRunF9Secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref JwtSecret
+                  - !Ref EncryptionKey
+                  - !GetAtt Database.MasterUserSecret.SecretArn
+                  - !If [UseRegistryCreds, !Ref RegistryCredentialsArn, !Ref AWS::NoValue]
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: ecs-tasks.amazonaws.com }, Action: sts:AssumeRole }]
+      Policies:
+        - !If
+          - UseBedrock
+          - PolicyName: UseBedrock
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+                  Resource: '*'
+          - !Ref AWS::NoValue
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-runf9'
+      Cpu: '1024'
+      Memory: '2048'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: runf9
+          Image: !Ref ImageUri
+          Essential: true
+          RepositoryCredentials: !If [UseRegistryCreds, { CredentialsParameter: !Ref RegistryCredentialsArn }, !Ref AWS::NoValue]
+          PortMappings: [{ ContainerPort: 3000, Protocol: tcp }]
+          Environment:
+            - { Name: DATABASE_URL, Value: !Sub 'postgres://runf9@${Database.Endpoint.Address}:${Database.Endpoint.Port}/runf9' }
+            - { Name: PGSSLROOTCERT, Value: /app/certs/aws-rds-global-bundle.pem }
+            - { Name: RUNF9_DEPLOYMENT, Value: onprem }
+            - { Name: RUNF9_DATA_LOCATION, Value: !Sub 'Your AWS account · ${AWS::Region}' }
+            - { Name: RUNF9_SIGNUP, Value: !If [OpenSignup, open, ''] }
+            - { Name: APP_URL, Value: !If [HasAppUrl, !Ref AppUrl, !If [UseHttps, !Sub 'https://${LoadBalancer.DNSName}', !Sub 'http://${LoadBalancer.DNSName}']] }
+            - { Name: RUNF9_AI_PROVIDER, Value: !If [UseBedrock, bedrock, ''] }
+            - { Name: RUNF9_AI_MODE, Value: !If [UseBedrock, cloud, offline] }
+            - { Name: AWS_REGION, Value: !Ref AWS::Region }
+            - { Name: BEDROCK_MODEL_ID, Value: !Ref BedrockModelId }
+          Secrets:
+            - { Name: PGPASSWORD, ValueFrom: !Sub '${Database.MasterUserSecret.SecretArn}:password::' }
+            - { Name: JWT_SECRET, ValueFrom: !Ref JwtSecret }
+            - { Name: RUNF9_ENCRYPTION_KEY, ValueFrom: !Ref EncryptionKey }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options: { awslogs-group: !Ref LogGroup, awslogs-region: !Ref AWS::Region, awslogs-stream-prefix: runf9 }
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      LoadBalancerAttributes:
+        - { Key: routing.http.drop_invalid_header_fields.enabled, Value: 'true' }
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref Vpc
+      Protocol: HTTP
+      Port: 3000
+      TargetType: ip
+      HealthCheckPath: /api/health
+      HealthCheckIntervalSeconds: 30
+      Matcher: { HttpCode: '200' }
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: !If
+        - UseHttps
+        - [{ Type: redirect, RedirectConfig: { Protocol: HTTPS, Port: '443', StatusCode: HTTP_301 } }]
+        - [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: UseHttps
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates: [{ CertificateArn: !Ref CertificateArn }]
+      DefaultActions: [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: [HttpListener]
+    Properties:
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref TaskDefinition
+      HealthCheckGracePeriodSeconds: 120
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker: { Enable: true, Rollback: true }
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+          SecurityGroups: [!Ref AppSecurityGroup]
+      LoadBalancers: [{ ContainerName: runf9, ContainerPort: 3000, TargetGroupArn: !Ref TargetGroup }]
+
+Outputs:
+  RunF9Url:
+    Description: Open this address and create your organization.
+    Value: !If [HasAppUrl, !Ref AppUrl, !If [UseHttps, !Sub 'https://${LoadBalancer.DNSName}', !Sub 'http://${LoadBalancer.DNSName}']]
+  LoadBalancerDns:
+    Description: Point your domain (CNAME) here when you use your own certificate.
+    Value: !GetAtt LoadBalancer.DNSName
+  DatabaseEndpoint:
+    Description: RDS endpoint (private; reachable only from the app).
+    Value: !GetAtt Database.Endpoint.Address
+  LogGroup:
+    Description: Application logs (CloudWatch).
+    Value: !Ref LogGroup

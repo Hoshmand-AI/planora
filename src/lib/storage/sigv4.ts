@@ -15,6 +15,8 @@ export interface SignInput {
   headers?: Record<string, string>
   now?: Date
   service?: string
+  /** Every AWS service except S3 signs the path encoded a second time (e.g. Bedrock model ids with ":") */
+  doubleEncodePath?: boolean
 }
 
 const sha256 = (data: string | Buffer) => createHash('sha256').update(data).digest('hex')
@@ -46,7 +48,9 @@ export function signV4(i: SignInput): Record<string, string> {
     .sort(([a, x], [b, y]) => (a < b ? -1 : a > b ? 1 : x < y ? -1 : x > y ? 1 : 0))
     .map(([k, v]) => `${k}=${v}`).join('&')
   // The URL's pathname is already percent-encoded once (built with uriEncode); S3 signs it as is.
-  const canonicalRequest = [i.method, i.url.pathname || '/', query, canonicalHeaders, signedHeaders.join(';'), payloadHash].join('\n')
+  const path = i.url.pathname || '/'
+  const canonicalPath = i.doubleEncodePath ? path.split('/').map(seg => uriEncode(seg)).join('/') : path
+  const canonicalRequest = [i.method, canonicalPath, query, canonicalHeaders, signedHeaders.join(';'), payloadHash].join('\n')
 
   const scope = `${day}/${i.region}/${service}/aws4_request`
   const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256(canonicalRequest)].join('\n')

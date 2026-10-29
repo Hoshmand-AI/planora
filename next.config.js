@@ -44,6 +44,8 @@ const nextConfig = {
       // Brand images (logos used in emails, social previews) must load inside mail apps and other
       // sites, so they alone may be embedded cross-origin. Later rules win for the same header.
       { source: '/brand/:path*', headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }] },
+      // Deploy templates: the Azure portal reads the template from the browser ("Deploy to Azure").
+      { source: '/deploy/:path*', headers: [{ key: 'Access-Control-Allow-Origin', value: 'https://portal.azure.com' }, { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }, { key: 'Cache-Control', value: 'public, max-age=300' }] },
     ]
   },
 }

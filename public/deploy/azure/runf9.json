@@ -1,0 +1,160 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "RunF9 in your own Azure subscription: the RunF9 container on Azure Container Apps and Azure Database for PostgreSQL (flexible server, TLS, automated backups), optionally with Azure OpenAI. Schedules, analysis, documents and the document-search index all stay in this subscription. Guide: https://runf9.ai/deploy"
+  },
+  "parameters": {
+    "namePrefix": { "type": "string", "defaultValue": "runf9", "minLength": 3, "maxLength": 12, "metadata": { "description": "Short lowercase prefix for resource names." } },
+    "location": { "type": "string", "defaultValue": "[resourceGroup().location]", "metadata": { "description": "Azure region (defaults to the resource group's)." } },
+    "imageUri": { "type": "string", "defaultValue": "ghcr.io/hoshmand-ai/runf9:latest", "metadata": { "description": "RunF9 container image (the version your RunF9 contact gives you)." } },
+    "registryServer": { "type": "string", "defaultValue": "", "metadata": { "description": "Optional: registry host if the image is private (e.g. ghcr.io)." } },
+    "registryUsername": { "type": "string", "defaultValue": "", "metadata": { "description": "Optional: registry user name." } },
+    "registryPassword": { "type": "securestring", "defaultValue": "", "metadata": { "description": "Optional: registry password or token." } },
+    "databasePassword": { "type": "securestring", "minLength": 16, "metadata": { "description": "Database administrator password (16+ characters). Generate one, e.g. openssl rand -base64 24, and keep it." } },
+    "jwtSecret": { "type": "securestring", "minLength": 32, "metadata": { "description": "Session signing secret (32+ random characters, e.g. openssl rand -base64 36). Keep it: supply the same value on every update." } },
+    "encryptionKey": { "type": "securestring", "minLength": 32, "metadata": { "description": "Field encryption key (32+ random characters). Keep it with your backups and supply the same value on every update; without it encrypted settings cannot be read." } },
+    "postgresVersion": { "type": "string", "defaultValue": "16", "allowedValues": [ "16", "17" ] },
+    "databaseSku": { "type": "string", "defaultValue": "Standard_B2s", "metadata": { "description": "PostgreSQL compute size (Burstable tier)." } },
+    "appUrl": { "type": "string", "defaultValue": "", "metadata": { "description": "Optional public address for email links, e.g. https://runf9.yourfirm.com." } },
+    "signupMode": { "type": "string", "defaultValue": "open", "allowedValues": [ "open", "invite_only" ], "metadata": { "description": "open lets the first person create the organization; switch to invite_only afterwards." } },
+    "aiProvider": { "type": "string", "defaultValue": "none", "allowedValues": [ "none", "azure_openai" ] },
+    "azureOpenAiEndpoint": { "type": "string", "defaultValue": "", "metadata": { "description": "https://<resource>.openai.azure.com (when aiProvider is azure_openai)." } },
+    "azureOpenAiDeployment": { "type": "string", "defaultValue": "", "metadata": { "description": "Model deployment name in Azure OpenAI." } },
+    "azureOpenAiKey": { "type": "securestring", "defaultValue": "", "metadata": { "description": "Azure OpenAI API key." } }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "logName": "[concat(parameters('namePrefix'), '-logs-', variables('suffix'))]",
+    "envName": "[concat(parameters('namePrefix'), '-env-', variables('suffix'))]",
+    "dbName": "[concat(parameters('namePrefix'), '-db-', variables('suffix'))]",
+    "appName": "[concat(parameters('namePrefix'), '-app')]",
+    "dbUser": "runf9admin",
+    "useAi": "[equals(parameters('aiProvider'), 'azure_openai')]",
+    "useRegistry": "[not(empty(parameters('registryServer')))]",
+    "baseSecrets": [
+      { "name": "pg-password", "value": "[parameters('databasePassword')]" },
+      { "name": "jwt-secret", "value": "[parameters('jwtSecret')]" },
+      { "name": "encryption-key", "value": "[parameters('encryptionKey')]" },
+      { "name": "aoai-key", "value": "[if(empty(parameters('azureOpenAiKey')), 'unset', parameters('azureOpenAiKey'))]" }
+    ],
+    "registrySecret": [ { "name": "registry-password", "value": "[if(empty(parameters('registryPassword')), 'unset', parameters('registryPassword'))]" } ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('logName')]",
+      "location": "[parameters('location')]",
+      "properties": { "sku": { "name": "PerGB2018" }, "retentionInDays": 90 }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "[variables('envName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [ "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logName'))]" ],
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logName')), '2022-10-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('logName')), '2022-10-01').primarySharedKey]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2024-08-01",
+      "name": "[variables('dbName')]",
+      "location": "[parameters('location')]",
+      "sku": { "name": "[parameters('databaseSku')]", "tier": "Burstable" },
+      "properties": {
+        "version": "[parameters('postgresVersion')]",
+        "administratorLogin": "[variables('dbUser')]",
+        "administratorLoginPassword": "[parameters('databasePassword')]",
+        "storage": { "storageSizeGB": 32, "autoGrow": "Enabled" },
+        "backup": { "backupRetentionDays": 14, "geoRedundantBackup": "Disabled" },
+        "highAvailability": { "mode": "Disabled" },
+        "network": { "publicNetworkAccess": "Enabled" }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbName'), '/runf9')]",
+      "dependsOn": [ "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbName'))]" ],
+      "properties": { "charset": "UTF8", "collation": "en_US.utf8" }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbName'), '/AllowAzureServices')]",
+      "dependsOn": [ "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbName'))]" ],
+      "properties": { "startIpAddress": "0.0.0.0", "endIpAddress": "0.0.0.0" }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbName'), '/require_secure_transport')]",
+      "dependsOn": [ "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/databases', variables('dbName'), 'runf9')]" ],
+      "properties": { "value": "on", "source": "user-override" }
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[variables('appName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', variables('envName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/databases', variables('dbName'), 'runf9')]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/firewallRules', variables('dbName'), 'AllowAzureServices')]"
+      ],
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('envName'))]",
+        "configuration": {
+          "ingress": { "external": true, "targetPort": 3000, "transport": "auto", "allowInsecure": false },
+          "secrets": "[if(variables('useRegistry'), concat(variables('baseSecrets'), variables('registrySecret')), variables('baseSecrets'))]",
+          "registries": "[if(variables('useRegistry'), createArray(createObject('server', parameters('registryServer'), 'username', parameters('registryUsername'), 'passwordSecretRef', 'registry-password')), createArray())]"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "runf9",
+              "image": "[parameters('imageUri')]",
+              "resources": { "cpu": 1, "memory": "2Gi" },
+              "env": [
+                { "name": "DATABASE_URL", "value": "[concat('postgres://', variables('dbUser'), '@', reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbName')), '2024-08-01').fullyQualifiedDomainName, ':5432/runf9')]" },
+                { "name": "PGPASSWORD", "secretRef": "pg-password" },
+                { "name": "JWT_SECRET", "secretRef": "jwt-secret" },
+                { "name": "RUNF9_ENCRYPTION_KEY", "secretRef": "encryption-key" },
+                { "name": "RUNF9_DEPLOYMENT", "value": "onprem" },
+                { "name": "RUNF9_DATA_LOCATION", "value": "[concat('Your Azure subscription · ', parameters('location'))]" },
+                { "name": "RUNF9_SIGNUP", "value": "[if(equals(parameters('signupMode'), 'open'), 'open', '')]" },
+                { "name": "APP_URL", "value": "[parameters('appUrl')]" },
+                { "name": "RUNF9_AI_MODE", "value": "[if(variables('useAi'), 'cloud', 'offline')]" },
+                { "name": "RUNF9_AI_PROVIDER", "value": "[if(variables('useAi'), 'azure_openai', '')]" },
+                { "name": "AZURE_OPENAI_ENDPOINT", "value": "[parameters('azureOpenAiEndpoint')]" },
+                { "name": "AZURE_OPENAI_DEPLOYMENT", "value": "[parameters('azureOpenAiDeployment')]" },
+                { "name": "AZURE_OPENAI_API_KEY", "secretRef": "aoai-key" }
+              ],
+              "probes": [
+                { "type": "Liveness", "httpGet": { "path": "/api/health", "port": 3000 }, "initialDelaySeconds": 30, "periodSeconds": 30 },
+                { "type": "Readiness", "httpGet": { "path": "/api/health", "port": 3000 }, "initialDelaySeconds": 10, "periodSeconds": 10 }
+              ]
+            }
+          ],
+          "scale": { "minReplicas": 1, "maxReplicas": 1 }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "runf9Url": {
+      "type": "string",
+      "value": "[if(empty(parameters('appUrl')), concat('https://', reference(resourceId('Microsoft.App/containerApps', variables('appName')), '2024-03-01').configuration.ingress.fqdn), parameters('appUrl'))]"
+    },
+    "databaseServer": { "type": "string", "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbName')), '2024-08-01').fullyQualifiedDomainName]" }
+  }
+}

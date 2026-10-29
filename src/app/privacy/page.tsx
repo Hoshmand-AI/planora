@@ -11,7 +11,7 @@ export default function PrivacyPage() {
       <h2>1. What we collect</h2>
       <ul>
         <li><strong>Account data:</strong> your name, work email, organization, role, and a one-way hash of your password (bcrypt). If you turn on two-step verification, its secret is stored encrypted and recovery codes are stored only as hashes.</li>
-        <li><strong>Project data your organization adds:</strong> interview answers and notes, generated schedules, overrides with reasons, reviews and quality decisions. When you upload a schedule file (P6 XER, MS Project XML, Excel/CSV, PDF), RunF9 extracts the activities, relationships, calendars and dates and stores those; the original file is not kept.</li>
+        <li><strong>Project data your organization adds:</strong> interview answers and notes, generated schedules, overrides with reasons, reviews and quality decisions. When you upload a schedule file (P6 XER, MS Project XML, Excel/CSV, PDF), RunF9 extracts the activities, relationships, calendars and dates and stores those, and keeps the original file for chain of custody: in RunF9's database, or only in your own connected cloud storage if you choose that when uploading.</li>
         <li><strong>Ask AI history:</strong> questions you ask about a schedule and the answers.</li>
         <li><strong>Security and audit records:</strong> sign-ins and failed sign-ins, the actions taken in RunF9 (for example &quot;exported plan&quot;, &quot;changed a role&quot;), with time, IP address and browser type. Your organization uses these to prove who did what.</li>
       </ul>
