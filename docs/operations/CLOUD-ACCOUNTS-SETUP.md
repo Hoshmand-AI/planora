@@ -151,9 +151,9 @@ Google HMAC key), which works without step 1b/2b/3b.
 
 ## 5. Test the full private install (optional)
 
-1. Publish the image: GitHub → Actions → **Release image** → Run workflow → version `0.1.0`. Then
-   github.com/orgs/Hoshmand-AI/packages → `runf9` → Package settings → **Change visibility → Public**
-   (or keep it private and use a read-only token in the template's registry fields).
+1. The image is already published and public: `ghcr.io/hoshmand-ai/runf9:0.1.0` (and `:latest`),
+   with build provenance. For a new version: GitHub → Actions → **Release image** → Run workflow →
+   version (e.g. `0.2.0`), or push a `v0.2.0` tag.
 2. runf9.ai/deploy → pick a cloud and follow its steps (Azure: **Deploy to Azure**; AWS: **Launch in
    AWS**; Google: Cloud Shell commands).
 3. Open the output URL, create the organization, upload a schedule. Organization → Where your data

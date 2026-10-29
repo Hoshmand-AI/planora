@@ -20,8 +20,8 @@ end in a real account; do the first install with the customer.
 
 `.github/workflows/release-image.yml` builds the Dockerfile's `runtime` target and pushes
 `ghcr.io/hoshmand-ai/runf9:<version>` and `:latest` with an SBOM and provenance on a `v*` tag (or by
-hand). The GitHub package is private by default: make it public, or give the customer a read-only
-token (templates accept registry credentials). The image includes the Amazon RDS CA bundle
+hand). First release: `0.1.0` (10/29/2026), public, so templates pull it with no credentials
+(the registry fields stay for a private mirror). The image includes the Amazon RDS CA bundle
 (`/app/certs/aws-rds-global-bundle.pem`) so RDS connections stay fully verified.
 
 ## Settings the templates set
