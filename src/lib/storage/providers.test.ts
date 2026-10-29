@@ -24,7 +24,7 @@ describe('validateConnection', () => {
     expect(() => validateConnection('s3', cfg, awsSecret, {})).toThrow(/private RunF9 deployment/)
     expect(() => validateConnection('azure', { account: 'acct1', container: 'runf9', endpoint: 'http://169.254.169.254' }, { sas: 'sp=rl&sig=x' }, {})).toThrow(/private RunF9 deployment/)
     expect(validateConnection('s3', cfg, awsSecret, { RUNF9_DEPLOYMENT: 'onprem' }).config.endpoint).toBe('https://minio.example.internal:9000')
-    expect(() => validateConnection('s3', { ...cfg, endpoint: 'https://user:pw@minio.internal/path' }, awsSecret, { RUNF9_DEPLOYMENT: 'onprem' })).toThrow(/only the address/)
+    expect(() => validateConnection('s3', { ...cfg, endpoint: 'https://user:pw@minio.internal/path' }, awsSecret, { RUNF9_DEPLOYMENT: 'onprem' })).toThrow(/without credentials/)
   })
 })
 

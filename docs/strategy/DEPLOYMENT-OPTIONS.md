@@ -65,6 +65,12 @@ The self-serve part of "link RunF9 to our AWS / Azure / Google" is now in the pr
 - Several connections can coexist, one per client, which covers "some projects on Azure, some on
   AWS" for files.
 
+**Sign-in instead of keys (10/29/2026):** "Sign in with Microsoft" (OAuth with RunF9's Entra app
+registration; token for Azure Storage only), "Sign in with Google" (OAuth, Cloud Storage scope only)
+and, for AWS, a one-click CloudFormation stack that creates a role trusting RunF9's AWS account with
+the firm's external ID (RunF9 assumes it for one-hour credentials). Keys and SAS tokens remain as a
+fallback. Each method appears only when the matching RunF9 identity is configured (.env.example).
+
 What it does not do: schedules, analysis and the document-search index still live in the
 deployment's database. Moving those into a client's cloud is the private deployment above.
 Next steps when customers ask: role-based sign-in instead of keys (AWS IAM role with external ID,
