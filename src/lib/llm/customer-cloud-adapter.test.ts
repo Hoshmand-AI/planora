@@ -1,48 +1,51 @@
-import http from 'node:http'
 import { createVerify, generateKeyPairSync } from 'node:crypto'
-import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createCustomerCloudAdapter, customerCloudConfig, resetCustomerCloudCredentials, type CustomerCloudConfig } from './customer-cloud-adapter'
 import { resolveLlmConfig } from './provider'
 
-// A stand-in for Azure OpenAI, Bedrock, Vertex AI, the ECS credentials endpoint and Google's token endpoint.
-const seen: { method: string; url: string; headers: http.IncomingHttpHeaders; body: string }[] = []
+// A stand-in for Azure OpenAI, Bedrock, Vertex AI, the ECS credentials endpoint and Google's token
+// endpoint: fetch is replaced for these tests, and every request is recorded.
+const seen: { method: string; url: string; headers: Record<string, string>; body: string }[] = []
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const jwtClaims: { iss?: string; scope?: string; aud?: string }[] = []
-let base = ''
-const server = http.createServer((req, res) => {
-  let body = ''
-  req.on('data', c => { body += c })
-  req.on('end', () => {
-    seen.push({ method: req.method!, url: req.url!, headers: req.headers, body })
-    const send = (s: number, d: unknown) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(d)) }
-    if (req.url!.startsWith('/openai/deployments/')) {
-      if (req.headers['api-key'] !== 'az-key') return send(401, {})
-      return send(200, { model: 'gpt-4o-2024-11-20', choices: [{ message: { content: 'azure says hi' }, finish_reason: 'stop' }], usage: { prompt_tokens: 11, completion_tokens: 3 } })
-    }
-    if (req.url === '/ecs-creds') return send(200, { AccessKeyId: 'ASIATASKROLE', SecretAccessKey: 'secret', Token: 'task-session', Expiration: new Date(Date.now() + 3600e3).toISOString() })
-    if (req.url!.startsWith('/model/')) return send(200, { output: { message: { content: [{ text: 'bedrock ' }, { text: 'says hi' }] } }, stopReason: 'end_turn', usage: { inputTokens: 20, outputTokens: 4 } })
-    if (req.url === '/token') {
-      const assertion = new URLSearchParams(body).get('assertion') || ''
-      const [h, p, s] = assertion.split('.')
-      // Only the signature decides here; the test checks the claims it recorded.
-      const valid = createVerify('RSA-SHA256').update(`${h}.${p}`).verify(publicKey, Buffer.from(s, 'base64url'))
-      if (!valid) return send(400, { error: 'invalid_grant' })
-      jwtClaims.push(JSON.parse(Buffer.from(p, 'base64url').toString()))
-      return send(200, { access_token: 'vertex-token', expires_in: 3600 })
-    }
-    if (req.url!.includes(':rawPredict')) {
-      if (req.headers.authorization !== 'Bearer vertex-token') return send(401, {})
-      const b = JSON.parse(body)
-      if (b.messages.some((m: { content: string }) => m.content.includes('refuse'))) return send(200, { content: [], stop_reason: 'refusal' })
-      return send(200, { model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'claude on vertex' }], stop_reason: 'max_tokens', usage: { input_tokens: 9, output_tokens: 2 } })
-    }
-    if (req.url!.includes(':generateContent')) return send(200, { candidates: [{ content: { parts: [{ text: 'gemini says hi' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 3 } })
-    send(404, {})
-  })
+const base = 'https://cloud.test'
+const reply = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } })
+
+function fakeCloud(path: string, headers: Record<string, string>, body: string): Response {
+  if (path.startsWith('/openai/deployments/')) {
+    return headers['api-key'] === 'az-key' ? reply(200, { model: 'gpt-4o-2024-11-20', choices: [{ message: { content: 'azure says hi' }, finish_reason: 'stop' }], usage: { prompt_tokens: 11, completion_tokens: 3 } }) : reply(401, {})
+  }
+  if (path === '/ecs-creds') return reply(200, { AccessKeyId: 'ASIATASKROLE', SecretAccessKey: 'secret', Token: 'task-session', Expiration: new Date(Date.now() + 3600e3).toISOString() })
+  if (path.startsWith('/model/')) return reply(200, { output: { message: { content: [{ text: 'bedrock ' }, { text: 'says hi' }] } }, stopReason: 'end_turn', usage: { inputTokens: 20, outputTokens: 4 } })
+  if (path === '/token') {
+    // Only the signature decides here; the tests check the claims recorded.
+    const [h, p, sig] = (new URLSearchParams(body).get('assertion') || '').split('.')
+    const valid = createVerify('RSA-SHA256').update(`${h}.${p}`).verify(publicKey, Buffer.from(sig || '', 'base64url'))
+    if (!valid) return reply(400, { error: 'invalid_grant' })
+    jwtClaims.push(JSON.parse(Buffer.from(p, 'base64url').toString()))
+    return reply(200, { access_token: 'vertex-token', expires_in: 3600 })
+  }
+  if (path.includes(':rawPredict')) {
+    if (headers.authorization !== 'Bearer vertex-token') return reply(401, {})
+    const b = JSON.parse(body)
+    if (b.messages.some((m: { content: string }) => m.content.includes('refuse'))) return reply(200, { content: [], stop_reason: 'refusal' })
+    return reply(200, { model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'claude on vertex' }], stop_reason: 'max_tokens', usage: { input_tokens: 9, output_tokens: 2 } })
+  }
+  if (path.includes(':generateContent')) return reply(200, { candidates: [{ content: { parts: [{ text: 'gemini says hi' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 3 } })
+  return reply(404, {})
+}
+
+const realFetch = globalThis.fetch
+beforeAll(() => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url)
+    const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), String(v)]))
+    const body = init?.body instanceof Uint8Array ? Buffer.from(init.body).toString() : init?.body ? String(init.body) : ''
+    seen.push({ method: init?.method ?? 'GET', url: url.pathname + url.search, headers, body })
+    return fakeCloud(url.pathname, headers, body)
+  }) as typeof fetch
 })
-beforeAll(async () => { await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${(server.address() as AddressInfo).port}` })
-afterAll(() => { server.close() })
+afterAll(() => { globalThis.fetch = realFetch })
 beforeEach(() => { seen.length = 0; resetCustomerCloudCredentials() })
 
 const msgs = [{ role: 'system' as const, content: 'You are RunF9.' }, { role: 'user' as const, content: 'Summarize the schedule.' }]
