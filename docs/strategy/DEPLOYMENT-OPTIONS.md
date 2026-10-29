@@ -77,6 +77,15 @@ Next steps when customers ask: role-based sign-in instead of keys (AWS IAM role 
 Azure app registration, Google workload identity federation), limiting a connection to a
 workspace, and import from SharePoint / OneDrive.
 
+### Built: the full private install (10/29/2026)
+
+The "on request" private deployment now ships as one template per cloud (public/deploy/*, guide at
+/deploy, operations notes in docs/operations/CLOUD-DEPLOY.md): AWS (ECS Fargate + RDS), Azure
+(Container Apps + PostgreSQL flexible server), Google Cloud (Cloud Run + Cloud SQL), with the
+customer's own AI (Amazon Bedrock, Azure OpenAI, Vertex AI) through new adapters. The image is
+published to GHCR by .github/workflows/release-image.yml. Status: preview (linted / validated, first
+installs done with the customer).
+
 ### Where the RAG data should live
 
 In **the same database as the project it describes**, i.e. the client's cloud when the project runs

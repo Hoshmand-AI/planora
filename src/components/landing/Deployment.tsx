@@ -29,19 +29,19 @@ const OPTIONS: Option[] = [
   },
   {
     id: 'aws', tab: 'AWS', title: 'Connect your Amazon S3', status: 'Available now',
-    data: 'Connect an S3 bucket in your AWS account (GovCloud included). Import schedules and documents straight from it, and keep the original files there instead of in RunF9. Running all of RunF9 inside your AWS account is available on request.',
+    data: 'Connect an S3 bucket in your AWS account (GovCloud included). Import schedules and documents straight from it, and keep the original files there instead of in RunF9. Or run all of RunF9 in your AWS account, database included, from one template.',
     ai: 'The same AI choice as RunF9 Cloud. Inside your own AWS account: none, or a model you host; an Amazon Bedrock connector is built with that deployment.',
     fit: 'Firms whose files must stay in their AWS account.',
   },
   {
     id: 'azure', tab: 'Azure', title: 'Connect your Azure Blob Storage', status: 'Available now',
-    data: 'Connect a container in your Azure storage account. Import schedules and documents straight from it, and keep the original files there. Running all of RunF9 in your Azure subscription (Azure Government included) is available on request.',
+    data: 'Connect a container in your Azure storage account. Import schedules and documents straight from it, and keep the original files there. Or run all of RunF9 in your Azure subscription, database included, from one template.',
     ai: 'The same AI choice as RunF9 Cloud. Inside your own subscription: none, or a model you host; an Azure OpenAI connector is built with that deployment.',
     fit: 'Firms that run on Microsoft 365 and Azure.',
   },
   {
     id: 'gcp', tab: 'Google Cloud', title: 'Connect your Google Cloud Storage', status: 'Available now',
-    data: 'Connect a Cloud Storage bucket in your Google Cloud project. Import schedules and documents straight from it, and keep the original files there. Running all of RunF9 in your project is available on request.',
+    data: 'Connect a Cloud Storage bucket in your Google Cloud project. Import schedules and documents straight from it, and keep the original files there. Or run all of RunF9 in your project, database included, from one template.',
     ai: 'The same AI choice as RunF9 Cloud. Inside your own project: none, or a model you host; a Vertex AI connector is built with that deployment.',
     fit: 'Firms standardized on Google Cloud.',
   },
@@ -49,7 +49,7 @@ const OPTIONS: Option[] = [
     id: 'mixed', tab: 'Per client', title: 'A different cloud for each client', status: 'Available now',
     data: 'Connect as many storages as your clients require, for example the owner’s Azure for one project and AWS for another. On every upload your team picks where the file comes from and where the original is kept.',
     ai: 'Follows your organization’s AI setting. Projects marked CUI or classified are never sent to a cloud model.',
-    fit: 'Firms whose owners and clients each mandate a cloud. For a whole RunF9 per client cloud (database included), ask us.',
+    fit: 'Firms whose owners and clients each mandate a cloud. For a whole RunF9 per client cloud (database included), deploy one copy in each.',
   },
   {
     id: 'onprem', tab: 'Your servers', title: 'On your own servers, air-gapped', status: 'Available now',
@@ -125,7 +125,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
             </dl>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link href={primaryHref} className={btn}>{primaryLabel}</Link>
-              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : 'Connect it after you sign up, under Organization > Cloud storage.'}</p>
+              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : <>Connect storage after you sign up, under Organization &gt; Cloud storage, or <Link href={`/deploy${o.id === 'mixed' ? '' : `#${o.id}`}`} className="text-accent-600 underline">run RunF9 in your own cloud</Link>.</>}</p>
             </div>
           </div>
         </div>

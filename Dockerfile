@@ -59,6 +59,9 @@ RUN groupadd --system --gid 10001 runf9 \
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/sbom.cdx.json /app/sbom.cdx.json
+# Amazon RDS certificate bundle, so a database on Amazon RDS is verified (PGSSLROOTCERT points here in
+# deploy/aws). Other managed databases (Azure, Google) use certificates Node already trusts.
+ADD --chmod=0644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/aws-rds-global-bundle.pem
 RUN mkdir -p /app/.next/cache && chown runf9:runf9 /app/.next/cache
 USER runf9:runf9
 EXPOSE 3000

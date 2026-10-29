@@ -405,7 +405,7 @@ function DataLocationSection({ loc }: { loc: DataLocation }) {
         <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
       </dl>
       <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
-        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? RunF9 can be installed there as its own deployment, with the same company sign-in (SSO). Contact support@hoshmand.ai.
+        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? <a href="/deploy" className="text-accent-600 underline">Run RunF9 in that cloud</a> from one template: the app, database, documents and search index all stay there, with the same company sign-in (SSO).
       </p>
     </Section>
   )
