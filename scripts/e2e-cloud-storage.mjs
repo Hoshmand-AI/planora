@@ -211,7 +211,7 @@ if (MOCK) {
   }
 
   let x = await signIn('azure', 'Client C (Microsoft sign-in)', { account: 'clientc', container: 'schedules', endpoint: `${MOCK}/blob` })
-  ok(x.authorize.searchParams.get('code_challenge_method') === 'S256' && x.authorize.searchParams.get('scope').split(' ').includes('https://storage.azure.com/user_impersonation') && !x.authorize.searchParams.has('client_secret'), 'Microsoft sign-in uses PKCE and asks only for storage access')
+  ok(x.authorize.searchParams.get('code_challenge_method') === 'S256' && x.authorize.searchParams.get('scope') === 'https://storage.azure.com/user_impersonation offline_access' && !x.authorize.searchParams.has('client_secret'), 'Microsoft sign-in uses PKCE and asks only for storage access')
   ok(x.status === 303 && /storage=connected/.test(x.location), 'signing in with Microsoft connects the Azure container', x)
   x = await signIn('gcp', 'Client D (Google sign-in)', { bucket: 'client-d', endpoint: `${MOCK}/gcs` })
   ok(x.status === 303 && /storage=connected/.test(x.location) && x.authorize.searchParams.get('access_type') === 'offline', 'signing in with Google connects the Cloud Storage bucket', x)
