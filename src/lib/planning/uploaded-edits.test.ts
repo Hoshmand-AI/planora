@@ -6,7 +6,7 @@ import { parseXER, readXerTables } from '@/lib/parsers/xer-parser'
 import { completeSchedule } from './complete-schedule'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit, type ScheduleEditChange } from './uploaded-edits'
-import { evaluateNetwork, uploadedRecoveryOptions, type NetworkInput } from './uploaded-recovery'
+import { evaluateNetwork, recoveryUnavailableReason, uploadedRecoveryOptions, type NetworkInput } from './uploaded-recovery'
 import { uploadedToGenerated } from './uploaded'
 import { runSra, distributionFor } from './sra'
 import { workKind } from './work-kind'
@@ -185,6 +185,17 @@ describe('what-if and recovery options on an uploaded network', () => {
     expect(late.options.every(o => typeof o.meetsDate === 'boolean')).toBe(true)
     expect(late.explanation[0]).toMatch(/after the required 04\/20\/2026/)
   })
+
+  it('all work complete: no options, with a reason that says why (reported as a state, not an error)', () => {
+    const doneActs = net.activities.map(a => ({ ...a, status: 'complete' as const, percentComplete: 100, remainingDuration: 0, actualStart: a.earlyStart ?? net.projectStart, actualFinish: a.earlyFinish ?? a.earlyStart ?? net.projectStart }))
+    expect(uploadedRecoveryOptions({ ...net, activities: doneActs })).toBeNull()
+    expect(recoveryUnavailableReason({ hasCpm: true, relationshipCount: net.relationships.length })).toMatch(/No open driving path/)
+  })
+
+  it('without a CPM the reason tells a list without logic apart from a network that could not be recalculated', () => {
+    expect(recoveryUnavailableReason({ hasCpm: false, relationshipCount: 0 })).toMatch(/no activity relationships/)
+    expect(recoveryUnavailableReason({ hasCpm: false, relationshipCount: 12 })).toMatch(/could not recalculate/)
+  })
 })
 
 describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name rules', () => {
@@ -206,7 +217,7 @@ describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name ru
     const ctx = { history: null, catalog: new Map(), nameRules: true }
     expect(distributionFor(steel, ctx)!.basis).toMatch(/procurement/i)
     expect(distributionFor(cure, ctx)).toBeNull()
-    // Without name rules (plans built in Planora) the old behavior stays.
+    // Without name rules (plans built in RunF9) the old behavior stays.
     expect(distributionFor(cure, { history: null, catalog: new Map() })).not.toBeNull()
   })
 
@@ -246,9 +257,9 @@ describe('Monte Carlo on uploads: the scheduler’s ranges, risk events, name ru
 })
 
 describe('reports and quality guidance for uploads', () => {
-  it('lists the edits made in Planora with before/after and reasons', () => {
+  it('lists the edits made in RunF9 with before/after and reasons', () => {
     const md = editsSection([{ label: 'A1050 Erect Structural Steel: remaining duration', before: '15d', after: '12d', reason: 'Second crew', by: 'u1', byName: 'Ana', at: '2026-10-05T10:00:00.000Z', status: 'applied', source: 'recovery' }])
-    expect(md).toMatch(/^## Edits made in Planora/)
+    expect(md).toMatch(/^## Edits made in RunF9/)
     expect(md).toContain('| 10/05/2026 | Ana | A1050 Erect Structural Steel: remaining duration | 15d | 12d | Second crew | Recovery option |')
     expect(editsSection([])).toBe('')
   })

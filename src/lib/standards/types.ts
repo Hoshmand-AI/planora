@@ -3,27 +3,27 @@
 // A Rule is a deterministic check with provenance metadata (which framework and edition it comes
 // from, what kind of source that is, where in that source it is discussed). Rules never contain
 // text copied from a published standard: `sourceReference` is a citation only, and titles, messages
-// and recommendations are Planora's own short paraphrases.
+// and recommendations are RunF9's own short paraphrases.
 //
-// Kind taxonomy (what the source IS, not how strict Planora is about it):
+// Kind taxonomy (what the source IS, not how strict RunF9 is about it):
 //   standard_guidance     published guidance on what a good schedule looks like (e.g. the GAO guide)
 //   assessment_metric     a published numeric test used to assess schedules (e.g. the DCMA 14-point)
-//   recommended_practice  a practice Planora recommends that no cited source prescribes numerically
+//   recommended_practice  a practice RunF9 recommends that no cited source prescribes numerically
 //   contract_requirement  a requirement from the customer's contract or specification
 // Professional credentials (PSP, PMI-SP and the like) are certifications of people, never standards,
 // and are never used as a rule's framework or kind.
 
 import type { AnalyzableSchedule, CpmResult } from '@/lib/planning/types'
 
-export const FRAMEWORKS = ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'CUSTOMER'] as const
+export const FRAMEWORKS = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'CUSTOMER'] as const
 export type Framework = typeof FRAMEWORKS[number]
 /** Frameworks a user can run today (CUSTOMER packs are reserved for contract-specific rules). */
-export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['PLANORA_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
+export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
 export const isFramework = (v: unknown): v is Framework => typeof v === 'string' && (FRAMEWORKS as readonly string[]).includes(v)
 export const isRunnableFramework = (v: unknown): v is Framework => typeof v === 'string' && (RUNNABLE_FRAMEWORKS as readonly string[]).includes(v)
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
-  PLANORA_COMPOSITE: 'Planora Composite',
+  RUNF9_COMPOSITE: 'RunF9 Composite',
   GAO_SCHEDULE_GUIDE: 'GAO Schedule Assessment Guide',
   DCMA_14: 'DCMA 14-point assessment',
   CUSTOMER: 'Customer contract requirements',
@@ -51,7 +51,7 @@ export type RuleSeverity = 'high' | 'medium' | 'low'
 export type RuleResultStatus = 'pass' | 'fail' | 'warning' | 'not_assessable'
 
 /** Where a threshold value came from. */
-export type ThresholdSource = 'published' | 'planora_default' | 'org_configured'
+export type ThresholdSource = 'published' | 'runf9_default' | 'org_configured'
 
 /**
  * A threshold on a named metric. `metricKey` is shared across packs when two packs measure the same
@@ -91,9 +91,9 @@ export interface RuleMeta {
   applicability: RuleApplicability
   /** Name of the deterministic calculation that produces the result */
   calculation: string
-  /** Short, Planora-written title */
+  /** Short, RunF9-written title */
   title: string
-  /** Short, Planora-written statement of what the rule looks for */
+  /** Short, RunF9-written statement of what the rule looks for */
   message: string
   /** Citation only (document, edition, section) — never quoted standard text */
   sourceReference: string

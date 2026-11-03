@@ -8,9 +8,9 @@ import { buildSbom, cdxLicenses, nameFromPath, npmPurl } from '../../scripts/sbo
 // `npm run sbom` (scripts/sbom.mjs): CycloneDX 1.5 JSON from package-lock.json, offline.
 
 const lock = {
-  name: 'planora', version: '1.0.0', lockfileVersion: 3,
+  name: 'runf9', version: '1.0.0', lockfileVersion: 3,
   packages: {
-    '': { name: 'planora', version: '1.0.0', license: 'ISC', dependencies: { pg: '^8', '@scope/lib': '^1' }, devDependencies: { vitest: '^5' } },
+    '': { name: 'runf9', version: '1.0.0', license: 'ISC', dependencies: { pg: '^8', '@scope/lib': '^1' }, devDependencies: { vitest: '^5' } },
     'node_modules/pg': { version: '8.20.0', resolved: 'https://registry.npmjs.org/pg/-/pg-8.20.0.tgz', integrity: 'sha512-AAEC', license: 'MIT' },
     'node_modules/@scope/lib': { version: '1.2.3', license: '(MIT OR GPL-3.0-or-later)' },
     'node_modules/@scope/lib/node_modules/pg': { version: '8.20.0', license: 'MIT' },
@@ -31,7 +31,7 @@ describe('SBOM (CycloneDX 1.5 from package-lock.json)', () => {
     expect(bom.version).toBe(1)
     expect(bom.serialNumber).toMatch(/^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(bom.metadata.timestamp).toBe('2026-10-06T00:00:00.000Z')
-    expect(bom.metadata.component).toMatchObject({ type: 'application', name: 'planora', version: '1.0.0', purl: 'pkg:npm/planora@1.0.0' })
+    expect(bom.metadata.component).toMatchObject({ type: 'application', name: 'runf9', version: '1.0.0', purl: 'pkg:npm/runf9@1.0.0' })
     expect(Array.isArray(bom.components)).toBe(true)
     for (const c of bom.components as Component[]) {
       expect(c.type).toBe('library')
@@ -53,7 +53,7 @@ describe('SBOM (CycloneDX 1.5 from package-lock.json)', () => {
     expect(scoped).toMatchObject({ name: 'lib', licenses: [{ expression: '(MIT OR GPL-3.0-or-later)' }] })
     expect((bom.components as Component[]).find(c => c.name === 'old')!.licenses).toBeUndefined()
     expect((bom.components as Component[]).find(c => c.name === 'odd')).toMatchObject({ scope: 'optional', licenses: [{ license: { name: 'MIT/X11' } }] })
-    expect(bom.dependencies).toEqual([{ ref: 'pkg:npm/planora@1.0.0', dependsOn: ['pkg:npm/%40scope/lib@1.2.3', 'pkg:npm/pg@8.20.0'] }])
+    expect(bom.dependencies).toEqual([{ ref: 'pkg:npm/runf9@1.0.0', dependsOn: ['pkg:npm/%40scope/lib@1.2.3', 'pkg:npm/pg@8.20.0'] }])
   })
 
   it('includes development tooling on request and is stable for the same lockfile', () => {
@@ -75,7 +75,7 @@ describe('SBOM (CycloneDX 1.5 from package-lock.json)', () => {
   })
 
   it('runs as a CLI on this repository without network access', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'planora-sbom-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'runf9-sbom-'))
     const out = path.join(dir, 'sbom.cdx.json')
     execFileSync(process.execPath, ['scripts/sbom.mjs', '--output', out], { cwd: process.cwd(), stdio: 'pipe' })
     const bom = JSON.parse(fs.readFileSync(out, 'utf8'))

@@ -55,6 +55,7 @@ export default function PlanPage() {
   const router = useRouter()
   const [view, setView] = useState<View | null>(null)
   const [tab, setTab] = useState<Tab>('interview')
+  const opened = useRef(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -75,6 +76,8 @@ export default function PlanPage() {
     setSraState('running')
     try {
       const res = await fetch(`/api/plans/${id}/risk`)
+      // Not in the organization's plan (402): say so instead of "could not run, try again".
+      if (res.status === 402) { setSraState('locked'); return }
       if (!res.ok) throw new Error()
       const data = await res.json()
       // A result for an older version must never be shown as this version's forecast.
@@ -102,6 +105,8 @@ export default function PlanPage() {
     const res = await fetch(`/api/plans/${id}`)
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Could not load plan.'); return }
+    // A plan that already has a schedule opens on it; a new one opens on the interview.
+    if (!opened.current) { opened.current = true; if (data.plan?.generated) setTab('schedule') }
     setView(data)
   }, [id])
   useEffect(() => { load() }, [load])
@@ -227,7 +232,7 @@ export default function PlanPage() {
     ...(ev ? [{ key: 'dcma', label: 'DCMA', value: `${ev.dcma.passed}/${ev.dcma.applicable}`, tone: failing ? 'warn' as const : undefined,
       explain: 'The DCMA 14-point assessment, a standard schedule health check from the U.S. Defense Contract Management Agency: checks passing out of those that apply.', go: { label: failing ? `${failing} to fix` : 'Details', onClick: goEvaluation } }] : []),
     { key: 'ai', label: 'AI', value: <span className="inline-flex items-center gap-1">{llm.airgapped && <Lock size={11} aria-label="Air-gapped" />}{aiLabel}</span>,
-      explain: llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : 'No AI model is used: questions, durations and logic come from Planora’s rules and your firm’s data.' },
+      explain: llm.model ? `${llm.model}${llm.provider ? ` · ${PROVIDER_LABEL[llm.provider]}` : ''}${llm.certified === false ? ' · approved alternate (not certified)' : ''}` : 'No AI model is used: questions, durations and logic come from RunF9’s rules and your firm’s data.' },
   ]
 
   // One obvious next step; everything else is quieter.
@@ -240,7 +245,7 @@ export default function PlanPage() {
     <div className="px-4 md:px-6 pb-8">
       {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
       <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
-        <Link href="/dashboard/plan" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> All plans</Link>
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> Projects</Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
           <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight min-w-0 md:truncate">{plan.name}</h1>
           <div className="flex flex-wrap items-center gap-1 flex-shrink-0">
@@ -256,7 +261,7 @@ export default function PlanPage() {
             </button>}
           </div>
         </div>
-        <div data-mood={status.mood} className="mood-tile grain mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div data-mood={status.mood} className="mood-tile mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
           <div className="flex-1 min-w-[180px] text-[14px] font-medium text-navy-950 leading-snug py-1">
             {status.onClick
@@ -307,7 +312,7 @@ export default function PlanPage() {
 
       {tab === 'interview' && (<>
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
-          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} Planora will not send this plan to a cloud AI model.</p>
+          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
         )}
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
@@ -880,7 +885,7 @@ interface Sra {
   assumptions: string[]
   warnings?: string[]
 }
-type SraState = 'idle' | 'running' | 'error'
+type SraState = 'idle' | 'running' | 'error' | 'locked'
 
 /** The simulation is run by the page for each plan version (see PlanPage); this panel shows it. */
 function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; onRun: () => void }) {
@@ -890,11 +895,12 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
     <section aria-labelledby="sra-title" className="border border-warm-200 rounded-2xl p-5 bg-white/70">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <h3 id="sra-title" className="text-[14px] font-semibold text-navy-950">Schedule risk analysis (Monte Carlo)</h3>
-        <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-full border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50">
+        {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-full border border-warm-300 bg-white hover:border-navy-900 text-navy-950 px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50">
           {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
-        </button>
+        </button>}
       </div>
-      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-500">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {state === 'locked' && <p role="status" className="text-[12.5px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
       {state === 'error' && <p role="alert" className="text-[12.5px] text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">

@@ -1,4 +1,4 @@
-// Nora's logic helper: finds loose ends (activities with no predecessor or no successor), work tied
+// Logic helper: finds loose ends (activities with no predecessor or no successor), work tied
 // only to the finish milestone, links that run against the usual trade order and links already implied
 // by others; proposes a predecessor or successor for each loose end from canonical trade sequencing,
 // location, neighbouring activities and the existing network. Every proposal is checked against the

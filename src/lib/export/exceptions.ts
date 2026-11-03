@@ -1,9 +1,9 @@
-// Export exception reports: what Planora could not write (or had to change) in a given export format,
+// Export exception reports: what RunF9 could not write (or had to change) in a given export format,
 // so nothing is dropped silently. Each export carries its report where provenance already goes: the
-// XLSX Provenance sheet, an X-Planora-Export-Exceptions response header on every download, and the
+// XLSX Provenance sheet, an X-RunF9-Export-Exceptions response header (also sent as X-Planora-…) on every download, and the
 // JSON report itself on request (?format=...&exceptions=json).
 //
-// The report lists (1) what the source file carried that Planora never imported (from the upload's
+// The report lists (1) what the source file carried that RunF9 never imported (from the upload's
 // import exception report), (2) activities the export model leaves out (WBS summaries, level of
 // effort), and (3) what the target format cannot hold or holds differently.
 
@@ -26,7 +26,7 @@ const WRITES_RESOURCES = new Set<ExportExceptionFormat>(['xer', 'xml'])
 export type ExportExceptionFormat = 'xer' | 'xer-original' | 'xml' | 'csv' | 'xlsx-import' | 'xlsx-p6'
 
 export interface ExportExceptionContext {
-  /** The upload's import exception report (null for Planora-built plans and older uploads) */
+  /** The upload's import exception report (null for RunF9-built plans and older uploads) */
   importReport?: ExceptionReport | null
   /** Activities of the upload that the export model leaves out */
   excluded?: { code: string; type: 'summary' | 'loe' }[]
@@ -44,25 +44,25 @@ function xerWorkTimes(c: WorkCalendar): string {
   return h > 6 ? `08:00-12:00,13:00-${hhmm(9 + h)}` : `08:00-${hhmm(8 + h)}`
 }
 
-const isPlanoraRationale = (a: PlanActivity) => !!a.rationale?.summary && !a.rationale.summary.startsWith('From the uploaded file')
+const isRunF9Rationale = (a: PlanActivity) => !!a.rationale?.summary && !a.rationale.summary.startsWith('From the uploaded file')
 
 export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFormat, ctx: ExportExceptionContext = {}): ExceptionReport {
   const ex = new ExceptionCollector('export', format)
   const label = FORMAT_LABEL[format]
   // The P6 export of an uploaded P6 file re-emits the original file row for row: everything the file
-  // carried is written back, including what Planora does not model.
+  // carried is written back, including what RunF9 does not model.
   if (format === 'xer-original') return ex.report()
 
   const resources = hasResourceData(s.resources) ? s.resources : null
   const writesResources = !!resources && WRITES_RESOURCES.has(format)
 
-  /* 1. What the source file carried that Planora never imported */
+  /* 1. What the source file carried that RunF9 never imported */
   for (const r of ctx.importReport?.records || []) {
     if (r.disposition !== 'dropped' && r.disposition !== 'preserved_in_raw') continue
     if (writesResources && RESOURCE_IMPORT_FIELDS.has(r.field)) continue
     ex.add({
       severity: r.severity, entity: r.entity, field: r.field, disposition: 'dropped', count: r.count, examples: r.examples,
-      message: `Not imported into Planora, so not in this ${label} export${r.disposition === 'preserved_in_raw' ? ' (it is in the original file and in the upload\'s P6 .xer export)' : ' (the original file is kept with the upload)'}: ${r.message}`,
+      message: `Not imported into RunF9, so not in this ${label} export${r.disposition === 'preserved_in_raw' ? ' (it is in the original file and in the upload\'s P6 .xer export)' : ' (the original file is kept with the upload)'}: ${r.message}`,
     })
   }
 
@@ -86,7 +86,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
   const withBaseline = acts.filter(a => a.baselineStart || a.baselineFinish)
   const calById = new Map(s.calendars.map(c => [c.id, c]))
   const nonDefaultCal = acts.filter(a => a.calendarId && a.calendarId !== s.defaultCalendarId)
-  const planoraRationale = acts.filter(isPlanoraRationale)
+  const runf9Rationale = acts.filter(isRunF9Rationale)
   const lossOfCalendars = () => {
     if (s.calendars.length) ex.add({ severity: 'loss', entity: 'calendar', field: 'Calendars', disposition: 'dropped', count: s.calendars.length, examples: s.calendars.map(c => c.name), message: `Calendar definitions (work week, hours per day, holidays) are not written to the ${label} export; durations are work days of each activity's calendar` })
   }
@@ -108,7 +108,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
       if (renamed.length) ex.add({ severity: 'info', entity: 'activity', field: 'TASK.task_name (characters)', disposition: 'converted', count: renamed.length, examples: renamed.map(a => a.code), message: 'Characters P6 cannot store in an XER (outside Windows-1252) were replaced' })
       const long = acts.filter(a => xerText(a.name).length > P6_NAME_MAX)
       if (long.length) ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.task_name (length)', disposition: 'converted', count: long.length, examples: long.map(a => a.code), message: `Names longer than P6's ${P6_NAME_MAX} characters were shortened` })
-      if (planoraRationale.length) ex.add({ severity: 'info', entity: 'activity', field: 'Rationale', disposition: 'dropped', count: planoraRationale.length, examples: planoraRationale.map(a => a.code), message: 'Why each activity exists (rationale and sources) is not written; overrides with reasons go into the notebook' })
+      if (runf9Rationale.length) ex.add({ severity: 'info', entity: 'activity', field: 'Rationale', disposition: 'dropped', count: runf9Rationale.length, examples: runf9Rationale.map(a => a.code), message: 'Why each activity exists (rationale and sources) is not written; overrides with reasons go into the notebook' })
       assumptions()
       break
     }
@@ -120,7 +120,7 @@ export function exportExceptions(s: GeneratedSchedule, format: ExportExceptionFo
       const hpd = (id?: string) => (calById.get(id || s.defaultCalendarId) ?? calById.get(s.defaultCalendarId))?.hoursPerDay ?? 8
       const byId = new Map(acts.map(a => [a.id, a]))
       const lagOnOtherCal = s.links.filter(l => l.lag !== 0 && hpd(byId.get(l.from)?.calendarId) !== hpd(byId.get(l.to)?.calendarId))
-      if (lagOnOtherCal.length) ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink.LinkLag', disposition: 'converted', count: lagOnOtherCal.length, examples: lagOnOtherCal.map(l => `${byId.get(l.from)?.code} -> ${byId.get(l.to)?.code}`), message: 'MS Project schedules lag on the successor\'s calendar; Planora (like P6) uses the predecessor\'s. Lags between calendars with different hours per day may schedule differently' })
+      if (lagOnOtherCal.length) ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink.LinkLag', disposition: 'converted', count: lagOnOtherCal.length, examples: lagOnOtherCal.map(l => `${byId.get(l.from)?.code} -> ${byId.get(l.to)?.code}`), message: 'MS Project schedules lag on the successor\'s calendar; RunF9 (like P6) uses the predecessor\'s. Lags between calendars with different hours per day may schedule differently' })
       if (s.mustFinishBy) ex.add({ severity: 'info', entity: 'project', field: 'Must Finish By', disposition: 'converted', example: s.mustFinishBy, message: 'The required finish is written as a Deadline on the project\'s finish task' })
       if (ctx.progressMode) ex.add({ severity: 'info', entity: 'project', field: 'Out-of-sequence progress', disposition: 'dropped', example: ctx.progressMode === 'override' ? 'Progress override' : 'Retained logic', message: 'MS Project has no retained-logic / progress-override setting' })
       assumptions()

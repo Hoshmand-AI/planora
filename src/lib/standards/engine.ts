@@ -17,8 +17,8 @@ import {
 } from './types'
 
 export const ENGINE_VERSION = '1.0.0'
-export const COMPOSITE_VERSION = 'Planora Composite 1.0'
-export const COMPOSITE_DISCLAIMER = 'Planora Composite applies the GAO screening checks and the DCMA 14-point checks side by side. Each finding keeps the framework, edition and threshold it came from; where two sources set different thresholds for the same measure, both results are shown and the difference is listed as a conflict rather than blended. This automated scan is not a GAO assessment, a DCMA review or a compliance determination.'
+export const COMPOSITE_VERSION = 'RunF9 Composite 1.0'
+export const COMPOSITE_DISCLAIMER = 'RunF9 Composite applies the GAO screening checks and the DCMA 14-point checks side by side. Each finding keeps the framework, edition and threshold it came from; where two sources set different thresholds for the same measure, both results are shown and the difference is listed as a conflict rather than blended. This automated scan is not a GAO assessment, a DCMA review or a compliance determination.'
 export const RUN_DISCLAIMER = 'Automated scan of schedule data. Results come only from deterministic rules; nothing here is decided by an AI model. It is not a GAO compliance determination or a substitute for a scheduler\'s or auditor\'s review.'
 
 export const RULE_PACKS: Record<'GAO_SCHEDULE_GUIDE' | 'DCMA_14', RuleDef[]> = { GAO_SCHEDULE_GUIDE: GAO_RULES, DCMA_14: DCMA_RULES }
@@ -31,7 +31,7 @@ export function engineConfig(o: { gao?: Partial<GaoThresholds> | null; dcma?: Pa
 export function rulesOf(fw: Framework): RuleDef[] {
   if (fw === 'GAO_SCHEDULE_GUIDE') return GAO_RULES
   if (fw === 'DCMA_14') return DCMA_RULES
-  if (fw === 'PLANORA_COMPOSITE') return [...GAO_RULES, ...DCMA_RULES]
+  if (fw === 'RUNF9_COMPOSITE') return [...GAO_RULES, ...DCMA_RULES]
   return []
 }
 
@@ -83,7 +83,7 @@ function byCategory(results: RuleResult[]): GroupResult[] {
   return keys.map(k => group(k.toLowerCase().replace(/\W+/g, '_'), k, results.filter(r => r.category === k)))
 }
 
-const describe = (t: ThresholdSpec) => `${t.display}${t.source === 'published' ? ' (published value)' : t.source === 'org_configured' ? ' (set by your organization)' : ' (Planora screening default)'}`
+const describe = (t: ThresholdSpec) => `${t.display}${t.source === 'published' ? ' (published value)' : t.source === 'org_configured' ? ' (set by your organization)' : ' (RunF9 screening default)'}`
 
 /**
  * Metrics that rules from different frameworks measure with different thresholds. Both findings
@@ -106,7 +106,7 @@ export function detectConflicts(results: RuleResult[]): ThresholdConflict[] {
       metricKey,
       description: list.map(x => `${FRAMEWORK_LABELS[x.r.framework]} ${x.r.ruleId}: ${describe(x.t)}`).join(' vs '),
       sides: list.map(x => ({ ruleId: x.r.ruleId, framework: x.r.framework, threshold: x.t, result: x.r.result })),
-      resolution: 'Both findings are reported, each against its own source\'s threshold. Planora does not merge them; decide which applies under your contract or set your organization\'s thresholds.',
+      resolution: 'Both findings are reported, each against its own source\'s threshold. RunF9 does not merge them; decide which applies under your contract or set your organization\'s thresholds.',
     })
   }
   return out.sort((a, b) => a.metricKey.localeCompare(b.metricKey))
@@ -138,7 +138,7 @@ export function rulesVersionOf(frameworks: Framework[], cfg: EngineConfig): stri
 }
 
 function frameworkVersionOf(fw: Framework): string {
-  return fw === 'GAO_SCHEDULE_GUIDE' ? GAO_VERSION : fw === 'DCMA_14' ? DCMA_VERSION : fw === 'PLANORA_COMPOSITE' ? COMPOSITE_VERSION : 'n/a'
+  return fw === 'GAO_SCHEDULE_GUIDE' ? GAO_VERSION : fw === 'DCMA_14' ? DCMA_VERSION : fw === 'RUNF9_COMPOSITE' ? COMPOSITE_VERSION : 'n/a'
 }
 
 export function runFramework(fw: Framework, net: Network, cfg: EngineConfig): FrameworkResult {
@@ -152,7 +152,7 @@ export function runFramework(fw: Framework, net: Network, cfg: EngineConfig): Fr
     groups: fw === 'DCMA_14' ? byCategory(results) : byCharacteristic(results),
     counts,
     score: scoreOf(counts),
-    conflicts: fw === 'PLANORA_COMPOSITE' ? detectConflicts(results) : [],
+    conflicts: fw === 'RUNF9_COMPOSITE' ? detectConflicts(results) : [],
     disclaimer: fw === 'GAO_SCHEDULE_GUIDE' ? GAO_DISCLAIMER : fw === 'DCMA_14' ? DCMA_DISCLAIMER : COMPOSITE_DISCLAIMER,
   }
 }

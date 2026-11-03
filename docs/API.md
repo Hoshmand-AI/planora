@@ -1,6 +1,6 @@
-# Planora API and webhooks
+# RunF9 API and webhooks
 
-For integrating Planora with BI dashboards, data warehouses and your own tools. Available on the Pro and Enterprise plans. Admins manage keys and webhooks under **Organization → Integrations: API and webhooks**.
+For integrating RunF9 with BI dashboards, data warehouses and your own tools. Available on the Pro and Enterprise plans. Admins manage keys and webhooks under **Organization → Integrations: API and webhooks**.
 
 ## API keys
 
@@ -8,11 +8,11 @@ For integrating Planora with BI dashboards, data warehouses and your own tools. 
   - **Read-only** (viewer role)
   - **Scheduler** (can also answer interview questions and generate schedules)
 - Keys never have admin rights.
-- The key is shown **once**. Planora stores only its SHA-256 hash, so a lost key can't be recovered: revoke it and create another.
+- The key is shown **once**. RunF9 stores only its SHA-256 hash, so a lost key can't be recovered: revoke it and create another.
 - Send the key as a bearer token:
 
 ```bash
-curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/portfolio
+curl -H "Authorization: Bearer pk_live_…" https://runf9.ai/api/portfolio
 ```
 
 - Each key is limited to 600 requests per minute.
@@ -27,14 +27,14 @@ curl -H "Authorization: Bearer pk_live_…" https://planora-chi.vercel.app/api/p
 | GET | `/api/plans` | read-only | Plans with readiness, finish and activity count |
 | GET | `/api/plans/{id}` | read-only | Full plan: answers, generated schedule (activities, logic, CPM dates and float), evaluation, recovery options |
 | GET | `/api/plans/{id}/risk` | read-only | Monte Carlo schedule risk analysis (P50/P80, criticality, sensitivity) |
-| GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes). XER, XML, CSV and XLSX carry an export exception report in the `X-Planora-Export-Exceptions` header (XLSX also in the Provenance sheet); `&exceptions=json` returns it as JSON |
-| GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics. `schedule.importExceptions` is the import exception report: every table, field or element the file carried that Planora did not map, and every value it converted or defaulted (`{direction, format, records: [{severity, entity, field, count, examples, disposition, message}]}`); the list carries `importExceptionSummary` counts. Uploads accept P6 XER, P6 XML (PMXML), MS Project XML, XLSX/CSV and PDF |
+| GET | `/api/plans/{id}/export?format=xer\|xml\|xlsx-import\|xlsx-p6\|pdf\|csv\|md` | read-only | Export file (formats your plan includes). XER, XML, CSV and XLSX carry an export exception report in the `X-RunF9-Export-Exceptions` header (also sent as `X-Planora-Export-Exceptions`) (XLSX also in the Provenance sheet); `&exceptions=json` returns it as JSON |
+| GET | `/api/schedules` | read-only | Uploaded schedules; `?id=` for one schedule with activities, logic and metrics. `schedule.importExceptions` is the import exception report: every table, field or element the file carried that RunF9 did not map, and every value it converted or defaulted (`{direction, format, records: [{severity, entity, field, count, examples, disposition, message}]}`); the list carries `importExceptionSummary` counts. Uploads accept P6 XER, P6 XML (PMXML), MS Project XML, XLSX/CSV and PDF |
 | GET | `/api/schedules/{id}/quality` | read-only | DCMA 14-point assessment (your organization's thresholds) and data questions, plus the reviewer dispositions (`review`) |
-| GET | `/api/schedules/{id}/standards` | read-only | Standards rules engine (`?frameworks=PLANORA_COMPOSITE,GAO_SCHEDULE_GUIDE,DCMA_14`, default: the organization's): results by framework → characteristic/category → rule, each with ruleId, source citation, threshold and its source, evidence and recommendation; threshold conflicts between frameworks (composite); stored runs (`runs`) and one stored run (`?run=`). Recording a run (`POST { frameworks }`, signed-in scheduler) stores the results with the rules version hash and is audited (`standards.run`). The same endpoints exist for plans at `/api/plans/{id}/standards`. An automated scan is not a GAO compliance determination |
+| GET | `/api/schedules/{id}/standards` | read-only | Standards rules engine (`?frameworks=RUNF9_COMPOSITE,GAO_SCHEDULE_GUIDE,DCMA_14`, default: the organization's): results by framework → characteristic/category → rule, each with ruleId, source citation, threshold and its source, evidence and recommendation; threshold conflicts between frameworks (composite); stored runs (`runs`) and one stored run (`?run=`). Recording a run (`POST { frameworks }`, signed-in scheduler) stores the results with the rules version hash and is audited (`standards.run`). The same endpoints exist for plans at `/api/plans/{id}/standards`. An automated scan is not a GAO compliance determination |
 | GET | `/api/schedules/{id}/review` | read-only | Reviewer dispositions of an uploaded submission: per DCMA finding / data question and overall |
-| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|lookahead-xlsx\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with Planora's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER. `lookahead-xlsx` is the 3-week look-ahead (work in progress or starting within 21 days of the data date). XLSX files carry a Provenance sheet (source file, SHA-256, basis, release, progress mode, settings, data date). Exports are the schedule as submitted; `&basis=scenario` (or `&scenario=1`) exports the what-if scenario with the Planora edits, whose provenance reads "derived from <sha> with N edits". Every download carries an export exception report (what the format could not write or had to convert) in the `X-Planora-Export-Exceptions` header (compact JSON) and, for XLSX, in the Provenance sheet; `&exceptions=json` returns the full report as JSON instead of the file |
-| GET | `/api/schedules/{id}/edits` | read-only | Edits made in Planora to an uploaded schedule (duration, relationship, constraint), each with before/after, reason, author and date. Adding (`POST`, reason required) and reverting (`DELETE ?editId=&reason=`) need a signed-in owner, admin or scheduler. Edits form the "With Planora edits" scenario: every other view, analysis and export is as submitted unless it is asked for `basis=scenario` (`GET /api/schedules?id=`, `/quality`, `/recovery`, `/risk`, `/export`, `/api/schedules/compare`, `/api/schedules/windows`, and `{ basis: 'scenario' }` in `POST /api/reports`); status, variance and the portfolio are always as submitted |
-| GET | `/api/schedules/{id}/recovery` | read-only | What-if / recovery options modeled on the schedule's own network (crash, overlap FS→SS+lag, expedite), targeting the contract milestone and its date (FNLT / FO / MFO date, else Must Finish By), each with the milestone's new date, whether it meets the date, the float effect and the edits that apply it. Work by others, fixed-duration work (cure, seeding / acclimation, agency review, inspection, lab turnaround) and work after the milestone are never crashed or overlapped |
+| GET | `/api/schedules/{id}/export?format=xer\|xml\|csv\|xlsx-p6\|xlsx-import\|lookahead-xlsx\|original` | read-only | Export an uploaded schedule. A P6 upload exports as its original XER with RunF9's recalculated dates and float (codes, UDFs, resources kept); add `&rebuild=1` for a fresh XER. `lookahead-xlsx` is the 3-week look-ahead (work in progress or starting within 21 days of the data date). XLSX files carry a Provenance sheet (source file, SHA-256, basis, release, progress mode, settings, data date). Exports are the schedule as submitted; `&basis=scenario` (or `&scenario=1`) exports the what-if scenario with the RunF9 edits, whose provenance reads "derived from <sha> with N edits". Every download carries an export exception report (what the format could not write or had to convert) in the `X-RunF9-Export-Exceptions` header (also sent as `X-Planora-Export-Exceptions`) (compact JSON) and, for XLSX, in the Provenance sheet; `&exceptions=json` returns the full report as JSON instead of the file |
+| GET | `/api/schedules/{id}/edits` | read-only | Edits made in RunF9 to an uploaded schedule (duration, relationship, constraint), each with before/after, reason, author and date. Adding (`POST`, reason required) and reverting (`DELETE ?editId=&reason=`) need a signed-in owner, admin or scheduler. Edits form the "With RunF9 edits" scenario: every other view, analysis and export is as submitted unless it is asked for `basis=scenario` (`GET /api/schedules?id=`, `/quality`, `/recovery`, `/risk`, `/export`, `/api/schedules/compare`, `/api/schedules/windows`, and `{ basis: 'scenario' }` in `POST /api/reports`); status, variance and the portfolio are always as submitted |
+| GET | `/api/schedules/{id}/recovery` | read-only | What-if / recovery options modeled on the schedule's own network (crash, overlap FS→SS+lag, expedite), targeting the contract milestone and its date (FNLT / FO / MFO date, else Must Finish By), each with the milestone's new date, whether it meets the date, the float effect and the edits that apply it. Work by others, fixed-duration work (cure, seeding / acclimation, agency review, inspection, lab turnaround) and work after the milestone are never crashed or overlapped. A schedule that cannot have options (no logic, a network that could not be recalculated, no open work) returns 200 with `available: false` and a `reason` |
 | GET | `/api/schedules/{id}/risk` | read-only | Monte Carlo risk analysis of an uploaded schedule, using the scheduler's three-point ranges, risk events (on a task or a milestone) and committed delivery dates (`PUT`, signed-in scheduler) over the rule-based ranges; `contract` and `milestones` give P50 / P80 and the probability of meeting the date for the contract milestone and every milestone with a finish constraint |
 | GET | `/api/schedules/compare?id=…&base=…[&format=csv\|xlsx]` | read-only | Update-to-update comparison; without `base`, the latest upload of the project with an earlier data date. `format=csv` downloads the activity-level differences, `format=xlsx` a workbook with a sheet per change category. Comparing a schedule with itself (same id or identical file) is `400` (`same_schedule`) |
 | GET | `/api/schedules/windows?id=…[&format=csv\|xlsx]` | read-only | Windows analysis of the update series `id` belongs to: per consecutive pair, data dates, finish-milestone movement, driving-path start/end and the movement split into progress, added/deleted activities and revisions (logic, durations, constraints, calendars) by half-step recalculation; plus the finish-float / BEI trend |
@@ -88,7 +88,7 @@ return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restric
 
 - Add an HTTPS endpoint and pick the events you want (`GET /api/org/integrations` lists them).
 - Endpoints that resolve to private or internal network addresses are refused.
-- Planora `POST`s JSON within seconds of the event and does not follow redirects.
+- RunF9 `POST`s JSON within seconds of the event and does not follow redirects.
 - After 20 consecutive failed deliveries the endpoint is disabled; re-enable it from the same screen.
 - "Send test" sends a `webhook.test` event.
 
@@ -113,9 +113,10 @@ Payload:
 ```
 
 Headers:
-- `X-Planora-Event`: the event name.
-- `X-Planora-Delivery`: a unique id; use it to ignore duplicates.
-- `X-Planora-Signature: t=<unix seconds>,v1=<hex>`.
+- `X-RunF9-Event`: the event name.
+- `X-RunF9-Delivery`: a unique id; use it to ignore duplicates.
+- `X-RunF9-Signature: t=<unix seconds>,v1=<hex>`.
+- The same three values are also sent as `X-Planora-Event`, `X-Planora-Delivery` and `X-Planora-Signature` for receivers built before the rename.
 
 ### Verifying the signature
 
@@ -139,11 +140,11 @@ The signing secret (`whsec_…`) is shown once when you add the endpoint.
 |---|---|
 | `RESEND_API_KEY` or `POSTMARK_TOKEN`, plus `EMAIL_FROM` | Turns on email: confirmation links for self sign-up and emailed invitations. Without them nothing is sent and email confirmation is not enforced |
 | `APP_URL` | Public URL used in emailed links (defaults to the request's origin) |
-| `PLANORA_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
-| `PLANORA_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
-| `PLANORA_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
-| `PLANORA_SIGNUP` | **Private beta: invite-only by default.** Sign-up needs an organization invitation or a beta invitation (SSO/SCIM into an organization still provisions members; the first account on an empty instance bootstraps), and signing in needs beta access. `PLANORA_SIGNUP=open` re-opens self sign-up and turns the sign-in gate off |
-| `PLANORA_PLATFORM_ADMINS` | Comma-separated emails (case-insensitive) of platform operators: they always pass the beta gate and get **Beta access** (`/dashboard/platform`, `/api/platform/beta`) to invite new firms and revoke or restore a person's beta access. Everyone else gets 404 there |
-| `PLANORA_ACCESS_REQUEST_EMAIL` | Where "Request access" links on the landing and sign-in pages send email. Without it the sign-in page hides the link and the landing page's "Request access" opens the sign-in page |
+| `RUNF9_ALERT_WEBHOOK_URL` | Slack/Teams incoming webhook for platform security alerts (lockouts, MFA disabled, ownership/SSO/role changes, organization exports, new API keys, failed audit verification) |
+| `RUNF9_ALLOW_INSECURE_WEBHOOKS=1` | **Tests only.** Allows `http://` and local webhook targets |
+| `RUNF9_EMAIL_OUTBOX=<dir>` | **Tests only.** Writes emails to a folder instead of sending them |
+| `RUNF9_SIGNUP` | **Private beta: invite-only by default.** Sign-up needs an organization invitation or a beta invitation (SSO/SCIM into an organization still provisions members; the first account on an empty instance bootstraps), and signing in needs beta access. `RUNF9_SIGNUP=open` re-opens self sign-up and turns the sign-in gate off |
+| `RUNF9_PLATFORM_ADMINS` | Comma-separated emails (case-insensitive) of platform operators: they always pass the beta gate and get **Beta access** (`/dashboard/platform`, `/api/platform/beta`) to invite new firms and revoke or restore a person's beta access. Everyone else gets 404 there |
+| `RUNF9_ACCESS_REQUEST_EMAIL` | Where "Request access" links on the landing and sign-in pages send email. Without it the sign-in page hides the link and the landing page's "Request access" opens the sign-in page |
 
 Every other setting, including on-premises and air-gapped ones, is listed in [operations/ON-PREM-INSTALL.md](operations/ON-PREM-INSTALL.md).

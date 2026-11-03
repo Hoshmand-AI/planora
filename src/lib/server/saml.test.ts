@@ -15,12 +15,12 @@ import { ApiError } from './api'
 // SAML 2.0 response validation against a test identity provider whose key pair and certificate are
 // generated here. Signatures are produced with xml-crypto, the same way real IdPs sign.
 
-const ORIGIN = 'https://planora.test'
+const ORIGIN = 'https://runf9.test'
 const IDP = 'https://idp.example.test/metadata'
 
 // A self-signed RSA-2048 / SHA-256 certificate, made with the system openssl (no extra dependency).
 function makeIdp() {
-  const dir = mkdtempSync(join(tmpdir(), 'planora-idp-'))
+  const dir = mkdtempSync(join(tmpdir(), 'runf9-idp-'))
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-sha256', '-nodes', '-days', '365', '-subj', '/CN=Test IdP',
       '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' })
@@ -49,7 +49,7 @@ function memoryStore() {
 
 const config = (over: Partial<SamlConfig> = {}): SamlConfig => normalizeSaml({
   enabled: true, connectionId: 'conn_test_1234', idpEntityId: IDP, ssoUrl: 'https://idp.example.test/sso', certs: [idp.cert],
-  domains: ['acme.test'], defaultRole: 'viewer', groupRoles: [{ group: 'Planora Admins', role: 'admin' }, { group: 'Schedulers', role: 'scheduler' }], ...over,
+  domains: ['acme.test'], defaultRole: 'viewer', groupRoles: [{ group: 'RunF9 Admins', role: 'admin' }, { group: 'Schedulers', role: 'scheduler' }], ...over,
 })
 const urls = spUrls(ORIGIN, 'conn_test_1234')
 
@@ -178,7 +178,7 @@ describe('SAML service provider', () => {
 
   it('rejects the wrong issuer', async () => {
     const { requestId } = await issue(mem.store)
-    await expectRejected(validate(signedResponse({ requestId, issuer: 'https://someone-else.test' }), requestId), /Issuer/)
+    await expectRejected(validate(signedResponse({ requestId, issuer: 'https://someone-else.test' }), requestId), /issuer/i) // node-saml (>=5.2) or our own check, whichever runs first
   })
 
   it('rejects a replayed response (request ID is one-time) and a replayed assertion ID', async () => {
@@ -263,6 +263,10 @@ describe('SAML configuration helpers', () => {
     expect(parsed).toMatchObject({ idpEntityId: IDP, ssoUrl: 'https://idp.example.test/sso' })
     expect(parsed.certs).toHaveLength(1)
     expect(() => parseIdpMetadata('<x>')).toThrow()
+    // Malformed documents are rejected with the friendly message (recoverable parser errors and fatal ones alike).
+    expect(() => parseIdpMetadata('<x>')).toThrow(/well-formed/)
+    expect(() => parseIdpMetadata(md.replace('</md:EntityDescriptor>', '</md:EntityDescriptor junk>'))).toThrow(/well-formed/)
+    expect(() => parseIdpMetadata(md.replace('<md:IDPSSODescriptor ', '<md:IDPSSODescriptor a="1" a="2" '))).toThrow(/well-formed/)
     expect(() => parseIdpMetadata(`<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>${md}`)).toThrow(/DOCTYPE/)
   })
 

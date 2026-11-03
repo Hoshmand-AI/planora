@@ -35,7 +35,7 @@ export const isPlanId = (p: unknown): p is PlanId => typeof p === 'string' && (P
 export const entitlementsFor = (plan: string | null | undefined): Entitlements => PLANS[isPlanId(plan) ? plan : 'free']
 
 /** Plan for organizations created from now on (existing ones were grandfathered to Pro). */
-export const defaultPlan = (): PlanId => isPlanId(process.env.PLANORA_DEFAULT_PLAN) ? process.env.PLANORA_DEFAULT_PLAN as PlanId : 'free'
+export const defaultPlan = (): PlanId => isPlanId(process.env.RUNF9_DEFAULT_PLAN) ? process.env.RUNF9_DEFAULT_PLAN as PlanId : 'free'
 
 export function requireFeature(plan: string, ok: boolean, what: string): void {
   if (!ok) throw new ApiError(402, `${what} isn't included in the ${entitlementsFor(plan).label} plan. Upgrade to use it (Organization → Plan).`, 'plan_limit', { plan })

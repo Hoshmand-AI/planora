@@ -3,10 +3,10 @@
 // Adding a provider means adding an adapter + registry entries — callers never change.
 
 /** Which adapter served a call. 'local' is any OpenAI-compatible endpoint (Ollama, vLLM, …). */
-export type ProviderName = 'anthropic' | 'openai' | 'local'
+export type ProviderName = 'anthropic' | 'openai' | 'local' | 'azure_openai' | 'bedrock' | 'vertex'
 
-/** Cloud providers selectable with PLANORA_AI_PROVIDER. */
-export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai'>
+/** Cloud providers selectable with RUNF9_AI_PROVIDER. */
+export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai' | 'azure_openai' | 'bedrock' | 'vertex'>
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -41,7 +41,7 @@ export interface LlmAdapter {
 }
 
 /** User-facing text when a provider declines to answer. */
-export const AI_REFUSAL_MESSAGE = 'The AI model declined to answer this request. Planora\'s schedule facts and rule-based results are still available; rephrase the question or continue without AI.'
+export const AI_REFUSAL_MESSAGE = 'The AI model declined to answer this request. RunF9\'s schedule facts and rule-based results are still available; rephrase the question or continue without AI.'
 
 /** The provider declined the request (e.g. a safety refusal). Never treat the content as an answer. */
 export class AiRefusalError extends Error {
@@ -60,7 +60,7 @@ export interface ModelEntry {
   provider: ProviderName
   /**
    * Certified models were evaluated with the golden prompts in docs/ai/AI-GOVERNANCE.md. Others are
-   * approved alternates: allowed, but Planora does not promise equivalent quality on them.
+   * approved alternates: allowed, but RunF9 does not promise equivalent quality on them.
    */
   certified: boolean
   /** USD per 1M tokens, for spend estimates in the audit trail */
@@ -97,10 +97,10 @@ export function estimateCostUsd(model: string, usage: LlmUsage): number | null {
   return Math.round(((usage.inputTokens * p.input + usage.outputTokens * p.output) / 1_000_000) * 1e6) / 1e6
 }
 
-/** Provider-side refusal fallback (Anthropic) is on unless PLANORA_AI_FALLBACK=off (also false / 0 / no / disabled). */
+/** Provider-side refusal fallback (Anthropic) is on unless RUNF9_AI_FALLBACK=off (also false / 0 / no / disabled). */
 export function aiFallbackEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return !/^(off|false|0|no|disabled?)$/i.test((env.PLANORA_AI_FALLBACK || '').trim())
+  return !/^(off|false|0|no|disabled?)$/i.test((env.RUNF9_AI_FALLBACK || '').trim())
 }
 
 /** Display names for the UI and docs. */
-export const PROVIDER_LABEL: Record<ProviderName, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', local: 'On-prem endpoint' }
+export const PROVIDER_LABEL: Record<ProviderName, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', local: 'On-prem endpoint', azure_openai: 'Azure OpenAI (your subscription)', bedrock: 'Amazon Bedrock (your account)', vertex: 'Google Vertex AI (your project)' }

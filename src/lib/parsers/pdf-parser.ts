@@ -5,6 +5,7 @@ import { Activity } from '@/lib/db'
 import { randomUUID as uuid } from 'crypto'
 import type { ParsedSchedule } from './types'
 import { ExceptionCollector } from './exceptions'
+import { parseDateCell } from './excel-parser'
 
 /** Text of one PDF page (1-based page number). */
 export interface PdfPageText { page: number; text: string }
@@ -54,14 +55,23 @@ export async function extractPdfText(buffer: Buffer): Promise<{ pages: PdfPageTe
 
 export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<ParsedSchedule> {
   const { text } = await extractPdfText(buffer)
-  
+  return parsePdfText(text, scheduleId)
+}
+
+/** Dates as printed by P6 (02-Nov-26), MS Project (11/2/26) and others (2026-11-02). */
+const DATE_TOKEN = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}-[A-Za-z]{3}-\d{2,4})/g
+
+/** The heuristic reader behind parsePDF, on the PDF's text layer. */
+export function parsePdfText(text: string, scheduleId: string): ParsedSchedule {
+
   // Try to extract project name from first few lines
   const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
   const projectName = lines[0] || 'Imported PDF Schedule'
   
   // Try to find dates in the text
-  const dateRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g
+  const dateRegex = DATE_TOKEN
   const dates = text.match(dateRegex) || []
+  const allDates = dates.map(parseFlexDate).filter((d): d is string => !!d).sort()
   
   // Try to extract activities from tabular data
   // Common patterns: ID | Name | Duration | Start | Finish
@@ -117,8 +127,8 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
       duration: 0,
       remainingDuration: 0,
       percentComplete: 0,
-      earlyStart: dates[0] ? parseFlexDate(dates[0]) : null,
-      earlyFinish: dates[dates.length - 1] ? parseFlexDate(dates[dates.length - 1]) : null,
+      earlyStart: allDates[0] ?? null,
+      earlyFinish: allDates[allDates.length - 1] ?? null,
       lateStart: null,
       lateFinish: null,
       actualStart: null,
@@ -141,8 +151,10 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
   return {
     projectName,
     dataDate: null,
-    projectStart: dates[0] ? parseFlexDate(dates[0]) : null,
-    projectFinish: dates[dates.length - 1] ? parseFlexDate(dates[dates.length - 1]) : null,
+    // Earliest and latest date printed (not the first and last in reading order: a run or print date
+    // in the page header came first and was taken as the project start)
+    projectStart: allDates[0] ?? null,
+    projectFinish: allDates[allDates.length - 1] ?? null,
     activities,
     relationships: [],
     calendars: [],
@@ -156,12 +168,12 @@ export async function parsePDF(buffer: Buffer, scheduleId: string): Promise<Pars
   }
 }
 
-function parseFlexDate(str: string): string | null {
-  try {
-    const d = new Date(str)
-    if (isNaN(d.getTime())) return null
-    return d.toISOString().split('T')[0]
-  } catch {
-    return null
-  }
+/**
+ * A printed date as YYYY-MM-DD, read as written (US month/day order). `new Date(str)` read it as local
+ * midnight and toISOString() shifted it to the previous day on any server east of UTC.
+ */
+export function parseFlexDate(str: string): string | null {
+  const s = str.trim()
+  const md = /^(\d{1,2})-(\d{1,2})-(\d{2,4})$/.exec(s)
+  return parseDateCell(md ? `${md[1]}/${md[2]}/${md[3]}` : s)
 }

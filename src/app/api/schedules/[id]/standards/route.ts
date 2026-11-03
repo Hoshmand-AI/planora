@@ -10,7 +10,7 @@ import { RUNNABLE_FRAMEWORKS } from '@/lib/standards/types'
 
 /**
  * Standards rules engine on an uploaded schedule.
- *   GET ?frameworks=PLANORA_COMPOSITE,GAO_SCHEDULE_GUIDE,DCMA_14 (default: the organization's) &basis=scenario
+ *   GET ?frameworks=RUNF9_COMPOSITE,GAO_SCHEDULE_GUIDE,DCMA_14 (default: the organization's) &basis=scenario
  *       → { result, runs, defaults, available } — runs the frameworks now (not stored) and lists stored runs
  *   GET ?run=<id> → { run } — a stored run exactly as it was recorded
  *   POST { frameworks?, basis? } → runs and records the assessment (schedule.write); audited

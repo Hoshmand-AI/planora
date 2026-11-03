@@ -8,7 +8,7 @@ import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import type { Schedule } from '@/lib/db'
 import { exportExceptions } from './exceptions'
 import { exportImportXlsx } from './xlsx'
-import { planoraRelease, type Provenance } from './provenance'
+import { runf9Release, type Provenance } from './provenance'
 import { exceptionHeader } from '@/lib/parsers/exceptions'
 
 // The equivalence fixture: two calendars (one with an added Saturday work day), constraints including a
@@ -72,7 +72,7 @@ describe('export exception reports', () => {
     const exceptions = exportExceptions(g, 'xlsx-import', ctx)
     const prov: Provenance = {
       sources: [{ scheduleName: 'EQ-1', version: 'Update 1', fileName: 'eq.xer', sha256: 'abc', dataDate: '2026-03-16', progressMode: 'retained' }],
-      release: planoraRelease({}), settings: ['CPM'], generatedAt: '2026-03-16T00:00:00.000Z', exceptions,
+      release: runf9Release({}), settings: ['CPM'], generatedAt: '2026-03-16T00:00:00.000Z', exceptions,
     }
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(await exportImportXlsx(g, 'EQ-1', { prov }) as unknown as ArrayBuffer)
@@ -92,8 +92,8 @@ describe('export exception reports', () => {
     const grLoe = uploadedToGenerated(schedule, done.activities, parsed.relationships, done.cpm, analysis, [], { includeLoe: true, resources: parsed.resources })
     // An older upload's import report that still names the resource tables as not imported.
     const old = { ...parsed.exceptions!, records: [...parsed.exceptions!.records,
-      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'resource' as const, field: 'RSRC', count: 2, examples: ['EXC', 'IW'], disposition: 'preserved_in_raw' as const, message: 'Resources: not used by Planora' },
-      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'assignment' as const, field: 'TASKRSRC', count: 3, examples: [], disposition: 'preserved_in_raw' as const, message: 'Resource assignments: not used by Planora' }] }
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'resource' as const, field: 'RSRC', count: 2, examples: ['EXC', 'IW'], disposition: 'preserved_in_raw' as const, message: 'Resources: not used by RunF9' },
+      { direction: 'import' as const, format: 'p6_xer', severity: 'warning' as const, entity: 'assignment' as const, field: 'TASKRSRC', count: 3, examples: [], disposition: 'preserved_in_raw' as const, message: 'Resource assignments: not used by RunF9' }] }
     for (const [f, s] of [['xer', gr], ['xml', grLoe]] as const) {
       const r = exportExceptions(s, f, { ...ctx, importReport: old })
       expect(r.records.filter(x => x.entity === 'resource' || x.entity === 'assignment'), f).toEqual([])

@@ -1,7 +1,7 @@
 // Single sign-on with SAML 2.0 (Microsoft Entra ID, Okta, Ping, ADFS, Google Workspace, OneLogin…),
 // alongside OpenID Connect (sso.ts).
 //
-// Planora is the service provider (SP). Each organization has one SAML connection with its own
+// RunF9 is the service provider (SP). Each organization has one SAML connection with its own
 // SP entity ID and assertion consumer service (ACS) URL:
 //   metadata  /api/auth/saml/<connectionId>/metadata
 //   login     /api/auth/saml/<connectionId>/login       (SP-initiated, HTTP-Redirect binding)
@@ -40,7 +40,7 @@ export const NAMEID_FORMATS = {
 export const CLOCK_SKEW_MS = 60_000
 /** How long an issued AuthnRequest (and the state cookie) stays valid. */
 export const REQUEST_TTL_MS = 10 * 60_000
-export const SAML_COOKIE = 'planora-saml'
+export const SAML_COOKIE = 'runf9-saml'
 export const SAML_COOKIE_PATH = '/api/auth/saml'
 const MAX_RESPONSE_BYTES = 512 * 1024
 const MAX_METADATA_BYTES = 256 * 1024
@@ -60,7 +60,7 @@ export interface SamlConfig {
   /** Attribute names; empty = use the common names (see EMAIL_ATTRS, NAME_ATTRS, GROUP_ATTRS) */
   attributes: { email: string; name: string; groups: string }
   defaultRole: Role
-  /** IdP group → Planora role. Applied on every sign-in (never to owners). */
+  /** IdP group → RunF9 role. Applied on every sign-in (never to owners). */
   groupRoles: GroupRole[]
   domains: string[]
   /** Members (other than owners) must sign in with SSO */
@@ -142,8 +142,13 @@ function elementsByLocalName(root: Node, name: string): Element[] {
 }
 
 function parseXml(xml: string): Document {
+  // xmldom 0.9: recoverable problems are reported to onError as 'warning' or 'error'; a fatal error throws.
+  // Treat anything above a warning as malformed, as before.
   let failed = false
-  const doc = new DOMParser({ errorHandler: { error: () => { failed = true }, fatalError: () => { failed = true } } }).parseFromString(xml, 'text/xml')
+  let doc: ReturnType<DOMParser['parseFromString']> | undefined
+  try {
+    doc = new DOMParser({ onError: level => { if (level !== 'warning') failed = true } }).parseFromString(xml, 'text/xml')
+  } catch { failed = true }
   if (failed || !doc?.documentElement) throw new ApiError(400, 'That is not well-formed XML.')
   return doc as unknown as Document
 }
@@ -216,7 +221,7 @@ export function publicSaml(c: SamlConfig, origin: string) {
     defaultRole: c.defaultRole, groupRoles: c.groupRoles, domains: c.domains, enforce: c.enforce,
     certs: c.certs.map(pem => ({ pem, ...certInfo(pem) })),
     sp: c.connectionId ? spUrls(origin, c.connectionId) : null,
-    verification: c.verificationToken ? { host: '_planora-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
+    verification: c.verificationToken ? { host: '_runf9-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
   }
 }
 
@@ -359,7 +364,7 @@ export function spMetadataXml(config: SamlConfig, urls: SpUrls): string {
 function cookieSecret() {
   const s = process.env.JWT_SECRET
   if (!s && process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be set in production')
-  return `saml:${s || 'planora-dev-secret-change-in-production-2026'}`
+  return `saml:${s || 'runf9-dev-secret-change-in-production-2026'}`
 }
 
 export interface SamlState { typ: 'saml'; orgId: string; cid: string; rid: string; relay: string; test: boolean }

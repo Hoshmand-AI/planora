@@ -9,6 +9,7 @@ import type { SraCommitment, SraRange, SraRiskEvent } from '@/lib/planning/sra'
 import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
 import type { FindingDisposition, ReviewState, SubmissionDisposition } from '@/lib/analysis/review'
 import { currentWorkspaceAccess, workspaceClause } from '@/lib/server/workspace-scope'
+import { upgradeLegacyData } from './legacy-data'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
@@ -51,8 +52,23 @@ const pool = new Pool({
   max: Number(process.env.PG_POOL_MAX) || 10,
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
+  keepAlive: true,
 })
-export const query = (text: string, params?: unknown[]) => pool.query(text, params)
+// An idle pooled connection can be closed by the server (e.g. Neon suspending compute after inactivity).
+// Without a listener that error would crash the process; the pool already discards the dead client.
+if (typeof pool.on === 'function') pool.on('error', err => console.warn(JSON.stringify({ level: 'warn', msg: 'idle database connection closed', error: err.message })))
+
+const STALE_CONNECTION = /Connection terminated unexpectedly|ECONNRESET|Client has encountered a connection error/i
+
+/** Runs a query; a read that hits a connection the server already closed is retried once on a fresh one. */
+export async function query(text: string, params?: unknown[]) {
+  try {
+    return await pool.query(text, params)
+  } catch (err) {
+    if (/^\s*SELECT\b/i.test(text) && STALE_CONNECTION.test((err as Error).message)) return pool.query(text, params)
+    throw err
+  }
+}
 
 let schemaReady: Promise<void> | null = null
 
@@ -243,7 +259,7 @@ export interface Schedule {
   criticalCount: number; percentComplete: number
   calendars: WorkCalendar[]; defaultCalendarId: string | null; warnings: string[]
   planId: string | null; projectType: string | null; region: string | null; grossSqft: number | null
-  /** Planora's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
+  /** RunF9's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
   analysis?: ScheduleAnalysis | null
   /** Groups uploads of the same project into an update series */
   projectKey?: string | null
@@ -257,8 +273,8 @@ export interface Schedule {
   uploadOrigin?: 'own' | 'third_party' | null
   /** Included in firm history although not as-built (explicit override) */
   historyOverride?: boolean
-  /** The file is a re-imported Planora export */
-  planoraExport?: boolean
+  /** The file is a re-imported RunF9 export */
+  runf9Export?: boolean
   /** Matter / engagement workspace; null = organization-wide */
   workspaceId?: string | null
   /** Earlier upload of the series designated as this upload's baseline; null = the upload labelled Baseline */
@@ -279,13 +295,13 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     calendars: (row.calendars as WorkCalendar[]) || [], defaultCalendarId: (row.default_calendar_id as string) || null, warnings: (row.warnings as string[]) || [],
     planId: (row.plan_id as string) || null, projectType: (row.project_type as string) || null, region: (row.region as string) || null,
     grossSqft: row.gross_sqft != null ? Number(row.gross_sqft) : null,
-    analysis: (row.analysis as ScheduleAnalysis) ?? null, projectKey: (row.project_key as string) ?? null,
+    analysis: upgradeLegacyData((row.analysis as ScheduleAnalysis) ?? null), projectKey: (row.project_key as string) ?? null,
     inHistory: row.in_history == null ? true : Boolean(row.in_history),
     finishMilestoneId: (row.finish_milestone_id as string) ?? null,
     classification: row.classification === 'cui' || row.classification === 'classified' || row.classification === 'unclassified' ? row.classification : null,
     uploadOrigin: row.upload_origin === 'own' || row.upload_origin === 'third_party' ? row.upload_origin : null,
     historyOverride: row.history_override === true,
-    planoraExport: row.planora_export === true,
+    runf9Export: row.planora_export === true,
     workspaceId: (row.workspace_id as string) ?? null,
     baselineScheduleId: (row.baseline_schedule_id as string) ?? null,
     baselineMeta: (row.baseline_meta as BaselineMeta) ?? null,
@@ -326,7 +342,7 @@ export async function createSchedule(s: Schedule): Promise<Schedule> {
   return s
 }
 
-/** Store Planora's analysis (and the numbers lists show) after a recalculation. */
+/** Store RunF9's analysis (and the numbers lists show) after a recalculation. */
 export async function updateScheduleAnalysis(id: string, orgId: string, a: { analysis: ScheduleAnalysis; projectFinish: string | null; varianceDays: number | null; criticalCount: number }): Promise<void> {
   await initSchema()
   await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
@@ -362,15 +378,15 @@ export async function setScheduleInHistory(id: string, orgId: string, inHistory:
   await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
 }
 
-/** Upload metadata set after the row is created (origin, classification, Planora re-import, history override). */
-export async function updateScheduleMeta(id: string, orgId: string, m: { classification?: Schedule['classification']; uploadOrigin?: Schedule['uploadOrigin']; planoraExport?: boolean; historyOverride?: boolean }): Promise<void> {
+/** Upload metadata set after the row is created (origin, classification, RunF9 re-import, history override). */
+export async function updateScheduleMeta(id: string, orgId: string, m: { classification?: Schedule['classification']; uploadOrigin?: Schedule['uploadOrigin']; runf9Export?: boolean; historyOverride?: boolean }): Promise<void> {
   await initSchema()
   const sets: string[] = []
   const vals: unknown[] = [id, orgId]
   const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col}=$${vals.length}`) }
   if (m.classification !== undefined) add('classification', m.classification)
   if (m.uploadOrigin !== undefined) add('upload_origin', m.uploadOrigin)
-  if (m.planoraExport !== undefined) add('planora_export', m.planoraExport)
+  if (m.runf9Export !== undefined) add('planora_export', m.runf9Export)
   if (m.historyOverride !== undefined) add('history_override', m.historyOverride)
   if (!sets.length) return
   await query(`UPDATE schedules SET ${sets.join(', ')} WHERE id=$1 AND org_id=$2`, vals)
@@ -383,10 +399,10 @@ export async function setScheduleVersion(id: string, orgId: string, version: str
 }
 
 /**
- * True when a file with this SHA-256 was exported by Planora for this organization (the export audit
- * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of Planora output.
+ * True when a file with this SHA-256 was exported by RunF9 for this organization (the export audit
+ * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of RunF9 output.
  */
-export async function isPlanoraExportSha(orgId: string, sha256: string): Promise<boolean> {
+export async function isRunF9ExportSha(orgId: string, sha256: string): Promise<boolean> {
   await initSchema()
   const res = await query(`SELECT 1 FROM audit_events WHERE org_id=$1 AND action IN ('schedule.export', 'plan.export') AND detail->>'sha256' = $2 LIMIT 1`, [orgId, sha256])
   return res.rows.length > 0
@@ -401,10 +417,12 @@ export async function getScheduleSeries(orgId: string, projectKey: string): Prom
   return res.rows.map(rowToSchedule)
 }
 
-export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer }): Promise<void> {
+export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer; kept?: { connectionId: string; objectKey: string } | null; from?: { connectionId: string; key: string } | null }): Promise<void> {
   await initSchema()
-  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content) VALUES ($1,$2,$3,$4,$5,$6)
-    ON CONFLICT (schedule_id) DO NOTHING`, [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.content])
+  // Kept in the firm's own storage: RunF9 records only where it is (content left empty).
+  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content, storage_connection_id, object_key, source_connection_id, source_key)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (schedule_id) DO NOTHING`,
+  [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.kept ? Buffer.alloc(0) : f.content, f.kept?.connectionId ?? null, f.kept?.objectKey ?? null, f.from?.connectionId ?? null, f.from?.key ?? null])
 }
 
 /** Uploads among `scheduleIds` whose stored original file has this SHA-256 (identical bytes). */
@@ -418,10 +436,17 @@ export async function findScheduleFilesBySha(orgId: string, sha256: string, sche
 export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
   await initSchema()
   const ws = await workspaceScope('s.workspace_id', 3)
-  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
+  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at, f.size_bytes, f.storage_connection_id, f.object_key FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
     WHERE f.schedule_id=$1 AND f.org_id=$2${ws.and}`, [scheduleId, orgId, ...ws.params])
   const r = res.rows[0]
-  return r ? { fileName: r.file_name, sha256: r.sha256, content: r.content as Buffer, createdAt: String(r.created_at) } : undefined
+  if (!r) return undefined
+  let content = r.content as Buffer
+  if (r.storage_connection_id && r.object_key && content.length === 0) {
+    // Kept in the firm's own cloud storage: read it back and make sure it is the file that was uploaded.
+    const { fetchKeptOriginal } = await import('@/lib/storage/kept')
+    content = await fetchKeptOriginal(orgId, String(r.storage_connection_id), String(r.object_key), String(r.sha256), Number(r.size_bytes))
+  }
+  return { fileName: r.file_name, sha256: r.sha256, content, createdAt: String(r.created_at) }
 }
 
 /** File name and SHA-256 of the stored original (no content), for provenance headers. */
@@ -607,7 +632,7 @@ export interface HistoryRow {
 /**
  * Activities from the firm's OWN past schedules, used to ground durations.
  * The org_id filter is the privacy boundary: competitors' data is never read.
- * Only uploads selectHistorySchedules accepts count (as-built, one per project, no Planora re-imports,
+ * Only uploads selectHistorySchedules accepts count (as-built, one per project, no RunF9 re-imports,
  * no third-party schedules), and none when the organization turned firm history off for its uploads.
  * Workspace walls apply too: a member never gets durations from a matter they are walled off from.
  */
@@ -625,7 +650,7 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
     GROUP BY s.id`, [orgId, excludeScheduleId ?? null, ...ws.params])
   const selection = selectHistorySchedules(cand.rows.map(r => ({
     id: r.id, name: r.name, version: r.version, projectKey: r.project_key ?? null, dataDate: r.data_date ?? null, uploadedAt: String(r.uploaded_at),
-    inHistory: r.in_history !== false, historyOverride: r.history_override === true, planoraExport: r.planora_export === true,
+    inHistory: r.in_history !== false, historyOverride: r.history_override === true, runf9Export: r.planora_export === true,
     uploadOrigin: r.upload_origin === 'own' || r.upload_origin === 'third_party' ? r.upload_origin : null,
     workCount: Number(r.work_count), openCount: Number(r.open_count),
   })), { orgOptOut })
@@ -848,7 +873,7 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
   return res.rows.map(row => ({ id: row.id, scheduleId: row.schedule_id, userId: row.user_id, role: row.role, content: row.content, createdAt: row.created_at }))
 }
 
-/** Everything the organization has stored in Planora, as one JSON document (data portability). */
+/** Everything the organization has stored in RunF9, as one JSON document (data portability). */
 export async function exportOrganization(orgId: string) {
   await initSchema()
   const org = await getOrganization(orgId)
@@ -863,7 +888,7 @@ export async function exportOrganization(orgId: string) {
       getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId), getReviewState(s.id, orgId),
     ])
     const timeImpact = await import('./tia-db').then(m => m.exportTimeImpact(s.id, orgId))
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInPlanora: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission, timeImpact })
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInRunF9: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission, timeImpact })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
   const standardsRuns = (await query('SELECT * FROM standards_runs WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
@@ -871,7 +896,7 @@ export async function exportOrganization(orgId: string) {
   const { exportDocuments } = await import('@/lib/rag/store')
   const projectDocuments = await exportDocuments(orgId)
   const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
-  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, projectDocuments, retrievalLog, auditEvents: audit }
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, projectDocuments, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -886,7 +911,8 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
       (SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1) AS last_hash`, [orgId])).rows[0]
     await q(`SELECT set_config('planora.audit_purge', 'on', true)`)
     await q('DELETE FROM audit_events WHERE org_id=$1', [orgId])
-    // Project documents: passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    // Project documents: passage vectors, passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    await q('DELETE FROM chunk_embeddings WHERE org_id=$1', [orgId])
     await q('DELETE FROM document_chunks WHERE org_id=$1', [orgId])
     await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])

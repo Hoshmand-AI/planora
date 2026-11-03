@@ -11,7 +11,7 @@ export const GET = publicApi<{ connection: string }>(async (req, { params }) => 
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/samlmetadata+xml; charset=utf-8',
-      ...(download ? { 'Content-Disposition': 'attachment; filename="planora-sp-metadata.xml"' } : {}),
+      ...(download ? { 'Content-Disposition': 'attachment; filename="runf9-sp-metadata.xml"' } : {}),
     },
   })
 }, { optionalAuth: false })

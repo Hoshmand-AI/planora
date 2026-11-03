@@ -1,4 +1,6 @@
 import { randomUUID as uuid } from 'crypto'
+import { dataLocation } from '@/lib/server/data-location'
+import { after } from 'next/server'
 import { getUserByEmail, getUserById, getOrganization, createUser, query } from '@/lib/db'
 import {
   hashPassword, verifyPassword, dummyPasswordCheck, createSession, setSessionCookie, clearSessionCookie, revokeSession,
@@ -9,7 +11,9 @@ import { hit, peek, reset, LIMITS } from '@/lib/server/rate-limit'
 import { passwordProblem } from '@/lib/server/password'
 import { appendAudit, audit, auditQuietly, SYSTEM_ORG } from '@/lib/server/audit'
 import { applyNewOrganizationDefaults, findInvitation, markInvitationAccepted } from '@/lib/server/org'
-import { currentRequest } from '@/lib/server/context'
+import { currentRequest, runWithRequest } from '@/lib/server/context'
+import { log, errorFields } from '@/lib/server/log'
+import { RESET_INVALID_MESSAGE, RESET_VALID_MINUTES, requestPasswordReset, resetPasswordWithToken } from '@/lib/server/password-reset'
 import { permissionsOf, isRole } from '@/lib/server/permissions'
 import { consumeSecondFactor } from '@/lib/server/mfa'
 import { ssoEnforced } from '@/lib/server/saml'
@@ -20,6 +24,8 @@ import { INVITE_ONLY_MESSAGE, accessRequestEmail, isPlatformAdmin, signupAccess,
 import { assertBetaAccess, findBetaInvite, markBetaInviteAccepted } from '@/lib/server/beta'
 
 const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.'
+/** The same answer for every address, so the reset form can't be used to find accounts. */
+const RESET_REQUESTED_MESSAGE = `If an account exists for that email, we've sent a link. It expires in ${RESET_VALID_MINUTES} minutes.`
 
 async function limitOrThrow(key: string, l: { limit: number; windowSec: number }, message: string) {
   const r = await hit(key, l.limit, l.windowSec)
@@ -38,7 +44,7 @@ async function startSession(user: { id: string; email: string; name: string; rol
 }
 
 export const POST = publicApi(async req => {
-  const b = await body<{ action?: string; email?: string; password?: string; name?: string; company?: string; invite?: string; betaInvite?: string; challenge?: string; code?: string }>(req)
+  const b = await body<{ action?: string; email?: string; password?: string; name?: string; company?: string; invite?: string; betaInvite?: string; challenge?: string; code?: string; token?: string }>(req)
   const ip = currentRequest()?.ip || 'unknown'
 
   if (b.action === 'signout') {
@@ -68,6 +74,37 @@ export const POST = publicApi(async req => {
     return startSession(user, used === 'recovery' ? 'password+recovery_code' : 'password+totp')
   }
 
+  if (b.action === 'request_password_reset') {
+    const address = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
+    if (!address || address.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) throw new ApiError(400, 'Enter a valid email address.')
+    // Says nothing about any account: the same for every address on this installation.
+    if (!emailConfigured()) throw new ApiError(400, "Password reset by email isn't available on this RunF9 installation. Ask your organization admin for help.", 'email_unavailable')
+    // Counted for every address, existing or not, so the limits reveal nothing either.
+    await limitOrThrow(`reset:request:ip:${ip}`, LIMITS.resetRequestsPerIp, 'Too many reset requests from this network. Wait a while and try again.')
+    await limitOrThrow(`reset:request:email:${address}`, LIMITS.resetRequestsPerEmail, 'Too many reset requests for this email. Check your inbox and spam folder, or try again later.')
+    // Looking the account up and sending happen after the response, so its timing is the same
+    // whether or not the account exists.
+    const info = currentRequest()
+    const origin = appOrigin(req)
+    const work = () => requestPasswordReset(address, origin)
+      .then(outcome => { if (outcome === 'send_failed') log('error', 'password reset email failed', {}) })
+      .catch(err => log('error', 'password reset request failed', errorFields(err)))
+    const run = () => info ? runWithRequest({ ...info }, work) : work()
+    try { after(run) } catch { void run() }
+    return json({ success: true, message: RESET_REQUESTED_MESSAGE })
+  }
+
+  if (b.action === 'reset_password') {
+    await limitOrThrow(`reset:confirm:ip:${ip}`, LIMITS.resetConfirmsPerIp, 'Too many attempts from this network. Wait a few minutes and try again.')
+    const r = await resetPasswordWithToken(b.token, b.password)
+    if (!r.ok) {
+      if (r.reason === 'weak_password') throw new ApiError(400, r.message, 'weak_password')
+      throw new ApiError(400, RESET_INVALID_MESSAGE, 'reset_invalid')
+    }
+    // No automatic sign-in (two-step verification and SSO rules stay with the normal sign-in).
+    return json({ success: true, message: 'Your password has been reset. Sign in with your new password.' })
+  }
+
   const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
   const password = typeof b.password === 'string' ? b.password : ''
   if (!email || !password) throw new ApiError(400, 'Email and password required')
@@ -85,7 +122,7 @@ export const POST = publicApi(async req => {
     const beta = !invite && b.betaInvite ? await findBetaInvite(String(b.betaInvite)) : null
     if (!invite && b.betaInvite && !beta) throw new ApiError(400, 'This beta invitation link is no longer valid. Ask for a new one.', 'beta_invite_invalid')
     if (beta && beta.email !== email) throw new ApiError(400, `This invitation is for ${beta.email}. Sign up with that email address.`, 'invite_email')
-    // Private beta (PLANORA_SIGNUP, invite-only by default): without an invitation only a platform
+    // Private beta (RUNF9_SIGNUP, invite-only by default): without an invitation only a platform
     // operator or the first account on an empty instance (the bootstrapping owner) may sign up.
     // Checked before the "already exists" answer, so refused sign-ups learn nothing about accounts.
     const mode = signupMode()
@@ -189,7 +226,7 @@ export const GET = publicApi(async req => {
   return json({
     // Organization's subscription plan (from the session's organization row), not the legacy users.plan.
     user: { id: ctx.userId, email: ctx.email, name: ctx.name, plan: ctx.plan, role: ctx.role },
-    org: { id: ctx.orgId, name: ctx.orgName },
+    org: { id: ctx.orgId, name: ctx.orgName, dataLocation: dataLocation() },
     permissions: isRole(ctx.role) ? permissionsOf(ctx.role) : [],
     security: { mfaEnabled: ctx.mfaEnabled, mfaSetupRequired: ctx.mfaSetupRequired, emailVerified: !!ctx.emailVerified, emailDelivery: emailConfigured() },
     service,

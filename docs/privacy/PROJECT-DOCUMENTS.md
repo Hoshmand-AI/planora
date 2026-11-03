@@ -14,7 +14,7 @@ can retrieve it, what reaches a model, and how it is deleted. Code: `src/lib/rag
 | `document_requirement_reviews` | a person's confirm / dismiss decision on a candidate requirement (key, kind, user, time) | No document text. |
 | `retrieval_log` | who retrieved, for which project and purpose, SHA-256 of the query (salted with the org id), returned document and passage ids, flagged passage ids, how results were delivered (`search`, `model`, `passages_only`, `withheld_restricted`, `none`), number of invalid citations removed | Never the query or passage text. Purged after 400 days. |
 
-**The original file is not stored.** Planora extracts the text (PDF text layer, Word `document.xml`,
+**The original file is not stored.** RunF9 extracts the text (PDF text layer, Word `document.xml`,
 plain text / Markdown), keeps the SHA-256 and size for chain of custody, and discards the bytes.
 Scanned PDFs without a text layer are refused with a request to OCR them first. Size limits: 15 MB
 per file, 1,500 pages, 2,000,000 characters, 4,000 passages, 200 documents per upload.
@@ -44,7 +44,7 @@ Permissions: `read` lists and searches; `schedule.write` uploads, deletes and co
 
 - Retrieval order (the grounding hierarchy): (1) approved project documents, (2) approved
   organization standards, (3) unreviewed contracts and owner requirements, (4) other unreviewed
-  documents — the last two only when the user opts in — then Planora's curated reference knowledge
+  documents — the last two only when the user opts in — then RunF9's curated reference knowledge
   (`src/lib/knowledge`), then general knowledge. The model is told this precedence.
 - Passages are sent as a separate data message inside `<<<DOCUMENT n nonce=…>>>` blocks with their
   title, section, page, trust and tier. The nonce is random per request and marker-like text inside a
@@ -91,8 +91,19 @@ dismiss them (`document.requirement_confirmed` / `_dismissed` in the audit log, 
 | Organization deleted | Passages, documents (including tombstones), requirement reviews and the retrieval log are deleted with everything else. |
 | Backups | Follow the database backup window ([../operations/BACKUP-AND-RECOVERY.md](../operations/BACKUP-AND-RECOVERY.md)). |
 
-## Extending retrieval
+## Search: keyword, construction vocabulary, and meaning
 
-Retrieval sits behind the `Retriever` interface (`src/lib/rag/types.ts`). A vector backend (for
-example pgvector on an on-prem deployment) can be added as another implementation, but it must apply
-the same scope in its own query; nothing may filter results after retrieval.
+Retrieval sits behind the `Retriever` interface (`src/lib/rag/types.ts`). Every backend applies the
+scope above inside its own SQL; nothing filters results after retrieval.
+
+- **Keyword** (always on): Postgres full-text search, plus a fixed construction vocabulary
+  (`src/lib/rag/vocabulary.ts`) so "LDs" also finds "liquidated damages" and "NTP" the "Notice to
+  Proceed". No model, nothing leaves the database.
+- **Meaning-based** (optional, `RUNF9_EMBEDDINGS_MODEL`; `src/lib/rag/embeddings.ts`): passages and
+  questions become vectors through an embedding model **inside the customer's network only**: a
+  public address, including any cloud AI provider, is refused in every deployment, and nothing is
+  embedded while the organization's AI switch is off. Vectors are stored in `chunk_embeddings`
+  (deleted with their passage) and compared inside Postgres under the same scoped SQL
+  (`buildVectorSearchSql`). Flagged passages are never embedded. Results are blended with keyword
+  results (reciprocal-rank fusion) and ordered by grounding tier; if the model is down, search is
+  keyword-only. Passages uploaded before AI was turned on are indexed on the next search.

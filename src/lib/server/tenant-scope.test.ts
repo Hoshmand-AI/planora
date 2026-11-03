@@ -20,7 +20,7 @@ const CHILD_TABLES = new Set(['activities', 'relationships', 'chat_messages', 'd
 /** Not firm data: per-user or operational tables, scoped by user id, token hash or key. */
 const NON_TENANT_TABLES = new Set(['sessions', 'rate_limits', 'email_tokens', 'maintenance_runs', 'schema_migrations',
   // Private beta invitations for NEW firms: platform-operator data (no organization exists yet), read
-  // and written only through /api/platform/beta (404 unless PLANORA_PLATFORM_ADMINS) and by token hash at sign-up.
+  // and written only through /api/platform/beta (404 unless RUNF9_PLATFORM_ADMINS) and by token hash at sign-up.
   'beta_invites'])
 const IDENTITY_TABLES = new Set(['users'])
 const ROOT_TABLE = 'organizations'
@@ -90,7 +90,7 @@ const ALLOWLIST: { file: string; sql: string; why: string }[] = [
   // Sign-up of a new firm creates its organization (the id is new; nothing is read).
   { file: 'src/lib/db.ts', sql: 'INSERT INTO organizations (id, name, plan)', why: 'createUser: a new organization for a self sign-up' },
   // Private beta administration: the platform operator's cross-organization view (/api/platform/beta
-  // answers 404 to everyone not in PLANORA_PLATFORM_ADMINS).
+  // answers 404 to everyone not in RUNF9_PLATFORM_ADMINS).
   { file: 'src/lib/server/beta.ts', sql: 'FROM beta_invites b LEFT JOIN organizations o ON o.id = b.accepted_org_id', why: 'listBetaInvites: platform operators only; names the firm each invitation created' },
   { file: 'src/lib/server/beta.ts', sql: 'FROM users u JOIN organizations o ON o.id = u.org_id ORDER BY u.created_at DESC', why: 'listBetaUsers: platform operators only; beta status of every account' },
   // Invite-only sign-up needs to know whether the instance is empty (a count, no data).
@@ -145,6 +145,8 @@ export function stringLiterals(src: string): { text: string; line: number }[] {
 // SQL in this codebase is written with upper-case keywords; matching case-sensitively keeps UI prose out.
 const SQL_RE = /^\s*(WITH|SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*\b(FROM|INTO|SET)\b/
 const TABLE_RE = /\b(?:FROM|JOIN|INTO|UPDATE|USING)\s+(?!SET\b)([a-z_]+)\b/g
+/** Set-returning SQL functions that can follow FROM/JOIN; they read no table. */
+const SQL_FUNCTIONS = new Set(['unnest', 'generate_series'])
 
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
@@ -164,7 +166,7 @@ function statements(): Statement[] {
     for (const lit of stringLiterals(fs.readFileSync(file, 'utf8'))) {
       const sql = lit.text.replace(/\s+/g, ' ').trim()
       if (!SQL_RE.test(sql)) continue
-      const tables = [...new Set([...sql.matchAll(TABLE_RE)].map(m => m[1].toLowerCase()))]
+      const tables = [...new Set([...sql.matchAll(TABLE_RE)].map(m => m[1].toLowerCase()))].filter(t => !SQL_FUNCTIONS.has(t))
       out.push({ file: rel, line: lit.line, sql, tables })
     }
   }

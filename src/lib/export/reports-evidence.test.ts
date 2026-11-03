@@ -6,7 +6,7 @@ import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { runDcma } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import { buildReport, reportSupplement } from '@/lib/export/reports'
-import { planoraRelease, withProvenance, type Provenance } from '@/lib/export/provenance'
+import { runf9Release, withProvenance, type Provenance } from '@/lib/export/provenance'
 import { defaultCalendar } from '@/lib/planning/calendar'
 
 // Same fixture as reports.test.ts: NTP done, A200 in progress, A300, M900 (baseline 03/30, forecast 04/01).
@@ -27,7 +27,7 @@ const input = { schedule, activities: done.activities, relationships: rels, anal
 
 const prov: Provenance = {
   sources: [{ scheduleName: 'Bridge 12', version: 'Update 3', fileName: 'bridge12_upd3.xer', sha256: 'a'.repeat(64), dataDate: '2026-03-09', progressMode: 'retained' }],
-  release: 'abc1234', settings: ['CPM recalculation by Planora; out-of-sequence progress: Retained logic'], generatedAt: '2026-10-06T12:00:00.000Z',
+  release: 'abc1234', settings: ['CPM recalculation by RunF9; out-of-sequence progress: Retained logic'], generatedAt: '2026-10-06T12:00:00.000Z',
 }
 
 describe('report provenance header', () => {
@@ -39,10 +39,10 @@ describe('report provenance header', () => {
       expect(at).toBeLessThan(out.indexOf('## 1.'))
       expect(out).toContain('| Source file | bridge12_upd3.xer |')
       expect(out).toContain(`| SHA-256 | ${'a'.repeat(64)} |`)
-      expect(out).toContain('| Planora version (release) | abc1234 |')
+      expect(out).toContain('| RunF9 version (release) | abc1234 |')
       expect(out).toContain('| Progress mode | Retained logic |')
       expect(out).toContain('| Data date | 03/09/2026 |')
-      expect(out).toContain('| Calculation settings | CPM recalculation by Planora')
+      expect(out).toContain('| Calculation settings | CPM recalculation by RunF9')
     }
   })
   it('adds provenance once to an AI-written report, and in the supplement', () => {
@@ -54,9 +54,9 @@ describe('report provenance header', () => {
     expect(sup).toContain('## Reviewer disposition')
   })
   it('states the release the same way /api/health does', () => {
-    expect(planoraRelease({ VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' })).toBe('0123456')
-    expect(planoraRelease({ PLANORA_RELEASE: 'v2.4.0' })).toBe('v2.4.0')
-    expect(planoraRelease({})).toBe('local')
+    expect(runf9Release({ VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' })).toBe('0123456')
+    expect(runf9Release({ RUNF9_RELEASE: 'v2.4.0' })).toBe('v2.4.0')
+    expect(runf9Release({})).toBe('local')
   })
 })
 

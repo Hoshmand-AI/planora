@@ -18,35 +18,35 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_USER: drill
           POSTGRES_PASSWORD: drill
           POSTGRES_DB: postgres
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U drill" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U drill -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       HAS_SECRETS: ${{ secrets.BACKUP_DATABASE_URL != '' && secrets.BACKUP_PASSPHRASE != '' }}
     steps:
       - if: env.HAS_SECRETS != 'true'
         run: echo "::notice::Set BACKUP_DATABASE_URL and BACKUP_PASSPHRASE repository secrets to enable off-provider backups (see docs/operations/BACKUP-AND-RECOVERY.md)."
       - if: env.HAS_SECRETS == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: env.HAS_SECRETS == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - if: env.HAS_SECRETS == 'true'
         run: npm ci
       - if: env.HAS_SECRETS == 'true'
-        name: PostgreSQL 17 client tools
-        # pg_dump refuses to dump a server newer than itself; production (Neon) runs PostgreSQL 17.
+        name: PostgreSQL 18 client tools
+        # pg_dump refuses to dump a server newer than itself; production (Neon) runs PostgreSQL 18.
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y postgresql-client-17
-          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
+          sudo apt-get install -y postgresql-client-18
+          echo "PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - if: env.HAS_SECRETS == 'true'
         name: Back up production
         env:
@@ -62,8 +62,8 @@ jobs:
         run: |
           for f in backups/*.dump; do gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"; rm "$f"; done
       - if: env.HAS_SECRETS == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: planora-backup-${{ github.run_id }}
+          name: runf9-backup-${{ github.run_id }}
           path: backups/
           retention-days: 35

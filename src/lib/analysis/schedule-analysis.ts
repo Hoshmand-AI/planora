@@ -1,10 +1,11 @@
-// Planora's reading of an uploaded schedule: the numbers a dashboard, portfolio and report show
+// RunF9's reading of an uploaded schedule: the numbers a dashboard, portfolio and report show
 // first. Everything comes from the recalculated network, never from header dates in the file:
 //   - forecast finish = the latest finish logic produces (a mandatory constraint can't hide a slip)
 //   - variance = forecast vs baseline of the finish milestone (calendar days), with the basis stated;
 //     in an update series, against the forecast in the upload marked Baseline
 //   - status = from negative float, overruled constraints, variance, the required finish and
-//     execution against the baseline (BEI / missed tasks)
+//     execution against the baseline (BEI / missed tasks); a file without logic needs attention, and
+//     a clean network with neither a baseline nor a required finish is 'no_baseline', never 'on_track'
 // Dates in text are MM/DD/YYYY. Pure, so it is unit tested.
 
 import type { Activity } from '@/lib/db'
@@ -14,7 +15,11 @@ import { pickFinishCandidate } from '@/lib/analysis/finish-milestone'
 import { baselineExecution, DEFAULT_DCMA_RULES, fmtIndex, roundIndex } from '@/lib/analysis/dcma'
 import { applyBaseline, summarizeBaseline, type BaselineSummary, type ResolvedBaseline } from '@/lib/analysis/baseline'
 
-export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete'
+/**
+ * 'no_baseline': nothing is wrong with the network, but there is no baseline and no required finish
+ * to be on track against, so RunF9 does not claim "on track".
+ */
+export type ScheduleStatus = 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline'
 
 export interface FinishMilestone {
   id: string
@@ -52,21 +57,21 @@ export const FINISH_LABELS = {
 } as const
 
 /**
- * One open activity whose file dates/float differ from Planora's recalculation. The early start and
+ * One open activity whose file dates/float differ from RunF9's recalculation. The early start and
  * late dates were added later: differences stored before then carry only finish and float.
  */
 export interface RecalcDifference {
   code: string; name: string
-  fileStart?: string | null; planoraStart?: string | null
-  fileFinish: string | null; planoraFinish: string | null
-  fileLateStart?: string | null; planoraLateStart?: string | null
-  fileLateFinish?: string | null; planoraLateFinish?: string | null
-  fileFloat: number | null; planoraFloat: number | null
+  fileStart?: string | null; runf9Start?: string | null
+  fileFinish: string | null; runf9Finish: string | null
+  fileLateStart?: string | null; runf9LateStart?: string | null
+  fileLateFinish?: string | null; runf9LateFinish?: string | null
+  fileFloat: number | null; runf9Float: number | null
 }
 
 /**
  * The contractor file's own forecast for an open activity that sits before the data date (DCMA #9
- * Invalid Dates is judged on the file's dates, which Planora's recalculation replaces).
+ * Invalid Dates is judged on the file's dates, which RunF9's recalculation replaces).
  */
 export interface FileForecastBeforeDataDate { id: string; code: string; earlyStart: string | null; earlyFinish: string | null; notStarted: boolean }
 
@@ -132,7 +137,7 @@ export interface ScheduleAnalysis {
   status: ScheduleStatus
   statusReasons: string[]
   /**
-   * How the file's own dates/float compare with Planora's recalculation (null when the file had none).
+   * How the file's own dates/float compare with RunF9's recalculation (null when the file had none).
    * `samples` lists EVERY differing activity (the name is kept for stored analyses, which were capped
    * at 10). `fileForecastsBeforeDataDate`: open activities whose file early dates fall before the data date.
    */
@@ -280,7 +285,7 @@ export function analyzeSchedule(input: {
     const diff = varianceDays
     varianceDays = null
     if (finishMilestone) finishMilestone.varianceDays = null
-    varianceBasis = `No work has started${input.dataDate ? ` (data date ${fmtDate(input.dataDate)})` : ''}, so the file's baseline (target) dates are planned dates, not a statused baseline, and no slip is reported. ${varianceBasis.replace(/\.$/, '')}: ${Math.abs(diff)} calendar days ${diff > 0 ? 'later' : 'earlier'} by Planora's recalculation, a difference between the file's dates and its logic. Mark an upload of this project as Baseline to measure variance against it.`
+    varianceBasis = `No work has started${input.dataDate ? ` (data date ${fmtDate(input.dataDate)})` : ''}, so the file's baseline (target) dates are planned dates, not a statused baseline, and no slip is reported. ${varianceBasis.replace(/\.$/, '')}: ${Math.abs(diff)} calendar days ${diff > 0 ? 'later' : 'earlier'} by RunF9's recalculation, a difference between the file's dates and its logic. Mark an upload of this project as Baseline to measure variance against it.`
   }
 
   // State the basis when an overruled mandatory constraint holds the milestone's scheduled date.
@@ -352,6 +357,11 @@ export function analyzeSchedule(input: {
         : `Forecast finish ${fmtDate(completion)} is after the required finish ${fmtDate(input.mustFinishBy)}.`)
     }
     if (input.today && forecastFinish && day(forecastFinish) < day(input.today)) bump('at_risk', `Forecast finish ${fmtDate(forecastFinish)} has already passed.`)
+    // Without logic there is no float or critical path to judge: say so instead of looking healthy.
+    const workIds = new Set(work.map(a => a.id))
+    if (work.length > 1 && !input.links.some(l => workIds.has(l.from) && workIds.has(l.to))) {
+      bump('attention', `No logic links: the file has no relationships between its ${work.length} activities, so float and the critical path cannot be calculated. Import the logic (for a P6 Excel file, the TASKPRED sheet) or an XER/XML export.`)
+    }
     // Execution against the baseline (DCMA #11 Missed Tasks / #14 BEI at the default thresholds).
     const ex = baselineExecution(
       work.map(a => ({ id: a.id, code: a.activityId, name: a.name, type: a.activityType, duration: a.duration, status: a.status, percentComplete: a.percentComplete, actualFinish: a.actualFinish, baselineStart: a.baselineStart, baselineFinish: a.baselineFinish })),
@@ -363,6 +373,9 @@ export function analyzeSchedule(input: {
       if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} tasks baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
+
+  // Nothing to be on track against: no baseline variance and no required finish.
+  if (status === 'on_track' && varianceDays == null && !input.mustFinishBy) status = 'no_baseline'
 
   let recalc: ScheduleAnalysis['recalc'] = null
   if (input.fileValues && input.fileValues.size) {
@@ -386,9 +399,9 @@ export function analyzeSchedule(input: {
         differing++
         samples.push({
           code: a.activityId, name: a.name,
-          fileStart: f.earlyStart ?? null, planoraStart: a.earlyStart, fileFinish: f.earlyFinish, planoraFinish: a.earlyFinish,
-          fileLateStart: f.lateStart ?? null, planoraLateStart: a.lateStart, fileLateFinish: f.lateFinish ?? null, planoraLateFinish: a.lateFinish,
-          fileFloat: f.totalFloat, planoraFloat: a.totalFloat,
+          fileStart: f.earlyStart ?? null, runf9Start: a.earlyStart, fileFinish: f.earlyFinish, runf9Finish: a.earlyFinish,
+          fileLateStart: f.lateStart ?? null, runf9LateStart: a.lateStart, fileLateFinish: f.lateFinish ?? null, runf9LateFinish: a.lateFinish,
+          fileFloat: f.totalFloat, runf9Float: a.totalFloat,
         })
       }
     }

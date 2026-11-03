@@ -4,15 +4,20 @@ import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
-import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isPlanoraExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta, setScheduleImportExceptions } from '@/lib/db'
+import { createSchedule, getSchedules, getScheduleById, getScheduleSeries, getActivities, createActivities, createRelationships, deleteSchedule, updateScheduleProfile, saveScheduleFile, findScheduleFilesBySha, setScheduleInHistory, setScheduleFinishMilestone, updateScheduleAnalysis, updateScheduleMeta, setScheduleVersion, isRunF9ExportSha, countUploadedSchedules, setScheduleBaseline, setScheduleBaselineMeta, setScheduleImportExceptions } from '@/lib/db'
 import { applyBaseline, assessFileTargets, resolveBaseline, type BaselineMeta } from '@/lib/analysis/baseline'
 import { analyzeSchedule } from '@/lib/analysis/schedule-analysis'
 import { parseScheduleFile } from '@/lib/parsers'
+import { addDaysIso } from '@/lib/parsers/types'
+import { keepInTarget, keepOriginal, readUploadSource } from '@/lib/storage/upload-source'
+import { effectiveUploadLimit, tooLargeMessage } from '@/lib/upload-limit'
 import { emptyReport, summarizeExceptions } from '@/lib/parsers/exceptions'
 import { classifySchedule, normalizeCalendar } from '@/lib/semantic/taxonomy'
 import { checkInputs } from '@/lib/analysis/input-checks'
 import { nearTermOutlook } from '@/lib/analysis/near-term'
 import { recalcWarning } from '@/lib/analysis/recalc-warning'
+import { criticalPathStatus } from '@/lib/analysis/critical-status'
+import { schedulePercentComplete } from '@/lib/analysis/progress'
 import { analyzableFromDb, basisFrom, basisLabel, loadScheduleData, pickSeriesBaseline, seriesBaselineFrom } from '@/lib/planning/service'
 import { completeSchedule } from '@/lib/planning/complete-schedule'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
@@ -41,7 +46,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
 
   if (scheduleId) {
     // Firm-scoped: a schedule from another organization is indistinguishable from a missing one.
-    // As submitted by default; ?basis=scenario shows the what-if scenario with the Planora edits.
+    // As submitted by default; ?basis=scenario shows the what-if scenario with the RunF9 edits.
     const data = await loadScheduleData(scheduleId, ctx.orgId, { basis: basisFrom(req.nextUrl.searchParams) })
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const { schedule, activities, relationships, brief, analysis, edits, editedActivityIds, basis, editsApplied } = data
@@ -66,9 +71,8 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
     // Window: the data date (today when there is none) to +14 days; work under way is listed separately.
     const nearTerm = nearTermOutlook(activities, schedule.dataDate, new Date().toISOString().slice(0, 10))
     const completedCount = activities.filter(a => a.status === 'complete').length
-    const percentComplete = activities.length > 0
-      ? Math.round((completedCount / activities.length) * 100)
-      : 0
+    // Duration-weighted physical % complete of the work (src/lib/analysis/progress.ts)
+    const percentComplete = schedulePercentComplete(activities)
 
     return NextResponse.json({
       schedule, activities, relationships, brief, analysis, edits, editedActivityIds,
@@ -76,6 +80,11 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
       metrics: {
         totalActivities: activities.length,
         criticalCount: criticalActivities.length,
+        // Whether the critical path could be determined at all, and why not (no logic, not calculated)
+        criticalPath: criticalPathStatus({
+          activities, links: relationships.map(r => ({ from: r.predecessorId, to: r.successorId })), calculated: !!data.cpm,
+          mustFinishBy: analysis.mustFinishBy, minFloat: analysis.minFloat,
+        }),
         completedCount,
         inProgressCount: activities.filter(a => a.status === 'in_progress').length,
         notStartedCount: activities.filter(a => a.status === 'not_started').length,
@@ -88,12 +97,18 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         scheduledFinish: analysis.scheduledFinish ?? null,
         logicFinish: analysis.logicFinish ?? null,
         reportedFinish: analysis.reportedFinish,
+        // For the overview's timeline ribbon: first start, the required finish (if any) and the finish milestone's baseline.
+        projectStart: activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()[0] ?? null,
+        mustFinishBy: analysis.mustFinishBy ?? null,
+        baselineFinish: analysis.varianceDays != null && analysis.forecastFinish ? (analysis.finishMilestone?.baselineFinish ?? addDaysIso(analysis.forecastFinish, -analysis.varianceDays)) : null,
         status: analysis.status,
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,
         nearTerm,
+        // False when no open activity has a forecast start (an undated file without logic)
+        hasForecastDates: activities.some(a => a.status !== 'complete' && !!(a.earlyStart || a.actualStart)),
         drivingTasks: (longest.length ? longest : criticalActivities).slice(0, 10),
-        // Edits made in Planora (override layer on the uploaded file)
+        // Edits made in RunF9 (override layer on the uploaded file)
         editedActivityIds,
         editsCount: editsApplied,
         basis,
@@ -121,7 +136,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   if (!quota.ok) throw new ApiError(429, 'Your organization has uploaded a lot of files in the last hour. Try again later.', 'rate_limited', { retryAfterSec: quota.retryAfterSec })
   {
     const formData = await req.formData()
-    const file = formData.get('file') as File | null
+    const picked = formData.get('file')
+    const requestedName = (picked && typeof picked !== 'string' ? picked.name : String(formData.get('sourceKey') || '').split('/').pop()) || null
     const versionInput = ((formData.get('version') as string) || '').trim().slice(0, 40)
     const progressInput = formData.get('progressMode')
     const chosenMode = progressInput === 'override' || progressInput === 'retained' ? progressInput : null
@@ -132,7 +148,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // The commercial cloud does not take classified schedules (nothing is parsed or stored).
     const classifiedRefusal = classifiedCloudRefusal(classificationInput, deploymentKind())
     if (classifiedRefusal) {
-      await audit({ action: 'schedule.upload_refused', detail: { reason: CLASSIFIED_CLOUD_CODE, fileName: file?.name ?? null, deployment: deploymentKind() } })
+      await audit({ action: 'schedule.upload_refused', detail: { reason: CLASSIFIED_CLOUD_CODE, fileName: requestedName, deployment: deploymentKind() } })
       return NextResponse.json({ error: classifiedRefusal, code: CLASSIFIED_CLOUD_CODE }, { status: 409 })
     }
     const originInput = formData.get('origin') || null
@@ -147,12 +163,16 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const typeErr = projectTypeError(projectType)
     if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
 
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'File is larger than 25 MB.' }, { status: 413 })
+    // The file: from the user's computer, or imported from the firm's connected cloud storage.
+    const maxBytes = effectiveUploadLimit(MAX_UPLOAD_BYTES)
+    const keepTarget = await keepInTarget(formData, ctx.orgId)
+    const source = await readUploadSource(formData, ctx.orgId, maxBytes, tooLargeMessage('schedule', maxBytes))
+    if (!source) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    const file = { name: source.fileName, size: source.bytes.length }
 
     const scheduleId = uuid()
     let parsed
-    const bytes = Buffer.from(await file.arrayBuffer())
+    const bytes = source.bytes
     const sha256 = createHash('sha256').update(bytes).digest('hex')
     try {
       parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
@@ -167,7 +187,12 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // The same bytes uploaded again are not a new update: point at the existing one instead of adding a
     // duplicate to the series (send allowDuplicate=true to store it anyway).
     const same = allowDuplicate ? [] : await findScheduleFilesBySha(ctx.orgId, sha256, series.map(s => s.id))
-    const existing = same.length ? series.find(s => s.id === same[0]) : undefined
+    const prior = same.length ? series.find(s => s.id === same[0]) : undefined
+    // The same bytes read differently now (an importer fix found logic or activities the earlier upload
+    // missed, e.g. a P6 Excel TASKPRED sheet): import it again instead of pointing at the stale upload.
+    const readsDifferently = !!prior && (prior.relationshipCount !== parsed.relationships.length || prior.activityCount !== parsed.activities.length)
+    const existing = readsDifferently ? undefined : prior
+    if (readsDifferently && prior) parsed.warnings.unshift(`This file is identical to ${prior.version} uploaded ${fmtDay(prior.uploadedAt)}, but RunF9 now reads ${parsed.activities.length} activities and ${parsed.relationships.length} relationships from it (${prior.activityCount} and ${prior.relationshipCount} then), so it was imported again. Delete the earlier upload if it is no longer needed.`)
     if (existing) {
       const warning = `This file is identical to ${existing.version} uploaded ${fmtDay(existing.uploadedAt)} (same SHA-256); no new update was created.`
       await audit({ action: 'schedule.upload_duplicate', targetType: 'schedule', targetId: existing.id, detail: { name: existing.name, version: existing.version, fileName: file.name, sha256 } })
@@ -209,7 +234,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const { mode: progressMode, warning: modeWarning } = resolveProgressMode(chosenMode, parsed.progressMode ?? null)
     if (modeWarning) warnings.push(modeWarning)
 
-    // Baseline facts judged on the file's own dates, before Planora recalculates them: the P6 project
+    // Baseline facts judged on the file's own dates, before RunF9 recalculates them: the P6 project
     // baseline exported with the file, and whether its target dates are a baseline or just the planned
     // dates of not-started work (src/lib/analysis/baseline.ts).
     const baselineMeta: BaselineMeta = { embedded: parsed.embeddedBaseline ?? null, fileTargets: assessFileTargets(parsed.activities) }
@@ -242,17 +267,15 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const recalcNote = recalcWarning(analysis.recalc)
     if (recalcNote) warnings.unshift(recalcNote)
     if (reportedFinish && analysis.forecastFinish && reportedFinish !== analysis.forecastFinish) {
-      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; Planora's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. Planora reports its own forecast.`)
+      warnings.unshift(`The file's header finish is ${fmtDate(reportedFinish)}; RunF9's recalculated forecast finish is ${fmtDate(analysis.forecastFinish)}. RunF9 reports its own forecast.`)
     }
     const varianceDays = analysis.varianceDays
-    const percentComplete = parsed.activities.length > 0
-      ? Math.round((parsed.activities.filter(a => a.status === 'complete').length / parsed.activities.length) * 100)
-      : 0
-    // Firm history: own as-built projects by default; never a Planora re-import or a third-party schedule.
-    const planoraExport = !!parsed.planoraExport || await isPlanoraExportSha(ctx.orgId, sha256).catch(() => false)
+    const percentComplete = schedulePercentComplete(parsed.activities)
+    // Firm history: own as-built projects by default; never a RunF9 re-import or a third-party schedule.
+    const runf9Export = !!parsed.runf9Export || await isRunF9ExportSha(ctx.orgId, sha256).catch(() => false)
     const history = decideHistory({
       requested: inHistoryInput === 'true' ? true : inHistoryInput === 'false' ? false : null, override: historyOverrideInput,
-      origin: originInput, planoraExport, ...workCounts(parsed.activities),
+      origin: originInput, runf9Export, ...workCounts(parsed.activities),
     })
     const inHistory = history.inHistory
     warnings.push(...history.warnings)
@@ -264,6 +287,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     if (profile.inherited.length) warnings.push(`Tags carried over from earlier uploads of this project: ${profile.inherited.map(k => ({ projectType: 'facility type', region: 'state', grossSqft: 'gross area' } as Record<string, string>)[k]).join(', ')}.`)
     const orderWarning = seriesDataDateWarning(series, parsed.dataDate, versionLabel)
     if (orderWarning) warnings.unshift(orderWarning)
+
+    // The original file in the firm's own storage (when chosen), saved before anything is recorded so a
+    // storage failure leaves nothing half-created.
+    const kept = keepTarget ? await keepOriginal(keepTarget, 'schedules', file.name, sha256, bytes) : null
 
     const schedule = await createSchedule({
       id: scheduleId,
@@ -294,7 +321,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
       grossSqft: profile.grossSqft,
       workspaceId,
     })
-    const meta = { classification: classificationInput, uploadOrigin: originInput, planoraExport, historyOverride: history.historyOverride }
+    const meta = { classification: classificationInput, uploadOrigin: originInput, runf9Export, historyOverride: history.historyOverride }
     await updateScheduleMeta(schedule.id, ctx.orgId, meta)
     await setScheduleBaselineMeta(schedule.id, ctx.orgId, baselineMeta)
     // What the parser saw but did not map, converted or defaulted (never dropped silently).
@@ -306,10 +333,10 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     if (parsed.activities.length > 0) await createActivities(parsed.activities)
     if (parsed.relationships.length > 0) await createRelationships(parsed.relationships)
     // Keep the original file for chain of custody (its SHA-256 is also in the audit log).
-    await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes })
+    await saveScheduleFile({ scheduleId: schedule.id, orgId: ctx.orgId, fileName: file.name, sha256, content: bytes, kept, from: source.from })
 
     const dataQuestions = checkInputs(analyzableFromDb(schedule, parsed.activities, parsed.relationships))
-    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, planoraExport, progressMode, workspaceId, importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
+    await audit({ action: 'schedule.upload', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, fileName: file.name, bytes: file.size, sha256, sourceType: schedule.sourceType, activities: parsed.activities.length, relationships: parsed.relationships.length, classification: classificationInput, origin: originInput, inHistory, historyOverride: history.historyOverride, runf9Export, progressMode, workspaceId, importedFrom: source.from ? { connectionId: source.from.connectionId, key: source.from.key } : null, originalKeptIn: kept ? { connectionId: kept.connectionId, key: kept.objectKey } : 'runf9', importExceptions: { records: importExceptions.records.length, total: exSummary.total, losses: exSummary.losses } } })
 
     return NextResponse.json({
       success: true, schedule,
@@ -389,7 +416,7 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     const requested = typeof body.inHistory === 'boolean' ? body.inHistory : (s.inHistory ?? true)
     const decision = decideHistory({
       requested, override: typeof body.historyOverride === 'boolean' ? body.historyOverride : (s.historyOverride ?? false),
-      origin: 'origin' in body ? (body.origin ?? null) : (s.uploadOrigin ?? null), planoraExport: !!s.planoraExport, ...workCounts(await getActivities(s.id)),
+      origin: 'origin' in body ? (body.origin ?? null) : (s.uploadOrigin ?? null), runf9Export: !!s.runf9Export, ...workCounts(await getActivities(s.id)),
     })
     warnings.push(...decision.warnings)
     if (decision.inHistory !== (s.inHistory ?? true) || decision.historyOverride !== !!s.historyOverride) {

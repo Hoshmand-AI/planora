@@ -1,3 +1,4 @@
+import { CUSTOMER_CLOUD_PROVIDERS, customerCloudConfig, type CustomerCloudConfig } from './customer-cloud-adapter'
 import { createHash } from 'crypto'
 import { currentRequest } from '@/lib/server/context'
 import { log } from '@/lib/server/log'
@@ -12,26 +13,26 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 // One place decides where model calls go (the AI gateway). Adapters in ./anthropic-adapter.ts and
 // ./openai-adapter.ts only translate a call to one provider's API; everything here is provider-agnostic.
 //
-//   PLANORA_AI_MODE   cloud | local | offline   (default: cloud if ANTHROPIC_API_KEY or OPENAI_API_KEY is set, else offline)
-//   PLANORA_AI_PROVIDER  anthropic | openai — the cloud provider (default: anthropic when ANTHROPIC_API_KEY is set,
+//   RUNF9_AI_MODE   cloud | local | offline   (default: cloud if ANTHROPIC_API_KEY or OPENAI_API_KEY is set, else offline)
+//   RUNF9_AI_PROVIDER  anthropic | openai — the cloud provider (default: anthropic when ANTHROPIC_API_KEY is set,
 //                     otherwise openai when OPENAI_API_KEY is set). Cloud calls send request content to this provider.
 //   ANTHROPIC_API_KEY key for the Anthropic (Claude) API — the default cloud provider
 //   OPENAI_API_KEY    key for the OpenAI API — approved alternate cloud provider
-//   PLANORA_AI_FALLBACK  off → disable Anthropic's server-side refusal fallback (on by default: a declined request is
+//   RUNF9_AI_FALLBACK  off → disable Anthropic's server-side refusal fallback (on by default: a declined request is
 //                     re-run on a fallback model inside the same call; the audit records fallbackUsed + served model)
-//   PLANORA_AIRGAPPED true → only loopback/private-network hosts are allowed; cloud mode is refused.
+//   RUNF9_AIRGAPPED true → only loopback/private-network hosts are allowed; cloud mode is refused.
 //   LLM_BASE_URL      OpenAI-compatible endpoint for local mode (Ollama: http://localhost:11434/v1, vLLM: http://host:8000/v1)
 //   LLM_MODEL         model name (defaults: claude-opus-5-5 for anthropic, gpt-4o-2024-11-20 for openai, llama3.1:8b for local)
 //   LLM_API_KEY       key for the local endpoint if it needs one
-//   PLANORA_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
-//   PLANORA_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/ai/MODEL-REGISTRY.md)
-//   PLANORA_DEPLOYMENT  commercial (default) | onprem — where this Planora instance itself runs. Air-gapped implies on-prem.
+//   RUNF9_ALLOWED_HOSTS  comma-separated extra on-prem hostnames allowed in air-gapped mode
+//   RUNF9_APPROVED_MODELS comma-separated model registry; any other model is refused (see docs/ai/MODEL-REGISTRY.md)
+//   RUNF9_DEPLOYMENT  commercial (default) | onprem — where this RunF9 instance itself runs. Air-gapped implies on-prem.
 //
 // Governance (enforced in chat(), the single choke point for every model call, for every provider):
 //   - organizations can switch AI off entirely (nothing is sent to any model);
 //   - per-organization daily and per-user per-minute quotas cap spend and abuse;
 //   - only approved, version-pinned models are used; each is either certified or an approved
-//     alternate (Planora does not promise equivalent quality on models it has not validated);
+//     alternate (RunF9 does not promise equivalent quality on models it has not validated);
 //   - content of a project marked CUI or classified is never sent to a model outside the customer's
 //     network (cloud mode, or a public LLM_BASE_URL) — see docs/security/CUI-HANDLING.md;
 //   - every call is recorded in the audit log with provider, model, served model version, SDK
@@ -43,16 +44,16 @@ export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, L
 
 export type AiMode = 'cloud' | 'local' | 'offline'
 
-/** Where this Planora instance runs. Only an on-prem / air-gapped instance may hold CUI. */
+/** Where this RunF9 instance runs. Only an on-prem / air-gapped instance may hold CUI. */
 export type Deployment = 'commercial_cloud' | 'on_prem' | 'airgapped'
 
 export function deploymentKind(env: Record<string, string | undefined> = process.env): Deployment {
-  if (/^(1|true|yes)$/i.test(env.PLANORA_AIRGAPPED || '')) return 'airgapped'
-  return /^(on-?prem(ises)?|on_prem|self-?hosted)$/i.test((env.PLANORA_DEPLOYMENT || '').trim()) ? 'on_prem' : 'commercial_cloud'
+  if (/^(1|true|yes)$/i.test(env.RUNF9_AIRGAPPED || '')) return 'airgapped'
+  return /^(on-?prem(ises)?|on_prem|self-?hosted)$/i.test((env.RUNF9_DEPLOYMENT || '').trim()) ? 'on_prem' : 'commercial_cloud'
 }
 
 /** Shown wherever project data is entered on the commercial cloud service. */
-export const CUI_CLOUD_WARNING = 'This is the commercial cloud service. Do not enter or store Controlled Unclassified Information (CUI) or classified information here: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped Planora deployment for CUI and classified projects.'
+export const CUI_CLOUD_WARNING = 'This is the commercial cloud service. Do not enter or store Controlled Unclassified Information (CUI) or classified information here: CUI must not be stored in the commercial cloud. Use an on-premises or air-gapped RunF9 deployment for CUI and classified projects.'
 
 /** Returned (and audited) when a model call for a CUI/classified project would leave the customer's network. */
 export const CUI_AI_REFUSAL = 'This project is marked CUI or classified, so its content is never sent to a cloud AI model. Scheduling, quality checks and reports still work without AI. Use an on-premises / air-gapped deployment with an on-prem model for AI on controlled projects.'
@@ -89,31 +90,31 @@ export const DEFAULT_CLOUD_MODEL = DEFAULT_ANTHROPIC_MODEL
 export const DEFAULT_APPROVED_MODELS = MODEL_REGISTRY.map(m => m.id)
 
 /** Default model for each provider. */
-export const DEFAULT_MODEL: Record<ProviderName, string> = { anthropic: DEFAULT_ANTHROPIC_MODEL, openai: DEFAULT_OPENAI_MODEL, local: DEFAULT_LOCAL_MODEL }
+export const DEFAULT_MODEL: Record<ProviderName, string> = { anthropic: DEFAULT_ANTHROPIC_MODEL, openai: DEFAULT_OPENAI_MODEL, local: DEFAULT_LOCAL_MODEL, azure_openai: '', bedrock: '', vertex: '' }
 
-const CLOUD: Record<CloudProvider, { keyVar: 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY'; host: string }> = {
+const CLOUD: Record<'anthropic' | 'openai', { keyVar: 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY'; host: string }> = {
   anthropic: { keyVar: 'ANTHROPIC_API_KEY', host: 'api.anthropic.com' },
   openai: { keyVar: 'OPENAI_API_KEY', host: 'api.openai.com' },
 }
 
 export function approvedModels(env: Record<string, string | undefined> = process.env): string[] {
-  const list = (env.PLANORA_APPROVED_MODELS || '').split(',').map(x => x.trim()).filter(Boolean)
+  const list = (env.RUNF9_APPROVED_MODELS || '').split(',').map(x => x.trim()).filter(Boolean)
   return list.length ? list : DEFAULT_APPROVED_MODELS
 }
 
-/** The cloud provider: PLANORA_AI_PROVIDER if set, else anthropic with an Anthropic key, else openai with an OpenAI key. */
+/** The cloud provider: RUNF9_AI_PROVIDER if set, else anthropic with an Anthropic key, else openai with an OpenAI key. */
 export function selectCloudProvider(env: Record<string, string | undefined> = process.env): { provider: CloudProvider | null; error?: string } {
-  const requested = (env.PLANORA_AI_PROVIDER || '').trim().toLowerCase()
+  const requested = (env.RUNF9_AI_PROVIDER || '').trim().toLowerCase()
   if (requested) {
-    if (requested === 'anthropic' || requested === 'openai') return { provider: requested }
-    return { provider: null, error: `Unknown PLANORA_AI_PROVIDER "${requested}" (use anthropic or openai).` }
+    if (requested === 'anthropic' || requested === 'openai' || (CUSTOMER_CLOUD_PROVIDERS as readonly string[]).includes(requested)) return { provider: requested as CloudProvider }
+    return { provider: null, error: `Unknown RUNF9_AI_PROVIDER "${requested}" (use anthropic, openai, azure_openai, bedrock or vertex).` }
   }
   if (env.ANTHROPIC_API_KEY) return { provider: 'anthropic' }
   if (env.OPENAI_API_KEY) return { provider: 'openai' }
   return { provider: null }
 }
 
-/** Certified models are listed as such in the registry; anything else (incl. models approved only via PLANORA_APPROVED_MODELS) is an approved alternate. */
+/** Certified models are listed as such in the registry; anything else (incl. models approved only via RUNF9_APPROVED_MODELS) is an approved alternate. */
 export function isCertifiedModel(model: string): boolean {
   return registryEntry(model)?.certified ?? false
 }
@@ -123,10 +124,10 @@ export function isAllowedAirgapHost(host: string, extra: string[] = []): boolean
   return PRIVATE_HOST.test(h) || extra.map(x => x.trim().toLowerCase()).filter(Boolean).includes(h)
 }
 
-export function resolveLlmConfig(env: Record<string, string | undefined> = process.env): LlmStatus & { baseURL?: string; apiKey?: string } {
-  const airgapped = /^(1|true|yes)$/i.test(env.PLANORA_AIRGAPPED || '')
-  const requested = (env.PLANORA_AI_MODE || '').toLowerCase() as AiMode | ''
-  const hasCloudKey = !!(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
+export function resolveLlmConfig(env: Record<string, string | undefined> = process.env): LlmStatus & { baseURL?: string; apiKey?: string; customerCloud?: CustomerCloudConfig } {
+  const airgapped = /^(1|true|yes)$/i.test(env.RUNF9_AIRGAPPED || '')
+  const requested = (env.RUNF9_AI_MODE || '').toLowerCase() as AiMode | ''
+  const hasCloudKey = !!(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY) || (CUSTOMER_CLOUD_PROVIDERS as readonly string[]).includes((env.RUNF9_AI_PROVIDER || '').trim().toLowerCase())
   let mode: AiMode = requested || (airgapped ? (env.LLM_BASE_URL ? 'local' : 'offline') : hasCloudKey ? 'cloud' : env.LLM_BASE_URL ? 'local' : 'offline')
   const off = (error: string, host: string | null = null) => ({ mode: 'offline' as const, airgapped, provider: null, model: null, host, smallModel: true, error })
 
@@ -135,13 +136,21 @@ export function resolveLlmConfig(env: Record<string, string | undefined> = proce
     const sel = selectCloudProvider(env)
     if (sel.error) return off(sel.error)
     if (!sel.provider) return off('No cloud AI key is set (ANTHROPIC_API_KEY or OPENAI_API_KEY).')
+    if (sel.provider !== 'anthropic' && sel.provider !== 'openai') {
+      // The customer's own cloud AI (private deployment): its model is the customer's choice; an explicit
+      // RUNF9_APPROVED_MODELS list still applies when set.
+      const c = customerCloudConfig(sel.provider, env)
+      if ('error' in c) return off(c.error)
+      if (env.RUNF9_APPROVED_MODELS && !approvedModels(env).includes(c.model)) return off(`Model ${c.model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`)
+      return { mode, airgapped, provider: sel.provider, model: c.model, certified: isCertifiedModel(c.model), host: c.host, smallModel: false, customerCloud: c }
+    }
     const { keyVar, host } = CLOUD[sel.provider]
     const apiKey = env[keyVar]
     if (!apiKey) return off(`${keyVar} is not set.`)
     const model = env.LLM_MODEL || DEFAULT_MODEL[sel.provider]
-    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (PLANORA_APPROVED_MODELS).`)
+    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`)
     const known = registryEntry(model)
-    if (known && known.provider !== sel.provider) return off(`Model ${model} is served by ${known.provider}, not the selected provider ${sel.provider} (PLANORA_AI_PROVIDER).`)
+    if (known && known.provider !== sel.provider) return off(`Model ${model} is served by ${known.provider}, not the selected provider ${sel.provider} (RUNF9_AI_PROVIDER).`)
     return { mode, airgapped, provider: sel.provider, model, certified: isCertifiedModel(model), host, smallModel: false, apiKey }
   }
   if (mode === 'local') {
@@ -149,11 +158,11 @@ export function resolveLlmConfig(env: Record<string, string | undefined> = proce
     if (!base) return off('LLM_BASE_URL is not set.')
     let host: string
     try { host = new URL(base).hostname } catch { return off(`Invalid LLM_BASE_URL: ${base}`) }
-    if (airgapped && !isAllowedAirgapHost(host, (env.PLANORA_ALLOWED_HOSTS || '').split(','))) {
+    if (airgapped && !isAllowedAirgapHost(host, (env.RUNF9_ALLOWED_HOSTS || '').split(','))) {
       return off(`Host ${host} is not a private/on-prem address; refused in air-gapped mode.`, host)
     }
     const model = env.LLM_MODEL || DEFAULT_LOCAL_MODEL
-    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (PLANORA_APPROVED_MODELS).`, host)
+    if (!approvedModels(env).includes(model)) return off(`Model ${model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`, host)
     const smallModel = !/(70b|72b|405b|gpt-4|claude|large)/i.test(model)
     return { mode, airgapped, provider: 'local', model, certified: isCertifiedModel(model), host, smallModel, baseURL: base, apiKey: env.LLM_API_KEY || 'not-needed' }
   }
@@ -167,7 +176,7 @@ function orgAiOff(): boolean {
 }
 
 export function llmStatus(): LlmStatus {
-  const { baseURL: _b, apiKey: _k, ...status } = resolveLlmConfig()
+  const { baseURL: _b, apiKey: _k, customerCloud: _c, ...status } = resolveLlmConfig()
   const deployment = deploymentKind()
   const where = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
   if (orgAiOff()) return { mode: 'offline', airgapped: status.airgapped, provider: null, model: null, host: null, smallModel: true, error: 'AI is turned off for your organization', ...where }
@@ -180,7 +189,7 @@ export function llmStatus(): LlmStatus {
  */
 export function isExternalModel(cfg: Pick<LlmStatus, 'mode' | 'host'>, env: Record<string, string | undefined> = process.env): boolean {
   if (cfg.mode === 'cloud') return true
-  if (cfg.mode === 'local') return !cfg.host || !isAllowedAirgapHost(cfg.host, (env.PLANORA_ALLOWED_HOSTS || '').split(','))
+  if (cfg.mode === 'local') return !cfg.host || !isAllowedAirgapHost(cfg.host, (env.RUNF9_ALLOWED_HOSTS || '').split(','))
   return false
 }
 
@@ -212,16 +221,19 @@ let cached: { provider: ProviderName; baseURL: string; apiKey: string; fallback:
 /** Build (or reuse) the adapter for the route. SDKs are loaded lazily, so an unused provider's SDK is never initialized. */
 async function adapterFor(cfg: Route): Promise<LlmAdapter> {
   const fallback = cfg.provider === 'anthropic' && aiFallbackEnabled()
-  const baseURL = cfg.baseURL ?? '', apiKey = cfg.apiKey ?? ''
+  const baseURL = cfg.baseURL ?? cfg.customerCloud?.endpoint ?? '', apiKey = cfg.apiKey ?? cfg.customerCloud?.azure?.apiKey ?? ''
   // Reuse the adapter while the route is unchanged (compared in memory; the key is never hashed or stored elsewhere).
   if (cached && cached.provider === cfg.provider && cached.baseURL === baseURL && cached.apiKey === apiKey && cached.fallback === fallback) return cached.adapter
   let adapter: LlmAdapter
-  if (cfg.provider === 'anthropic') {
+  if (cfg.customerCloud) {
+    const { createCustomerCloudAdapter } = await import('./customer-cloud-adapter')
+    adapter = createCustomerCloudAdapter(cfg.customerCloud)
+  } else if (cfg.provider === 'anthropic') {
     const { createAnthropicAdapter } = await import('./anthropic-adapter')
     adapter = createAnthropicAdapter({ apiKey: cfg.apiKey ?? '', fallback })
   } else {
     const { createOpenAiCompatibleAdapter } = await import('./openai-adapter')
-    adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL })
+    adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider as 'openai' | 'local', apiKey: cfg.apiKey, baseURL: cfg.baseURL })
   }
   cached = { provider: cfg.provider, baseURL, apiKey, fallback, adapter }
   return adapter

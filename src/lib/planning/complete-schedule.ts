@@ -1,6 +1,6 @@
-// Planora recalculates every uploaded schedule that has logic, instead of trusting the dates and
+// RunF9 recalculates every uploaded schedule that has logic, instead of trusting the dates and
 // float written in the file: a reviewer needs to know whether the contractor's float is real, and
-// mixing the file's early dates with Planora's late dates produced inconsistent float. The file's
+// mixing the file's early dates with RunF9's late dates produced inconsistent float. The file's
 // own finish and float are kept as a snapshot so the differences can be shown. Files without
 // logic keep their listed dates and make no critical-path claims.
 
@@ -8,13 +8,14 @@ import type { Activity, Relationship } from '@/lib/db'
 import { CONSTRAINT_TYPES, type ConstraintType, type CpmActivity, type CpmResult, type ProgressMode, type WorkCalendar } from './types'
 import { runCpm } from './cpm'
 import { defaultCalendar } from './calendar'
+import { fmtDate } from '@/lib/format'
 
 export interface CompletionResult {
   activities: Activity[]
   projectStart: string | null
-  /** Forecast finish: Planora's logic-driven finish when it recalculated, else the file's */
+  /** Forecast finish: RunF9's logic-driven finish when it recalculated, else the file's */
   projectFinish: string | null
-  /** What Planora did, in plain language (shown to the user), or null if nothing was needed */
+  /** What RunF9 did, in plain language (shown to the user), or null if nothing was needed */
   note: string | null
   hasLogic: boolean
   cpm: CpmResult | null
@@ -22,7 +23,7 @@ export interface CompletionResult {
   fileValues: Map<string, FileValues> | null
 }
 
-/** The file's own calculated values for one activity, before Planora recalculated it. */
+/** The file's own calculated values for one activity, before RunF9 recalculated it. */
 export interface FileValues {
   earlyStart?: string | null
   earlyFinish: string | null
@@ -86,6 +87,9 @@ export function completeSchedule(input: {
     }
   }
 
+  // A file built for import (P6 Excel template) can carry logic but no dates at all: it is then
+  // scheduled from today, and the note says so (the dates are not the contractor's).
+  const undated = !input.projectStart && !earliest && !input.dataDate
   const projectStart = input.projectStart || earliest || input.dataDate || new Date().toISOString().slice(0, 10)
   const cals = calendars.length ? calendars : [defaultCalendar()]
   const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
@@ -112,7 +116,7 @@ export function completeSchedule(input: {
       mustFinishBy: input.mustFinishBy || undefined, progressMode: input.progressMode ?? 'retained', linkFloat: true,
     })
   } catch {
-    return { activities, projectStart: input.projectStart || earliest, projectFinish: input.projectFinish || latest, hasLogic, cpm: null, fileValues: null, note: 'Planora could not recalculate this schedule; dates are shown as listed in the file.' }
+    return { activities, projectStart: input.projectStart || earliest, projectFinish: input.projectFinish || latest, hasLogic, cpm: null, fileValues: null, note: 'RunF9 could not recalculate this schedule; dates are shown as listed in the file.' }
   }
   let filled = 0
   for (const a of work) {
@@ -129,7 +133,8 @@ export function completeSchedule(input: {
   }
   const mode = res.progressMode === 'retained' ? 'retained logic' : 'progress override'
   const note = fileHadResults
-    ? `Planora recalculated all ${filled} activities from their durations, logic, calendars and constraints (${mode}) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.`
-    : `The file did not include calculated dates or float, so Planora scheduled ${filled} activities from their durations, logic and calendars (${mode}; critical path and float are Planora's calculation).`
+    ? `RunF9 recalculated all ${filled} activities from their durations, logic, calendars and constraints (${mode}) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.`
+    : `The file did not include calculated dates or float, so RunF9 scheduled ${filled} activities from their durations, logic and calendars (${mode}; critical path and float are RunF9's calculation).`
+      + (undated ? ` It has no project start, data date or activity dates either, so the network was scheduled from ${fmtDate(projectStart)}, the day it was first calculated: the durations, logic and float are the file's, the calendar dates are not.` : '')
   return { activities, projectStart, projectFinish: res.logicFinish, hasLogic, cpm: res, fileValues, note }
 }

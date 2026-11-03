@@ -271,10 +271,12 @@ describe('retrieval SQL is scoped before ranking', () => {
   })
 
   it('builds "any term" queries from plain words only', () => {
-    expect(anyTermsQuery("What's the max activity-duration? (20 days) & | !")).toBe('what | the | max | activity | duration | 20 | days')
-    const b = buildSearchSql({ orgId: 'o', scheduleId: 's', access: full }, 'max duration', { ...opts, match: 'any' })
+    // User text contributes plain words only; construction synonyms are appended from the fixed vocabulary.
+    expect(anyTermsQuery("What's the max activity-duration? (20 days) & | !")).toBe('what | the | max | activity | duration | 20 | days | (working <-> days) | (calendar <-> days)')
+    expect(anyTermsQuery('max activity length')).toBe('max | activity | length')
+    const b = buildSearchSql({ orgId: 'o', scheduleId: 's', access: full }, 'max length', { ...opts, match: 'any' })
     expect(b.text).toMatch(/to_tsquery\('english', \$3\)/)
-    expect(b.values[2]).toBe('max | duration')
+    expect(b.values[2]).toBe('max | length')
   })
 
   it('hashes queries per organization (no text stored)', () => {
@@ -333,6 +335,7 @@ describe('scheduling requirement extraction', () => {
   it('finds the common requirements with values', () => {
     expect(kinds('No activity shall have an original duration that exceeds a maximum of 20 working days, except procurement.')).toMatchObject({ max_activity_duration: '20 working days' })
     expect(kinds('Activity durations shall not exceed twenty (20) work days.')).toMatchObject({ max_activity_duration: '20 working days' })
+    expect(kinds('No activity duration shall exceed 20 working days, except procurement and fabrication activities.')).toMatchObject({ max_activity_duration: '20 working days' })
     expect(kinds('The Contractor shall update the progress schedule monthly.')).toMatchObject({ update_frequency: 'monthly' })
     expect(kinds('Float shall not be sequestered by the Contractor through preferential logic.')).toMatchObject({ float_ownership: 'float shall not be sequestered' })
     expect(kinds('Total float is a shared project resource available to both parties.')).toMatchObject({ float_ownership: 'float is a shared project resource' })

@@ -1,4 +1,5 @@
 import { api, json, body, ApiError } from '@/lib/server/api'
+import { dataLocation } from '@/lib/server/data-location'
 import { getOrganization, listMembers, query, exportOrganization, deleteOrganization, getUserById, countUploadedSchedules } from '@/lib/db'
 import { verifyPassword, clearSessionCookie } from '@/lib/auth'
 import { audit } from '@/lib/server/audit'
@@ -11,6 +12,7 @@ import { normalizeSso, publicSso, saveSsoConfig, ssoConfigFor } from '@/lib/serv
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
 import { requireVerifiedEmail } from '@/lib/server/email-verification'
 import { appOrigin, sendEmail } from '@/lib/server/email'
+import { orgInviteEmail } from '@/lib/server/emails'
 import { CUI_CLOUD_WARNING, deploymentKind } from '@/lib/llm/provider'
 
 /** Organization overview: members are visible to every member; invitations and settings to admins. */
@@ -35,7 +37,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
       sso: publicSso(normalizeSso(org.sso)),
     } : {}),
     plan: { id: org.plan, ...entitlementsFor(org.plan), uploadedSchedules: await countUploadedSchedules(auth.orgId) },
-    service: { deployment: deploymentKind(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
+    service: { deployment: deploymentKind(), dataLocation: dataLocation(), ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) },
   })
 })
 
@@ -57,8 +59,8 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       const link = `${appOrigin(req)}/auth?invite=${encodeURIComponent(token)}`
       // Emailed when a provider is configured; the link is always shown to the admin as well.
       const emailed = (await sendEmail({
-        to: invitation.email, subject: `${auth.name} invited you to ${auth.orgName} on Planora`,
-        text: `${auth.name} (${auth.email}) invited you to join ${auth.orgName} on Planora as ${ROLE_LABELS[b.role]}.\n\nAccept the invitation:\n\n${link}\n\nThe link works once, only for this email address, and expires in ${INVITE_DAYS} days.\n\n— Planora by Hoshmand AI`,
+        to: invitation.email,
+        ...orgInviteEmail({ inviter: auth.name, inviterEmail: auth.email, org: auth.orgName, role: ROLE_LABELS[b.role], link, days: INVITE_DAYS }, appOrigin(req)),
       })).sent
       await audit({ action: 'member.invited', targetType: 'invitation', targetId: invitation.id, detail: { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt, emailed } })
       return json({ invitation, link, emailed, expiresInDays: INVITE_DAYS })
@@ -141,7 +143,7 @@ export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
       requireVerifiedEmail(auth)
       const data = await exportOrganization(auth.orgId)
       await audit({ action: 'privacy.organization_exported', targetType: 'organization', targetId: auth.orgId, detail: { plans: data.plans.length, schedules: data.schedules.length, projectDocuments: data.projectDocuments.length, auditEvents: data.auditEvents.length } })
-      return new Response(JSON.stringify(data, null, 2), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="planora-organization-export-${new Date().toISOString().slice(0, 10)}.json"` } })
+      return new Response(JSON.stringify(data, null, 2), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json"` } })
     }
     case 'delete_org': {
       if (actorRole !== 'owner') throw new ApiError(403, 'Only an owner can delete the organization.')

@@ -22,14 +22,25 @@ export interface PortfolioRow {
   gapDays: number | null
   readiness: number | null
   updatedAt: string
-  status: 'on_track' | 'attention' | 'at_risk' | 'not_started' | 'complete'
+  status: 'on_track' | 'attention' | 'at_risk' | 'no_baseline' | 'not_started' | 'complete'
   alerts: PortfolioAlert[]
   /** Uploaded schedules: how many updates of this project are on file (the row shows the latest) */
   updates?: number
   /** Uploaded schedules: the latest update's data date */
   dataDate?: string | null
-  /** Uploaded schedules: what the variance was measured against (Planora's analysis) */
+  /** Uploaded schedules: what the variance was measured against (RunF9's analysis) */
   varianceBasis?: string | null
+  /** The project's own name (without the upload's version label) */
+  title: string
+  /** Uploaded in a file, or built in RunF9 through the interview */
+  source: 'uploaded' | 'built'
+  /** Version label of the upload shown (Baseline, Update 3, ...); null for plans */
+  version: string | null
+  start: string | null
+  /** Progress by duration, 0–100; null when unknown */
+  percentComplete: number | null
+  activities: number | null
+  critical: number | null
 }
 
 export interface Portfolio {
@@ -82,11 +93,13 @@ export function planRow(p: Plan, today: string): PortfolioRow {
   return {
     kind: 'plan', id: p.id, name: p.name, href: `/dashboard/plan/${p.id}`, finish, required, gapDays, readiness: elic.readiness,
     updatedAt: isNaN(updated.getTime()) ? p.updatedAt : updated.toISOString(), status: statusOf(alerts, !!g), alerts,
+    title: p.name, source: 'built', version: null, start: g?.projectStart ?? null, percentComplete: g ? 0 : null,
+    activities: g ? g.activities.length : null, critical: g?.cpm ? Object.values(g.cpm.times).filter(t => t.critical).length : null,
   }
 }
 
 /**
- * One uploaded schedule. Status, variance and their reasons come from Planora's stored analysis
+ * One uploaded schedule. Status, variance and their reasons come from RunF9's stored analysis
  * (src/lib/analysis/schedule-analysis.ts) — the same numbers the dashboard overview shows — never
  * from a separate computation here. Uploads without a stored analysis show no status until opened.
  */
@@ -97,7 +110,7 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
   if (an) {
     for (const reason of an.statusReasons ?? []) alerts.push(reasonAlert(reason, an.varianceDays))
   } else {
-    alerts.push({ code: 'not_analyzed', severity: 'info', text: 'Planora has not analyzed this upload yet; open it to calculate status and variance.' })
+    alerts.push({ code: 'not_analyzed', severity: 'info', text: 'RunF9 has not analyzed this upload yet; open it to calculate status and variance.' })
   }
   if (s.dataDate) {
     const age = days(s.dataDate, today)
@@ -108,9 +121,11 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
   // Exactly the analysis status (the overview badge); 'not_started' = not analyzed yet.
   const status: PortfolioRow['status'] = an ? an.status : 'not_started'
   return {
-    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
+    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard/project?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
     gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status, alerts,
     updates, dataDate: s.dataDate, varianceBasis: an ? fmtDates([an.baseline?.header ? `${an.baseline.header}.` : '', an.varianceBasis].filter(Boolean).join(' ')) || null : null,
+    title: s.name, source: 'uploaded', version: s.version || null, start: s.projectStart, percentComplete: Number.isFinite(s.percentComplete) ? s.percentComplete : null,
+    activities: s.activityCount, critical: s.criticalCount,
   }
 }
 
@@ -147,7 +162,7 @@ export function latestUpdates(schedules: Schedule[]): { schedule: Schedule; upda
   return out
 }
 
-const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, not_started: 3, complete: 4 }
+const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, no_baseline: 3, not_started: 4, complete: 5 }
 
 export function buildPortfolio(plans: Plan[], schedules: Schedule[], today = new Date().toISOString().slice(0, 10)): Portfolio {
   // A published plan's generated schedule is represented by the plan row.

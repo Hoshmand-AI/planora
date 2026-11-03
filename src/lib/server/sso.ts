@@ -13,6 +13,7 @@ import { initSchema, query } from '@/lib/db'
 import { decrypt, encrypt } from './crypto'
 import { ApiError } from './api'
 import { isRole, type Role } from './permissions'
+import { egressProblem } from './egress'
 
 export interface SsoConfig {
   enabled: boolean
@@ -44,32 +45,35 @@ export function normalizeSso(raw: unknown): SsoConfig {
   }
 }
 
-export const TXT_PREFIX = 'planora-domain-verification='
-export const txtHost = (domain: string) => `_planora-challenge.${domain}`
+export const TXT_PREFIX = 'runf9-domain-verification='
+export const txtHost = (domain: string) => `_runf9-challenge.${domain}`
+// Records created before the RunF9 rename keep verifying
+const LEGACY_TXT_PREFIX = 'planora-domain-verification='
+const legacyTxtHost = (domain: string) => `_planora-challenge.${domain}`
 
-/** Domain ownership: _planora-challenge.<domain> must have a TXT record planora-domain-verification=<token>. */
+/** Domain ownership: _runf9-challenge.<domain> must have a TXT record runf9-domain-verification=<token>. */
 export async function verifyDomain(domain: string, token: string): Promise<boolean> {
   if (insecureAllowed() && /\.(example|test|invalid|localhost)$/.test(domain)) return true
-  try {
-    const records = await resolveTxt(txtHost(domain))
-    return records.some(parts => parts.join('') === `${TXT_PREFIX}${token}`)
-  } catch {
-    return false
+  const has = async (host: string, value: string) => {
+    try { return (await resolveTxt(host)).some(parts => parts.join('') === value) } catch { return false }
   }
+  return await has(txtHost(domain), `${TXT_PREFIX}${token}`) || await has(legacyTxtHost(domain), `${LEGACY_TXT_PREFIX}${token}`)
 }
 
 /** What admins see: everything except the secret. */
 export const publicSso = (c: SsoConfig) => ({
   enabled: c.enabled, issuer: c.issuer, clientId: c.clientId, hasSecret: !!c.clientSecretEnc, domains: c.domains, defaultRole: c.defaultRole, enforce: c.enforce,
-  verification: c.verificationToken ? { host: '_planora-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
+  verification: c.verificationToken ? { host: '_runf9-challenge.<domain>', value: `${TXT_PREFIX}${c.verificationToken}` } : null,
 })
 
-export const insecureAllowed = () => /^(1|true)$/i.test(process.env.PLANORA_ALLOW_INSECURE_OIDC || '')
+export const insecureAllowed = () => /^(1|true)$/i.test(process.env.RUNF9_ALLOW_INSECURE_OIDC || '')
 
 export function validateIssuer(issuer: string): void {
   let u: URL
   try { u = new URL(issuer) } catch { throw new ApiError(400, 'Issuer must be a URL, e.g. https://login.microsoftonline.com/<tenant>/v2.0') }
   if (u.protocol !== 'https:' && !(insecureAllowed() && u.protocol === 'http:')) throw new ApiError(400, 'The issuer must use https.')
+  const outside = egressProblem(issuer)
+  if (outside) throw new ApiError(400, outside)
 }
 
 interface Discovery { issuer: string; authorization_endpoint: string; token_endpoint: string; jwks_uri: string }
@@ -77,6 +81,8 @@ const discoveryCache = new Map<string, { at: number; d: Discovery }>()
 const jwksCache = new Map<string, { at: number; keys: Record<string, unknown>[] }>()
 
 async function getJson(url: string): Promise<unknown> {
+  const outside = egressProblem(url)
+  if (outside) throw new ApiError(400, outside)
   const res = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new ApiError(502, `The identity provider returned ${res.status} for ${new URL(url).pathname}.`)
   return res.json()
@@ -144,7 +150,7 @@ export async function startSso(orgId: string, config: SsoConfig, email: string, 
 function cookieSecret() {
   const s = process.env.JWT_SECRET
   if (!s && process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be set in production')
-  return `sso:${s || 'planora-dev-secret-change-in-production-2026'}`
+  return `sso:${s || 'runf9-dev-secret-change-in-production-2026'}`
 }
 
 export interface SsoIdentity { orgId: string; email: string; name: string; subject: string; config: SsoConfig }
@@ -160,6 +166,8 @@ export async function finishSso(params: URLSearchParams, stateCookie: string | u
   const config = await ssoConfigFor(st.orgId)
   if (!config.enabled || !config.clientSecretEnc) throw new ApiError(400, 'Single sign-on is not set up for this organization.')
   const d = await discover(config.issuer)
+  const outside = egressProblem(d.token_endpoint)
+  if (outside) throw new ApiError(400, outside)
   const res = await fetch(d.token_endpoint, {
     method: 'POST', signal: AbortSignal.timeout(10_000),
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },

@@ -41,6 +41,11 @@ export const LIMITS = {
   signinPerEmail: { limit: 10, windowSec: 15 * 60 },
   signupPerIp: { limit: 20, windowSec: 60 * 60 },
   mfaPerUser: { limit: 10, windowSec: 15 * 60 },
+  /** "Forgot password?" emails: per address and per network, counted whether or not the account exists. */
+  resetRequestsPerEmail: { limit: 5, windowSec: 60 * 60 },
+  resetRequestsPerIp: { limit: 30, windowSec: 60 * 60 },
+  /** Reset-link submissions (guessed-token target) per network. */
+  resetConfirmsPerIp: { limit: 30, windowSec: 15 * 60 },
   apiPerUser: { limit: 600, windowSec: 60 },
   aiPerUser: { limit: 20, windowSec: 60 },
   uploadsPerOrg: { limit: 60, windowSec: 60 * 60 },

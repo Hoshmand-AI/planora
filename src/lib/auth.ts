@@ -13,9 +13,11 @@ import type { NextResponse } from 'next/server'
 import { initSchema, query } from '@/lib/db'
 import { normalizeSettings, type OrgSettings } from '@/lib/server/settings'
 import { currentRequest } from '@/lib/server/context'
-import { mayUsePlanora } from '@/lib/server/signup-policy'
+import { mayUseRunF9 } from '@/lib/server/signup-policy'
 
-export const SESSION_COOKIE = 'planora-token'
+export const SESSION_COOKIE = 'runf9-token'
+/** The cookie's name before the RunF9 rename; still read (and cleared) so existing sessions keep working. */
+export const LEGACY_SESSION_COOKIE = 'planora-token'
 export const SESSION_MAX_DAYS = 7
 const TOUCH_EVERY_MS = 5 * 60_000
 
@@ -23,7 +25,7 @@ function jwtSecret(): string {
   const secret = process.env.JWT_SECRET
   if (secret) return secret
   if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be set in production')
-  return 'planora-dev-secret-change-in-production-2026'
+  return 'runf9-dev-secret-change-in-production-2026'
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -37,7 +39,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 let dummyHash: Promise<string> | null = null
 /** Spends the same time as a real password check, so unknown emails can't be found by timing. */
 export async function dummyPasswordCheck(password: string): Promise<void> {
-  dummyHash ??= bcrypt.hash('planora-timing-equalizer', 12)
+  dummyHash ??= bcrypt.hash('runf9-timing-equalizer', 12)
   await bcrypt.compare(password, await dummyHash)
 }
 
@@ -62,6 +64,7 @@ export function setSessionCookie(res: NextResponse, token: string, expiresAt: Da
 
 export function clearSessionCookie(res: NextResponse) {
   res.cookies.set(SESSION_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
+  res.cookies.set(LEGACY_SESSION_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
 }
 
 /** Revokes one session (only the given user's, when userId is passed). Returns whether a session was revoked. */
@@ -135,7 +138,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   const r = currentRequest() as (ReturnType<typeof currentRequest> & { auth?: AuthContext | null }) | undefined
   if (r && r.auth !== undefined) return r.auth
   const cookieStore = await cookies()
-  const token = cookieStore.get(SESSION_COOKIE)?.value
+  const token = cookieStore.get(SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_SESSION_COOKIE)?.value
   const ctx = token ? await resolveSession(token) : null
   if (r) r.auth = ctx
   return ctx
@@ -152,7 +155,7 @@ export async function resolveSession(token: string): Promise<AuthContext | null>
   if (!row || row.disabled_at) return null
   // Private beta: a session ends as soon as the person's beta access is revoked (or the instance
   // turns invite-only while they lack it). Platform operators always pass.
-  if (!mayUsePlanora({ email: row.email, betaAccessAt: row.beta_access_at ? String(row.beta_access_at) : null, betaRevokedAt: row.beta_revoked_at ? String(row.beta_revoked_at) : null })) return null
+  if (!mayUseRunF9({ email: row.email, betaAccessAt: row.beta_access_at ? String(row.beta_access_at) : null, betaRevokedAt: row.beta_revoked_at ? String(row.beta_revoked_at) : null })) return null
   const settings = normalizeSettings(row.settings)
   const lastSeen = new Date(row.last_seen_at).getTime()
   if (Date.now() - lastSeen > settings.sessionIdleHours * 3_600_000) {

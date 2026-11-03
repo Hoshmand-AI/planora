@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto'
 import { initSchema, query } from '@/lib/db'
 import type { EngineConfig } from './rule'
 import type { Framework, RuleResultStatus, StandardsRunOutput } from './types'
+import { upgradeLegacyData } from '@/lib/legacy-data'
 
 export interface StoredRunSummary {
   id: string
@@ -33,9 +34,9 @@ const iso = (v: unknown) => { const d = v instanceof Date ? v : new Date(String(
 function rowToSummary(r: Record<string, unknown>): StoredRunSummary {
   return {
     id: String(r.id), subjectType: r.subject_type as 'schedule' | 'plan', subjectId: String(r.schedule_id ?? r.plan_id),
-    subjectVersion: (r.subject_version as string) ?? null, frameworks: (r.frameworks as Framework[]) || [],
-    frameworkVersions: (r.framework_versions as Record<string, string>) || {}, engineVersion: String(r.engine_version), rulesVersion: String(r.rules_version),
-    basis: (r.basis as string) ?? null, summary: (r.summary as StoredRunSummary['summary']) || {},
+    subjectVersion: (r.subject_version as string) ?? null, frameworks: upgradeLegacyData((r.frameworks as Framework[]) || []),
+    frameworkVersions: upgradeLegacyData((r.framework_versions as Record<string, string>) || {}), engineVersion: String(r.engine_version), rulesVersion: String(r.rules_version),
+    basis: (r.basis as string) ?? null, summary: upgradeLegacyData((r.summary as StoredRunSummary['summary']) || {}),
     createdBy: (r.created_by as string) ?? null, createdByName: (r.created_by_name as string) ?? null, createdAt: iso(r.created_at),
   }
 }
@@ -72,5 +73,5 @@ export async function getStandardsRun(orgId: string, subjectType: 'schedule' | '
   const res = await query(`SELECT r.*, u.name AS created_by_name FROM standards_runs r LEFT JOIN users u ON u.id = r.created_by
     WHERE r.org_id=$1 AND r.${subjectCol(subjectType)}=$2 AND r.id=$3`, [orgId, subjectId, runId])
   const r = res.rows[0]
-  return r ? { ...rowToSummary(r), thresholds: r.thresholds as EngineConfig, results: r.results as StandardsRunOutput } : undefined
+  return r ? { ...rowToSummary(r), thresholds: upgradeLegacyData(r.thresholds as EngineConfig), results: upgradeLegacyData(r.results as StandardsRunOutput) } : undefined
 }

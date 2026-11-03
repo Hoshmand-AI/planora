@@ -156,7 +156,7 @@ type OutlineLine =
   | { kind: 'act'; a: PlanActivity; level: number; outline: string; wbs: string }
 
 /**
- * Task order and outline for MS Project: WBS summary tasks (Planora phases / work packages, or the
+ * Task order and outline for MS Project: WBS summary tasks (RunF9 phases / work packages, or the
  * uploaded file's own WBS) with their activities nested one level below. The WBS field of a summary
  * is its WBS code without the project prefix ("03.02", or the source path "1.2.3"); an activity's
  * WBS is its parent's code plus its position.
@@ -226,8 +226,11 @@ export function exportMspXml(s: GeneratedSchedule, projectName: string, opts: { 
   const lastOnPath = s.cpm?.longestPath?.[s.cpm.longestPath.length - 1]
   const projectFinishId = (lastOnPath && pool.some(a => a.id === lastOnPath) ? lastOnPath : null)
     ?? [...pool].sort((a, b) => finishOf(b).localeCompare(finishOf(a)))[0]?.id
+  // The finish activity's Deadline IS the required finish (the importer reads an end task's Deadline as
+  // Must Finish By): without one it gets none. Writing its own FNLT/FO date there turned a constraint
+  // into a project required finish on re-import, which gave every activity float (0 critical).
   const deadlineOf = (a: PlanActivity, isMs: boolean): string | null => {
-    if (s.mustFinishBy && a.id === projectFinishId) return s.mustFinishBy
+    if (a.id === projectFinishId) return s.mustFinishBy ?? null
     return isMs && a.constraint && DEADLINE_TYPES.has(a.constraint.type) ? a.constraint.date : null
   }
 

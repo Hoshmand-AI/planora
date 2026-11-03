@@ -1,9 +1,9 @@
 // GAO Schedule Assessment Guide profile (GAO-16-89G): the ten best practices grouped under the four
-// characteristics, each with one or more deterministic checks on data Planora already holds.
+// characteristics, each with one or more deterministic checks on data RunF9 already holds.
 //
-// GAO describes best practices; it does not publish numeric pass marks. Thresholds here are Planora
+// GAO describes best practices; it does not publish numeric pass marks. Thresholds here are RunF9
 // screening defaults (configurable per organization) and are labelled as such on every result.
-// Titles, messages and recommendations are Planora's own paraphrases; sourceReference is a citation.
+// Titles, messages and recommendations are RunF9's own paraphrases; sourceReference is a citation.
 // An automated scan is not a GAO compliance determination (see GAO_DISCLAIMER).
 
 import { isValidDate, toDayNumber } from '@/lib/planning/calendar'
@@ -14,7 +14,7 @@ import { notAssessable, threshold, type EngineConfig, type RuleDef } from './rul
 import type { Characteristic, RuleMeta, ThresholdSpec } from './types'
 
 export const GAO_VERSION = 'GAO-16-89G'
-export const GAO_DISCLAIMER = 'This is an automated screen of schedule data against practices described in the GAO Schedule Assessment Guide (GAO-16-89G). It is not a GAO assessment and not a determination of compliance with the guide: GAO assessments rely on documents, interviews and professional judgment that an automated scan cannot replace. Thresholds are Planora screening defaults unless your organization changed them.'
+export const GAO_DISCLAIMER = 'This is an automated screen of schedule data against practices described in the GAO Schedule Assessment Guide (GAO-16-89G). It is not a GAO assessment and not a determination of compliance with the guide: GAO assessments rely on documents, interviews and professional judgment that an automated scan cannot replace. Thresholds are RunF9 screening defaults unless your organization changed them.'
 
 const BP_TITLES: Record<number, string> = {
   1: 'Capturing all activities',
@@ -53,10 +53,10 @@ function gao(meta: Meta, rest: Pick<RuleDef, 'evaluate'> & Partial<Pick<RuleDef,
   }
 }
 
-/** A GAO screening threshold: 'planora_default' unless the organization changed it. */
+/** A GAO screening threshold: 'runf9_default' unless the organization changed it. */
 function gt(cfg: EngineConfig, key: keyof GaoThresholds, metricKey: string, unit: ThresholdSpec['unit'], direction: ThresholdSpec['direction']): ThresholdSpec {
   const v = cfg.gao[key]
-  return threshold(metricKey, v, unit, direction, v === DEFAULT_GAO_THRESHOLDS[key] ? 'planora_default' : 'org_configured')
+  return threshold(metricKey, v, unit, direction, v === DEFAULT_GAO_THRESHOLDS[key] ? 'runf9_default' : 'org_configured')
 }
 
 const codes = (xs: AnalyzableActivity[]) => uniq(xs.map(a => a.code))
@@ -173,7 +173,7 @@ export const GAO_RULES: RuleDef[] = [
     message: 'Negative lags let a successor start before its predecessor logically allows and hide overlap assumptions.',
     applicability: { subjects: ['schedule', 'plan'], requires: ['logic'] },
   }, {
-    threshold: () => threshold('logic.leads_count', 0, 'count', 'max', 'planora_default'),
+    threshold: () => threshold('logic.leads_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
       const into = net.links.filter(l => net.openIds.has(l.to))
       if (!into.length) return notAssessable('There are no relationships into open activities.')
@@ -451,7 +451,7 @@ export const GAO_RULES: RuleDef[] = [
     message: 'Negative float means the plan cannot meet a required date as drawn.',
     applicability: { subjects: ['schedule', 'plan'], requires: ['float'] },
   }, {
-    threshold: () => threshold('float.negative_count', 0, 'count', 'max', 'planora_default'),
+    threshold: () => threshold('float.negative_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
       const withTf = net.open.map(a => ({ a, tf: net.totalFloat(a) })).filter((x): x is { a: AnalyzableActivity; tf: number } => x.tf !== null)
       if (!withTf.length) return notAssessable('Total float is not available.')

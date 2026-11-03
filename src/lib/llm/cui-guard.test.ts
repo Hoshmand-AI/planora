@@ -15,9 +15,9 @@ describe('CUI / classified data never goes to a cloud model', () => {
 
   it('detects the deployment (commercial cloud unless on-prem or air-gapped)', () => {
     expect(deploymentKind({})).toBe('commercial_cloud')
-    expect(deploymentKind({ PLANORA_DEPLOYMENT: 'onprem' })).toBe('on_prem')
-    expect(deploymentKind({ PLANORA_DEPLOYMENT: 'on-premises' })).toBe('on_prem')
-    expect(deploymentKind({ PLANORA_AIRGAPPED: 'true' })).toBe('airgapped')
+    expect(deploymentKind({ RUNF9_DEPLOYMENT: 'onprem' })).toBe('on_prem')
+    expect(deploymentKind({ RUNF9_DEPLOYMENT: 'on-premises' })).toBe('on_prem')
+    expect(deploymentKind({ RUNF9_AIRGAPPED: 'true' })).toBe('airgapped')
   })
 
   it('treats the cloud provider and public model hosts as external, private hosts as internal', () => {
@@ -37,7 +37,7 @@ describe('CUI / classified data never goes to a cloud model', () => {
 
   it('refuses a cloud model call for a CUI or classified project before anything is sent', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-test-not-used')
-    vi.stubEnv('PLANORA_AI_MODE', 'cloud')
+    vi.stubEnv('RUNF9_AI_MODE', 'cloud')
     for (const c of ['cui', 'classified']) {
       await expect(runWithRequest(req(c), () => chat([{ role: 'user', content: 'secret project details' }]))).rejects.toBeInstanceOf(RestrictedDataError)
       // Structured calls don't swallow the refusal as a validation retry.
@@ -46,7 +46,7 @@ describe('CUI / classified data never goes to a cloud model', () => {
   })
 
   it('refuses a public OpenAI-compatible endpoint too', async () => {
-    vi.stubEnv('PLANORA_AI_MODE', 'local')
+    vi.stubEnv('RUNF9_AI_MODE', 'local')
     vi.stubEnv('LLM_BASE_URL', 'https://llm.example.com/v1')
     await expect(runWithRequest(req('cui'), () => chat([{ role: 'user', content: 'x' }]))).rejects.toBeInstanceOf(RestrictedDataError)
   })
@@ -58,10 +58,10 @@ describe('CUI / classified data never goes to a cloud model', () => {
   })
 
   it('shows the commercial-cloud CUI warning in the AI status', () => {
-    vi.stubEnv('PLANORA_AIRGAPPED', '')
-    vi.stubEnv('PLANORA_DEPLOYMENT', '')
+    vi.stubEnv('RUNF9_AIRGAPPED', '')
+    vi.stubEnv('RUNF9_DEPLOYMENT', '')
     expect(llmStatus().cuiWarning).toBe(CUI_CLOUD_WARNING)
-    vi.stubEnv('PLANORA_DEPLOYMENT', 'onprem')
+    vi.stubEnv('RUNF9_DEPLOYMENT', 'onprem')
     expect(llmStatus().cuiWarning).toBeUndefined()
   })
 })

@@ -1,12 +1,12 @@
 // What-if and recovery options for an UPLOADED schedule.
 //
-// The recovery engine for plans built in Planora (recovery.ts) works by re-answering interview
+// The recovery engine for plans built in RunF9 (recovery.ts) works by re-answering interview
 // questions and regenerating the plan (work week, delivery method, catalog lead times), which an
 // uploaded P6 / MS Project network does not have. So uploads get their own generator, driven by the
 // network itself: it walks the driving path to the CONTRACT milestone (the designated or auto-picked
 // finish milestone; the project finish when there is none) and models the levers a scheduler would
 // try — crash a driving field activity, overlap two driving field activities (FS → SS with a lag),
-// expedite a driving fabrication/delivery item — each recalculated with Planora's CPM on the real
+// expedite a driving fabrication/delivery item — each recalculated with RunF9's CPM on the real
 // network (all calendars, lags, constraints and progress), showing the new milestone date, whether it
 // meets the milestone's own constraint date (FNLT / FO / MFO, else Must Finish By) and the float effect.
 //
@@ -120,7 +120,7 @@ function finishOf(done: ReturnType<typeof completeSchedule>, id: string): string
 /** Recalculate the network with these changes applied (nothing is stored); `measureId` = the contract milestone. */
 export function evaluateNetwork(net: NetworkInput, changes: ScheduleEditChange[] = [], measureId: string | null = net.contract?.milestoneId ?? null): NetworkOutcome {
   const edited = changes.length
-    ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `whatif-${i}`, change, reason: 'what-if', by: 'planora', at: '' })))
+    ? applyScheduleEdits(net.activities, net.relationships, changes.map((change, i) => ({ id: `whatif-${i}`, change, reason: 'what-if', by: 'runf9', at: '' })))
     : { activities: net.activities, relationships: net.relationships }
   const done = completeSchedule({
     activities: edited.activities, relationships: edited.relationships, calendars: net.calendars, defaultCalendarId: net.defaultCalendarId,
@@ -245,7 +245,7 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
     .map(a => ({ id: a.id, code: a.activityId, name: a.name, remaining: remainingOf(a), kind: kindOf(a) }))
   const excluded = path.filter(a => !isField(a) && kindOf(a) !== 'procurement')
     .map(a => ({ id: a.id, code: a.activityId, name: a.name, kind: kindOf(a), why: NOT_CRASHABLE[kindOf(a)] ?? 'not crashable' }))
-  const what = target ? `${target.activityId} ${target.name} (${net.contract?.designated ? 'the designated contract milestone' : 'the contract milestone, picked automatically'})` : "Planora's recalculated project finish"
+  const what = target ? `${target.activityId} ${target.name} (${net.contract?.designated ? 'the designated contract milestone' : 'the contract milestone, picked automatically'})` : "RunF9's recalculated project finish"
   const after = target && base.finish > current ? `Work after ${target.activityId} (e.g. punch list, defects period, as-builts, close-out) runs to ${us(base.finish)}; it cannot move the contract milestone and is not part of these options.` : ''
   const explanation = [
     required
@@ -264,4 +264,18 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
     milestone: target ? { id: target.id, code: target.activityId, name: target.name, designated: !!net.contract?.designated } : null,
     required, requiredSource, gapDays, minFloat: base.minFloat, explanation, drivers, excluded, options: useful,
   }
+}
+
+/**
+ * Why a schedule has no recovery options. "No options" is a normal state of a schedule (a list
+ * without logic, a network the CPM could not run, all remaining work complete), not a bad request,
+ * so the API answers 200 with `available: false` and this reason instead of a 4xx.
+ */
+export function recoveryUnavailableReason(s: { hasCpm: boolean; relationshipCount: number }): string {
+  if (!s.hasCpm) {
+    return s.relationshipCount === 0
+      ? 'This schedule has no activity relationships, so there is no driving path to recover on. Add logic in P6 or MS Project and upload it again.'
+      : 'RunF9 could not recalculate this network (see the quality checks for logic loops or invalid dates), so no recovery options can be modeled.'
+  }
+  return 'No open driving path was found (the remaining work may be complete).'
 }

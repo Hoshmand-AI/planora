@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import type { DataLocation } from '@/lib/server/data-location'
+import { CloudStorage } from '@/components/CloudStorage'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
@@ -27,7 +29,7 @@ interface OrgData {
   settings?: Settings
   aiUsageToday?: number
   plan: { id: string; label: string; maxUploadedSchedules: number | null; aiPerDay: number; reports: string[]; exports: string[]; sso: boolean; uploadedSchedules: number }
-  service?: { deployment: string; cuiWarning?: string }
+  service?: { deployment: string; cuiWarning?: string; dataLocation?: DataLocation }
   sso?: { enabled: boolean; issuer: string; clientId: string; hasSecret: boolean; domains: string[]; defaultRole: string; enforce: boolean; verification: { host: string; value: string } | null }
 }
 interface AuditEvent { seq: number; at: string; actorEmail: string | null; action: string; targetType: string | null; targetId: string | null; detail: Record<string, unknown>; ip: string | null; hash: string }
@@ -58,7 +60,7 @@ function summarize(e: AuditEvent): string {
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
 
-const STANDARD_FRAMEWORK_OPTIONS = [['PLANORA_COMPOSITE', 'Planora Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
+const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -118,7 +120,7 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDate(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact sales@hoshmand.ai.">
+      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-navy-950 font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
@@ -128,6 +130,9 @@ export default function OrgPage() {
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Roles, 2-step, audit log</dt><dd className="text-navy-950 font-medium">Included</dd></div>
         </dl>
       </Section>
+
+      {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} />}
+      <CloudStorage manage={manage} />
 
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
@@ -213,8 +218,8 @@ export default function OrgPage() {
               ['requireMfa', 'Require two-step verification', 'Members without it are asked to set it up before they can continue. Turn it on for your own account first.'],
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
-              ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never Planora re-imports or third-party schedules).'],
-              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (OpenAI on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
+              ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never RunF9 re-imports or third-party schedules).'],
+              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (Anthropic Claude by default on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={settings[k]} onChange={e => setSettings({ ...settings, [k]: e.target.checked })} />
@@ -243,14 +248,14 @@ export default function OrgPage() {
               <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
               <div className="space-y-1.5">
                 {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
-                  const current = settings.standards?.defaultFrameworks ?? ['PLANORA_COMPOSITE']
+                  const current = settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']
                   const on = current.includes(fw)
                   return (
                     <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
                       <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
                         onChange={e => {
                           const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
-                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['PLANORA_COMPOSITE'] } })
+                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['RUNF9_COMPOSITE'] } })
                         }} />
                       {label}
                     </label>
@@ -353,7 +358,7 @@ export default function OrgPage() {
             setBusy(null)
             if (!res.ok) { setMsg({ tone: 'error', text: 'Export failed.', section: 'data' }); return }
             const url = URL.createObjectURL(await res.blob())
-            const a = document.createElement('a'); a.href = url; a.download = `planora-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+            const a = document.createElement('a'); a.href = url; a.download = `runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
           }}><Download size={13} className="inline mr-1" aria-hidden="true" />{busy === 'data' ? 'Preparing…' : 'Export organization data'}</Button>
         </Section>
       )}
@@ -387,5 +392,21 @@ export default function OrgPage() {
         </Section>
       )}
     </div>
+  )
+}
+
+/** Where this deployment keeps the firm's data. */
+function DataLocationSection({ loc }: { loc: DataLocation }) {
+  return (
+    <Section id="data-location" title="Where your data lives" description="Schedules, analysis and the document-search index are stored in this deployment's database. Original files can be kept in your own cloud storage (below).">
+      <dl className="grid gap-4 md:grid-cols-3 text-[13.5px]">
+        <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-navy-950">{loc.label}</dd></div>
+        <div><dt className="text-warm-600">Database</dt><dd className="mt-1 text-warm-700">{loc.database}</dd></div>
+        <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
+      </dl>
+      <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
+        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? <a href="/deploy" className="text-accent-600 underline">Run RunF9 in that cloud</a> from one template: the app, database, documents and search index all stay there, with the same company sign-in (SSO).
+      </p>
+    </Section>
   )
 }

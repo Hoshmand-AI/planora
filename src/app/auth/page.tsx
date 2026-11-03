@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
-import { Robot } from '@/components/Robot'
 
 function AuthForm() {
   const router = useRouter()
@@ -23,7 +22,7 @@ function AuthForm() {
   const [cuiWarning, setCuiWarning] = useState('')
   const [invitation, setInvitation] = useState<{ email?: string; role?: string; orgName?: string; invalid?: boolean } | null>(null)
   const [betaInvitation, setBetaInvitation] = useState<{ email?: string; company?: string | null; invalid?: boolean } | null>(null)
-  // Private beta: invite-only unless the instance re-opened self sign-up (PLANORA_SIGNUP=open).
+  // Private beta: invite-only unless the instance re-opened self sign-up (RUNF9_SIGNUP=open).
   const [inviteOnly, setInviteOnly] = useState(false)
   const [requestEmail, setRequestEmail] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState('')
@@ -31,6 +30,9 @@ function AuthForm() {
   const [challenge, setChallenge] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [ssoMode, setSsoMode] = useState(false)
+  // "Forgot password?": request a reset link by email
+  const [forgot, setForgot] = useState(searchParams.get('forgot') === '1')
+  const [resetNote, setResetNote] = useState('')
   useEffect(() => { const e = searchParams.get('sso_error'); if (e) { setError(e); setSsoMode(true) } }, [searchParams])
   useEffect(() => { if (searchParams.get('verified') === '0') setError('That confirmation link is invalid or has expired. Sign in and resend it from Account → Profile.') }, [searchParams])
 
@@ -65,7 +67,8 @@ function AuthForm() {
     }).catch(() => {})
   }, [invite, betaToken])
 
-  const requestHref = requestEmail ? `mailto:${requestEmail}?subject=${encodeURIComponent('Planora private beta: access request')}` : null
+  // Same fallback as the landing page, so "Request access" is never a dead end.
+  const requestHref = `mailto:${requestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 private beta: access request')}`
   const betaInvited = !!betaInvitation?.email
 
   const post = async (body: Record<string, unknown>) => {
@@ -96,6 +99,24 @@ function AuthForm() {
     }
   }
 
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(''); setResetNote('')
+    setLoading(true)
+    try {
+      const { ok, data } = await post({ action: 'request_password_reset', email })
+      if (!ok) { setError(data.error || 'Something went wrong.'); return }
+      setResetNote(data.message || "If an account exists for that email, we've sent a link. It expires in 30 minutes.")
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openForgot = () => { setForgot(true); setError(''); setErrorCode(''); setResetNote(''); setPassword('') }
+  const closeForgot = () => { setForgot(false); setError(''); setResetNote('') }
+
   const handleCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -118,9 +139,9 @@ function AuthForm() {
 
   return (
     <div className="min-h-screen bg-warm-50 flex flex-col">
-      <nav className="bg-navy-900 h-14 flex items-center px-6">
-        <Link href="/">
-          <Logo variant="light" size="text-[18px]" />
+      <nav className="h-16 flex items-center px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
+        <Link href="/" aria-label="RunF9 home">
+          <Logo variant="dark" size="text-[22px]" />
         </Link>
       </nav>
 
@@ -129,29 +150,26 @@ function AuthForm() {
           <Link href="/" className="inline-flex items-center gap-1.5 text-warm-400 text-[13px] font-medium hover:text-warm-700 transition-colors mb-8">
             <ArrowLeft size={14} /> Back to home
           </Link>
-
-          {/* Nora greets you; the heading below says the same thing in words */}
-          <div className="mood-tile grain flex w-fit items-center border rounded-[24px] px-4 pt-3 pb-2 mb-5" data-mood={challenge ? 'waiting' : mode === 'signin' ? 'done' : 'working'}>
-            <Robot mood={challenge ? 'waiting' : mode === 'signin' ? 'done' : 'working'} size={64} />
-          </div>
           <h1 className="font-display text-[32px] text-navy-950 mb-2">
-            {challenge ? 'Two-step verification' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the Planora beta' : 'Create your account'}
+            {challenge ? 'Two-step verification' : forgot ? 'Reset your password' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the RunF9 beta' : 'Create your account'}
           </h1>
           <p className="text-warm-500 text-[15px] mb-8">
             {challenge
               ? 'Enter the 6-digit code from your authenticator app, or one of your recovery codes.'
-              : mode === 'signin'
+              : forgot
+                ? "Enter your account's email address and we'll send you a link to choose a new password."
+                : mode === 'signin'
                 ? 'Sign in to access your schedule analysis.'
                 : invitation?.orgName
                   ? `You've been invited as ${invitation.role === 'admin' ? 'an' : 'a'} ${invitation.role}. Create your account with ${invitation.email}.`
                   : betaInvited
                     ? `You're invited to the private beta. Create your firm's account with ${betaInvitation?.email}; you'll be its owner and can invite colleagues.`
-                    : 'Start analyzing construction schedules with Planora.'}
+                    : 'Start analyzing construction schedules with RunF9.'}
           </p>
 
-          {inviteOnly && !challenge && !ssoMode && !invitation?.orgName && !betaInvited && (
+          {inviteOnly && !challenge && !ssoMode && !forgot && !invitation?.orgName && !betaInvited && (
             <div role="note" aria-label="Private beta" className="bg-warm-100 border border-warm-200 border-l-2 border-l-accent-500 text-warm-700 text-[13.5px] px-4 py-3 rounded-md mb-5">
-              <strong className="font-semibold text-navy-950">Planora is in private beta</strong> — sign up with your invitation link.
+              <strong className="font-semibold text-navy-950">RunF9 is in private beta</strong> — sign up with your invitation link.
               {mode === 'signup' && ' No link yet? Ask your organization admin to invite you.'}
               {requestHref && <> <a href={requestHref} className="text-accent-600 font-medium underline hover:text-navy-950">Request access</a></>}
             </div>
@@ -185,14 +203,31 @@ function AuthForm() {
             </div>
           )}
 
-          {ssoMode && !challenge ? (
+          {forgot && !challenge ? (
+            <form onSubmit={handleForgot} className="space-y-4">
+              <div>
+                <label htmlFor="reset-email" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
+                <input id="reset-email" type="email" autoComplete="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
+                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
+              </div>
+              <div role="status" aria-live="polite">
+                {resetNote && (
+                  <p className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-[13.5px] px-4 py-3 rounded-md">{resetNote}</p>
+                )}
+              </div>
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
+                {loading ? 'Sending…' : resetNote ? 'Send another link' : 'Send reset link'}
+              </button>
+              <button type="button" onClick={closeForgot} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Back to sign in</button>
+            </form>
+          ) : ssoMode && !challenge ? (
             <form onSubmit={handleSso} className="space-y-4">
               <div>
                 <label htmlFor="sso-email" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Work email</label>
                 <input id="sso-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50">
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 pressable shadow-sm">
                 {loading ? 'Redirecting…' : 'Continue with single sign-on'}
               </button>
               <button type="button" onClick={() => { setSsoMode(false); setError('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Use email and password instead</button>
@@ -208,7 +243,7 @@ function AuthForm() {
                 />
               </div>
               <button type="submit" disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="w-full flex items-center justify-center gap-2 bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 <ShieldCheck size={16} aria-hidden="true" /> {loading ? 'Checking…' : 'Verify and sign in'}
               </button>
               <button type="button" onClick={() => { setChallenge(null); setError(''); setPassword('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">
@@ -247,7 +282,12 @@ function AuthForm() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Password</label>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400">Password</label>
+                {mode === 'signin' && (
+                  <button type="button" onClick={openForgot} className="text-[12.5px] font-medium text-accent-600 hover:underline">Forgot password?</button>
+                )}
+              </div>
               <div className="relative">
                 <input
                   id="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
@@ -262,18 +302,18 @@ function AuthForm() {
               {mode === 'signup' && <p id="password-hint" className="text-[11.5px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>}
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create Account'}
             </button>
           </form>
           )}
 
-          {!challenge && !ssoMode && mode === 'signin' && (
+          {!challenge && !ssoMode && !forgot && mode === 'signin' && (
             <button type="button" onClick={() => { setSsoMode(true); setError('') }} className="w-full mt-3 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[14px] font-medium hover:bg-warm-100 transition-colors">
               Sign in with SSO
             </button>
           )}
-          {!challenge && !ssoMode && (
+          {!challenge && !ssoMode && !forgot && (
           <p className="text-center text-[13.5px] text-warm-500 mt-6">
             {mode === 'signin' && inviteOnly ? (
               <>Have an invitation? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button>

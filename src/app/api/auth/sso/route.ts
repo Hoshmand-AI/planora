@@ -7,7 +7,7 @@ import { entitlementsFor } from '@/lib/server/entitlements'
 import { samlOrgForEmail, startSaml, samlCookieOptions, SAML_COOKIE } from '@/lib/server/saml'
 import { appOrigin } from '@/lib/server/email'
 
-const SSO_COOKIE = 'planora-sso'
+const SSO_COOKIE = 'runf9-sso'
 
 /** Start single sign-on: { email } → { url } to send the browser to the organization's identity provider. */
 export const POST = publicApi(async req => {

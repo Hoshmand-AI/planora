@@ -1,4 +1,4 @@
-// Nora's logic helper: deterministic, explainable, offline activity understanding and logic suggestions.
+// Logic helper: deterministic, explainable, offline activity understanding and logic suggestions.
 //   abbreviations — construction abbreviation dictionary and name normalisation
 //   locations     — Level / Area / Zone / Building / Wing / side / grid tokens
 //   categories    — twelve MasterFormat-style categories through finer work stages, with the matching terms

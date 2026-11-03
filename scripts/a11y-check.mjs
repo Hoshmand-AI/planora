@@ -1,21 +1,21 @@
 #!/usr/bin/env node
-// Automated accessibility check (WCAG 2.2 A/AA rules via axe-core) of Planora's main screens,
+// Automated accessibility check (WCAG 2.2 A/AA rules via axe-core) of RunF9's main screens,
 // signed in as a real user with a generated plan. Also checks that every page can be operated
 // from the keyboard to the main actions (focus is visible and lands on interactive elements).
 //   BASE_URL=http://localhost:3200 node scripts/a11y-check.mjs
 // Fails on any "serious" or "critical" violation. SCREENSHOTS=dir also saves a screenshot per page.
 // With BETA_BASE_URL (a server in the default invite-only mode) and BETA_ADMIN_EMAIL (one of its
-// PLANORA_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
+// RUNF9_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
-// This suite creates its own organizations, so the server must allow self sign-up (PLANORA_SIGNUP=open,
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
 // as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
 if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
-  console.error('✗ Start the server with PLANORA_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
   process.exit(1)
 }
 const shots = process.env.SCREENSHOTS
@@ -42,11 +42,11 @@ await post(`/api/plans/${plan.id}/generate`, {})
 const sample = (await (await post('/api/plans', { sample: true })).json()).plan
 
 const PAGES = [
-  ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'],
+  ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
-  ['Overview', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
-  ['Portfolio', '/dashboard/portfolio'], ['Time impact', '/dashboard/time-impact'],
+  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
+  ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
   // Last, so the pages above keep their no-upload state: an uploaded schedule with a project document,
   // a search with a flagged passage and the candidate requirements.
@@ -62,6 +62,12 @@ const PAGES = [
     await page.getByRole('button', { name: 'Search' }).click()
     await page.waitForSelector('text=Caution:')
   }],
+  // With an uploaded schedule: Home lists both projects (cards, then the table view) and the project page opens.
+  ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
+  ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
+  ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]'); await page.waitForSelector('text=Driving Tasks') }],
+  ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
+  ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
 ]
 
 let failed = 0
@@ -103,12 +109,12 @@ if (process.env.BETA_BASE_URL) {
   const admin = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   const adminEmail = process.env.BETA_ADMIN_EMAIL || 'ops@beta.test'
   const pw = 'correct horse battery staple'
-  const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'Planora Operations' }, headers: { origin: betaOrigin } })
+  const res = await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signup', email: adminEmail, password: pw, name: 'Olga Operator', company: 'RunF9 Operations' }, headers: { origin: betaOrigin } })
   if (res.status() === 409) await admin.request.post(`${betaBase}/api/auth`, { data: { action: 'signin', email: adminEmail, password: pw }, headers: { origin: betaOrigin } })
   const me = await (await admin.request.get(`${betaBase}/api/auth`)).json()
-  if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.PLANORA_EMAIL_OUTBOX) {
-    const dir = process.env.PLANORA_EMAIL_OUTBOX
-    for (const f of fs.readdirSync(dir).sort().reverse()) {
+  if (me.security?.emailDelivery && !me.security?.emailVerified && process.env.RUNF9_EMAIL_OUTBOX) {
+    const dir = process.env.RUNF9_EMAIL_OUTBOX
+    for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()) {
       const m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
       const link = m.to === adminEmail && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
       if (link) { await admin.request.get(link[0], { maxRedirects: 0 }); break }

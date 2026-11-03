@@ -18,10 +18,10 @@ export function resolveProgressMode(chosen: ProgressMode | null | undefined, fil
   return { mode: chosen ?? fileMode ?? 'retained', warning: null }
 }
 
-/** Warning when the progress mode Planora schedules with differs from the file's own setting (null when not). */
+/** Warning when the progress mode RunF9 schedules with differs from the file's own setting (null when not). */
 export function progressModeWarning(chosen: ProgressMode, fileMode: ProgressMode | null | undefined): string | null {
   if (!fileMode || chosen === fileMode) return null
-  return `The file was scheduled in P6 with ${MODE_LABEL[fileMode]}, but Planora is scheduling it with ${MODE_LABEL[chosen]}, so out-of-sequence work and float can differ from P6. The P6 export carries the ${MODE_LABEL[chosen]} setting.`
+  return `The file was scheduled in P6 with ${MODE_LABEL[fileMode]}, but RunF9 is scheduling it with ${MODE_LABEL[chosen]}, so out-of-sequence work and float can differ from P6. The P6 export carries the ${MODE_LABEL[chosen]} setting.`
 }
 
 export interface HistoryDecision {
@@ -32,7 +32,7 @@ export interface HistoryDecision {
 
 /**
  * Whether an upload calibrates firm history:
- *  - a re-imported Planora export or a third-party schedule: never by default;
+ *  - a re-imported RunF9 export or a third-party schedule: never by default;
  *  - otherwise as-built schedules (every activity except LOE / WBS summaries has an actual finish) by default;
  *  - an explicit inHistory=true on a schedule that is not as-built is kept with a warning, and only
  *    counts when `override` is also set (the explicit "include anyway").
@@ -41,14 +41,14 @@ export function decideHistory(input: {
   requested: boolean | null
   override?: boolean
   origin: UploadOrigin | null
-  planoraExport: boolean
+  runf9Export: boolean
   workCount: number
   openCount: number
 }): HistoryDecision {
   const warnings: string[] = []
   const asBuilt = isAsBuilt(input)
-  if (input.planoraExport) {
-    warnings.push('This file is a Planora export re-imported (it was produced by Planora), so it is not used for firm history: its durations are Planora\'s own, not the project\'s record.')
+  if (input.runf9Export) {
+    warnings.push('This file is a RunF9 export re-imported (it was produced by RunF9), so it is not used for firm history: its durations are RunF9\'s own, not the project\'s record.')
     return { inHistory: false, historyOverride: false, warnings }
   }
   if (input.origin === 'third_party') {

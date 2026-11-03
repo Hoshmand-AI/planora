@@ -2,15 +2,15 @@
 
 _Last updated 10/06/2026._
 
-This guide is for customers who run Planora inside their own network: federal and defense
+This guide is for customers who run RunF9 inside their own network: federal and defense
 contractors handling Controlled Unclassified Information (CUI), firms that need EU or Canadian data
 residency, and enterprises that don't use the hosted service. It covers the container deliverable
 (`Dockerfile`, `docker-compose.yml`), every setting the application reads, TLS, backups, upgrades,
 hardening, and what support exists today.
 
-Planora's commercial cloud service is not authorized for CUI (see
+RunF9's commercial cloud service is not authorized for CUI (see
 [../security/CUI-HANDLING.md](../security/CUI-HANDLING.md)). An on-premises instance runs inside
-your boundary, under your controls. How Planora's own controls map to NIST SP 800-171 is in
+your boundary, under your controls. How RunF9's own controls map to NIST SP 800-171 is in
 [../security/NIST-800-171-MAPPING.md](../security/NIST-800-171-MAPPING.md).
 
 ## 1. What you get
@@ -46,13 +46,13 @@ against your own PostgreSQL. The settings are identical.
 **On a connected build host:**
 
 ```bash
-git clone <your Planora source or release bundle> planora && cd planora
+git clone <your RunF9 source or release bundle> runf9 && cd runf9
 git checkout <release commit>
-docker build -t planora:<version> .                 # app image
-docker build --target ops -t planora-ops:<version> .  # backup / restore tools
-node scripts/sbom.mjs --output planora-<version>.cdx.json   # SBOM for your records (no network needed)
-docker save planora:<version> planora-ops:<version> postgres:17 | gzip > planora-<version>-images.tar.gz
-sha256sum planora-<version>-images.tar.gz > planora-<version>-images.tar.gz.sha256
+docker build -t runf9:<version> .                 # app image
+docker build --target ops -t runf9-ops:<version> .  # backup / restore tools
+node scripts/sbom.mjs --output runf9-<version>.cdx.json   # SBOM for your records (no network needed)
+docker save runf9:<version> runf9-ops:<version> postgres:17 | gzip > runf9-<version>-images.tar.gz
+sha256sum runf9-<version>-images.tar.gz > runf9-<version>-images.tar.gz.sha256
 ```
 
 The web fonts are fetched once by `next build` and bundled into the image. Nothing is downloaded
@@ -61,11 +61,11 @@ at runtime.
 **Inside the enclave:**
 
 ```bash
-sha256sum -c planora-<version>-images.tar.gz.sha256
-gunzip -c planora-<version>-images.tar.gz | docker load
+sha256sum -c runf9-<version>-images.tar.gz.sha256
+gunzip -c runf9-<version>-images.tar.gz | docker load
 cp .env.onprem.example .env && chmod 600 .env
-# Fill in POSTGRES_PASSWORD, JWT_SECRET, PLANORA_ENCRYPTION_KEY (openssl rand -base64 48 for each),
-# APP_URL (the HTTPS address users will open) and PLANORA_VERSION=<version>.
+# Fill in POSTGRES_PASSWORD, JWT_SECRET, RUNF9_ENCRYPTION_KEY (openssl rand -base64 48 for each),
+# APP_URL (the HTTPS address users will open) and RUNF9_VERSION=<version>.
 docker compose up -d
 docker compose ps        # app and db should become "healthy"
 curl -s http://127.0.0.1:3000/api/health
@@ -74,7 +74,7 @@ curl -s http://127.0.0.1:3000/api/health
 The first request creates the database schema (section 7). Then:
 
 1. Open `APP_URL` in a browser and sign up. On an empty instance the first account creates the
-   organization and becomes its **owner**. With `PLANORA_SIGNUP=invite_only` (the default)
+   organization and becomes its **owner**. With `RUNF9_SIGNUP=invite_only` (the default)
    every later account needs an invitation from an admin, or single sign-on into a verified domain.
    Create the owner account before you open the instance to users.
 2. Under **Organization**: turn on **Require two-step verification**, set the session idle timeout,
@@ -84,7 +84,7 @@ The first request creates the database schema (section 7). Then:
    explains the model).
 4. Set the plan for your organization according to your licence:
    `docker compose run --rm --entrypoint node backup scripts/set-plan.mjs <owner email> enterprise "licence <ref>"`
-   (the change is written to the audit log), or set `PLANORA_DEFAULT_PLAN` before the first sign-up.
+   (the change is written to the audit log), or set `RUNF9_DEFAULT_PLAN` before the first sign-up.
 
 ## 4. Configuration reference
 
@@ -97,9 +97,9 @@ These are all the environment variables the application and its scripts read (co
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string. Compose builds it from `POSTGRES_PASSWORD`. |
 | `JWT_SECRET` | Signs session cookies. The app refuses to authenticate in production without it. 64+ random characters. Rotating it signs everyone out. |
-| `PLANORA_ENCRYPTION_KEY` | AES-256-GCM key material for secrets stored in the database (MFA seeds, SSO client secret, webhook secrets). Defaults to a key derived from `JWT_SECRET`. Set it once, before anyone enrolls in two-step verification: changing it later makes stored MFA and SSO secrets unreadable (members re-enroll). |
-| `APP_URL` | Public HTTPS origin used in invitation and verification links, e.g. `https://planora.example.internal`. |
-| `PLANORA_DEPLOYMENT` | `onprem` (set in the image). Marks the instance as customer-hosted, which removes the "do not store CUI in the commercial cloud" warning. |
+| `RUNF9_ENCRYPTION_KEY` | AES-256-GCM key material for secrets stored in the database (MFA seeds, SSO client secret, webhook secrets). Defaults to a key derived from `JWT_SECRET`. Set it once, before anyone enrolls in two-step verification: changing it later makes stored MFA and SSO secrets unreadable (members re-enroll). |
+| `APP_URL` | Public HTTPS origin used in invitation and verification links, e.g. `https://runf9.example.internal`. |
+| `RUNF9_DEPLOYMENT` | `onprem` (set in the image). Marks the instance as customer-hosted, which removes the "do not store CUI in the commercial cloud" warning. |
 
 ### Database
 
@@ -117,15 +117,18 @@ These are all the environment variables the application and its scripts read (co
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PLANORA_AI_MODE` | `offline` in the image | `offline` (no model), `local` (an OpenAI-compatible server in your network) or `cloud` (Anthropic by default, or OpenAI with `PLANORA_AI_PROVIDER=openai`; sends request content to that provider; not for CUI). |
-| `PLANORA_AIRGAPPED` | `true` in Compose | Refuses cloud AI and any model host that is not loopback, private-network, `*.local`, `*.internal`, or listed in `PLANORA_ALLOWED_HOSTS`. |
+| `RUNF9_AI_MODE` | `offline` in the image | `offline` (no model), `local` (an OpenAI-compatible server in your network) or `cloud` (Anthropic by default, or OpenAI with `RUNF9_AI_PROVIDER=openai`; sends request content to that provider; not for CUI). |
+| `RUNF9_AIRGAPPED` | `true` in Compose | Refuses cloud AI and any model host that is not loopback, private-network, `*.local`, `*.internal`, or listed in `RUNF9_ALLOWED_HOSTS`. |
 | `LLM_BASE_URL` | — | Local model endpoint, e.g. `http://gpu01.enclave.internal:11434/v1`. |
 | `LLM_MODEL` | `llama3.1:8b` (local) | Model name. Must be in the approved list. |
 | `LLM_API_KEY` | — | Key for the local endpoint, if it needs one. |
-| `PLANORA_ALLOWED_HOSTS` | — | Extra on-prem model host names allowed in air-gapped mode (comma-separated). |
-| `PLANORA_APPROVED_MODELS` | list in [../ai/MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) | Comma-separated registry; any other model is refused. |
-| `PLANORA_AI_DAILY_LIMIT` | 300 | Ceiling on each organization's AI requests per day. |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PLANORA_AI_PROVIDER` | — | Cloud mode only. Leave unset on CUI instances. |
+| `RUNF9_ALLOWED_HOSTS` | — | Host names inside your network that RunF9 may connect to in air-gapped mode, beyond loopback, private addresses and `*.internal` / `*.local` / `*.lan` (comma-separated): a model server, an identity provider, webhook and alert receivers. Webhook and alert receivers must be listed here. |
+| `RUNF9_EMBEDDINGS_MODEL` | — | Turns on meaning-based document search with this embedding model on an in-network OpenAI-compatible server (e.g. `nomic-embed-text` in Ollama). Unset: keyword search with the construction vocabulary only. |
+| `RUNF9_EMBEDDINGS_URL` | `LLM_BASE_URL` | The embedding server's `/v1` URL. Must be inside your network in **every** deployment; a public address is refused. |
+| `RUNF9_EMBEDDINGS_MIN_SIMILARITY` | `0.3` | Lowest cosine similarity a passage needs to count as a meaning-based match. |
+| `RUNF9_APPROVED_MODELS` | list in [../ai/MODEL-REGISTRY.md](../ai/MODEL-REGISTRY.md) | Comma-separated registry; any other model is refused. |
+| `RUNF9_AI_DAILY_LIMIT` | 300 | Ceiling on each organization's AI requests per day. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `RUNF9_AI_PROVIDER` | — | Cloud mode only. Leave unset on CUI instances. |
 
 Organizations also have their own AI switch (off by default for new organizations) under
 Organization → Policies. Projects marked CUI or classified are never sent to a model outside your
@@ -135,22 +138,22 @@ network, whatever these settings say ([../security/CUI-HANDLING.md](../security/
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PLANORA_SIGNUP` | `invite_only` (private beta) | `invite_only`: after the first account, sign-up requires an invitation (SSO or SCIM into a verified domain still provisions members), and signing in requires beta access (accounts that existed when migration 18 ran keep it). `open`: anyone may create an organization and the sign-in gate is off. |
-| `PLANORA_PLATFORM_ADMINS` | — | Comma-separated operator emails. Operators always pass the beta gate and can invite new firms and revoke a person's beta access under **Beta access** (`/dashboard/platform`). |
-| `PLANORA_ACCESS_REQUEST_EMAIL` | — | Address for the "Request access" links on the landing and sign-in pages (hidden when unset). |
-| `PLANORA_DEFAULT_PLAN` | `free` | Plan for organizations created from now on (`free`, `pro`, `enterprise`); see `src/lib/server/entitlements.ts`. Change an existing organization with `scripts/set-plan.mjs`. |
+| `RUNF9_SIGNUP` | `invite_only` (private beta) | `invite_only`: after the first account, sign-up requires an invitation (SSO or SCIM into a verified domain still provisions members), and signing in requires beta access (accounts that existed when migration 18 ran keep it). `open`: anyone may create an organization and the sign-in gate is off. |
+| `RUNF9_PLATFORM_ADMINS` | — | Comma-separated operator emails. Operators always pass the beta gate and can invite new firms and revoke a person's beta access under **Beta access** (`/dashboard/platform`). |
+| `RUNF9_ACCESS_REQUEST_EMAIL` | — | Address for the "Request access" links on the landing and sign-in pages (hidden when unset). |
+| `RUNF9_DEFAULT_PLAN` | `free` | Plan for organizations created from now on (`free`, `pro`, `enterprise`); see `src/lib/server/entitlements.ts`. Change an existing organization with `scripts/set-plan.mjs`. |
 | `NODE_EXTRA_CA_CERTS` | — | Standard Node.js setting: a PEM bundle of private CAs to trust for an on-prem OpenID Connect provider or model host over HTTPS. |
-| `PLANORA_ALLOW_INSECURE_OIDC` | — | Tests only: allows `http://` identity providers and skips DNS domain verification. Never set in production. |
+| `RUNF9_ALLOW_INSECURE_OIDC` | — | Tests only: allows `http://` identity providers and skips DNS domain verification. Never set in production. |
 
 ### Email, alerts and webhooks
 
 | Variable | Purpose |
 |---|---|
-| `RESEND_API_KEY` / `POSTMARK_TOKEN` | Cloud email providers. **Usually not reachable from an enclave.** Without a provider nothing is emailed: invitation links are shown to the admin to pass on, and email verification is reported as unavailable instead of blocking anyone. There is no SMTP option today. |
+| `RESEND_API_KEY` / `POSTMARK_TOKEN` | Cloud email providers. **Never called in air-gapped mode** (refused even if a key is set). Without a provider nothing is emailed: invitation links are shown to the admin to pass on, and email verification is reported as unavailable instead of blocking anyone. There is no SMTP option today. |
 | `EMAIL_FROM` | Sender address when a provider is set. |
-| `PLANORA_EMAIL_OUTBOX` | Tests only: writes emails as JSON files to a folder. |
-| `PLANORA_ALERT_WEBHOOK_URL` | Security alerts (lockouts, MFA turned off, role/SSO/ownership changes, organization exports, new API keys, failed audit verification). Webhook and alert destinations must be public HTTPS addresses (private and internal addresses are refused to prevent SSRF), so inside an enclave leave this unset: each alert is then written to the application log as a `security alert` line that your log collector can forward. |
-| `PLANORA_ALLOW_INSECURE_WEBHOOKS` | Tests only: allows `http://` and private webhook destinations. Never set in production. |
+| `RUNF9_EMAIL_OUTBOX` | Tests only: writes emails as JSON files to a folder. |
+| `RUNF9_ALERT_WEBHOOK_URL` | Security alerts (lockouts, MFA turned off, role/SSO/ownership changes, organization exports, new API keys, failed audit verification). Outside air-gapped mode, webhook and alert destinations must be public HTTPS addresses (private and internal addresses are refused to prevent SSRF). In air-gapped mode the rule is inverted: only HTTPS receivers inside your network that are listed in `RUNF9_ALLOWED_HOSTS`. Unset, each alert is written to the application log as a `security alert` line that your log collector can forward. |
+| `RUNF9_ALLOW_INSECURE_WEBHOOKS` | Tests only: allows `http://` and private webhook destinations. Never set in production. |
 
 ### Runtime and diagnostics
 
@@ -158,11 +161,18 @@ network, whatever these settings say ([../security/CUI-HANDLING.md](../security/
 |---|---|---|
 | `PORT` / `HOSTNAME` | 3000 / 0.0.0.0 | Listening port and address inside the container. |
 | `NODE_ENV` | `production` | Must be `production` (secure cookies, strict CSP, required secrets). |
-| `PLANORA_RELEASE` | `local` | Release label shown by `/api/health`. Compose sets it to `PLANORA_VERSION`. |
-| `PLANORA_DEBUG` | — | Enables debug log lines. |
-| `PLANORA_STANDALONE` | — | Build time only: `1` makes `next build` produce the standalone server the image uses. The hosted (Vercel) build doesn't set it. |
+| `RUNF9_RELEASE` | `local` | Release label shown by `/api/health`. Compose sets it to `RUNF9_VERSION`. |
+| `RUNF9_DEBUG` | — | Enables debug log lines. |
+| `RUNF9_STANDALONE` | — | Build time only: `1` makes `next build` produce the standalone server the image uses. The hosted (Vercel) build doesn't set it. |
 | `VERCEL_GIT_COMMIT_SHA` | — | Set by Vercel on the hosted service only. |
 | `BASE_URL`, `OIDC_ISSUER`, `WEBHOOK_RECEIVER_PORT`, `LLM_LOG`, `FULL_PAGE`, `SCREENSHOTS` | — | End-to-end and accessibility test scripts only. |
+
+### Proving nothing leaves
+
+`scripts/e2e-no-egress.mjs` (run in CI on every change) starts RunF9 air-gapped with a network guard
+in the server process and fails if any feature attempts a connection outside the private network.
+Run it against your own build before acceptance: `npm run build && DATABASE_URL=… node scripts/e2e-no-egress.mjs`.
+See [WHERE-YOUR-DATA-GOES.md](../privacy/WHERE-YOUR-DATA-GOES.md).
 
 ## 5. TLS termination
 
@@ -183,9 +193,9 @@ Minimal nginx example:
 ```nginx
 server {
   listen 443 ssl;
-  server_name planora.example.internal;
-  ssl_certificate     /etc/pki/planora/fullchain.pem;
-  ssl_certificate_key /etc/pki/planora/privkey.pem;
+  server_name runf9.example.internal;
+  ssl_certificate     /etc/pki/runf9/fullchain.pem;
+  ssl_certificate_key /etc/pki/runf9/privkey.pem;
   ssl_protocols TLSv1.2 TLSv1.3;
   client_max_body_size 26m;
   location / {
@@ -211,8 +221,8 @@ that every audit hash chain still verifies.
 
 ```bash
 mkdir -p backups && sudo chown 999:999 backups        # the ops image runs as the postgres user
-docker compose --profile ops run --rm backup           # → backups/planora-<timestamp>.dump + .manifest.json
-docker compose --profile ops run --rm restore-drill /backups/planora-<timestamp>.dump
+docker compose --profile ops run --rm backup           # → backups/runf9-<timestamp>.dump + .manifest.json
+docker compose --profile ops run --rm restore-drill /backups/runf9-<timestamp>.dump
 ```
 
 - **Schedule it** (cron or a systemd timer) at least daily, and run the restore drill at least
@@ -237,10 +247,10 @@ docker compose --profile ops run --rm restore-drill /backups/planora-<timestamp>
 - **Upgrade steps:**
   1. Read the release notes for the target commit.
   2. Take a backup and run the restore drill on it (section 6).
-  3. `docker load` the new images, set `PLANORA_VERSION` in `.env`.
+  3. `docker load` the new images, set `RUNF9_VERSION` in `.env`.
   4. `docker compose up -d app` and wait for `healthy`; `curl -s 127.0.0.1:3000/api/health` should
      show `"current": true` for the schema.
-  5. To roll back, set the previous `PLANORA_VERSION` and `docker compose up -d app` again.
+  5. To roll back, set the previous `RUNF9_VERSION` and `docker compose up -d app` again.
 - Skipping releases is supported: all pending migrations are applied in order.
 - PostgreSQL major-version upgrades (for example 17 → 18) are a database operation: back up,
   restore into the new major version, run the restore drill, then switch `DATABASE_URL`.
@@ -253,16 +263,16 @@ docker compose --profile ops run --rm restore-drill /backups/planora-<timestamp>
   carries the published port is not, so add host firewall rules (the `DOCKER-USER` iptables chain or
   nftables) that drop outbound traffic from the app container, or run the host without a default
   route.
-- Keep `PLANORA_AIRGAPPED=true`: it refuses any model host outside your private network even if
+- Keep `RUNF9_AIRGAPPED=true`: it refuses any model host outside your private network even if
   someone misconfigures `LLM_BASE_URL`.
 - Expose only the reverse proxy (443) to users. Don't publish the database port.
 
 **Secrets**
-- Generate `JWT_SECRET`, `PLANORA_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` with a CSPRNG
+- Generate `JWT_SECRET`, `RUNF9_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` with a CSPRNG
   (`openssl rand -base64 48`); keep `.env` mode 600 and owned by root, or use Docker secrets / your
   secrets manager to inject them.
 - Never set the `*_ALLOW_INSECURE_*` test flags or `ALLOW_BROKEN_CHAINS` in production.
-- Rotating `JWT_SECRET` signs everyone out. Rotating `PLANORA_ENCRYPTION_KEY` requires members to
+- Rotating `JWT_SECRET` signs everyone out. Rotating `RUNF9_ENCRYPTION_KEY` requires members to
   re-enroll two-step verification and admins to re-enter the SSO client secret and webhook secrets.
 
 **Containers**
@@ -276,7 +286,7 @@ docker compose --profile ops run --rm restore-drill /backups/planora-<timestamp>
 - Apply your OS baseline (DISA STIG or CIS benchmark), time synchronization from your authoritative
   NTP source (audit timestamps come from the host clock), host-based audit logging, endpoint
   protection, and full-disk or volume encryption for the Docker data directory and backup media.
-  Planora does not encrypt schedule content itself at the application layer; protection at rest is
+  RunF9 does not encrypt schedule content itself at the application layer; protection at rest is
   provided by your storage encryption.
 - Collect the app's JSON logs (`docker logs`, or a log driver to your SIEM). Every line carries a
   request id; security alerts appear as `security alert` lines (section 4).
@@ -289,13 +299,13 @@ walls for client separation, and review the audit log (it can be verified and ex
 
 ## 9. Data residency
 
-Planora's hosted service stores data in the United States only (Vercel iad1 and Neon us-east; see
+RunF9's hosted service stores data in the United States only (Vercel iad1 and Neon us-east; see
 [../privacy/SUBPROCESSORS.md](../privacy/SUBPROCESSORS.md)). There is **no hosted EU or Canadian
 region**. Customers who need data to stay in the EU, Canada or any other jurisdiction can run this
 on-premises or private-cloud deployment in a data centre or cloud region of their choice: the
 application, database, backups and (optional) model all run where you put them, and the instance
-makes no calls to Planora or any other outside service at runtime. Residency is then determined by
-your hosting, not by Planora.
+makes no calls to RunF9 or any other outside service at runtime. Residency is then determined by
+your hosting, not by RunF9.
 
 ## 10. Versioning and support
 
@@ -311,8 +321,8 @@ What exists today, stated plainly:
   [../security/VULNERABILITY-MANAGEMENT.md](../security/VULNERABILITY-MANAGEMENT.md). On-premises
   customers receive fixes as a new image; applying it is the customer's change.
 - **No phone-home and no licence server:** the instance keeps working without any connection to
-  Planora.
-- **Support channel:** support@hoshmand.ai. Planora is a single-founder company (see
+  RunF9.
+- **Support channel:** support@hoshmand.ai. RunF9 is a single-founder company (see
   [../security/VENDOR-QUESTIONNAIRE.md](../security/VENDOR-QUESTIONNAIRE.md), section 9).
 
 **To be agreed per contract** (no standard terms exist yet): support hours and response times,

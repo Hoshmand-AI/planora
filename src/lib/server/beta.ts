@@ -1,6 +1,6 @@
 // Private beta administration (platform operators only, see signup-policy.ts).
 //
-// Beta invitations let a NEW firm onto Planora: single-use, for one email address, expiring after
+// Beta invitations let a NEW firm onto RunF9: single-use, for one email address, expiring after
 // BETA_INVITE_DAYS, with only the SHA-256 of the token stored. Accepting one creates a new
 // organization owned by the invitee. Operators can also revoke (and restore) a person's beta access;
 // revoking signs them out everywhere.
@@ -14,7 +14,7 @@ import { initSchema, query, withTransaction } from '@/lib/db'
 import { randomToken, sha256 } from './crypto'
 import { ApiError } from './api'
 import type { AuthContext } from '@/lib/auth'
-import { BETA_SIGNIN_MESSAGE, isPlatformAdmin, mayUsePlanora } from './signup-policy'
+import { BETA_SIGNIN_MESSAGE, isPlatformAdmin, mayUseRunF9 } from './signup-policy'
 import { emailConfigured } from './email'
 import { auditQuietly } from './audit'
 
@@ -57,7 +57,7 @@ export function requirePlatformAdmin(auth: AuthContext): void {
  * the same rule in auth.ts). Refusals are audited in the person's organization.
  */
 export async function assertBetaAccess(user: { id: string; email: string; orgId: string; betaAccessAt: string | null; betaRevokedAt: string | null }, method: string): Promise<void> {
-  if (mayUsePlanora(user)) return
+  if (mayUseRunF9(user)) return
   await auditQuietly({
     orgId: user.orgId, action: 'auth.login_refused_beta', targetType: 'user', targetId: user.id, actor: { id: null, email: user.email },
     detail: { method, reason: user.betaRevokedAt ? 'beta_access_revoked' : 'no_beta_access' },
@@ -71,7 +71,7 @@ export async function createBetaInvite(email: string, company: string | null, by
   const normalized = email.trim().toLowerCase()
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized) || normalized.length > 254) throw new ApiError(400, 'Enter a valid email address.')
   const existing = await query('SELECT id FROM users WHERE LOWER(email)=$1', [normalized])
-  if (existing.rows[0]) throw new ApiError(409, 'That email already has a Planora account. To let them back in, restore their beta access below.')
+  if (existing.rows[0]) throw new ApiError(409, 'That email already has a RunF9 account. To let them back in, restore their beta access below.')
   const name = company?.trim().slice(0, 160) || null
   // One live invitation per address: a new one replaces any pending one.
   await query('UPDATE beta_invites SET revoked_at=NOW() WHERE LOWER(email)=$1 AND accepted_at IS NULL AND revoked_at IS NULL', [normalized])
@@ -138,7 +138,7 @@ export async function revokeBetaAccess(userId: string): Promise<{ email: string;
     const cur = await q('SELECT email, org_id, beta_revoked_at FROM users WHERE id=$1 FOR UPDATE', [userId])
     const row = cur.rows[0]
     if (!row) throw new ApiError(404, 'Person not found.')
-    if (isPlatformAdmin(String(row.email))) throw new ApiError(400, 'Platform operators always have access. Remove them from PLANORA_PLATFORM_ADMINS first.')
+    if (isPlatformAdmin(String(row.email))) throw new ApiError(400, 'Platform operators always have access. Remove them from RUNF9_PLATFORM_ADMINS first.')
     if (row.beta_revoked_at) throw new ApiError(409, 'Their beta access is already revoked.')
     await q('UPDATE users SET beta_revoked_at=NOW() WHERE id=$1', [userId])
     const s = await q('UPDATE sessions SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL', [userId])
