@@ -150,12 +150,12 @@ export function BetaAdmin() {
                   </td>
                   <td className="py-2 text-right whitespace-nowrap">
                     {!u.platformAdmin && (u.hasAccess ? (
-                      <Button variant="ghost" disabled={busy === 'users'} aria-label={`Revoke beta access for ${u.email}`} onClick={async () => {
+                      <Button variant="ghost" disabled={busy === 'users'} aria-label={`Revoke access for ${u.email}`} onClick={async () => {
                         if (!window.confirm(`Revoke beta access for ${u.email}? They will be signed out everywhere.`)) return
                         if (await act('users', { action: 'revoke_access', userId: u.id }, `Beta access revoked for ${u.email}.`)) load()
                       }}>Revoke access</Button>
                     ) : (
-                      <Button variant="ghost" disabled={busy === 'users'} aria-label={`Restore beta access for ${u.email}`}
+                      <Button variant="ghost" disabled={busy === 'users'} aria-label={`Restore access for ${u.email}`}
                         onClick={async () => { if (await act('users', { action: 'restore_access', userId: u.id }, `Beta access restored for ${u.email}.`)) load() }}>Restore access</Button>
                     ))}
                   </td>

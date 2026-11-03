@@ -309,9 +309,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
               </span>
             )}
-            <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
+            {/* The accessible name includes the visible name and firm (WCAG 2.5.3 label in name). */}
+            <button type="button" onClick={() => setShowSettings(true)}
               className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-left hover:bg-navy-800 transition-colors">
-              <span className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span className="sr-only">Account menu: </span>
+              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
               <span className="min-w-0">
                 <span className="block text-[13.5px] font-semibold truncate">{user.name}</span>
                 {org && <span className="block text-[12px] text-warm-200 truncate">{org.name}</span>}
