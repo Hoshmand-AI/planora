@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Answer, AnswerValue, GeneratedSchedule } from './types'
+import type { Answer, AnswerValue, GeneratedSchedule, PlanActivity, PlanLink } from './types'
+import { defaultCalendar } from './calendar'
 import { generateSchedule } from './generator'
 import { runSra, triangular, phi, spearman } from './sra'
 
@@ -60,9 +61,54 @@ describe('schedule risk analysis', () => {
     expect(pl).toBeGreaterThan(0.85)
   })
 
+  it('reports no warnings for a schedule without mandatory constraints', () => {
+    expect(r.warnings).toEqual([])
+  })
+
   it('runs fast enough to use interactively', () => {
     const t = runSra(g, answers(), null)
     expect(t.iterations).toBeGreaterThanOrEqual(200)
     expect(t.ms).toBeLessThan(20_000)
+  })
+})
+
+describe('schedule risk analysis: criticality and mandatory constraints (scheduler pilot)', () => {
+  const why = { summary: 'test', sources: [], confidence: 'medium' as const }
+  const task = (id: string, duration: number, extra: Partial<PlanActivity> = {}): PlanActivity => ({
+    id, code: id, name: id, duration, type: duration ? 'task' : 'milestone', category: 'sitework', phase: 'sitework', rationale: why, ...extra,
+  } as PlanActivity)
+  const link = (from: string, to: string): PlanLink => ({ id: `${from}-${to}`, from, to, type: 'FS', lag: 0, rationale: why })
+  // Y (40d) drives the finish. X (5d) feeds M, a mandatory finish milestone set before X can finish,
+  // so X carries negative float without driving anything. W (10d) then C (Start On, too early) also
+  // shows negative float off the driving path.
+  const s: GeneratedSchedule = {
+    generatedAt: '2026-01-01T00:00:00Z', projectStart: '2026-03-02', calendars: [defaultCalendar()], defaultCalendarId: 'default-5d',
+    activities: [
+      task('Y', 40), task('X', 5), task('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } }),
+      task('W', 10), task('C', 2, { constraint: { type: 'SO', date: '2026-03-05' } }), task('END', 0),
+    ],
+    links: [link('X', 'M'), link('W', 'C'), link('Y', 'END'), link('M', 'END'), link('C', 'END')],
+    assumptions: [],
+  }
+  const r = runSra(s, {}, null, { iterations: 200 })
+  const ci = (id: string) => r.criticality.find(c => c.id === id)?.index ?? 0
+
+  it('counts an activity critical only when it is on the driving path to the finish in that iteration', () => {
+    expect(ci('Y')).toBe(1)
+    expect(ci('X')).toBe(0) // negative float from the mandatory finish, but never driving
+    expect(ci('C')).toBe(0) // negative float from a Start On constraint, but never driving
+    expect(ci('W')).toBe(0)
+  })
+
+  it('relaxes mandatory constraints for the simulation and says so', () => {
+    expect(r.warnings.join(' ')).toMatch(/M \(Mandatory Finish 2026-03-04\).*relaxed/)
+    expect(r.assumptions.join(' ')).toMatch(/driving/)
+  })
+
+  it('a mandatory finish does not pin the simulated finish', () => {
+    const pinned: GeneratedSchedule = { ...s, activities: [task('X', 30), task('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } })], links: [link('X', 'M')] }
+    const rr = runSra(pinned, {}, null, { iterations: 200 })
+    expect(rr.percentiles.p10 > '2026-03-04').toBe(true)
+    expect(rr.percentiles.p90 > rr.percentiles.p10).toBe(true)
   })
 })

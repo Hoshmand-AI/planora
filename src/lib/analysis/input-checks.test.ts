@@ -112,6 +112,26 @@ describe('checkInputs', () => {
     expect(q.activityCodes).toEqual(['B', 'A'])
   })
 
+  it('out_of_sequence on SS / FF lag links and historical FS', () => {
+    const oos = (acts: AnalyzableActivity[], links: CpmLink[]) => checkInputs(sched(acts, links)).filter((x) => x.rule === 'out_of_sequence')
+    // Historical FS: both actuals recorded, the successor started before the predecessor finished.
+    const fs = oos([act('A', { actualStart: '2026-02-02', actualFinish: '2026-02-13', status: 'complete' }), act('B', { actualStart: '2026-02-10', actualFinish: '2026-02-20', status: 'complete' })], [{ from: 'A', to: 'B', type: 'FS', lag: 0 }])
+    expect(fs.map((q) => q.activityCodes)).toEqual([['B', 'A']])
+    expect(fs[0].question).toMatch(/started 2026-02-10, before its finish-to-start predecessor A 'Activity A' allowed it \(finished 2026-02-13\)/)
+    // In sequence: FS successor starting the next work day is fine.
+    expect(oos([act('A', { actualStart: '2026-02-02', actualFinish: '2026-02-13' }), act('B', { actualStart: '2026-02-16' })], [{ from: 'A', to: 'B', type: 'FS', lag: 0 }])).toEqual([])
+    // SS lag 5: successor started 2 work days after the predecessor.
+    const ss = oos([act('A', { actualStart: '2026-02-02' }), act('B', { actualStart: '2026-02-04' })], [{ from: 'A', to: 'B', type: 'SS', lag: 5 }])
+    expect(ss[0].question).toMatch(/earlier than its start-to-start predecessor A 'Activity A' allows \(started 2026-02-02 \+ 5 wd lag\)/)
+    expect(oos([act('A', { actualStart: '2026-02-02' }), act('B', { actualStart: '2026-02-09' })], [{ from: 'A', to: 'B', type: 'SS', lag: 5 }])).toEqual([])
+    // SS: successor started, predecessor not.
+    expect(oos([act('A'), act('B', { actualStart: '2026-02-04' })], [{ from: 'A', to: 'B', type: 'SS', lag: 0 }])).toHaveLength(1)
+    // FF lag 2: successor finished before the predecessor (+ lag); and successor finished, predecessor open.
+    expect(oos([act('A', { actualStart: '2026-02-02', actualFinish: '2026-02-13' }), act('B', { actualStart: '2026-02-02', actualFinish: '2026-02-16' })], [{ from: 'A', to: 'B', type: 'FF', lag: 2 }])[0].question).toMatch(/finished 2026-02-16, earlier than its finish-to-finish predecessor/)
+    expect(oos([act('A', { actualStart: '2026-02-02' }), act('B', { actualStart: '2026-02-02', actualFinish: '2026-02-16' })], [{ from: 'A', to: 'B', type: 'FF', lag: 0 }])[0].question).toMatch(/has finished \(2026-02-16\) although its finish-to-finish predecessor/)
+    expect(oos([act('A', { actualStart: '2026-02-02', actualFinish: '2026-02-13' }), act('B', { actualStart: '2026-02-02', actualFinish: '2026-02-17' })], [{ from: 'A', to: 'B', type: 'FF', lag: 2 }])).toEqual([])
+  })
+
   it('long_duration is info', () => {
     const qs = checkInputs(sched([act('L1', { duration: 60 })]))
     const q = qs.find((x) => x.rule === 'long_duration')!

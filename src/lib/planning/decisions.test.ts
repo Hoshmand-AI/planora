@@ -52,6 +52,14 @@ describe('date logic', () => {
     expect(elicit({ answers: a }).conflicts.join(' ')).toMatch(/dried-in/)
   })
 
+  it('does not flag a required completion on the same day as Substantial Completion', () => {
+    const a = { ...base(), 'milestone.substantial_completion.target': k('2027-12-15'), 'project.required_finish': k('2027-12-15') }
+    const { permits, longLead } = questionBank({ answers: a })
+    expect(checkAnswerDates(a, permits, longLead).filter(i => /Required completion/.test(i.text))).toEqual([])
+    const early = { ...a, 'project.required_finish': k('2027-12-14') }
+    expect(checkAnswerDates(early, permits, longLead).some(i => /Required completion” \(12\/14\/2027\) is on or before “Substantial completion/.test(i.text))).toBe(true)
+  })
+
   it('flags a delivery that arrives after the milestone it gates', () => {
     const a = base()
     const { longLead } = questionBank({ answers: a })
@@ -90,6 +98,30 @@ describe('recovery options', () => {
     for (const o of r.options) expect(o.newFinish).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(recoveryPlan(generateSchedule({ answers: base(), today: '2026-09-30' }), base(), null)).toBeNull()
   })
+
+  it('prices each option from the cost basis and leaves it unpriced without one', () => {
+    const a = { ...base(), 'project.required_finish': k('2028-06-30') }
+    const g = generateSchedule({ answers: a, today: '2026-09-30' })
+    const unpriced = recoveryPlan(g, a, null)!
+    const ww0 = unpriced.options.find(o => o.id === 'workweek')!
+    expect(ww0.impact.cost).toBeNull()
+    expect(ww0.impact.costBasis).toMatch(/Cost basis/)
+    expect(ww0.impact.resources).toMatch(/60 hours a week instead of 40/)
+    // The cost questions are asked once there is a required date, and they don't move the schedule.
+    expect(questionBank({ answers: a }).all.map(q => q.id)).toEqual(expect.arrayContaining(['cost.labor_per_day', 'cost.delay_per_day']))
+    expect(questionBank({ answers: base() }).all.some(q => q.section === 'cost')).toBe(false)
+    const priced = { ...a, 'cost.labor_per_day': k(20000), 'cost.delay_per_day': k(15000) }
+    const g2 = generateSchedule({ answers: priced, today: '2026-09-30' })
+    expect(g2.cpm!.projectFinish).toBe(g.cpm!.projectFinish)
+    const r = recoveryPlan(g2, priced, null)!
+    const ww = r.options.find(o => o.id === 'workweek')!
+    expect(ww.impact.cost!.low).toBeGreaterThan(0)
+    expect(ww.impact.cost!.high).toBeCloseTo(ww.impact.cost!.low * 2, -2)
+    expect(ww.impact.delaySavings).toBe(ww.daysSaved * 15000)
+    const crash = r.options.find(o => o.id === 'crash')
+    if (crash) expect(crash.impact.cost!.high).toBeGreaterThan(crash.impact.cost!.low)
+    expect(r.options.find(o => o.id === 'move_date')!.impact.costBasis).toMatch(new RegExp(`${r.gapDays} days`))
+  })
 })
 
 describe('DCMA guidance', () => {
@@ -114,7 +146,7 @@ describe('uploaded files without calculated results', () => {
     expect(r.activities.find(a => a.id === 'C')!.isCritical).toBe(false)
     expect(r.activities.find(a => a.id === 'C')!.totalFloat).toBeGreaterThan(0)
     expect(r.activities.find(a => a.id === 'B')!.isCritical).toBe(true)
-    expect(r.note).toMatch(/Planora scheduled/)
+    expect(r.note).toMatch(/RunF9 scheduled/)
   })
 
   it('does not claim a critical path when the file has no logic', () => {
@@ -124,10 +156,17 @@ describe('uploaded files without calculated results', () => {
   })
 
   it('writes a short project overview', () => {
-    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Ashburn DC Phase 1', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 4, relationshipCount: 3, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: null, region: 'VA', grossSqft: 250000 } as Schedule
+    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Ashburn DC Phase 1', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 4, relationshipCount: 3, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: 'data_center', region: 'VA', grossSqft: 250000 } as Schedule
     const b = projectBrief(s, [{ ...mk('M', 0), name: 'Substantial Completion', activityType: 'milestone', earlyFinish: '2028-02-15' }, { ...mk('F', 20), category: 'foundations', earlyStart: '2026-10-01' }])
     expect(b.summary).toMatch(/data center project in VA/)
     expect(b.summary).toMatch(/09\/01\/2026 to 03\/01\/2028/)
     expect(b.summary).toMatch(/Substantial Completion by 02\/15\/2028/)
+  })
+
+  it('does not guess a project type from names', () => {
+    const s = { id: 's', userId: 'u', orgId: 'o', name: 'Fox River Bridge (restore storm outfalls)', version: 'v1', sourceType: 'p6_xer', fileName: 'x', uploadedAt: '', activityCount: 1, relationshipCount: 0, projectStart: '2026-09-01', projectFinish: '2028-03-01', dataDate: '2026-09-01', varianceDays: null, criticalCount: 0, percentComplete: 0, calendars: [], defaultCalendarId: null, warnings: [], planId: null, projectType: null, region: 'IL', grossSqft: null } as Schedule
+    const b = projectBrief(s, [{ ...mk('A', 5), name: 'Retail store tenant coordination' }])
+    expect(b.summary).toMatch(/a construction project in IL/)
+    expect(b.facts.find(f => f.label === 'Type')).toBeUndefined()
   })
 })

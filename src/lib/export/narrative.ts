@@ -5,9 +5,9 @@
 import type { SraResult } from '@/lib/planning/sra'
 import type { GeneratedSchedule } from '@/lib/planning/types'
 import { fmtDates } from '@/lib/format'
-import type { Evaluation } from '@/lib/planning/evaluation'
+import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import type { ExpertReview } from '@/lib/db'
-import { PROJECT_TYPE_LABELS } from '@/lib/planning/types'
+import { PROJECT_TYPE_LABELS, isCivilType } from '@/lib/planning/types'
 import type { ProjectProfile } from '@/lib/planning/types'
 
 const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ')
@@ -32,15 +32,20 @@ export function basisOfSchedule(opts: {
   const L: string[] = []
 
   L.push(`# Basis of Schedule — ${planName}`, '')
-  L.push(`Prepared ${new Date().toISOString().slice(0, 10)} by ${opts.generatedBy} with Planora (AI mode: ${opts.aiMode}).`, '')
+  L.push(`Prepared ${new Date().toISOString().slice(0, 10)} by ${opts.generatedBy} with RunF9 (AI mode: ${opts.aiMode}).`, '')
 
   L.push('## 1. Project description', '')
   L.push(`| Item | Value |`, `|---|---|`)
-  L.push(`| Facility type | ${profile.projectType ? PROJECT_TYPE_LABELS[profile.projectType] : 'Not stated'} |`)
+  const civil = isCivilType(profile.projectType)
+  L.push(`| ${civil ? 'Project type' : 'Facility type'} | ${profile.projectType ? PROJECT_TYPE_LABELS[profile.projectType] : 'Not stated'} |`)
   L.push(`| Location | ${[profile.city, profile.state].filter(Boolean).join(', ') || 'Not stated'} |`)
   L.push(`| Scope | ${profile.scope?.replace(/_/g, ' ') || 'Not stated'} |`)
-  L.push(`| Gross area | ${profile.grossSqft ? profile.grossSqft.toLocaleString() + ' sf' : 'Not stated'} |`)
-  L.push(`| Stories | ${profile.stories ?? 'Not stated'} |`)
+  // Civil work is sized by construction value; area and stories describe buildings only.
+  if (civil) L.push(`| Construction value | ${profile.valueMusd ? `$${profile.valueMusd.toLocaleString()}M` : 'Not stated'} |`)
+  else {
+    L.push(`| Gross area | ${profile.grossSqft ? profile.grossSqft.toLocaleString() + ' sf' : 'Not stated'} |`)
+    L.push(`| Stories | ${profile.stories ?? 'Not stated'} |`)
+  }
   L.push(`| Delivery method | ${profile.deliveryMethod?.toUpperCase() || 'Not stated'} |`)
   L.push(`| Federal | ${profile.isFederal ? 'Yes' : 'No'}${profile.classification ? ` (${profile.classification})` : ''} |`)
   L.push('')
@@ -49,11 +54,12 @@ export function basisOfSchedule(opts: {
   L.push(`| Milestone | Date |`, `|---|---|`)
   L.push(`| Notice to Proceed | ${s.projectStart} |`)
   for (const a of s.activities.filter(a => a.type === 'milestone' && a.category !== 'ntp')) L.push(`| ${esc(a.name)} | ${t[a.id]?.earlyFinish ?? '—'} |`)
-  L.push(`| Deterministic finish | ${ev.forecast.deterministic} |`)
-  L.push(`| Rule-based scenario P50 / P80 | ${ev.forecast.p50} / ${ev.forecast.p80} |`)
-  if (opts.sra) L.push(`| Monte Carlo P50 / P80 / P90 | ${opts.sra.percentiles.p50} / ${opts.sra.percentiles.p80} / ${opts.sra.percentiles.p90} |`)
-  if (ev.forecast.requiredFinish) L.push(`| Required finish | ${ev.forecast.requiredFinish}${opts.sra?.required ? ` (probability of meeting it: ${Math.round(opts.sra.required.probability * 100)}%)` : ''} |`)
-  L.push('', `Scenario basis: ${ev.forecast.basis}`, '')
+  // One forecast: Monte Carlo when it was run for this export, otherwise the rule-based estimate, labeled as such.
+  const fc = headlineForecast(ev.forecast, opts.sra)!
+  L.push(`| Deterministic finish | ${fc.deterministic} |`)
+  L.push(`| P50 / P80${fc.p90 ? ' / P90' : ''} (${fc.label}) | ${fc.p50} / ${fc.p80}${fc.p90 ? ` / ${fc.p90}` : ''} |`)
+  if (fc.requiredFinish) L.push(`| Required finish | ${fc.requiredFinish}${fc.probabilityOfRequired != null ? ` (probability of meeting it: ${Math.round(fc.probabilityOfRequired * 100)}%)` : ''} |`)
+  L.push('', `Forecast method: ${fc.method === 'monte_carlo' ? 'Monte Carlo schedule risk analysis (details below).' : fc.basis}`, '')
   if (opts.sra) {
     const r = opts.sra
     L.push('### Schedule risk analysis', '', r.method, '')
@@ -73,7 +79,7 @@ export function basisOfSchedule(opts: {
   L.push('## 4. Sources of durations and logic', '')
   const counts: Record<string, number> = {}
   for (const a of s.activities) for (const src of a.rationale.sources) counts[src.kind] = (counts[src.kind] || 0) + 1
-  const labels: Record<string, string> = { user: 'Project team answers', file: 'Uploaded files', catalog: 'Regional permit / regulation / lead-time catalog', firm_history: "Firm's own completed projects (private)", template: 'Planora activity templates', model: 'AI model suggestions', override: 'Scheduler overrides', assumption: 'Stated assumptions' }
+  const labels: Record<string, string> = { user: 'Project team answers', file: 'Uploaded files', catalog: 'Regional permit / regulation / lead-time catalog', firm_history: "Firm's own completed projects (private)", template: 'RunF9 activity templates', model: 'AI model suggestions', override: 'Scheduler overrides', assumption: 'Stated assumptions' }
   for (const [k, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) L.push(`- ${labels[k] || k}: cited by ${n} activities`)
   L.push('', ...((s.notes || []).map(n => `> ${n}`)), '')
 
@@ -132,7 +138,8 @@ export function basisOfSchedule(opts: {
     }
     L.push('')
   }
-  if (ev.findings.length) { L.push('Findings:', ''); for (const f of ev.findings) L.push(`- ${esc(f)}`); L.push('') }
+  const findings = findingsFor(ev, opts.sra)
+  if (findings.length) { L.push('Findings:', ''); for (const f of findings) L.push(`- ${esc(f)}`); L.push('') }
 
   const overrides = [
     ...s.activities.flatMap(a => (a.overrides || []).map(o => ({ what: `${a.code} ${a.name}`, o }))),

@@ -1,13 +1,13 @@
 // Field-level encryption (AES-256-GCM) for secrets stored in the database, e.g. MFA seeds.
-// Key: PLANORA_ENCRYPTION_KEY if set (recommended; 32+ random characters), else derived from JWT_SECRET.
+// Key: RUNF9_ENCRYPTION_KEY if set (recommended; 32+ random characters), else derived from JWT_SECRET.
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'crypto'
 
 function key(): Buffer {
-  const material = process.env.PLANORA_ENCRYPTION_KEY || process.env.JWT_SECRET
+  const material = process.env.RUNF9_ENCRYPTION_KEY || process.env.JWT_SECRET
   if (!material) {
-    if (process.env.NODE_ENV === 'production') throw new Error('PLANORA_ENCRYPTION_KEY or JWT_SECRET must be set in production')
-    return createHash('sha256').update('planora-dev-encryption-key').digest()
+    if (process.env.NODE_ENV === 'production') throw new Error('RUNF9_ENCRYPTION_KEY or JWT_SECRET must be set in production')
+    return createHash('sha256').update('runf9-dev-encryption-key').digest()
   }
   return createHash('sha256').update(`planora-field-encryption:${material}`).digest()
 }

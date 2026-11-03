@@ -1,14 +1,22 @@
 'use client'
 
-import { useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense } from 'react'
+import type { DataLocation } from '@/lib/server/data-location'
+import { FileSourcePicker } from '@/components/FileSourcePicker'
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
-  LayoutDashboard, MessageSquare, FileText, Clock,
-  Upload, LogOut, X, ChevronDown, ClipboardList, ShieldCheck, Database, Lock, UserCog, Building2,
+  LayoutGrid, Plus, BarChart3, Upload,
+  LogOut, X, ChevronDown, Lock, UserCog, Building2, KeyRound, MailCheck,
 } from 'lucide-react'
+import { fmtDate } from '@/lib/format'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
+import { WorkspaceSelect } from '@/components/WorkspaceSelect'
+import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
+import { ImportExceptions } from '@/components/ImportExceptions'
+import { tooLargeMessage } from '@/lib/upload-limit'
+import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
 /* ─── Types ─────────────────────────────────────────── */
 interface User     { id: string; email: string; name: string; plan: string; role?: string }
@@ -17,6 +25,11 @@ interface Schedule {
   uploadedAt: string; varianceDays: number | null; criticalCount: number
   percentComplete: number; sourceType: string
   projectStart: string | null; projectFinish: string | null; dataDate: string | null
+  analysis?: { progressMode?: string; status?: string } | null
+  inHistory?: boolean
+  classification?: string | null
+  uploadOrigin?: string | null
+  historyOverride?: boolean
 }
 
 interface AppContextType {
@@ -28,35 +41,84 @@ interface AppContextType {
   metrics: Record<string, unknown> | null
   refreshMetrics: () => Promise<void>
   /** Organization the user belongs to */
-  org: { id: string; name: string } | null
+  org: { id: string; name: string; dataLocation?: DataLocation } | null
   /** What the user's role allows (read, plan.write, schedule.write, plan.review, …) */
   can: (permission: string) => boolean
+  /** Opens the upload dialog (empty states use it as their one action); without upload rights it opens Build */
+  openUpload: () => void
 }
 
 const AppContext = createContext<AppContextType>({
   user: null, schedules: [], selectedSchedule: null, setSelectedSchedule: () => {},
   refreshSchedules: async () => {}, metrics: null, refreshMetrics: async () => {},
-  org: null, can: () => false,
+  org: null, can: () => false, openUpload: () => {},
 })
 
 export const useApp = () => useContext(AppContext)
 
-/* ─── Tabs ───────────────────────────────────────────── */
-// Build → Analyze → Monitor, plus the firm's private knowledge base.
-const TABS = [
-  { href: '/dashboard/plan',     icon: ClipboardList,   label: 'Build'    },
-  { href: '/dashboard',          icon: LayoutDashboard, label: 'Overview' },
-  { href: '/dashboard/quality',  icon: ShieldCheck,     label: 'Quality'  },
-  { href: '/dashboard/ask',      icon: MessageSquare,   label: 'Ask AI'   },
-  { href: '/dashboard/reports',  icon: FileText,        label: 'Reports'  },
-  { href: '/dashboard/timeline', icon: Clock,           label: 'Timeline' },
-  { href: '/dashboard/history',  icon: Database,        label: 'Firm data' },
+/* ─── Navigation ─────────────────────────────────────── */
+// Level 1 (sidebar): where you are in the firm. Level 2 (project tabs): what you are looking at in
+// one project. Every project page names its project in the URL (?schedule=<id>).
+const NAV = [
+  { href: '/dashboard',         icon: LayoutGrid,    label: 'Projects' },
+  { href: '/dashboard/plan',    icon: Plus,          label: 'New project' },
+  { href: '/dashboard/history', icon: BarChart3,     label: 'Firm insights' },
+  { href: '/dashboard/org',     icon: Building2,     label: 'Organization' },
 ]
+/** Tabs inside one uploaded project, in the order a scheduler works. */
+export const PROJECT_TABS = [
+  { href: '/dashboard/project',     label: 'Overview' },
+  { href: '/dashboard/timeline',    label: 'Schedule' },
+  { href: '/dashboard/quality',     label: 'Quality' },
+  { href: '/dashboard/time-impact', label: 'Delays' },
+  { href: '/dashboard/resources',   label: 'Resources' },
+  { href: '/dashboard/documents',   label: 'Documents' },
+  { href: '/dashboard/reports',     label: 'Reports' },
+  { href: '/dashboard/ask',         label: 'Ask AI' },
+]
+/** Pages that work on one uploaded schedule: they show the project header and tabs. */
+const SCHEDULE_PAGES = PROJECT_TABS.map(t => t.href)
+const isProjectPage = (pathname: string) => SCHEDULE_PAGES.some(p => pathname.startsWith(p))
 
-const isActive = (pathname: string, href: string) => href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+const navActive = (pathname: string, href: string) =>
+  href === '/dashboard' ? pathname === '/dashboard' || pathname.startsWith('/dashboard/portfolio') || isProjectPage(pathname) || /^\/dashboard\/plan\/./.test(pathname)
+  : href === '/dashboard/plan' ? pathname === '/dashboard/plan'
+  : pathname.startsWith(href)
 
-interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; model: string | null; host: string | null; error?: string }
+const STATUS_PILL: Record<string, { label: string; cls: string; dot: string }> = {
+  at_risk: { label: 'At risk', cls: 'text-status-at-risk bg-status-at-risk-bg', dot: 'bg-status-at-risk' },
+  attention: { label: 'Needs attention', cls: 'text-status-attention bg-status-attention-bg', dot: 'bg-status-attention' },
+  on_track: { label: 'On track', cls: 'text-status-on-track bg-status-on-track-bg', dot: 'bg-status-on-track' },
+  complete: { label: 'Complete', cls: 'text-status-on-track bg-status-on-track-bg', dot: 'bg-status-on-track' },
+  no_baseline: { label: 'No baseline yet', cls: 'text-warm-700 bg-warm-100', dot: 'bg-warm-400' },
+}
+
+interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; provider?: ProviderName | null; model: string | null; certified?: boolean; host: string | null; error?: string }
+/** "claude-opus-5-5 (Anthropic (Claude))", plus a note when the model is an approved alternate rather than certified. */
+const modelLine = (l: LlmStatus) => `${l.model}${l.provider ? ` · ${PROVIDER_LABEL[l.provider]}` : ''}${l.certified === false ? ' · approved alternate (not certified; quality may differ)' : ''}`
 const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
+
+/** Schedule id a deep link asks for: /dashboard/project?schedule=<id> (Home links) or ?id=<id>; old /dashboard?schedule= links too. */
+function deepLinkedScheduleId(pathname: string, params: { get(name: string): string | null }): string | null {
+  if (pathname !== '/dashboard' && !isProjectPage(pathname)) return null
+  return params.get('schedule') || params.get('id') || null
+}
+
+/** Opens the schedule a deep link names once the list is loaded (and again whenever the link changes). */
+function ScheduleDeepLink({ schedules, select }: { schedules: Schedule[]; select: (s: Schedule) => void }) {
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const wanted = deepLinkedScheduleId(pathname, params)
+  const applied = useRef<string | null>(null)
+  useEffect(() => {
+    if (!wanted || applied.current === wanted) return
+    const s = schedules.find(x => x.id === wanted)
+    if (!s) return
+    applied.current = wanted
+    select(s)
+  }, [wanted, schedules, select])
+  return null
+}
 
 /* ─── Layout ─────────────────────────────────────────── */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -73,12 +135,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showSettings,     setShowSettings]     = useState(false)
   const [uploading,        setUploading]        = useState(false)
   const [uploadError,      setUploadError]      = useState('')
-  const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[] } | null>(null)
+  const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[]; importExceptions?: ExceptionReport | null } | null>(null)
   const [llm,              setLlm]              = useState<LlmStatus | null>(null)
-  const [org,              setOrg]              = useState<{ id: string; name: string } | null>(null)
+  const [org,              setOrg]              = useState<{ id: string; name: string; dataLocation?: DataLocation } | null>(null)
   const [permissions,      setPermissions]      = useState<string[]>([])
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
+  const [emailUnconfirmed, setEmailUnconfirmed] = useState(false)
+  const [platformAdmin,    setPlatformAdmin]    = useState(false)
+  const [emailWhy,         setEmailWhy]         = useState(false)
+  const [resend,           setResend]           = useState<{ busy: boolean; note: string; ok: boolean }>({ busy: false, note: '', ok: false })
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
+  const inProject = isProjectPage(pathname)
 
   /* ── Auth ── */
   useEffect(() => {
@@ -88,6 +155,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setOrg(data.org ?? null)
       setPermissions(data.permissions ?? [])
       setMfaSetupRequired(!!data.security?.mfaSetupRequired)
+      setEmailUnconfirmed(!!data.security?.emailDelivery && !data.security?.emailVerified)
+      setPlatformAdmin(data.platformAdmin === true)
     })
   }, [router])
 
@@ -100,16 +169,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const refreshSchedules = useCallback(async () => {
     const res  = await fetch('/api/schedules')
     const data = await res.json()
-    setSchedules(data.schedules || [])
-    if (!selectedSchedule && data.schedules?.length > 0) {
-      setSelectedSchedule(data.schedules[0])
+    const list: Schedule[] = data.schedules || []
+    setSchedules(list)
+    if (!selectedSchedule && list.length > 0) {
+      // Honor a deep link on first load instead of flashing the newest schedule.
+      const wanted = typeof window === 'undefined' ? null : deepLinkedScheduleId(window.location.pathname, new URLSearchParams(window.location.search))
+      setSelectedSchedule(list.find(s => s.id === wanted) ?? list[0])
     }
   }, [selectedSchedule])
 
+  // Only the latest selection's metrics may land (a slower earlier request must not overwrite them).
+  const metricsFor = useRef<string | null>(null)
   const refreshMetrics = useCallback(async () => {
+    metricsFor.current = selectedSchedule?.id ?? null
     if (!selectedSchedule) { setMetrics(null); return }
-    const res  = await fetch(`/api/schedules?id=${selectedSchedule.id}`)
+    const id = selectedSchedule.id
+    const res  = await fetch(`/api/schedules?id=${id}`)
     const data = await res.json()
+    if (metricsFor.current !== id) return
     setMetrics(data.metrics ? { ...data.metrics, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
   }, [selectedSchedule])
 
@@ -125,15 +202,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const form = new FormData(e.currentTarget)
     try {
       const res  = await fetch('/api/schedules', { method: 'POST', body: form })
+      // The hosting platform refuses an oversized body with its own non-JSON 413 page.
+      if (res.status === 413 && !res.headers.get('content-type')?.includes('application/json')) { setUploadError(tooLargeMessage('schedule')); return }
       const data = await res.json()
       if (!res.ok) { setUploadError(data.error); return }
       await refreshSchedules()
       setSelectedSchedule(data.schedule)
       setUploadSummary(data.summary)
+      // Open the new upload: on its project page, or on the same tab of the project when it is an update.
+      router.push(`${inProject ? pathname : '/dashboard/project'}?schedule=${data.schedule.id}`)
     } catch {
       setUploadError('Upload failed. Please try again.')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    setResend({ busy: true, note: '', ok: false })
+    try {
+      const res = await fetch('/api/account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resend_verification' }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setResend({ busy: false, note: data.error || 'We could not send the email right now. Try again shortly.', ok: false }); return }
+      if (data.alreadyVerified) { setResend({ busy: false, note: '', ok: true }); setEmailUnconfirmed(false); return }
+      setResend({ busy: false, note: 'Sent — check your inbox (and spam).', ok: true })
+    } catch {
+      setResend({ busy: false, note: 'Network error. Please try again.', ok: false })
     }
   }
 
@@ -150,10 +244,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  const sourceLabel = (t: string) => ({ p6_xer: 'P6', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in Planora' } as Record<string, string>)[t] || t
+  const openUpload = () => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }
+  // Sidebar: the five most recent projects (one entry per project name, its latest upload)
+  const recent = schedules.filter(s => s.sourceType !== 'generated')
+    .filter((s, i, all) => all.findIndex(x => x.name === s.name) === i).slice(0, 5)
+  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in RunF9' } as Record<string, string>)[t] || t
 
   return (
-    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can }}>
+    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
+      <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} select={setSelectedSchedule} /></Suspense>
       {/*
        * LAYOUT STRATEGY
        * ─────────────────────────────────────────────────────────
@@ -168,116 +267,150 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        *   - Content area is full-width scrollable
        * ─────────────────────────────────────────────────────────
        */}
-      <div className="min-h-screen bg-warm-50 flex flex-col">
+      <div className="min-h-screen bg-warm-50 md:flex">
         <a href="#main" className="skip-link">Skip to content</a>
 
-        {/* ── Top Header ──────────────────────────────────────── */}
-        <header className="bg-navy-900 flex-shrink-0 sticky top-0 z-40 border-b border-white/5">
-          <div className="h-12 flex items-center justify-between px-4 md:px-5">
-
-            {/* Left: logo */}
-            <Link href="/" className="flex-shrink-0">
-              <Logo variant="light" size="text-[17px]" />
-            </Link>
-
-            {/* Center (desktop): schedule selector */}
-            <button
-              onClick={() => setShowScheduleList(true)}
-              className="hidden md:flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 rounded-md px-3 py-1.5 transition-colors max-w-[260px]"
-            >
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
-              <span className="text-white/65 text-[12px] font-medium truncate">
-                {selectedSchedule ? selectedSchedule.name : 'No schedule selected'}
-              </span>
-              <ChevronDown size={11} className="text-white/60 flex-shrink-0" />
-            </button>
-
-            {/* Right: actions */}
-            <div className="flex items-center gap-2.5">
-              {/* Mobile: schedule pill (compact) */}
-              <button
-                onClick={() => setShowScheduleList(true)}
-                className="md:hidden flex items-center gap-1.5 bg-navy-800 border border-white/10 rounded-md px-2.5 py-1.5"
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${selectedSchedule ? 'bg-accent-500' : 'bg-warm-500'}`} />
-                <span className="text-white/60 text-[11px] font-medium max-w-[100px] truncate">
-                  {selectedSchedule ? selectedSchedule.name : 'No schedule'}
-                </span>
-              </button>
-
-              {llm && (
-                <span title={llm.error || (llm.model ? `${llm.model} @ ${llm.host}` : 'Deterministic analysis only')}
-                  className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-white/65 border border-white/10 rounded-md px-2 py-1">
-                  {llm.airgapped && <Lock size={10} />}{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
-                </span>
-              )}
-              {can('schedule.write') && (
-              <button
-                onClick={() => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }}
-                className="flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
-              >
-                <Upload size={12} aria-hidden="true" />
-                <span className="hidden sm:inline">Upload</span>
-                <span className="sr-only sm:hidden">Upload schedule</span>
-              </button>
-              )}
-
-              <button
-                onClick={() => setShowSettings(true)}
-                aria-label={`Account menu for ${user.name}`}
-                className="w-7 h-7 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[11px] font-bold text-white/70 hover:border-accent-500/40 transition-colors flex-shrink-0"
-              >
-                {user.name?.[0]?.toUpperCase() || 'U'}
-              </button>
-            </div>
-          </div>
-
-          {/* Desktop tab bar (inside header, below the main row) */}
-          <nav aria-label="Main" className="hidden md:flex border-t border-white/5 px-5">
-            {TABS.map(tab => {
-              const active = isActive(pathname, tab.href)
+        {/* ── Sidebar (desktop) ─────────────────────────────── */}
+        <aside className="hidden md:flex md:flex-col w-[240px] flex-shrink-0 bg-navy-900 text-white sticky top-0 h-screen px-3 py-5 z-30">
+          <Link href="/dashboard" className="px-2.5 pb-6 flex-shrink-0" aria-label="RunF9 projects">
+            <Logo variant="light" size="text-[21px]" />
+          </Link>
+          <nav aria-label="Main" className="flex flex-col gap-1 min-h-0">
+            {NAV.map(n => {
+              const active = navActive(pathname, n.href)
               return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
-                    active
-                      ? 'text-white border-accent-500'
-                      : 'text-white/60 border-transparent hover:text-white/85'
-                  }`}
-                >
-                  <tab.icon size={13} aria-hidden="true" />
-                  {tab.label}
-                </Link>
+                <div key={n.href}>
+                  <Link href={n.href} aria-current={active ? 'page' : undefined}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] transition-colors ${active ? 'bg-navy-800 text-white font-semibold' : 'text-warm-200 font-medium hover:bg-navy-800/70 hover:text-white'}`}>
+                    <n.icon size={17} aria-hidden="true" />{n.label}
+                  </Link>
+                  {n.href === '/dashboard' && recent.length > 0 && (
+                    <ul aria-label="Recent projects" className="mt-1 mb-2 ml-[38px] flex flex-col">
+                      {recent.map(s => {
+                        const here = inProject && selectedSchedule?.id === s.id
+                        return (
+                          <li key={s.id}>
+                            <Link href={`/dashboard/project?schedule=${s.id}`} onClick={() => setSelectedSchedule(s)} aria-current={here ? 'page' : undefined}
+                              className={`block truncate py-1.5 text-[13.5px] transition-colors ${here ? 'text-white font-semibold' : 'text-warm-200 hover:text-white'}`}>{s.name}</Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
               )
             })}
           </nav>
-        </header>
-
-        {/* ── Main content ────────────────────────────────────── */}
-        {/* pb-16 on mobile = space for bottom tab bar */}
-        <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-16 md:pb-0 focus:outline-none">
-          <div className="max-w-5xl mx-auto">
-            {children}
+          <div className="mt-auto pt-4 border-t border-navy-800 flex flex-col gap-2">
+            {llm && (
+              <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only: scheduling, CPM, quality checks and reports still work')}
+                className="flex items-center gap-2 px-3 text-[12px] font-medium text-warm-200">
+                {llm.airgapped ? <Lock size={11} aria-hidden="true" /> : <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${llm.mode === 'offline' ? 'bg-warm-300' : 'bg-emerald-400'}`} />}
+                {aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}
+              </span>
+            )}
+            <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
+              className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-left hover:bg-navy-800 transition-colors">
+              <span className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-semibold truncate">{user.name}</span>
+                {org && <span className="block text-[12px] text-warm-200 truncate">{org.name}</span>}
+              </span>
+            </button>
           </div>
-        </main>
+        </aside>
 
-        {/* ── Mobile bottom tab bar ────────────────────────────── */}
-        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900 border-t border-white/8 safe-area-bottom">
-          <div className="flex overflow-x-auto">
-            {TABS.map(tab => {
-              const active = isActive(pathname, tab.href)
+        <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+          {/* ── Top bar (phones) ─────────────────────────────── */}
+          <header className="md:hidden glass-bar sticky top-0 z-40 h-14 flex items-center justify-between px-4 border-b border-white/5">
+            <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[21px]" /></Link>
+            <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
+              className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-bold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
+          </header>
+
+          {/* ── Project header: one project's name, status and tabs ── */}
+          {inProject && (
+            <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
+              <div className="max-w-6xl mx-auto px-5 md:px-8 pt-4 md:pt-5">
+                {selectedSchedule ? (
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600">
+                        <Link href="/dashboard" className="hover:text-navy-950">Projects</Link>
+                        <span aria-hidden="true"> / </span>
+                        <button type="button" onClick={() => setShowScheduleList(true)} className="inline-flex items-center gap-1 hover:text-navy-950" aria-label={`Switch project (current: ${selectedSchedule.name})`}>
+                          Switch project <ChevronDown size={12} aria-hidden="true" />
+                        </button>
+                      </nav>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
+                        <h1 className="text-[22px] md:text-[26px] font-bold tracking-[-0.025em] text-navy-950 leading-tight">{selectedSchedule.name}</h1>
+                        {(() => {
+                          const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
+                          return st ? <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
+                        })()}
+                      </div>
+                      <p className="text-[13px] text-warm-600 mt-1">
+                        {selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}
+                      </p>
+                    </div>
+                    {can('schedule.write') && selectedSchedule.sourceType !== 'generated' && (
+                      <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 py-2 text-[13.5px] font-semibold hover:bg-warm-100">
+                        <Upload size={14} aria-hidden="true" /> Upload update
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[14px] text-warm-600 pb-2"><Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
+                )}
+                <nav aria-label="Project" className="flex gap-1 overflow-x-auto -mx-1 mt-3">
+                  {PROJECT_TABS.map(t => {
+                    const here = pathname.startsWith(t.href)
+                    return (
+                      <Link key={t.href} href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
+                        className={`relative whitespace-nowrap px-3 py-3 text-[14px] transition-colors ${here ? 'text-navy-950 font-semibold' : 'text-warm-600 font-medium hover:text-navy-950'}`}>
+                        {t.label}
+                        <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
+                      </Link>
+                    )
+                  })}
+                </nav>
+              </div>
+            </div>
+          )}
+
+          {/* ── Main content ────────────────────────────────── */}
+          {/* pb-20 on phones = space for the bottom bar */}
+          <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none">
+            {emailUnconfirmed && pathname !== '/dashboard/account' && (
+              <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-[13px] text-warm-700">
+                <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <MailCheck size={14} aria-hidden="true" className="text-accent-600 flex-shrink-0" />
+                  <span>Please confirm your email. We sent you a link.</span>
+                  <button type="button" disabled={resend.busy} onClick={resendConfirmation} className="font-medium text-accent-600 hover:underline disabled:opacity-60 disabled:cursor-wait">
+                    {resend.busy ? 'Sending…' : 'Resend the link'}
+                  </button>
+                  <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-navy-950">Why?</button>
+                  <span role="status" aria-live="polite" className={resend.ok ? 'text-warm-700' : 'text-status-at-risk'}>{resend.note}</span>
+                  <span id="email-why" hidden={!emailWhy} className="basis-full text-[12.5px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
+                </div>
+              </div>
+            )}
+            <div key={pathname} className="max-w-6xl mx-auto md:px-3 page-enter">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        {/* ── Bottom bar (phones) ──────────────────────────────── */}
+        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-bar border-t border-white/8 safe-area-bottom">
+          <div className="flex">
+            {NAV.map(n => {
+              const active = navActive(pathname, n.href)
               return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={`flex-1 min-w-[64px] flex flex-col items-center gap-1 py-2.5 transition-colors ${
-                    active ? 'text-accent-400' : 'text-white/60'
-                  }`}
-                >
-                  <tab.icon size={18} strokeWidth={active ? 2 : 1.5} />
-                  <span className="text-[10px] font-medium">{tab.label}</span>
+                <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
+                  className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 transition-colors ${active ? 'text-white' : 'text-warm-200'}`}>
+                  <n.icon size={19} strokeWidth={active ? 2.2 : 1.7} aria-hidden="true" />
+                  <span className={`text-[10.5px] ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
                 </Link>
               )
             })}
@@ -289,7 +422,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
             <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="font-display text-[20px] text-navy-950">Upload Schedule</h2>
+                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Upload a schedule</h2>
                 <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
 
@@ -308,25 +441,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div>{uploadSummary.classifiedPct}% of activities mapped to standard work categories.</div>
                     {uploadSummary.warnings.slice(0, 4).map((w, i) => <div key={i} className="text-warm-500">· {w}</div>)}
                   </div>
+                  {uploadSummary.importExceptions && (
+                    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 max-h-[40vh] overflow-y-auto">
+                      <ImportExceptions report={uploadSummary.importExceptions} />
+                    </div>
+                  )}
                   {uploadSummary.dataQuestions > 0 && (
                     <div className="border-l-2 border-status-attention bg-status-attention-bg text-[13px] text-warm-700 px-3 py-2 rounded-md">
-                      Planora has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
+                      RunF9 has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Link href="/dashboard/quality" onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-500 text-navy-950 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-400 transition-colors">Review data questions</Link>
+                    <Link href="/dashboard/quality" onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     <button onClick={() => setShowUpload(false)} className="flex-1 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors">Done</button>
                   </div>
                 </div>
               ) : (
               <form onSubmit={handleUpload}>
                 <div className="mb-4">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Schedule File</label>
-                  <input
-                    type="file" name="file" accept=".xer,.xml,.pdf,.xlsx,.csv" required
-                    className="w-full border border-warm-300 bg-warm-100 rounded-md px-3 py-2 text-[13.5px] text-warm-700 file:mr-3 file:bg-navy-900 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:text-[12px] file:font-medium"
-                  />
-                  <p className="text-[11px] text-warm-400 mt-1.5">Primavera P6 (.xer), MS Project (.xml), Excel (.xlsx), CSV, or PDF</p>
+                  <FileSourcePicker accept=".xer,.xml,.pdf,.xlsx,.csv" canManage={can('org.manage')}
+                    hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
                 <div className="mb-4">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></label>
@@ -338,15 +472,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <input name="region" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
                     <input name="grossSqft" type="number" min={0} placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
                   </div>
-                  <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach Planora how your projects really perform. Used only for your firm.</p>
+                  <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
+                </div>
+                <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  <label className="block text-[12px] text-warm-600">Whose schedule
+                    <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                      <option value="">Not stated</option>
+                      <option value="own">Our own project</option>
+                      <option value="third_party">Third-party (we review it)</option>
+                    </select>
+                  </label>
+                  <label className="block text-[12px] text-warm-600">Classification
+                    <select name="classification" defaultValue="unclassified" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                      <option value="unclassified">Unclassified</option>
+                      <option value="cui">CUI</option>
+                      <option value="classified">Classified</option>
+                    </select>
+                  </label>
+                  <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 <div className="mb-5">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
-                  <input type="text" name="version" defaultValue="v1.0"
+                  <input type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[14px] font-semibold hover:bg-accent-400 disabled:opacity-50 transition-colors">
+                  className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 disabled:opacity-50 transition-colors pressable shadow-sm">
                   {uploading ? 'Parsing schedule…' : 'Upload & Parse'}
                 </button>
               </form>
@@ -361,7 +513,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 className="font-display text-[20px] text-navy-950">Select Schedule</h2>
+                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Switch project</h2>
                 <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
@@ -371,7 +523,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {schedules.map(s => (
                     <button
                       key={s.id}
-                      onClick={() => { setSelectedSchedule(s); setShowScheduleList(false) }}
+                      onClick={() => { setSelectedSchedule(s); setShowScheduleList(false); router.push(`${inProject ? pathname : '/dashboard/project'}?schedule=${s.id}`) }}
                       className={`w-full text-left p-3.5 rounded-md border transition-colors ${
                         selectedSchedule?.id === s.id
                           ? 'border-accent-500 bg-accent-100'
@@ -391,7 +543,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
                 className="w-full mt-4 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors"
               >
-                + Upload New Schedule
+                + Upload a new project
               </button>
               )}
             </div>
@@ -404,7 +556,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 className="font-display text-[20px] text-navy-950">Account</h2>
+                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Account</h2>
                 <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               <div className="space-y-3">
@@ -425,20 +577,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Building2 size={14} aria-hidden="true" /> Organization
                   </Link>
                 </div>
+                {platformAdmin && (
+                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                    <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
+                  </Link>
+                )}
                 {llm && (
                   <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
                     <div className="text-[13px] text-warm-700 font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
                     <div className="text-[12px] text-warm-500 mt-1">
-                      {llm.mode === 'cloud' && `Model ${llm.model} via ${llm.host}. Withheld answers are never sent.`}
-                      {llm.mode === 'local' && `Model ${llm.model} on ${llm.host}. Nothing leaves your network.`}
+                      {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
+                      {llm.mode === 'local' && `Model ${modelLine(llm)} on ${llm.host}. Nothing leaves your network.`}
                       {llm.mode === 'offline' && (llm.error || 'No model configured. Scheduling, CPM, quality checks and reports run fully offline.')}
                     </div>
                   </div>
                 )}
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">About</div>
-                  <div className="text-[13px] text-warm-600">Planora · Version 1.0</div>
+                  <div className="text-[13px] text-warm-600">RunF9 · Version 1.0</div>
                   <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
                   <div className="flex gap-4 mt-2">
                     <Link href="/privacy" className="text-[13px] text-accent-600 hover:underline">Privacy</Link>

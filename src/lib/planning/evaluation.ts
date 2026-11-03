@@ -7,11 +7,14 @@
 //   6. Backtest — leave-one-out: re-predict each completed firm project and compare to its actual duration
 
 import type { Answer, AnalyzableSchedule, DcmaReport, GeneratedSchedule, ProjectType, WorkCalendar } from './types'
+import { PROJECT_TYPES } from './types'
 import { runCpm } from './cpm'
-import { runDcma } from '@/lib/analysis/dcma'
-import { computeFirmHistory, scaleForSize, type FirmHistory } from './history'
+import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
+import { computeFirmHistory, historyForPlan, historyOptedOut, scaleForSize, type FirmHistory } from './history'
+import { committedActivities, hasDurationOverride, type SraResult } from './sra'
 import { questionBank, elicit, profileFrom } from './elicitation'
 import { generateSchedule } from './generator'
+import { checkPlanLogic } from './logic-check'
 import type { ExpertReview, HistoryRow } from '@/lib/db'
 
 export function toAnalyzable(s: GeneratedSchedule): AnalyzableSchedule {
@@ -22,6 +25,7 @@ export function toAnalyzable(s: GeneratedSchedule): AnalyzableSchedule {
     projectFinish: s.cpm?.projectFinish ?? null,
     calendars: s.calendars,
     defaultCalendarId: s.defaultCalendarId,
+    mustFinishBy: s.mustFinishBy ?? null,
     links: s.links,
     activities: s.activities.map(a => ({
       id: a.id, code: a.code, name: a.name, type: a.type, duration: a.duration, calendarId: a.calendarId,
@@ -86,6 +90,14 @@ export function scheduleDateChecks(s: GeneratedSchedule): ScheduleDateCheck[] {
   return out
 }
 
+/** Latest expert review against the current schedule; any regeneration or override after it makes it stale. */
+export function reviewStatusOf(s: GeneratedSchedule, reviews: ExpertReview[]): Evaluation['review']['status'] {
+  const latest = reviews[reviews.length - 1]
+  if (!latest) return 'none'
+  if (latest.at < lastOverrideAt(s)) return 'stale'
+  return latest.verdict === 'reject' ? 'changes_requested' : 'approved'
+}
+
 export interface Evaluation {
   score: number
   grade: 'A' | 'B' | 'C' | 'D'
@@ -93,16 +105,81 @@ export interface Evaluation {
   readiness: number
   openAssumptions: number
   benchmark: { rows: BenchmarkRow[]; basis: string }
-  forecast: { deterministic: string; p50: string; p80: string; basis: string; requiredFinish?: string; p80MeetsRequired?: boolean }
+  /**
+   * Rule-based P50/P80 estimate (not a simulation). It is only the headline forecast when no Monte
+   * Carlo result is available; use headlineForecast() to pick the one forecast to show.
+   */
+  forecast: { method: 'rule_based'; label: string; deterministic: string; p50: string; p80: string; basis: string; requiredFinish?: string; p80MeetsRequired?: boolean }
   coverage: { item: string; kind: 'permit' | 'long_lead'; status: 'scheduled' | 'resolved' | 'missing'; detail: string }[]
   review: { status: 'none' | 'approved' | 'changes_requested' | 'stale'; latest?: ExpertReview; reviewedVersion?: string }
   findings: string[]
   dateChecks: ScheduleDateCheck[]
+  /** Problems that cap the grade and that publishing must confirm explicitly (see publishBlockers) */
+  blockers: PublishBlocker[]
 }
 
-export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, history: FirmHistory | null, reviews: ExpertReview[]): Evaluation {
+/* ─── Publish blockers: a plan that misses its date or has no real template is not a baseline ── */
+
+/** Calendar days the forecast may miss the contract / required date before publishing needs confirmation. */
+export const LATE_THRESHOLD_DAYS = 30
+/** Days late at which the grade drops to D (between the threshold and this it is capped at C). */
+export const LATE_GRADE_D_DAYS = 90
+
+export interface PublishBlocker {
+  code: 'late' | 'no_template'
+  text: string
+  /** Calendar days late (code 'late') */
+  days?: number
+  /** Highest grade the plan can get while this stands */
+  maxGrade: 'C' | 'D'
+}
+
+/**
+ * What must be confirmed before this plan is published as a baseline: the deterministic forecast
+ * missing the required finish (or a contractual milestone target) by more than LATE_THRESHOLD_DAYS,
+ * and a project type typed in by the user that matches no RunF9 template (planned with the
+ * generic building network).
+ */
+export function publishBlockers(s: GeneratedSchedule, answers: Record<string, Answer>): PublishBlocker[] {
+  const out: PublishBlocker[] = []
+  const t = s.cpm?.times || {}
+  const misses: { label: string; target: string; forecast: string; days: number }[] = []
+  const required = answers['project.required_finish']?.status === 'known' && typeof answers['project.required_finish'].value === 'string' ? String(answers['project.required_finish'].value) : s.mustFinishBy
+  if (required && /^\d{4}-\d{2}-\d{2}$/.test(required) && s.cpm?.projectFinish) {
+    misses.push({ label: 'the required finish', target: required, forecast: s.cpm.projectFinish, days: days(required, s.cpm.projectFinish) })
+  }
+  for (const m of s.milestoneTargets || []) {
+    const ef = t[m.activityId]?.earlyFinish
+    if (ef) misses.push({ label: `the “${m.label}” target`, target: m.target, forecast: ef, days: days(m.target, ef) })
+  }
+  const worst = misses.filter(m => m.days > LATE_THRESHOLD_DAYS).sort((a, b) => b.days - a.days)[0]
+  if (worst) {
+    out.push({
+      code: 'late', days: worst.days, maxGrade: worst.days > LATE_GRADE_D_DAYS ? 'D' : 'C',
+      text: `The forecast (${us(worst.forecast)}) misses ${worst.label} (${us(worst.target)}) by ${worst.days} calendar days — more than the ${LATE_THRESHOLD_DAYS}-day threshold. Recover the schedule (Evaluation tab) or confirm that you are publishing a baseline that does not meet the date.`,
+    })
+  }
+  const type = answers['project.type']
+  if (type?.status === 'known' && typeof type.value === 'string' && (type.custom || !(PROJECT_TYPES as readonly string[]).includes(type.value))) {
+    out.push({
+      code: 'no_template', maxGrade: 'C',
+      text: `“${type.value}” is not a RunF9 project type, so the plan uses the generic building network. Choose the closest listed type, or review every activity and its logic before publishing.`,
+    })
+  }
+  return out
+}
+
+const GRADE_ORDER = ['A', 'B', 'C', 'D'] as const
+/** The grade, no better than any blocker allows. */
+export function cappedGrade(grade: Evaluation['grade'], blockers: PublishBlocker[]): Evaluation['grade'] {
+  return blockers.reduce<Evaluation['grade']>((g, b) => (GRADE_ORDER.indexOf(b.maxGrade) > GRADE_ORDER.indexOf(g) ? b.maxGrade : g), grade)
+}
+
+export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answer>, firmHistory: FirmHistory | null, reviews: ExpertReview[], rules?: Partial<DcmaRules>): Evaluation {
+  // Opting out of firm history (history.use = No) removes it from benchmarks and forecast ratios.
+  const history = historyForPlan(firmHistory, answers)
   const profile = profileFrom(answers)
-  const dcma = runDcma(toAnalyzable(s))
+  const dcma = runDcma(toAnalyzable(s), rules)
   const elic = elicit({ answers })
   const findings: string[] = []
 
@@ -134,7 +211,8 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
 
   /* Risk-adjusted forecast */
   const forecast = riskForecast(s, history, answers)
-  if (forecast.requiredFinish && forecast.p80MeetsRequired === false) findings.push(`At the P80 level the project finishes ${forecast.p80}, after the required ${forecast.requiredFinish}.`)
+  const late = forecastFinding(headlineForecast(forecast))
+  if (late) findings.push(late)
 
   /* Coverage of grounded requirements */
   const bank = questionBank({ answers })
@@ -160,12 +238,7 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
 
   /* Expert review */
   const latest = reviews[reviews.length - 1]
-  let reviewStatus: Evaluation['review']['status'] = 'none'
-  if (latest) {
-    // Any regeneration or override after the review makes it stale.
-    const stale = latest.at < lastOverrideAt(s)
-    reviewStatus = stale ? 'stale' : latest.verdict === 'reject' ? 'changes_requested' : 'approved'
-  }
+  const reviewStatus = reviewStatusOf(s, reviews)
   if (reviewStatus === 'none') findings.push('No expert review recorded yet. A senior scheduler should review before baselining.')
   if (reviewStatus === 'stale') findings.push('The schedule changed after the last expert review.')
 
@@ -186,6 +259,8 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
   }
   const qualified = (s.qualifications || []).filter(q => q.activityIds.length)
   if (qualified.length) findings.push(`${qualified.length} answer(s) were qualified in the team's own words (e.g. “${qualified[0].note.slice(0, 80)}”). The related activities are marked low-confidence — open them on the Schedule tab and adjust durations or logic if needed.`)
+  const logic = checkPlanLogic(s)
+  if (logic.length) findings.push(`Logic integrity: ${logic.length} issue${logic.length > 1 ? 's' : ''} — ${logic.slice(0, 3).map(i => i.text).join(' ')}${logic.length > 3 ? ' …' : ''}`)
   const placeholders = s.activities.filter(a => a.placeholder)
   if (placeholders.length) findings.push(`${placeholders.length} placeholder(s) reserve time for withheld constraints; a cleared scheduler should position them on-site.`)
 
@@ -194,15 +269,18 @@ export function evaluatePlan(s: GeneratedSchedule, answers: Record<string, Answe
   const cov = coverage.length ? 100 * (coverage.length - missing.length) / coverage.length : 100
   const rev = reviewStatus === 'approved' ? 100 : reviewStatus === 'none' ? 50 : 30
   const score = Math.round(dcma.score * 0.35 + elic.readiness * 0.2 + realism * 0.2 + cov * 0.15 + rev * 0.1)
-  const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D'
+  const blockers = publishBlockers(s, answers)
+  const grade = cappedGrade(score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D', blockers)
 
   const dateChecks = scheduleDateChecks(s)
   for (const c of dateChecks.filter(c => c.severity !== 'info')) findings.unshift(c.text)
+  for (const b of [...blockers].reverse()) findings.unshift(`Grade capped at ${b.maxGrade}: ${b.text}`)
   return {
+    blockers,
     dateChecks,
     score, grade, dcma, readiness: elic.readiness,
     openAssumptions: s.assumptions.filter(a => a.kind !== 'inferred').length,
-    benchmark: { rows, basis: history ? `${history.projectCount} of your firm's past schedules (${history.similarCount} same type). Private to your firm.` : 'No firm history uploaded yet — upload past schedules with actual dates to benchmark durations.' },
+    benchmark: { rows, basis: history ? `${history.projectCount} of your firm's past schedules (${history.similarCount} same type). Private to your firm.` : firmHistory ? 'Firm history not used: the team chose not to use it for this plan in the interview.' : 'No firm history uploaded yet — upload past schedules with actual dates to benchmark durations.' },
     forecast,
     coverage,
     review: { status: reviewStatus, latest, reviewedVersion: latest?.at },
@@ -229,7 +307,10 @@ function riskForecast(s: GeneratedSchedule, history: FirmHistory | null, answers
     defaultCalendarId: s.defaultCalendarId,
   }).projectFinish
 
+  const committed = committedActivities(answers, questionBank({ answers }))
   const permitHigh = (a: GeneratedSchedule['activities'][number], p: 'p50' | 'p80') => {
+    // The scheduler's inputs (duration overrides, expected issuance / committed delivery dates) are not inflated.
+    if (hasDurationOverride(a) || committed.has(a.id)) return 1
     // Catalog-based uncertainty for agency reviews and fabrication (no firm history needed).
     if (a.category.startsWith('permit') && a.calendarId === 'cal-7d') return p === 'p80' ? 1.35 : 1.1
     if (a.category === 'procurement' && a.calendarId === 'cal-7d') return p === 'p80' ? 1.3 : 1.05
@@ -249,10 +330,75 @@ function riskForecast(s: GeneratedSchedule, history: FirmHistory | null, answers
     basis = `Rule-based scenario (not a Monte Carlo simulation): firm actual-vs-planned ratios (median ×${history.overallOverrunMedian.toFixed(2)}, P80 ×${(history.overallOverrunP80 ?? history.overallOverrunMedian).toFixed(2)}) plus catalog review/lead-time ranges.`
   } else {
     p50 = scenario(a => permitHigh(a, 'p50'))
-    p80 = scenario(a => permitHigh(a, 'p80') * (a.calendarId === 'cal-7d' ? 1 : 1.1))
-    basis = 'Rule-based scenario (not a Monte Carlo simulation). No firm history yet: catalog high-end review and lead times, plus 10% on field work for P80.'
+    p80 = scenario(a => permitHigh(a, 'p80') * (a.calendarId === 'cal-7d' || hasDurationOverride(a) ? 1 : 1.1))
+    basis = `Rule-based scenario (not a Monte Carlo simulation). ${historyOptedOut(answers) ? 'Firm history not used (opted out in the interview)' : 'No firm history yet'}: catalog high-end review and lead times, plus 10% on field work for P80.`
   }
-  return { deterministic, p50, p80, basis, requiredFinish: required, p80MeetsRequired: required ? p80 <= required : undefined }
+  return { method: 'rule_based', label: RULE_BASED_LABEL, deterministic, p50, p80, basis, requiredFinish: required, p80MeetsRequired: required ? p80 <= required : undefined }
+}
+
+/* ─── The one forecast the product shows ── */
+
+export const RULE_BASED_LABEL = 'Rule-based estimate'
+export const MONTE_CARLO_LABEL = 'Monte Carlo'
+
+/**
+ * The single P50/P80 forecast shown in the plan header, the Basis of Schedule and the PDF.
+ * Monte Carlo when a simulation result is available; otherwise the rule-based estimate, labeled as such.
+ * The two are never shown side by side as competing forecasts.
+ */
+export interface HeadlineForecast {
+  method: 'monte_carlo' | 'rule_based'
+  /** Short label for the method, e.g. "Monte Carlo" or "Rule-based estimate" */
+  label: string
+  deterministic: string
+  p50: string
+  p80: string
+  /** Monte Carlo only */
+  p90?: string
+  basis: string
+  requiredFinish?: string
+  p80MeetsRequired?: boolean
+  /** Monte Carlo only: share of simulated finishes on or before the required date */
+  probabilityOfRequired?: number
+}
+
+export function headlineForecast(
+  forecast: Evaluation['forecast'] | null | undefined,
+  sra?: Pick<SraResult, 'method' | 'deterministic' | 'percentiles' | 'required'> | null,
+): HeadlineForecast | null {
+  if (sra) {
+    const requiredFinish = sra.required?.date ?? forecast?.requiredFinish
+    return {
+      method: 'monte_carlo', label: MONTE_CARLO_LABEL,
+      deterministic: forecast?.deterministic ?? sra.deterministic,
+      p50: sra.percentiles.p50, p80: sra.percentiles.p80, p90: sra.percentiles.p90,
+      basis: sra.method,
+      requiredFinish,
+      p80MeetsRequired: requiredFinish ? sra.percentiles.p80 <= requiredFinish : undefined,
+      probabilityOfRequired: sra.required?.probability,
+    }
+  }
+  if (!forecast) return null
+  return {
+    method: 'rule_based', label: RULE_BASED_LABEL, deterministic: forecast.deterministic, p50: forecast.p50, p80: forecast.p80,
+    basis: forecast.basis, requiredFinish: forecast.requiredFinish, p80MeetsRequired: forecast.p80MeetsRequired,
+  }
+}
+
+/** The finding raised when the forecast P80 misses the required finish (null when it doesn't). */
+export function forecastFinding(f: HeadlineForecast | null): string | null {
+  if (!f?.requiredFinish || f.p80MeetsRequired !== false) return null
+  return `At the P80 level (${f.method === 'monte_carlo' ? MONTE_CARLO_LABEL : 'rule-based estimate'}) the project finishes ${f.p80}, after the required ${f.requiredFinish}.`
+}
+
+/** Evaluation findings with the forecast finding stated from the headline forecast (Monte Carlo when available). */
+export function findingsFor(ev: Evaluation, sra?: Pick<SraResult, 'method' | 'deterministic' | 'percentiles' | 'required'> | null): string[] {
+  if (!sra) return ev.findings
+  const ruleBased = forecastFinding(headlineForecast(ev.forecast))
+  const out = ev.findings.filter(f => f !== ruleBased)
+  const mc = forecastFinding(headlineForecast(ev.forecast, sra))
+  if (mc) out.push(mc)
+  return out
 }
 
 /* ─── Backtest against the firm's completed projects ── */

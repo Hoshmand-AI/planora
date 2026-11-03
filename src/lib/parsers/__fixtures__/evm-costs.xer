@@ -1,0 +1,46 @@
+ERMHDR	19.12	2026-03-16	Project	admin	admin	dbxDatabaseNoName	Project Management	USD
+%T	CURRTYPE
+%F	curr_id	decimal_digit_cnt	curr_symbol	decimal_symbol	curr_type	curr_short_name	base_exch_rate
+%R	1	2	$	.	US Dollar	USD	1
+%T	CALENDAR
+%F	clndr_id	default_flag	clndr_name	proj_id	base_clndr_id	last_chng_date	clndr_type	day_hr_cnt	week_hr_cnt	month_hr_cnt	year_hr_cnt	rsrc_private	clndr_data
+%R	100	Y	5 Day x 8h (US Holidays)				CA_Base	8	40	172	2000	N	(0||CalendarData()(  (0||DaysOfWeek()(    (0||1()())    (0||2()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||3()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||4()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||5()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||6()(      (0||0(s|08:00|f|12:00)())      (0||1(s|13:00|f|17:00)())))    (0||7()())))  (0||VIEW(ShowTotal|Y)())  (0||Exceptions()(    (0||0(d|46206)())    (0||1(d|46459)(      (0||0(s|08:00|f|12:00)())))    (0||2(d|46102)())))))
+%T	PROJECT
+%F	proj_id	proj_short_name	clndr_id	plan_start_date	plan_end_date	scd_end_date	last_recalc_date	orig_proj_id	sum_base_proj_id	ev_compute_type
+%R	1	EVM-1	100	2026-03-02 00:00		2026-04-03 17:00	2026-03-16 00:00		2	EC_Cmp_pct
+%R	2	EVM-1 BL	100	2026-03-02 00:00		2026-04-03 17:00	2026-03-02 00:00	1		
+%T	PROJWBS
+%F	wbs_id	proj_id	proj_node_flag	wbs_short_name	wbs_name	parent_wbs_id
+%R	10	1	Y	EVM	EVM project	
+%R	11	1	N	SITE	Sitework	10
+%R	12	1	N	BLDG	Building	10
+%R	20	2	Y	EVM	EVM project	
+%R	21	2	N	SITE	Sitework	20
+%R	22	2	N	BLDG	Building	20
+%T	TASK
+%F	task_id	proj_id	wbs_id	clndr_id	phys_complete_pct	complete_pct_type	task_type	status_code	task_code	task_name	total_float_hr_cnt	free_float_hr_cnt	remain_drtn_hr_cnt	target_drtn_hr_cnt	act_work_qty	remain_work_qty	act_start_date	act_end_date	early_start_date	early_end_date	target_start_date	target_end_date
+%R	101	1	11	100	50	CP_Drtn	TT_Task	TK_Complete	A1000	Site prep			0	80			2026-03-02 08:00	2026-03-13 17:00			2026-03-02 08:00	2026-03-13 17:00
+%R	102	1	11	100	30	CP_Phys	TT_Task	TK_Active	A1010	Foundations	0	0	56	80			2026-03-09 08:00		2026-03-16 08:00	2026-03-24 17:00	2026-03-09 08:00	2026-03-20 17:00
+%R	103	1	12	100	0	CP_Units	TT_Task	TK_NotStart	A1020	Structure	0	0	80	80	0	240			2026-03-25 08:00	2026-04-07 17:00	2026-03-23 08:00	2026-04-03 17:00
+%R	201	2	21	100	0	CP_Drtn	TT_Task	TK_NotStart	A1000	Site prep			80	80					2026-03-02 08:00	2026-03-13 17:00	2026-03-02 08:00	2026-03-13 17:00
+%R	202	2	21	100	0	CP_Phys	TT_Task	TK_NotStart	A1010	Foundations			80	80					2026-03-09 08:00	2026-03-20 17:00	2026-03-09 08:00	2026-03-20 17:00
+%R	203	2	22	100	0	CP_Units	TT_Task	TK_NotStart	A1020	Structure			80	80	0	240			2026-03-23 08:00	2026-04-03 17:00	2026-03-23 08:00	2026-04-03 17:00
+%T	TASKPRED
+%F	task_pred_id	task_id	pred_task_id	proj_id	pred_proj_id	pred_type	lag_hr_cnt
+%R	1	102	101	1	1	PR_SS	40
+%R	2	103	102	1	1	PR_FS	0
+%R	3	202	201	2	2	PR_SS	40
+%R	4	203	202	2	2	PR_FS	0
+%T	TASKRSRC
+%F	taskrsrc_id	task_id	proj_id	rsrc_id	target_cost	act_reg_cost	act_ot_cost	remain_cost	target_qty
+%R	1	101	1	7	10000	11000	1000	0	80
+%R	2	102	1	7	15000	4000	0	11000	80
+%R	3	103	1	8	32000	0	0	32000	240
+%R	4	201	2	7	10000	0	0	10000	80
+%R	5	202	2	7	15000	0	0	15000	80
+%R	6	203	2	8	30000	0	0	30000	240
+%T	PROJCOST
+%F	cost_item_id	task_id	proj_id	cost_name	target_cost	act_cost	remain_cost
+%R	1	102	1	Rebar supply	5000	1000	4000
+%R	2	202	2	Rebar supply	5000	0	5000
+%E

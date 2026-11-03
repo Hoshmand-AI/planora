@@ -16,6 +16,8 @@ export async function runRetention(): Promise<{ housekeeping: Record<string, num
   const housekeeping: Record<string, number> = {}
   housekeeping.rateLimits = (await query(`DELETE FROM rate_limits WHERE window_start < NOW() - INTERVAL '2 days'`)).rowCount ?? 0
   housekeeping.sessions = (await query(`DELETE FROM sessions WHERE (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '30 days') OR expires_at < NOW() - INTERVAL '30 days'`)).rowCount ?? 0
+  // Retrieval log (ids and query hashes only): kept 400 days for investigations, then purged.
+  housekeeping.retrievalLog = (await query(`DELETE FROM retrieval_log WHERE created_at < NOW() - INTERVAL '400 days'`)).rowCount ?? 0
   housekeeping.invitations = (await query(`DELETE FROM invitations WHERE (accepted_at IS NULL) AND (expires_at < NOW() - INTERVAL '30 days' OR revoked_at < NOW() - INTERVAL '30 days')`)).rowCount ?? 0
 
   const orgs: PurgeSummary[] = []

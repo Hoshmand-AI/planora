@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end smoke test against a running Planora server.
+// End-to-end smoke test against a running RunF9 server.
 //   BASE_URL=http://localhost:3200 node scripts/e2e-smoke.mjs
 // Exercises: two competing firms (tenant isolation), multi-format upload, data questions,
 // firm history + backtest, the interview → generate → override → review → export → publish flow,
@@ -9,6 +9,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
+// as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
+if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  process.exit(1)
+}
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'src', 'lib', 'parsers', '__fixtures__')
 let passed = 0
 
@@ -162,6 +168,12 @@ async function main() {
   ok(r.data.elicitation.assumptions.some(a => a.kind === 'withheld'), `Withheld/unknown answers recorded as ${r.data.elicitation.assumptions.length} explicit assumptions`)
 
   /* ── AI follow-ups from the on-prem model (withheld answers never sent) ── */
+  r = await A.get('/api/org')
+  ok(r.data.settings?.aiEnabled === false, 'AI is off by default for a new organization (opt-in)')
+  r = await A.post(`/api/plans/${planId}/suggest`)
+  ok(r.status === 400 && /turned off/i.test(r.data.error), 'Nothing is sent to a model until an admin turns AI on')
+  r = await A.post('/api/org', { action: 'update_settings', settings: { aiEnabled: true } })
+  ok(r.status === 200 && r.data.settings.aiEnabled === true, 'Admin opts the organization in to AI features')
   r = await A.post(`/api/plans/${planId}/suggest`)
   if (r.status === 200) {
     ok(r.data.added > 0, `On-prem model added ${r.data.added} follow-up questions`)
@@ -214,7 +226,10 @@ async function main() {
   x = await A.req('GET', `/api/plans/${planId}/export?format=xml`, undefined, true)
   ok(x.status === 200 && /<Project xmlns="http:\/\/schemas.microsoft.com\/project"/.test(x.text), 'MS Project XML export')
   const xml = x.text
-  const xmlCount = g.activities.length
+  // The export nests activities under WBS summary tasks (one per phase / work package); the importer
+  // keeps those as summary rows, so they count too. UID 0 is the project summary, which it skips.
+  const xmlSummaries = (xml.match(/<Summary>1<\/Summary>/g) || []).length - 1
+  const xmlCount = g.activities.length + xmlSummaries
   x = await A.req('GET', `/api/plans/${planId}/export?format=csv`, undefined, true)
   ok(x.status === 200 && /Activity ID/.test(x.text), 'CSV export')
 

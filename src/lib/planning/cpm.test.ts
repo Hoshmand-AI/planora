@@ -81,7 +81,7 @@ describe('runCpm: relationship types and lags', () => {
 })
 
 describe('runCpm: multi-calendar', () => {
-  it('uses each activity calendar; lags on the successor calendar', () => {
+  it('uses each activity calendar; lags on the predecessor calendar (P6 default)', () => {
     const r = runCpm(
       input(
         [act('A', 5), act('B', 2, { calendarId: '7d' }), act('C', 1), act('D', 1, { calendarId: '7d' }), act('E', 1)],
@@ -90,7 +90,8 @@ describe('runCpm: multi-calendar', () => {
     )
     expect(r.times.B).toMatchObject({ earlyStart: '2026-03-07', earlyFinish: '2026-03-08' })
     expect(r.times.C.earlyStart).toBe('2026-03-09')
-    expect(r.times.D.earlyStart).toBe('2026-03-09') // Sat+Sun are the 2 lag days on 7d
+    // A is on the 5-day calendar, so the 2 lag days are Mon+Tue even though D works weekends
+    expect(r.times.D.earlyStart).toBe('2026-03-11')
     expect(r.times.E.earlyStart).toBe('2026-03-11') // Mon+Tue lag days on 5d
   })
   it('float on a 7-day calendar counts weekend days', () => {
@@ -259,5 +260,224 @@ describe('constrained milestones', () => {
     ))
     expect(r.times.D.earlyStart).toBe('2026-11-02')
     expect(r.times.I.earlyStart).toBe('2026-11-03')
+  })
+})
+
+describe('runCpm: P6 constraint semantics (pilot findings)', () => {
+  // A (10d, Mon 03/02-Fri 03/13) -> M finish milestone
+  it('Finish On keeps logic in charge and shows the slip as negative float', () => {
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'FO', date: '2026-03-11' } })], [fs('A', 'M')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-13') // logic wins over the Finish On date
+    expect(r.times.M.totalFloat).toBe(-2)
+    expect(r.times.A.totalFloat).toBe(-2)
+    expect(r.violations).toEqual([])
+  })
+  it('Start On keeps logic in charge for a task', () => {
+    const r = runCpm(input([act('A', 10), act('B', 2, { constraint: { type: 'SO', date: '2026-03-12' } })], [fs('A', 'B')]))
+    expect(r.times.B.earlyStart).toBe('2026-03-16')
+    expect(r.times.B.totalFloat).toBe(-2)
+  })
+  it('a mandatory finish overrules logic: float 0 on itself, the overrun as negative float on predecessors, reported', () => {
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-11' } })], [fs('A', 'M')]))
+    expect(r.times.M).toMatchObject({ earlyFinish: '2026-03-11', lateFinish: '2026-03-11', totalFloat: 0 })
+    expect(r.times.A.totalFloat).toBe(-2)
+    expect(r.violations).toEqual([{ id: 'M', type: 'MFO', constraintDate: '2026-03-11', logicDate: '2026-03-13', days: 2, logicStart: '2026-03-13', logicFinish: '2026-03-13' }])
+    expect(r.logicFinish).toBe('2026-03-13')
+    expect(r.logicLongestPath).toEqual(['A', 'M'])
+    // A (finishing 03/13) is the scheduled finish; M's date comes from its constraint, not from A
+    expect(r.longestPath).toEqual(['A'])
+  })
+})
+
+describe('runCpm: out-of-sequence progress', () => {
+  // A (10d) is half done; B started early (out of sequence) with 3d remaining. Data date Mon 03/09.
+  const acts = [
+    act('A', 10, { actualStart: '2026-03-02', remaining: 5 }),
+    act('B', 6, { actualStart: '2026-03-04', remaining: 3 }),
+    act('C', 1),
+  ]
+  const links = [fs('A', 'B'), fs('B', 'C')]
+  it('retained logic (default) resumes the out-of-sequence work after its predecessor', () => {
+    const r = runCpm(input(acts, links, { dataDate: '2026-03-09' }))
+    expect(r.progressMode).toBe('retained')
+    expect(r.times.A.earlyFinish).toBe('2026-03-13')
+    expect(r.times.B.earlyFinish).toBe('2026-03-18')
+    expect(r.times.C.earlyFinish).toBe('2026-03-19')
+    expect(r.longestPath).toEqual(['A', 'B', 'C'])
+  })
+  it('progress override continues the remaining work from the data date', () => {
+    const r = runCpm(input(acts, links, { dataDate: '2026-03-09', progressMode: 'override' }))
+    expect(r.times.B.earlyFinish).toBe('2026-03-11')
+    expect(r.times.C.earlyFinish).toBe('2026-03-12')
+  })
+})
+
+describe('runCpm: longest path with a later required finish', () => {
+  it('finds the driving path even when no activity has zero float', () => {
+    const r = runCpm(input([act('A', 5), act('B', 3), act('C', 1)], [fs('A', 'B'), fs('A', 'C')], { mustFinishBy: '2026-04-30' }))
+    expect(r.criticalPath).toEqual([])
+    expect(r.longestPath).toEqual(['A', 'B'])
+  })
+})
+
+describe('runCpm: P6 parity (scheduler pilot, round 2)', () => {
+  // A: 5d Mon 03/02 - Fri 03/06
+  it('a start milestone after a predecessor is at the start of the next work day; its FS successor starts the same day', () => {
+    const r = runCpm(input([act('A', 5), act('M', 0, { milestoneKind: 'start' }), act('B', 2)], [fs('A', 'M'), fs('M', 'B')]))
+    expect(r.times.M).toMatchObject({ earlyStart: '2026-03-09', earlyFinish: '2026-03-09', totalFloat: 0 })
+    expect(r.times.B.earlyStart).toBe('2026-03-09')
+    expect(r.longestPath).toEqual(['A', 'M', 'B'])
+  })
+  it('a start milestone with Start On or After and predecessors does not push its FS successor a day', () => {
+    const r = runCpm(input(
+      [act('A', 2), act('M', 0, { milestoneKind: 'start', constraint: { type: 'SNET', date: '2026-03-10' } }), act('B', 2)],
+      [fs('A', 'M'), fs('M', 'B')],
+    ))
+    expect(r.times.M.earlyStart).toBe('2026-03-10')
+    expect(r.times.B.earlyStart).toBe('2026-03-10')
+  })
+  it('a finish milestone keeps finish semantics (successor starts the next work day)', () => {
+    const r = runCpm(input([act('A', 5), act('M', 0, { milestoneKind: 'finish' }), act('B', 2)], [fs('A', 'M'), fs('M', 'B')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-06')
+    expect(r.times.B.earlyStart).toBe('2026-03-09')
+  })
+  it('a finish milestone without predecessors (TT_FinMile) with SNET pushes its successor to the next day', () => {
+    const r = runCpm(input([act('M', 0, { milestoneKind: 'finish', constraint: { type: 'SNET', date: '2026-03-10' } }), act('B', 2)], [fs('M', 'B')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-10')
+    expect(r.times.B.earlyStart).toBe('2026-03-11')
+  })
+
+  it('counts relationship lag on the predecessor calendar', () => {
+    // P (7-day) finishes Sat 03/07; its 2 lag days are Sun 03/08 and Mon 03/09
+    const r = runCpm(input([act('P', 6, { calendarId: '7d' }), act('S', 1)], [fs('P', 'S', 2)]))
+    expect(r.times.P.earlyFinish).toBe('2026-03-07')
+    expect(r.times.S.earlyStart).toBe('2026-03-10')
+    // the backward pass uses the same calendar: P is critical, with no float
+    expect(r.times.P.totalFloat).toBe(0)
+    expect(r.times.P.freeFloat).toBe(0)
+  })
+
+  it('a past-dated mandatory finish measures negative float from the constraint date, not the data date', () => {
+    const r = runCpm(input(
+      [act('A', 2), act('B', 3, { constraint: { type: 'MFO', date: '2026-03-04' } })],
+      [fs('A', 'B')],
+      { dataDate: '2026-03-09' },
+    ))
+    expect(r.times.A).toMatchObject({ earlyStart: '2026-03-09', earlyFinish: '2026-03-10' })
+    expect(r.times.B).toMatchObject({ earlyStart: '2026-03-09', earlyFinish: '2026-03-11', lateStart: '2026-03-02', lateFinish: '2026-03-04' })
+    expect(r.times.B.totalFloat).toBe(-5) // finishes 03/11, 5 work days after 03/04
+    expect(r.times.A.totalFloat).toBeLessThan(r.times.B.totalFloat)
+    expect(r.warnings.join(' ')).toMatch(/before the data date/)
+  })
+
+  it('free float never exceeds total float', () => {
+    // B finishes 03/13 but the required finish is 03/11: A (no successors) has 3 days of total float
+    const r = runCpm(input([act('A', 5), act('B', 10)], [], { mustFinishBy: '2026-03-11' }))
+    expect(r.times.A.totalFloat).toBe(3)
+    expect(r.times.A.freeFloat).toBe(3)
+    // a successor with negative float (SNLT) caps its predecessor's free float at 0
+    const r2 = runCpm(input([act('A', 2), act('B', 2, { constraint: { type: 'SNLT', date: '2026-03-03' } }), act('C', 10)], [fs('A', 'B')]))
+    expect(r2.times.A.totalFloat).toBeLessThan(0)
+    expect(r2.times.A.freeFloat).toBe(0)
+  })
+
+  it('a Mandatory Start on a Saturday stays on Saturday on a 7-day calendar', () => {
+    const r = runCpm(input(
+      [act('A', 3), act('B', 2, { calendarId: '7d', constraint: { type: 'MSO', date: '2026-03-07' } }),
+        act('S', 0, { calendarId: '7d', milestoneKind: 'start', constraint: { type: 'MSO', date: '2026-03-07' } }),
+        act('F', 0, { calendarId: '7d', milestoneKind: 'finish', constraint: { type: 'MSO', date: '2026-03-07' } })],
+      [fs('A', 'B'), fs('A', 'S'), fs('A', 'F')],
+    ))
+    for (const id of ['B', 'S', 'F']) {
+      expect(r.times[id]).toMatchObject({ earlyStart: '2026-03-07', lateStart: '2026-03-07', totalFloat: 0 })
+    }
+  })
+
+  it('a Mandatory Start that drives the finish ends the longest path, and is reported', () => {
+    // A -> B (MSO 03/16, later than logic) -> C; D (8d) alone would be the logic-driven finish
+    const r = runCpm(input(
+      [act('A', 3), act('B', 2, { constraint: { type: 'MSO', date: '2026-03-16' } }), act('C', 2), act('D', 8)],
+      [fs('A', 'B'), fs('B', 'C')],
+    ))
+    expect(r.projectFinish).toBe('2026-03-19')
+    expect(r.longestPath).toEqual(['B', 'C'])
+    expect(r.longestPathConstraint).toEqual({ id: 'B', type: 'MSO', date: '2026-03-16' })
+    expect(r.logicFinish).toBe('2026-03-11')
+    expect(r.logicLongestPath).toEqual(['D'])
+    expect(r.times.A.totalFloat).toBeGreaterThan(0)
+  })
+
+  it('date and float invariants hold on a large mixed network', () => {
+    let seed = 7
+    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+    const acts: CpmActivity[] = []
+    const types = ['SNET', 'SNLT', 'FNET', 'FNLT', 'SO', 'FO', 'MSO', 'MFO'] as const
+    for (let i = 0; i < 400; i++) {
+      const ms = rand() < 0.1
+      const extra: Partial<CpmActivity> = { calendarId: i % 3 === 0 ? '7d' : undefined }
+      if (ms) extra.milestoneKind = rand() < 0.5 ? 'start' : 'finish'
+      if (rand() < 0.08) extra.constraint = { type: types[Math.floor(rand() * types.length)], date: `2026-0${3 + Math.floor(rand() * 4)}-1${Math.floor(rand() * 9)}` }
+      acts.push(act(`A${i}`, ms ? 0 : 1 + Math.floor(rand() * 15), extra))
+    }
+    const links: CpmLink[] = []
+    const lt = ['FS', 'SS', 'FF', 'SF'] as const
+    for (let i = 0; i < 800; i++) {
+      const to = 1 + Math.floor(rand() * 399)
+      const from = Math.max(0, to - 1 - Math.floor(rand() * 20))
+      links.push({ from: `A${from}`, to: `A${to}`, type: lt[Math.floor(rand() * 4)], lag: Math.floor(rand() * 4) - 1 })
+    }
+    for (const mustFinishBy of [undefined, '2026-05-01']) {
+      const r = runCpm(input(acts, links, { mustFinishBy }))
+      for (const a of acts) {
+        const t = r.times[a.id]
+        expect(t.freeFloat).toBeLessThanOrEqual(Math.max(0, t.totalFloat))
+        if (t.totalFloat >= 0) {
+          expect(t.lateStart >= t.earlyStart, `${a.id} LS ${t.lateStart} < ES ${t.earlyStart} with TF ${t.totalFloat}`).toBe(true)
+          expect(t.lateFinish >= t.earlyFinish, `${a.id} LF < EF with TF ${t.totalFloat}`).toBe(true)
+        }
+      }
+    }
+  })
+})
+
+describe('runCpm: round-3 mandatory-constraint handling', () => {
+  it('a violation is measured from the predecessor-driven date to the constraint date, not from the data date', () => {
+    // A in progress (5d left from the data date Mon 03/09) -> M (MFO Wed 03/04, before the data date)
+    const r = runCpm(input(
+      [act('A', 10, { actualStart: '2026-03-02', remaining: 5 }), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } })],
+      [fs('A', 'M')], { dataDate: '2026-03-09' },
+    ))
+    // logic date = A's finish Fri 03/13; hidden = Thu 03/05 .. Fri 03/13 = 7 work days (not 5 from the data date)
+    expect(r.violations).toEqual([expect.objectContaining({ id: 'M', logicDate: '2026-03-13', days: 7 })])
+  })
+  it('a mandatory constraint before the data date with no predecessors is not a logic violation', () => {
+    const r = runCpm(input([act('M', 0, { constraint: { type: 'MFO', date: '2026-03-04' } }), act('B', 3)], [fs('M', 'B')], { dataDate: '2026-03-09' }))
+    expect(r.violations).toEqual([])
+  })
+  it('exposes logic-driven dates for the overruled activity and every successor', () => {
+    // A (10d, to Fri 03/13) -> M (MFO Wed 03/11) -> B (2d) -> FC
+    const r = runCpm(input([act('A', 10), act('M', 0, { constraint: { type: 'MFO', date: '2026-03-11' } }), act('B', 2), act('FC', 0)], [fs('A', 'M'), fs('M', 'B'), fs('B', 'FC')]))
+    expect(r.times.B.earlyFinish).toBe('2026-03-13')
+    expect(r.times.FC.earlyFinish).toBe('2026-03-13')
+    expect(r.logicTimes).toEqual({
+      M: { earlyStart: '2026-03-13', earlyFinish: '2026-03-13' },
+      B: { earlyStart: '2026-03-16', earlyFinish: '2026-03-17' },
+      FC: { earlyStart: '2026-03-17', earlyFinish: '2026-03-17' },
+    })
+    // the driving path to present is the logic path, through the flagged MFO
+    expect(r.drivingTrace).toEqual({ basis: 'logic', path: ['A', 'M', 'B', 'FC'], constraints: [{ id: 'M', type: 'MFO', date: '2026-03-11', effect: 'earlier' }] })
+  })
+  it('a Finish On that holds the finish milestone later than logic: the trace runs back through it', () => {
+    const r = runCpm(input([act('A', 5), act('B', 5), act('F', 0, { constraint: { type: 'FO', date: '2026-04-30' } })], [fs('A', 'B'), fs('B', 'F')]))
+    expect(r.longestPath).toEqual(['F']) // P6: the constraint, not logic, sets F
+    expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'F'], constraints: [{ id: 'F', type: 'FO', date: '2026-04-30', effect: 'later' }] })
+  })
+  it('a Mandatory Start that drives the finish: the trace continues through it to its logic predecessors', () => {
+    const r = runCpm(input(
+      [act('A', 3), act('B', 2, { constraint: { type: 'MSO', date: '2026-03-16' } }), act('C', 2), act('D', 8)],
+      [fs('A', 'B'), fs('B', 'C')],
+    ))
+    expect(r.longestPath).toEqual(['B', 'C'])
+    expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'C'], constraints: [{ id: 'B', type: 'MSO', date: '2026-03-16', effect: 'later' }] })
   })
 })

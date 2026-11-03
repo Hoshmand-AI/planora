@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { randomUUID as uuid } from 'crypto'
 import { savePlan, type ExpertReview } from '@/lib/db'
+import { scheduleFingerprint, type FingerprintedReview } from '@/lib/server/approval'
 import { loadPlanContext, planView } from '../context'
 
 const VERDICTS: ExpertReview['verdict'][] = ['approve', 'approve_with_comments', 'reject']
@@ -18,9 +19,11 @@ export const POST = api<{ id: string }>({ permission: 'plan.review' }, async (re
   }
   const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 4000) : ''
   if (body.verdict !== 'approve' && !comment) return NextResponse.json({ error: 'Add a comment explaining what should change.' }, { status: 400 })
-  const review: ExpertReview = {
+  const review: FingerprintedReview = {
     id: uuid(), reviewer: typeof body.reviewer === 'string' && body.reviewer.trim() ? `${body.reviewer.trim().slice(0, 120)} (entered by ${ctx.name})` : ctx.name,
     verdict: body.verdict, comment, at: new Date().toISOString(), reviewerUserId: ctx.userId, generatedAt: plan.generated.generatedAt,
+    // Binds the review to the exact schedule content reviewed (see src/lib/server/approval.ts).
+    scheduleFingerprint: scheduleFingerprint(plan.generated) ?? undefined,
     activityNotes: body.activityNotes && typeof body.activityNotes === 'object' ? body.activityNotes : undefined,
   }
   plan.reviews = [...plan.reviews, review]

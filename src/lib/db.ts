@@ -1,9 +1,23 @@
 import { Pool } from 'pg'
 import { MIGRATIONS, LATEST_MIGRATION, checksum } from './migrations'
 import type { Answer, GeneratedSchedule, Question, WorkCalendar } from '@/lib/planning/types'
+import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import type { BaselineMeta } from '@/lib/analysis/baseline'
+import { asExceptionReport, type ExceptionReport } from '@/lib/parsers/exceptions'
+import type { ScheduleEdit, ScheduleEditChange } from '@/lib/planning/uploaded-edits'
+import type { SraCommitment, SraRange, SraRiskEvent } from '@/lib/planning/sra'
+import { selectHistorySchedules, type HistorySelection } from '@/lib/planning/history-selection'
+import type { FindingDisposition, ReviewState, SubmissionDisposition } from '@/lib/analysis/review'
+import { currentWorkspaceAccess, workspaceClause } from '@/lib/server/workspace-scope'
+import { upgradeLegacyData } from './legacy-data'
 
 // Tenancy: every firm is an organization. All schedule, plan, and history data is keyed by org_id,
 // and every read of firm data filters on org_id — there is no query path that reads across orgs.
+//
+// Workspaces (ethical walls): inside an organization, every schedule and plan read below also applies
+// the caller's workspace access (src/lib/server/workspace-scope.ts) through workspaceScope(). This is
+// the single enforcement point: routes, services and exports all read through these functions, so a
+// restricted member gets "not found" for another workspace's schedule or plan on every endpoint.
 
 /**
  * TLS for remote databases always verifies the server certificate and host name (verify-full).
@@ -38,8 +52,23 @@ const pool = new Pool({
   max: Number(process.env.PG_POOL_MAX) || 10,
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
+  keepAlive: true,
 })
-export const query = (text: string, params?: unknown[]) => pool.query(text, params)
+// An idle pooled connection can be closed by the server (e.g. Neon suspending compute after inactivity).
+// Without a listener that error would crash the process; the pool already discards the dead client.
+if (typeof pool.on === 'function') pool.on('error', err => console.warn(JSON.stringify({ level: 'warn', msg: 'idle database connection closed', error: err.message })))
+
+const STALE_CONNECTION = /Connection terminated unexpectedly|ECONNRESET|Client has encountered a connection error/i
+
+/** Runs a query; a read that hits a connection the server already closed is retried once on a fresh one. */
+export async function query(text: string, params?: unknown[]) {
+  try {
+    return await pool.query(text, params)
+  } catch (err) {
+    if (/^\s*SELECT\b/i.test(text) && STALE_CONNECTION.test((err as Error).message)) return pool.query(text, params)
+    throw err
+  }
+}
 
 let schemaReady: Promise<void> | null = null
 
@@ -111,6 +140,15 @@ export async function withTransaction<T>(fn: (q: (text: string, params?: unknown
 
 export async function closePool() { await pool.end() }
 
+/**
+ * " AND <condition>" limiting `column` to the current caller's visible workspaces (empty when the
+ * caller sees everything), plus its parameters numbered from `firstParam`.
+ */
+async function workspaceScope(column: string, firstParam: number): Promise<{ and: string; params: unknown[] }> {
+  const c = workspaceClause(await currentWorkspaceAccess(), column, firstParam)
+  return { and: c.sql ? ` AND ${c.sql}` : '', params: c.params }
+}
+
 /* ─── Organizations & users ─────────────────────────── */
 
 export interface User {
@@ -129,6 +167,11 @@ export interface User {
   mfaEnabledAt: string | null
   mfaLastStep: number | null
   mfaRecovery: string[]
+  emailVerifiedAt: string | null
+  /** Private beta: when the account got access (null = none), when it was revoked, and how it got it */
+  betaAccessAt: string | null
+  betaRevokedAt: string | null
+  betaAccessVia: string | null
 }
 
 function rowToUser(row: Record<string, unknown>): User {
@@ -139,6 +182,8 @@ function rowToUser(row: Record<string, unknown>): User {
     role: (row.role as string) || 'viewer', disabledAt: ts(row.disabled_at), failedLogins: Number(row.failed_logins || 0), lockedUntil: ts(row.locked_until),
     mfaSecret: (row.mfa_secret as string) || null, mfaEnabledAt: ts(row.mfa_enabled_at),
     mfaLastStep: row.mfa_last_step != null ? Number(row.mfa_last_step) : null, mfaRecovery: (row.mfa_recovery as string[]) || [],
+    emailVerifiedAt: ts(row.email_verified_at),
+    betaAccessAt: ts(row.beta_access_at), betaRevokedAt: ts(row.beta_revoked_at), betaAccessVia: (row.beta_access_via as string) || null,
   }
 }
 
@@ -155,7 +200,12 @@ export async function getUserById(id: string): Promise<User | undefined> {
 }
 
 /** Creates the user and, unless joining an existing org (invitation), a new private organization for their firm. */
-export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'passwordHash' | 'plan' | 'createdAt'> & { orgId?: string; orgName?: string; role?: string }): Promise<User> {
+/**
+ * Creates an account (and, without orgId, a new organization it owns). `betaAccess` records how the
+ * account got private-beta access (see signup-policy.ts); without it the account can't sign in
+ * while the instance is invite-only.
+ */
+export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'passwordHash' | 'plan' | 'createdAt'> & { orgId?: string; orgName?: string; role?: string; betaAccess?: string }): Promise<User> {
   await initSchema()
   const orgId = user.orgId || `org_${user.id}`
   const role = user.orgId ? (user.role || 'viewer') : 'owner'
@@ -164,8 +214,9 @@ export async function createUser(user: Pick<User, 'id' | 'email' | 'name' | 'pas
       const { defaultPlan } = await import('@/lib/server/entitlements')
       await q('INSERT INTO organizations (id, name, plan) VALUES ($1,$2,$3) ON CONFLICT (id) DO NOTHING', [orgId, user.orgName || user.name, defaultPlan()])
     }
-    const res = await q('INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
-      [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId, role])
+    const res = await q(`INSERT INTO users (id, email, name, password_hash, plan, created_at, org_id, role, password_changed_at, beta_access_at, beta_access_via)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(), CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END, $9::text) RETURNING *`,
+      [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, orgId, role, user.betaAccess ?? null])
     return rowToUser(res.rows[0])
   })
 }
@@ -198,7 +249,7 @@ export async function updateUser(id: string, updates: Partial<User>): Promise<Us
 
 /* ─── Schedules ─────────────────────────────────────── */
 
-export type SourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
+export type SourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
 
 export interface Schedule {
   id: string; userId: string; orgId: string; name: string; version: string
@@ -208,6 +259,30 @@ export interface Schedule {
   criticalCount: number; percentComplete: number
   calendars: WorkCalendar[]; defaultCalendarId: string | null; warnings: string[]
   planId: string | null; projectType: string | null; region: string | null; grossSqft: number | null
+  /** RunF9's analysis of the schedule (src/lib/analysis/schedule-analysis.ts); null for older uploads until re-read */
+  analysis?: ScheduleAnalysis | null
+  /** Groups uploads of the same project into an update series */
+  projectKey?: string | null
+  /** Whether this schedule's actuals calibrate firm history */
+  inHistory?: boolean
+  /** Contract/finish milestone the scheduler designated (activity id or activity code); null = automatic */
+  finishMilestoneId?: string | null
+  /** Security classification set on this upload (same values as plans); null = not set */
+  classification?: 'unclassified' | 'cui' | 'classified' | null
+  /** The firm's own project or a third-party schedule it reviews; null = not stated */
+  uploadOrigin?: 'own' | 'third_party' | null
+  /** Included in firm history although not as-built (explicit override) */
+  historyOverride?: boolean
+  /** The file is a re-imported RunF9 export */
+  runf9Export?: boolean
+  /** Matter / engagement workspace; null = organization-wide */
+  workspaceId?: string | null
+  /** Earlier upload of the series designated as this upload's baseline; null = the upload labelled Baseline */
+  baselineScheduleId?: string | null
+  /** Embedded P6 baseline and the assessment of the file's own target dates (src/lib/analysis/baseline.ts) */
+  baselineMeta?: BaselineMeta | null
+  /** What the importer saw but did not map, converted or defaulted (src/lib/parsers/exceptions.ts); null for older uploads */
+  importExceptions?: ExceptionReport | null
 }
 
 function rowToSchedule(row: Record<string, unknown>): Schedule {
@@ -220,29 +295,166 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     calendars: (row.calendars as WorkCalendar[]) || [], defaultCalendarId: (row.default_calendar_id as string) || null, warnings: (row.warnings as string[]) || [],
     planId: (row.plan_id as string) || null, projectType: (row.project_type as string) || null, region: (row.region as string) || null,
     grossSqft: row.gross_sqft != null ? Number(row.gross_sqft) : null,
+    analysis: upgradeLegacyData((row.analysis as ScheduleAnalysis) ?? null), projectKey: (row.project_key as string) ?? null,
+    inHistory: row.in_history == null ? true : Boolean(row.in_history),
+    finishMilestoneId: (row.finish_milestone_id as string) ?? null,
+    classification: row.classification === 'cui' || row.classification === 'classified' || row.classification === 'unclassified' ? row.classification : null,
+    uploadOrigin: row.upload_origin === 'own' || row.upload_origin === 'third_party' ? row.upload_origin : null,
+    historyOverride: row.history_override === true,
+    runf9Export: row.planora_export === true,
+    workspaceId: (row.workspace_id as string) ?? null,
+    baselineScheduleId: (row.baseline_schedule_id as string) ?? null,
+    baselineMeta: (row.baseline_meta as BaselineMeta) ?? null,
+    importExceptions: asExceptionReport(row.import_exceptions),
   }
 }
 
+/** The organization's schedules the caller may see (organization and workspace scoped). */
 export async function getSchedules(orgId: string): Promise<Schedule[]> {
   await initSchema()
-  const res = await query('SELECT * FROM schedules WHERE org_id=$1 ORDER BY uploaded_at DESC', [orgId])
+  const ws = await workspaceScope('workspace_id', 2)
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1${ws.and} ORDER BY uploaded_at DESC`, [orgId, ...ws.params])
   return res.rows.map(rowToSchedule)
 }
 
-/** Always scoped to the caller's organization — a schedule id alone never grants access. */
+/** Uploaded (not generated) schedules in the whole organization, for plan limits only — not workspace scoped. */
+export async function countUploadedSchedules(orgId: string): Promise<number> {
+  await initSchema()
+  const res = await query(`SELECT COUNT(*)::int AS n FROM schedules WHERE org_id=$1 AND source_type <> 'generated'`, [orgId])
+  return Number(res.rows[0]?.n ?? 0)
+}
+
+/** Always scoped to the caller's organization and workspaces — a schedule id alone never grants access. */
 export async function getScheduleById(id: string, orgId: string): Promise<Schedule | undefined> {
   await initSchema()
-  const res = await query('SELECT * FROM schedules WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return res.rows[0] ? rowToSchedule(res.rows[0]) : undefined
 }
 
 export async function createSchedule(s: Schedule): Promise<Schedule> {
   await initSchema()
-  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+  await query(`INSERT INTO schedules (id,user_id,org_id,name,version,source_type,file_name,uploaded_at,activity_count,relationship_count,project_start,project_finish,data_date,variance_days,critical_count,percent_complete,calendars,default_calendar_id,warnings,plan_id,project_type,region,gross_sqft,analysis,project_key,in_history,workspace_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
     [s.id, s.userId, s.orgId, s.name, s.version, s.sourceType, s.fileName, s.uploadedAt, s.activityCount, s.relationshipCount, s.projectStart, s.projectFinish, s.dataDate, s.varianceDays, s.criticalCount, s.percentComplete,
-      JSON.stringify(s.calendars), s.defaultCalendarId, JSON.stringify(s.warnings), s.planId, s.projectType, s.region, s.grossSqft])
+      JSON.stringify(s.calendars), s.defaultCalendarId, JSON.stringify(s.warnings), s.planId, s.projectType, s.region, s.grossSqft,
+      s.analysis ? JSON.stringify(s.analysis) : null, s.projectKey ?? null, s.inHistory ?? true, s.workspaceId ?? null])
   return s
+}
+
+/** Store RunF9's analysis (and the numbers lists show) after a recalculation. */
+export async function updateScheduleAnalysis(id: string, orgId: string, a: { analysis: ScheduleAnalysis; projectFinish: string | null; varianceDays: number | null; criticalCount: number }): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET analysis=$3, project_finish=$4, variance_days=$5, critical_count=$6 WHERE id=$1 AND org_id=$2',
+    [id, orgId, JSON.stringify(a.analysis), a.projectFinish, a.varianceDays, a.criticalCount])
+}
+
+/** Designate (or clear, with null) the earlier upload this schedule's variance, BEI and reports measure against. */
+export async function setScheduleBaseline(id: string, orgId: string, baselineScheduleId: string | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET baseline_schedule_id=$3 WHERE id=$1 AND org_id=$2', [id, orgId, baselineScheduleId])
+}
+
+/** Baseline facts captured at import (embedded P6 baseline, file target assessment). */
+export async function setScheduleBaselineMeta(id: string, orgId: string, meta: BaselineMeta | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET baseline_meta=$3 WHERE id=$1 AND org_id=$2', [id, orgId, meta ? JSON.stringify(meta) : null])
+}
+
+/** The import exception report captured when the file was parsed. */
+export async function setScheduleImportExceptions(id: string, orgId: string, report: ExceptionReport | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET import_exceptions=$3 WHERE id=$1 AND org_id=$2', [id, orgId, report ? JSON.stringify(report) : null])
+}
+
+/** Designate (or clear, with null) the schedule's contract/finish milestone. */
+export async function setScheduleFinishMilestone(id: string, orgId: string, finishMilestoneId: string | null): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET finish_milestone_id=$3 WHERE id=$1 AND org_id=$2', [id, orgId, finishMilestoneId])
+}
+
+export async function setScheduleInHistory(id: string, orgId: string, inHistory: boolean): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET in_history=$3 WHERE id=$1 AND org_id=$2', [id, orgId, inHistory])
+}
+
+/** Upload metadata set after the row is created (origin, classification, RunF9 re-import, history override). */
+export async function updateScheduleMeta(id: string, orgId: string, m: { classification?: Schedule['classification']; uploadOrigin?: Schedule['uploadOrigin']; runf9Export?: boolean; historyOverride?: boolean }): Promise<void> {
+  await initSchema()
+  const sets: string[] = []
+  const vals: unknown[] = [id, orgId]
+  const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col}=$${vals.length}`) }
+  if (m.classification !== undefined) add('classification', m.classification)
+  if (m.uploadOrigin !== undefined) add('upload_origin', m.uploadOrigin)
+  if (m.runf9Export !== undefined) add('planora_export', m.runf9Export)
+  if (m.historyOverride !== undefined) add('history_override', m.historyOverride)
+  if (!sets.length) return
+  await query(`UPDATE schedules SET ${sets.join(', ')} WHERE id=$1 AND org_id=$2`, vals)
+}
+
+/** Relabel an upload (its version label, e.g. "Update 3" or "Baseline"). */
+export async function setScheduleVersion(id: string, orgId: string, version: string): Promise<void> {
+  await initSchema()
+  await query('UPDATE schedules SET version=$3 WHERE id=$1 AND org_id=$2', [id, orgId, version])
+}
+
+/**
+ * True when a file with this SHA-256 was exported by RunF9 for this organization (the export audit
+ * records carry the SHA-256 of what was downloaded): an upload of it is a re-import of RunF9 output.
+ */
+export async function isRunF9ExportSha(orgId: string, sha256: string): Promise<boolean> {
+  await initSchema()
+  const res = await query(`SELECT 1 FROM audit_events WHERE org_id=$1 AND action IN ('schedule.export', 'plan.export') AND detail->>'sha256' = $2 LIMIT 1`, [orgId, sha256])
+  return res.rows.length > 0
+}
+
+/** Every upload in the same update series, oldest data date first. */
+export async function getScheduleSeries(orgId: string, projectKey: string): Promise<Schedule[]> {
+  await initSchema()
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'${ws.and}
+    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey, ...ws.params])
+  return res.rows.map(rowToSchedule)
+}
+
+export async function saveScheduleFile(f: { scheduleId: string; orgId: string; fileName: string; sha256: string; content: Buffer; kept?: { connectionId: string; objectKey: string } | null; from?: { connectionId: string; key: string } | null }): Promise<void> {
+  await initSchema()
+  // Kept in the firm's own storage: RunF9 records only where it is (content left empty).
+  await query(`INSERT INTO schedule_files (schedule_id, org_id, file_name, sha256, size_bytes, content, storage_connection_id, object_key, source_connection_id, source_key)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (schedule_id) DO NOTHING`,
+  [f.scheduleId, f.orgId, f.fileName, f.sha256, f.content.length, f.kept ? Buffer.alloc(0) : f.content, f.kept?.connectionId ?? null, f.kept?.objectKey ?? null, f.from?.connectionId ?? null, f.from?.key ?? null])
+}
+
+/** Uploads among `scheduleIds` whose stored original file has this SHA-256 (identical bytes). */
+export async function findScheduleFilesBySha(orgId: string, sha256: string, scheduleIds: string[]): Promise<string[]> {
+  if (!scheduleIds.length) return []
+  await initSchema()
+  const res = await query('SELECT schedule_id FROM schedule_files WHERE org_id=$1 AND sha256=$2 AND schedule_id = ANY($3::text[])', [orgId, sha256, scheduleIds])
+  return res.rows.map(r => String(r.schedule_id))
+}
+
+export async function getScheduleFile(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string; content: Buffer; createdAt: string } | undefined> {
+  await initSchema()
+  const ws = await workspaceScope('s.workspace_id', 3)
+  const res = await query(`SELECT f.file_name, f.sha256, f.content, f.created_at, f.size_bytes, f.storage_connection_id, f.object_key FROM schedule_files f JOIN schedules s ON s.id = f.schedule_id AND s.org_id = f.org_id
+    WHERE f.schedule_id=$1 AND f.org_id=$2${ws.and}`, [scheduleId, orgId, ...ws.params])
+  const r = res.rows[0]
+  if (!r) return undefined
+  let content = r.content as Buffer
+  if (r.storage_connection_id && r.object_key && content.length === 0) {
+    // Kept in the firm's own cloud storage: read it back and make sure it is the file that was uploaded.
+    const { fetchKeptOriginal } = await import('@/lib/storage/kept')
+    content = await fetchKeptOriginal(orgId, String(r.storage_connection_id), String(r.object_key), String(r.sha256), Number(r.size_bytes))
+  }
+  return { fileName: r.file_name, sha256: r.sha256, content, createdAt: String(r.created_at) }
+}
+
+/** File name and SHA-256 of the stored original (no content), for provenance headers. */
+export async function getScheduleFileMeta(scheduleId: string, orgId: string): Promise<{ fileName: string; sha256: string } | undefined> {
+  await initSchema()
+  const res = await query('SELECT file_name, sha256 FROM schedule_files WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { fileName: String(r.file_name), sha256: String(r.sha256) } : undefined
 }
 
 export async function updateScheduleProfile(id: string, orgId: string, p: { projectType?: string | null; region?: string | null; grossSqft?: number | null }): Promise<void> {
@@ -252,7 +464,8 @@ export async function updateScheduleProfile(id: string, orgId: string, p: { proj
 
 export async function deleteSchedule(id: string, orgId: string): Promise<boolean> {
   await initSchema()
-  const res = await query('DELETE FROM schedules WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`DELETE FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return (res.rowCount ?? 0) > 0
 }
 
@@ -265,6 +478,8 @@ export interface Activity {
   actualStart: string | null; actualFinish: string | null; baselineStart: string | null; baselineFinish: string | null
   totalFloat: number; freeFloat: number; isCritical: boolean
   status: 'not_started' | 'in_progress' | 'complete'; activityType: 'task' | 'milestone' | 'loe' | 'summary'
+  /** Milestones: P6 start (TT_Mile) or finish (TT_FinMile) milestone; null when the source does not say */
+  milestoneKind?: 'start' | 'finish' | null
   /** Source calendar id (as referenced in the schedule's calendars list) */
   calendarId?: string | null
   constraintType?: string | null; constraintDate?: string | null
@@ -282,6 +497,7 @@ function rowToActivity(row: Record<string, unknown>): Activity {
     actualStart: row.actual_start as string | null, actualFinish: row.actual_finish as string | null, baselineStart: row.baseline_start as string | null, baselineFinish: row.baseline_finish as string | null,
     totalFloat: Number(row.total_float), freeFloat: Number(row.free_float), isCritical: Boolean(row.is_critical),
     status: row.status as Activity['status'], activityType: row.activity_type as Activity['activityType'],
+    milestoneKind: row.milestone_kind === 'start' || row.milestone_kind === 'finish' ? row.milestone_kind : null,
     calendarId: (row.calendar_id as string) ?? null, constraintType: (row.constraint_type as string) ?? null, constraintDate: (row.constraint_date as string) ?? null,
     category: (row.category as string) ?? null, sourceId: (row.source_id as string) ?? null,
   }
@@ -304,11 +520,24 @@ async function bulkInsert(table: string, columns: string[], rows: unknown[][]) {
   }
 }
 
+/**
+ * Correct the category of one activity on an uploaded schedule (firm-scoped through the schedule).
+ * Returns the activity's name and previous category, or undefined when it is not in this firm's schedule.
+ */
+export async function setActivityCategory(orgId: string, scheduleId: string, activityId: string, category: string): Promise<{ name: string; previous: string | null } | undefined> {
+  await initSchema()
+  const cur = await query('SELECT a.name, a.category FROM activities a JOIN schedules s ON s.id = a.schedule_id WHERE s.org_id=$1 AND a.schedule_id=$2 AND a.id=$3', [orgId, scheduleId, activityId])
+  const r = cur.rows[0]
+  if (!r) return undefined
+  await query('UPDATE activities a SET category=$4 FROM schedules s WHERE s.id = a.schedule_id AND s.org_id=$1 AND a.schedule_id=$2 AND a.id=$3', [orgId, scheduleId, activityId, category])
+  return { name: String(r.name ?? ''), previous: (r.category as string) ?? null }
+}
+
 export async function createActivities(activities: Activity[]): Promise<void> {
   await initSchema()
   await bulkInsert('activities',
-    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id'],
-    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null]))
+    ['id', 'schedule_id', 'activity_id', 'name', 'wbs', 'duration', 'remaining_duration', 'percent_complete', 'early_start', 'early_finish', 'late_start', 'late_finish', 'actual_start', 'actual_finish', 'baseline_start', 'baseline_finish', 'total_float', 'free_float', 'is_critical', 'status', 'activity_type', 'calendar_id', 'constraint_type', 'constraint_date', 'category', 'source_id', 'milestone_kind'],
+    activities.map(a => [a.id, a.scheduleId, a.activityId, a.name, a.wbs, a.duration, a.remainingDuration, a.percentComplete, a.earlyStart, a.earlyFinish, a.lateStart, a.lateFinish, a.actualStart, a.actualFinish, a.baselineStart, a.baselineFinish, a.totalFloat, a.freeFloat, a.isCritical, a.status, a.activityType, a.calendarId ?? null, a.constraintType ?? null, a.constraintDate ?? null, a.category ?? null, a.sourceId ?? null, a.milestoneKind ?? null]))
 }
 
 export interface Relationship {
@@ -325,6 +554,62 @@ export async function createRelationships(rels: Relationship[]): Promise<void> {
   await initSchema()
   await bulkInsert('relationships', ['id', 'schedule_id', 'predecessor_id', 'successor_id', 'type', 'lag'],
     rels.map(r => [r.id, r.scheduleId, r.predecessorId, r.successorId, r.type, r.lag]))
+}
+
+/* ─── Edits to uploaded schedules (override layer) and risk inputs ── */
+
+export interface StoredScheduleEdit extends ScheduleEdit {
+  revertedAt: string | null; revertedBy: string | null; revertReason: string | null
+}
+
+function rowToEdit(r: Record<string, unknown>): StoredScheduleEdit {
+  return {
+    id: String(r.id), change: r.change as ScheduleEditChange, reason: String(r.reason), by: String(r.user_id ?? ''), byName: (r.user_name as string) ?? null,
+    at: new Date(String(r.created_at)).toISOString(), source: r.source === 'recovery' || r.source === 'leveling' ? r.source : 'manual', optionId: (r.option_id as string) ?? null,
+    revertedAt: r.reverted_at ? new Date(String(r.reverted_at)).toISOString() : null, revertedBy: (r.reverted_by as string) ?? null, revertReason: (r.revert_reason as string) ?? null,
+  }
+}
+
+/** All edits of one firm's schedule, oldest first (reverted ones included, flagged). */
+export async function getScheduleEdits(scheduleId: string, orgId: string): Promise<StoredScheduleEdit[]> {
+  await initSchema()
+  const res = await query('SELECT * FROM schedule_edits WHERE schedule_id=$1 AND org_id=$2 ORDER BY created_at, id', [scheduleId, orgId])
+  return res.rows.map(rowToEdit)
+}
+
+/** Store edits atomically (a recovery option may be several edits). */
+export async function addScheduleEdits(scheduleId: string, orgId: string, edits: ScheduleEdit[]): Promise<void> {
+  await initSchema()
+  await withTransaction(async q => {
+    for (const e of edits) {
+      await q(`INSERT INTO schedule_edits (id, schedule_id, org_id, kind, change, reason, source, option_id, user_id, user_name, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [e.id, scheduleId, orgId, e.change.kind, JSON.stringify(e.change), e.reason, e.source ?? 'manual', e.optionId ?? null, e.by, e.byName ?? null, e.at])
+    }
+  })
+}
+
+/** Revert (not delete) an edit; returns false when there is no active edit with that id in this firm's schedule. */
+export async function revertScheduleEdit(scheduleId: string, orgId: string, editId: string, by: string, reason: string): Promise<boolean> {
+  await initSchema()
+  const res = await query('UPDATE schedule_edits SET reverted_at=NOW(), reverted_by=$4, revert_reason=$5 WHERE id=$3 AND schedule_id=$1 AND org_id=$2 AND reverted_at IS NULL', [scheduleId, orgId, editId, by, reason])
+  return (res.rowCount ?? 0) > 0
+}
+
+export interface ScheduleRiskInputs { ranges: SraRange[]; events: SraRiskEvent[]; commitments: SraCommitment[]; updatedBy: string | null; updatedAt: string | null }
+
+export async function getScheduleRiskInputs(scheduleId: string, orgId: string): Promise<ScheduleRiskInputs> {
+  await initSchema()
+  const res = await query('SELECT * FROM schedule_risk_inputs WHERE schedule_id=$1 AND org_id=$2', [scheduleId, orgId])
+  const r = res.rows[0]
+  return r ? { ranges: (r.ranges as SraRange[]) || [], events: (r.events as SraRiskEvent[]) || [], commitments: (r.commitments as SraCommitment[] | undefined) || [], updatedBy: r.updated_by ?? null, updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : null }
+    : { ranges: [], events: [], commitments: [], updatedBy: null, updatedAt: null }
+}
+
+export async function saveScheduleRiskInputs(scheduleId: string, orgId: string, inputs: { ranges: SraRange[]; events: SraRiskEvent[]; commitments?: SraCommitment[] }, by: string): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO schedule_risk_inputs (schedule_id, org_id, ranges, events, commitments, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    ON CONFLICT (schedule_id) DO UPDATE SET ranges=EXCLUDED.ranges, events=EXCLUDED.events, commitments=EXCLUDED.commitments, updated_by=EXCLUDED.updated_by, updated_at=NOW()
+    WHERE schedule_risk_inputs.org_id=EXCLUDED.org_id`, [scheduleId, orgId, JSON.stringify(inputs.ranges), JSON.stringify(inputs.events), JSON.stringify(inputs.commitments ?? []), by])
 }
 
 /* ─── Firm history (private to one org) ─────────────── */
@@ -347,16 +632,36 @@ export interface HistoryRow {
 /**
  * Activities from the firm's OWN past schedules, used to ground durations.
  * The org_id filter is the privacy boundary: competitors' data is never read.
+ * Only uploads selectHistorySchedules accepts count (as-built, one per project, no RunF9 re-imports,
+ * no third-party schedules), and none when the organization turned firm history off for its uploads.
+ * Workspace walls apply too: a member never gets durations from a matter they are walled off from.
  */
-export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]> }> {
+export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]>; selection: HistorySelection }> {
   await initSchema()
+  const ws = await workspaceScope('s.workspace_id', 3)
+  const org = await query('SELECT settings FROM organizations WHERE id=$1', [orgId])
+  const orgOptOut = (org.rows[0]?.settings as Record<string, unknown> | null)?.historyExcludeUploads === true
+  const cand = await query(`
+    SELECT s.id, s.name, s.version, s.project_key, s.data_date, s.uploaded_at, s.in_history, s.history_override, s.planora_export, s.upload_origin,
+           COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary')) AS work_count,
+           COUNT(a.id) FILTER (WHERE a.activity_type NOT IN ('loe', 'summary') AND a.actual_finish IS NULL) AS open_count
+    FROM schedules s LEFT JOIN activities a ON a.schedule_id = s.id
+    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'${ws.and}
+    GROUP BY s.id`, [orgId, excludeScheduleId ?? null, ...ws.params])
+  const selection = selectHistorySchedules(cand.rows.map(r => ({
+    id: r.id, name: r.name, version: r.version, projectKey: r.project_key ?? null, dataDate: r.data_date ?? null, uploadedAt: String(r.uploaded_at),
+    inHistory: r.in_history !== false, historyOverride: r.history_override === true, runf9Export: r.planora_export === true,
+    uploadOrigin: r.upload_origin === 'own' || r.upload_origin === 'third_party' ? r.upload_origin : null,
+    workCount: Number(r.work_count), openCount: Number(r.open_count),
+  })), { orgOptOut })
+  if (!selection.included.length) return { rows: [], calendars: {}, selection }
   const res = await query(`
     SELECT a.schedule_id, s.project_type, s.region, s.gross_sqft, a.category, a.name, a.calendar_id, a.duration,
            a.baseline_start, a.baseline_finish, a.actual_start, a.actual_finish
     FROM activities a JOIN schedules s ON s.id = a.schedule_id
-    WHERE s.org_id = $1 AND ($2::text IS NULL OR s.id <> $2) AND s.source_type <> 'generated'
-      AND a.category IS NOT NULL AND a.category <> 'other' AND a.activity_type = 'task'`, [orgId, excludeScheduleId ?? null])
-  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND source_type <> 'generated'`, [orgId])
+    WHERE s.org_id = $1 AND s.id = ANY($2::text[])
+      AND a.category IS NOT NULL AND a.category <> 'other' AND a.activity_type = 'task'`, [orgId, selection.included])
+  const cal = await query(`SELECT id, calendars FROM schedules WHERE org_id=$1 AND id = ANY($2::text[])`, [orgId, selection.included])
   return {
     rows: res.rows.map(r => ({
       scheduleId: r.schedule_id, projectType: r.project_type, region: r.region, grossSqft: r.gross_sqft != null ? Number(r.gross_sqft) : null,
@@ -364,6 +669,7 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
       baselineStart: r.baseline_start, baselineFinish: r.baseline_finish, actualStart: r.actual_start, actualFinish: r.actual_finish,
     })),
     calendars: Object.fromEntries(cal.rows.map(r => [r.id, r.calendars as WorkCalendar[]])),
+    selection,
   }
 }
 
@@ -371,6 +677,8 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
 
 export interface ChatMessage {
   id: string; scheduleId: string; userId: string; role: 'user' | 'assistant'; content: string; createdAt: string
+  /** Project documents an answer quoted (redacted when one of them is deleted) */
+  documentIds?: string[]
 }
 
 export async function getChatMessages(scheduleId: string, userId: string): Promise<ChatMessage[]> {
@@ -381,6 +689,10 @@ export async function getChatMessages(scheduleId: string, userId: string): Promi
 
 export async function createChatMessage(msg: ChatMessage): Promise<void> {
   await initSchema()
+  if (msg.documentIds?.length) {
+    await query('INSERT INTO chat_messages (id,schedule_id,user_id,role,content,created_at,document_ids) VALUES ($1,$2,$3,$4,$5,$6,$7)', [msg.id, msg.scheduleId, msg.userId, msg.role, msg.content, msg.createdAt, msg.documentIds])
+    return
+  }
   await query('INSERT INTO chat_messages (id,schedule_id,user_id,role,content,created_at) VALUES ($1,$2,$3,$4,$5,$6)', [msg.id, msg.scheduleId, msg.userId, msg.role, msg.content, msg.createdAt])
 }
 
@@ -415,6 +727,8 @@ export interface Plan {
   /** Scheduler decisions on quality findings, e.g. { "dcma:6": { decision: 'accept', note, by, at } } */
   decisions: Record<string, PlanDecision>
   scheduleId: string | null
+  /** Matter / engagement workspace; null = organization-wide */
+  workspaceId?: string | null
   createdAt: string; updatedAt: string
   /** Optimistic-locking version; incremented on every save. */
   version: number
@@ -423,12 +737,15 @@ export interface Plan {
 /** Audit entries already persisted when the plan was loaded (new ones are appended to the audit log on save). */
 const loadedAuditLength = new WeakMap<Plan, number>()
 
+const isoTs = (v: unknown) => { const d = v instanceof Date ? v : new Date(String(v)); return isNaN(d.getTime()) ? String(v) : d.toISOString() }
+
 function rowToPlan(r: Record<string, unknown>): Plan {
   return {
     id: r.id as string, orgId: r.org_id as string, userId: r.user_id as string, name: r.name as string,
     answers: (r.answers as Record<string, Answer>) || {}, extraQuestions: (r.extra_questions as Question[]) || [], generated: (r.generated as GeneratedSchedule) || null,
     reviews: (r.reviews as ExpertReview[]) || [], decisions: (r.decisions as Record<string, PlanDecision>) || {}, audit: (r.audit as AuditEntry[]) || [], scheduleId: (r.schedule_id as string) || null,
-    createdAt: String(r.created_at), updatedAt: String(r.updated_at), version: Number(r.version ?? 1),
+    workspaceId: (r.workspace_id as string) ?? null,
+    createdAt: isoTs(r.created_at), updatedAt: isoTs(r.updated_at), version: Number(r.version ?? 1),
   }
 }
 
@@ -437,21 +754,25 @@ function trackPlan(p: Plan): Plan {
   return p
 }
 
+/** The organization's plans the caller may see (organization and workspace scoped). */
 export async function listPlans(orgId: string): Promise<Plan[]> {
   await initSchema()
-  const res = await query('SELECT * FROM plans WHERE org_id=$1 ORDER BY updated_at DESC', [orgId])
+  const ws = await workspaceScope('workspace_id', 2)
+  const res = await query(`SELECT * FROM plans WHERE org_id=$1${ws.and} ORDER BY updated_at DESC`, [orgId, ...ws.params])
   return res.rows.map(r => trackPlan(rowToPlan(r)))
 }
 
+/** Organization and workspace scoped: another firm's or another walled matter's plan is "not found". */
 export async function getPlan(id: string, orgId: string): Promise<Plan | undefined> {
   await initSchema()
-  const res = await query('SELECT * FROM plans WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`SELECT * FROM plans WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return res.rows[0] ? trackPlan(rowToPlan(res.rows[0])) : undefined
 }
 
-export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name'>): Promise<Plan> {
+export async function createPlan(p: Pick<Plan, 'id' | 'orgId' | 'userId' | 'name'> & { workspaceId?: string | null }): Promise<Plan> {
   await initSchema()
-  const res = await query('INSERT INTO plans (id, org_id, user_id, name) VALUES ($1,$2,$3,$4) RETURNING *', [p.id, p.orgId, p.userId, p.name])
+  const res = await query('INSERT INTO plans (id, org_id, user_id, name, workspace_id) VALUES ($1,$2,$3,$4,$5) RETURNING *', [p.id, p.orgId, p.userId, p.name, p.workspaceId ?? null])
   return trackPlan(rowToPlan(res.rows[0]))
 }
 
@@ -488,7 +809,8 @@ export async function savePlan(p: Plan): Promise<Plan> {
 
 export async function deletePlan(id: string, orgId: string): Promise<boolean> {
   await initSchema()
-  const res = await query('DELETE FROM plans WHERE id=$1 AND org_id=$2', [id, orgId])
+  const ws = await workspaceScope('workspace_id', 3)
+  const res = await query(`DELETE FROM plans WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   return (res.rowCount ?? 0) > 0
 }
 
@@ -509,6 +831,40 @@ export async function saveDataQuestionResponse(scheduleId: string, r: Omit<DataQ
     [scheduleId, r.questionId, r.response, r.note, r.userId])
 }
 
+/* ─── Reviewer dispositions on uploaded submissions ─── */
+
+
+/** Dispositions recorded on one upload (org-scoped), with the reviewer's name. */
+export async function getReviewState(scheduleId: string, orgId: string): Promise<ReviewState> {
+  await initSchema()
+  const [items, sub] = await Promise.all([
+    query(`SELECT d.item_id, d.disposition, d.justification, d.user_id, d.created_at, u.name AS reviewer FROM review_dispositions d
+      LEFT JOIN users u ON u.id = d.user_id WHERE d.schedule_id=$1 AND d.org_id=$2 ORDER BY d.item_id`, [scheduleId, orgId]),
+    query(`SELECT s.disposition, s.comments, s.user_id, s.created_at, u.name AS reviewer FROM submission_reviews s
+      LEFT JOIN users u ON u.id = s.user_id WHERE s.schedule_id=$1 AND s.org_id=$2`, [scheduleId, orgId]),
+  ])
+  const ts = (v: unknown) => new Date(v as string).toISOString()
+  const r = sub.rows[0]
+  return {
+    items: items.rows.map(x => ({ itemId: String(x.item_id), disposition: x.disposition, justification: x.justification ?? null, userId: x.user_id ?? null, reviewer: x.reviewer ?? null, createdAt: ts(x.created_at) })),
+    submission: r ? { disposition: r.disposition, comments: r.comments ?? null, userId: r.user_id ?? null, reviewer: r.reviewer ?? null, createdAt: ts(r.created_at) } : null,
+  }
+}
+
+export async function saveReviewDisposition(scheduleId: string, orgId: string, d: { itemId: string; disposition: FindingDisposition; justification: string | null; userId: string }): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO review_dispositions (schedule_id, org_id, item_id, disposition, justification, user_id) VALUES ($1,$2,$3,$4,$5,$6)
+    ON CONFLICT (schedule_id, item_id) DO UPDATE SET disposition=EXCLUDED.disposition, justification=EXCLUDED.justification, user_id=EXCLUDED.user_id, created_at=NOW()`,
+  [scheduleId, orgId, d.itemId, d.disposition, d.justification, d.userId])
+}
+
+export async function saveSubmissionReview(scheduleId: string, orgId: string, d: { disposition: SubmissionDisposition; comments: string | null; userId: string }): Promise<void> {
+  await initSchema()
+  await query(`INSERT INTO submission_reviews (schedule_id, org_id, disposition, comments, user_id) VALUES ($1,$2,$3,$4,$5)
+    ON CONFLICT (schedule_id) DO UPDATE SET disposition=EXCLUDED.disposition, comments=EXCLUDED.comments, user_id=EXCLUDED.user_id, created_at=NOW()`,
+  [scheduleId, orgId, d.disposition, d.comments, d.userId])
+}
+
 /* ─── Privacy: export and deletion ──────────────────── */
 
 export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {
@@ -517,7 +873,7 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
   return res.rows.map(row => ({ id: row.id, scheduleId: row.schedule_id, userId: row.user_id, role: row.role, content: row.content, createdAt: row.created_at }))
 }
 
-/** Everything the organization has stored in Planora, as one JSON document (data portability). */
+/** Everything the organization has stored in RunF9, as one JSON document (data portability). */
 export async function exportOrganization(orgId: string) {
   await initSchema()
   const org = await getOrganization(orgId)
@@ -526,14 +882,21 @@ export async function exportOrganization(orgId: string) {
   const schedules = await getSchedules(orgId)
   const scheduleData = []
   for (const s of schedules) {
-    const [activities, relationships, responses, chats] = await Promise.all([
+    const [activities, relationships, responses, chats, edits, riskInputs, review] = await Promise.all([
       getActivities(s.id), getRelationships(s.id), getDataQuestionResponses(s.id),
       query('SELECT * FROM chat_messages WHERE schedule_id=$1 ORDER BY created_at', [s.id]).then(r => r.rows.map(m => ({ id: m.id, userId: m.user_id, role: m.role, content: m.content, createdAt: m.created_at }))),
+      getScheduleEdits(s.id, orgId), getScheduleRiskInputs(s.id, orgId), getReviewState(s.id, orgId),
     ])
-    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats })
+    const timeImpact = await import('./tia-db').then(m => m.exportTimeImpact(s.id, orgId))
+    scheduleData.push({ ...s, activities, relationships, dataQuestionResponses: responses, askAiMessages: chats, editsInRunF9: edits, riskInputs, reviewDispositions: review.items, submissionReview: review.submission, timeImpact })
   }
   const audit = (await query('SELECT * FROM audit_events WHERE org_id=$1 ORDER BY seq', [orgId])).rows
-  return { format: 'planora-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, auditEvents: audit }
+  const standardsRuns = (await query('SELECT * FROM standards_runs WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  // Project documents (extracted text and passages; original files are never stored) and the retrieval log (ids and query hashes only).
+  const { exportDocuments } = await import('@/lib/rag/store')
+  const projectDocuments = await exportDocuments(orgId)
+  const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, projectDocuments, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -548,6 +911,12 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
       (SELECT hash FROM audit_events WHERE org_id=$1 ORDER BY seq DESC LIMIT 1) AS last_hash`, [orgId])).rows[0]
     await q(`SELECT set_config('planora.audit_purge', 'on', true)`)
     await q('DELETE FROM audit_events WHERE org_id=$1', [orgId])
+    // Project documents: passage vectors, passages, requirement reviews, documents (incl. tombstones) and the retrieval log.
+    await q('DELETE FROM chunk_embeddings WHERE org_id=$1', [orgId])
+    await q('DELETE FROM document_chunks WHERE org_id=$1', [orgId])
+    await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
+    await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])
+    await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
     await q('DELETE FROM plans WHERE org_id=$1', [orgId])
     await q('DELETE FROM invitations WHERE org_id=$1', [orgId])
@@ -587,6 +956,13 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE plans SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE schedules SET user_id=$2 WHERE user_id=$1', [userId, heir])
     await q('UPDATE data_question_responses SET user_id=$2 WHERE user_id=$1', [userId, heir])
+    await q("UPDATE schedule_edits SET user_id=$2, user_name='Former member' WHERE user_id=$1", [userId, heir])
+    await q('UPDATE delay_events SET created_by=$2 WHERE created_by=$1', [userId, heir])
+    await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
+    await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])
+    await q('UPDATE retrieval_log SET user_id=NULL WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('DELETE FROM chat_messages WHERE user_id=$1', [userId])
     await q('DELETE FROM users WHERE id=$1', [userId])
   })

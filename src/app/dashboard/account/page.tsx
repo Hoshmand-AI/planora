@@ -7,7 +7,8 @@ import { Section, Field, Button, Alert, inputClass, postJson, downloadJson } fro
 import { fmtDateTime } from '@/lib/format'
 
 interface AccountData {
-  user: { id: string; email: string; name: string; role: string; createdAt: string }
+  user: { id: string; email: string; name: string; role: string; createdAt: string; emailVerifiedAt: string | null }
+  emailDelivery: boolean
   org: { id: string; name: string }
   mfa: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number; required: boolean }
   sessions: { id: string; createdAt: string; lastSeenAt: string; ip: string | null; userAgent: string | null; current: boolean }[]
@@ -32,8 +33,8 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
       <div className="flex gap-2">
         <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(codes.join('\n')); setCopied(true) }}><Copy size={13} className="inline mr-1" aria-hidden="true" />{copied ? 'Copied' : 'Copy'}</Button>
         <Button variant="secondary" onClick={() => {
-          const url = URL.createObjectURL(new Blob([`Planora recovery codes\n\n${codes.join('\n')}\n`], { type: 'text/plain' }))
-          const a = document.createElement('a'); a.href = url; a.download = 'planora-recovery-codes.txt'; a.click()
+          const url = URL.createObjectURL(new Blob([`RunF9 recovery codes\n\n${codes.join('\n')}\n`], { type: 'text/plain' }))
+          const a = document.createElement('a'); a.href = url; a.download = 'runf9-recovery-codes.txt'; a.click()
         }}><Download size={13} className="inline mr-1" aria-hidden="true" />Download</Button>
       </div>
     </div>
@@ -85,7 +86,7 @@ function AccountPage() {
       </div>
 
       {(mfaNeeded || params.get('setup') === 'mfa') && !data.mfa.enabled && (
-        <Alert tone="warning">Your organization requires two-step verification. Set it up below to continue using Planora.</Alert>
+        <Alert tone="warning">Your organization requires two-step verification. Set it up below to continue using RunF9.</Alert>
       )}
 
       <Section title="Two-step verification" description="A code from an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Authy…) is required after your password. This protects your firm's projects even if your password leaks." id="mfa">
@@ -141,12 +142,24 @@ function AccountPage() {
           </div>
         )}
         {codes && data.mfa.enabled && mfaNeeded === false && params.get('setup') === 'mfa' && (
-          <div className="mt-3"><Button onClick={() => { window.location.href = '/dashboard/plan' }}>Continue to Planora</Button></div>
+          <div className="mt-3"><Button onClick={() => { window.location.href = '/dashboard/plan' }}>Continue to RunF9</Button></div>
         )}
       </Section>
 
       <Section title="Profile">
         {note('profile')}
+        <div className="mb-3 text-[13px] text-warm-700">
+          <span className="font-medium text-navy-950">{data.user.email}</span>{' · '}
+          {data.user.emailVerifiedAt
+            ? <span className="text-status-on-track font-medium">Email confirmed</span>
+            : data.emailDelivery
+              ? <>
+                  <span className="text-status-attention font-medium">Email not confirmed yet</span>{' · '}
+                  <Button variant="ghost" disabled={busy === 'profile'} onClick={() => act('profile', { action: 'resend_verification' }, 'Confirmation link sent. Check your inbox.')}>Resend the confirmation link</Button>
+                </>
+              : <span className="text-warm-500">Email confirmation isn&apos;t set up on this installation.</span>}
+          {params.get('verified') === '1' && <div className="mt-2"><Alert tone="success">Thanks, your email address is confirmed.</Alert></div>}
+        </div>
         <div className="flex gap-2 items-end">
           <div className="flex-1"><Field label="Name">{p => <input {...p} autoComplete="name" className={inputClass} value={name} onChange={e => setName(e.target.value)} />}</Field></div>
           <Button variant="secondary" disabled={busy === 'profile' || name === data.user.name} onClick={async () => { if (await act('profile', { action: 'update_profile', name }, 'Saved.')) load() }}>Save</Button>
@@ -186,11 +199,11 @@ function AccountPage() {
         {data.sessions.length > 1 && <Button variant="secondary" onClick={async () => { if (await act('sessions', { action: 'revoke_other_sessions' }, 'Signed out everywhere else.')) load() }}>Sign out everywhere else</Button>}
       </Section>
 
-      <Section title="Your personal data" description="Download what Planora holds about you as a person: your account, sign-ins, activity in the audit log and your Ask AI history. Project data belongs to your organization (an admin can export it).">
+      <Section title="Your personal data" description="Download what RunF9 holds about you as a person: your account, sign-ins, activity in the audit log and your Ask AI history. Project data belongs to your organization (an admin can export it).">
         {note('export')}
         <Button variant="secondary" disabled={busy === 'export'} onClick={async () => {
           const d = await act('export', { action: 'export_my_data' }, 'Downloaded.')
-          if (d) downloadJson(`planora-my-data-${new Date().toISOString().slice(0, 10)}.json`, d)
+          if (d) downloadJson(`runf9-my-data-${new Date().toISOString().slice(0, 10)}.json`, d)
         }}><Download size={13} className="inline mr-1" aria-hidden="true" />Download my data</Button>
       </Section>
 

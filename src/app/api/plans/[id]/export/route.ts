@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
@@ -7,13 +8,20 @@ import { basisOfSchedule } from '@/lib/export/narrative'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
 import { exportXer } from '@/lib/export/xer'
+import { encodeXer } from '@/lib/parsers/xer-codec'
 import { exportPdf } from '@/lib/export/pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
+import { calculationSettings, runf9Release, type Provenance } from '@/lib/export/provenance'
+import { exportExceptions, type ExportExceptionFormat } from '@/lib/export/exceptions'
+import { exceptionHeader, summarizeExceptions } from '@/lib/parsers/exceptions'
+import { scheduleFingerprint } from '@/lib/server/approval'
 import { profileFrom } from '@/lib/planning/elicitation'
 import { runSra } from '@/lib/planning/sra'
 import { loadFirmHistory } from '@/lib/planning/service'
 import type { ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
+import { CSV_CUI_REFUSAL, exportMarking, markText, markXer } from '@/lib/export/markings'
+import { classificationFromAnswer } from '@/lib/server/classification'
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -26,8 +34,10 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  *   ?format=xlsx-import  Excel for importing into MS Project or P6
  *   ?format=csv          flat activity table
  *   ?format=md           Basis of Schedule narrative
+ * XER, XML, CSV and XLSX downloads carry an export exception report (what the format cannot hold) in the
+ * X-RunF9-Export-Exceptions header (also sent as X-Planora-…) (XLSX also in the Provenance sheet); &exceptions=json returns it.
  */
-export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { params, auth }) => {
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
   const g = plan.generated
@@ -37,29 +47,44 @@ export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { par
     requireFeature(ctx.plan, entitlementsFor(ctx.plan).exports.includes(format), `${format.toUpperCase()} export`)
   }
   const slug = plan.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'schedule'
+  // CUI / classified plans carry markings on every export; CSV cannot carry them and is refused.
+  const marking = exportMarking(classificationFromAnswer(plan.answers['security.classification']), { controlledBy: ctx.orgName, poc: ctx.name })
+  if (marking && format === 'csv') return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
   const teamNotes = Object.entries(plan.answers).filter(([id, a]) => id.startsWith('note.') && a.status === 'known').map(([, a]) => String(a.value))
 
-  const sraFor = async () => g.cpm ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
+  // Same rule as the plan page header: Monte Carlo only where the plan has it, else the rule-based estimate.
+  const sraFor = async () => g.cpm && entitlementsFor(ctx.plan).sra ? runSra(g, plan.answers, await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType | undefined)) : undefined
+  // A generated plan has no uploaded file: the hash is the SHA-256 of the generated schedule content
+  // (the same fingerprint approvals are bound to).
+  const exKey: ExportExceptionFormat | null = format === 'xer' || format === 'xml' || format === 'csv' || format === 'xlsx-import' || format === 'xlsx-p6' ? format : null
+  const exceptions = exKey ? exportExceptions(g, exKey, { progressMode: g.cpm?.progressMode ?? null }) : null
+  if (exceptions && req.nextUrl.searchParams.get('exceptions') === 'json') return NextResponse.json({ format, exceptions, summary: summarizeExceptions(exceptions) })
+  const prov = (): Provenance => ({
+    exceptions,
+    sources: [{ scheduleName: plan.name, version: `plan version ${plan.version}`, fileName: `Generated in RunF9 (plan "${plan.name}")`, sha256: scheduleFingerprint(g), dataDate: g.dataDate ?? g.projectStart, progressMode: g.cpm?.progressMode ?? 'retained' }],
+    release: runf9Release(), generatedAt: new Date().toISOString(),
+    settings: calculationSettings({ calendars: g.calendars, defaultCalendarId: g.defaultCalendarId }, { progressMode: g.cpm?.progressMode ?? 'retained', mustFinishBy: g.mustFinishBy ?? null, finishMilestone: null }, ctx.settings?.quality),
+  })
   let body: string | Buffer | Uint8Array, type: string, file: string
   switch (format) {
     case 'xer':
       // P6 reads XER in Windows-1252; exportXer only emits characters in that range.
-      body = Buffer.from(exportXer(g, plan.name, { exportedBy: ctx.name }), 'latin1'); type = 'application/octet-stream'; file = `${slug}.xer`; break
+      body = encodeXer(markXer(exportXer(g, plan.name, { exportedBy: ctx.name }), marking)); type = 'application/octet-stream'; file = `${slug}.xer`; break
     case 'xml':
-      body = exportMspXml(g, plan.name); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
+      body = exportMspXml(g, plan.name, { marking }); type = 'application/xml; charset=utf-8'; file = `${slug}.xml`; break
     case 'csv':
       body = exportScheduleCsv(g); type = 'text/csv; charset=utf-8'; file = `${slug}.csv`; break
     case 'xlsx-import':
-      body = await exportImportXlsx(g, plan.name); type = XLSX; file = `${slug}-import-to-p6-or-ms-project.xlsx`; break
+      body = await exportImportXlsx(g, plan.name, { marking, prov: prov() }); type = XLSX; file = `${slug}-import-to-p6-or-ms-project.xlsx`; break
     case 'xlsx-p6':
-      body = await exportP6LayoutXlsx(g, plan.name); type = XLSX; file = `${slug}-p6-layout.xlsx`; break
+      body = await exportP6LayoutXlsx(g, plan.name, { marking, prov: prov() }); type = XLSX; file = `${slug}-p6-layout.xlsx`; break
     case 'pdf': {
       const view = await planView(plan, ctx.orgId)
-      body = await exportPdf(g, plan.name, view.evaluation, { preparedBy: ctx.name, sra: await sraFor() }); type = 'application/pdf'; file = `${slug}-schedule.pdf`; break
+      body = await exportPdf(g, plan.name, view.evaluation, { preparedBy: ctx.name, sra: await sraFor(), marking }); type = 'application/pdf'; file = `${slug}-schedule.pdf`; break
     }
     case 'md': {
       const view = await planView(plan, ctx.orgId)
-      body = basisOfSchedule({ sra: await sraFor(), decisions: plan.decisions, teamNotes, planName: plan.name, profile: profileFrom(plan.answers), schedule: g, evaluation: view.evaluation!, reviews: plan.reviews, generatedBy: ctx.name, aiMode: view.llm.mode })
+      body = markText(basisOfSchedule({ sra: await sraFor(), decisions: plan.decisions, teamNotes, planName: plan.name, profile: profileFrom(plan.answers), schedule: g, evaluation: view.evaluation!, reviews: plan.reviews, generatedBy: ctx.name, aiMode: view.llm.mode }), marking)
       type = 'text/markdown; charset=utf-8'; file = `${slug}-basis-of-schedule.md`; break
     }
     default:
@@ -67,6 +92,7 @@ export const GET = api<{ id: string }>({ permission: 'read' }, async (req, { par
   }
   const rl = await hit(`export:user:${ctx.userId}`, LIMITS.exportsPerUser.limit, LIMITS.exportsPerUser.windowSec)
   if (!rl.ok) throw new ApiError(429, 'Too many exports in the last hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
-  await audit({ action: 'plan.export', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, format, file, version: plan.version, activities: g.activities.length } })
-  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"` } })
+  const exSummary = exceptions ? summarizeExceptions(exceptions) : null
+  await audit({ action: 'plan.export', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, format, file, version: plan.version, activities: g.activities.length, marking: marking?.banner ?? null, sha256: createHash('sha256').update(body).digest('hex'), ...(exSummary ? { exportExceptions: { records: exceptions!.records.length, total: exSummary.total, losses: exSummary.losses } } : {}) } })
+  return new NextResponse(body as BodyInit, { headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${file}"`, ...(exceptions ? { 'X-RunF9-Export-Exceptions': exceptionHeader(exceptions), 'X-Planora-Export-Exceptions': exceptionHeader(exceptions) } : {}) } })
 })

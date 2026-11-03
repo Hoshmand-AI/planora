@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { hotp, verifyTotp, base32Encode, base32Decode, newRecoveryCodes, otpauthUri } from './totp'
 import { passwordProblem } from './password'
 import { can, canAssign, ROLES, permissionsOf } from './permissions'
-import { normalizeSettings, DEFAULT_SETTINGS } from './settings'
+import { normalizeSettings, DEFAULT_SETTINGS, NEW_ORGANIZATION_SETTINGS } from './settings'
+import { LIMITS } from './rate-limit'
 import { crossSiteWrite } from './api'
 import { eventHash, GENESIS } from './audit'
 import { encrypt, decrypt } from './crypto'
@@ -34,7 +35,7 @@ describe('two-step verification codes (RFC 4226 / RFC 6238 test vectors)', () =>
     const codes = newRecoveryCodes()
     expect(new Set(codes).size).toBe(10)
     expect(codes.every(c => /^[a-z2-7]{5}-[a-z2-7]{5}$/.test(c))).toBe(true)
-    expect(otpauthUri(secret, 'a@b.co')).toMatch(/^otpauth:\/\/totp\/Planora:a%40b\.co\?secret=GEZ/)
+    expect(otpauthUri(secret, 'a@b.co')).toMatch(/^otpauth:\/\/totp\/RunF9:a%40b\.co\?secret=GEZ/)
   })
 })
 
@@ -84,17 +85,34 @@ describe('organization settings', () => {
     expect(s.aiDailyLimit).toBe(0)
     expect(s.chatRetentionDays).toBe(DEFAULT_SETTINGS.chatRetentionDays)
   })
+  it('cloud AI is opt-in for new organizations; existing ones keep their setting', () => {
+    // New organizations get NEW_ORGANIZATION_SETTINGS stored at creation (AI off).
+    expect(normalizeSettings({ ...NEW_ORGANIZATION_SETTINGS }).aiEnabled).toBe(false)
+    // Organizations created earlier never stored aiEnabled and keep the previous behavior (on)...
+    expect(normalizeSettings({}).aiEnabled).toBe(true)
+    // ...and an explicit choice always wins.
+    expect(normalizeSettings({ aiEnabled: true }).aiEnabled).toBe(true)
+    expect(normalizeSettings({ aiEnabled: false }).aiEnabled).toBe(false)
+  })
+})
+
+describe('sign-in rate limits', () => {
+  it('stay strict per account and only count failures per network', () => {
+    expect(LIMITS.signinPerEmail).toEqual({ limit: 10, windowSec: 15 * 60 })
+    expect(LIMITS.lockoutAfter).toBe(8)
+    expect(LIMITS.signinFailuresPerIp.limit).toBeGreaterThanOrEqual(300)
+  })
 })
 
 describe('cross-site request forgery defence', () => {
-  const req = (method: string, headers: Record<string, string>) => new Request('https://app.planora.test/api/plans', { method, headers })
+  const req = (method: string, headers: Record<string, string>) => new Request('https://app.runf9.test/api/plans', { method, headers })
   it('blocks writes from other sites and allows same-origin and non-browser clients', () => {
-    expect(crossSiteWrite(req('POST', { origin: 'https://evil.test', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { 'sec-fetch-site': 'cross-site', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { origin: 'null', host: 'app.planora.test' }))).toBe(true)
-    expect(crossSiteWrite(req('POST', { origin: 'https://app.planora.test', host: 'app.planora.test' }))).toBe(false)
-    expect(crossSiteWrite(req('POST', { host: 'app.planora.test' }))).toBe(false)
-    expect(crossSiteWrite(req('GET', { origin: 'https://evil.test', host: 'app.planora.test' }))).toBe(false)
+    expect(crossSiteWrite(req('POST', { origin: 'https://evil.test', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { 'sec-fetch-site': 'cross-site', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { origin: 'null', host: 'app.runf9.test' }))).toBe(true)
+    expect(crossSiteWrite(req('POST', { origin: 'https://app.runf9.test', host: 'app.runf9.test' }))).toBe(false)
+    expect(crossSiteWrite(req('POST', { host: 'app.runf9.test' }))).toBe(false)
+    expect(crossSiteWrite(req('GET', { origin: 'https://evil.test', host: 'app.runf9.test' }))).toBe(false)
   })
 })
 
@@ -116,7 +134,10 @@ describe('field encryption', () => {
     expect(sealed).not.toContain('JBSWY3DP')
     expect(decrypt(sealed)).toBe('JBSWY3DPEHPK3PXP')
     const parts = sealed.split('.')
-    parts[3] = parts[3].slice(0, -2) + (parts[3].endsWith('A') ? 'BB' : 'AA')
+    // Flip a bit in the decoded bytes (editing base64 text can land in padding bits and change nothing)
+    const bytes = Buffer.from(parts[3], 'base64url')
+    bytes[0] ^= 0x01
+    parts[3] = bytes.toString('base64url')
     expect(() => decrypt(parts.join('.'))).toThrow()
     const short = sealed.split('.')
     short[2] = Buffer.from(short[2], 'base64url').subarray(0, 4).toString('base64url')
@@ -167,5 +188,32 @@ describe('withheld answers never reach a model', () => {
     expect(brief).toMatch(/withheld for security reasons/)
     const g = generateSchedule({ answers: Object.fromEntries(Object.entries(all).map(([id, a]) => [id, a.status === 'withheld' ? { ...a, value: undefined, note: undefined } : a])), today: '2026-09-30' })
     expect(JSON.stringify(g)).not.toContain(SECRET)
+  })
+})
+
+describe('webhooks and API keys', () => {
+  it('refuses private, loopback, link-local and metadata destinations', async () => {
+    delete process.env.RUNF9_ALLOW_INSECURE_WEBHOOKS // a test-only escape hatch must not leak into this check
+    const { isPrivateAddress, urlProblem } = await import('./webhooks')
+    for (const ip of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.5.4', '192.168.1.1', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '224.0.0.1'])
+      expect(isPrivateAddress(ip), ip).toBe(true)
+    for (const ip of ['8.8.8.8', '172.32.0.1', '2606:4700:4700::1111']) expect(isPrivateAddress(ip), ip).toBe(false)
+    expect(await urlProblem('http://example.com/hook')).toMatch(/HTTPS/)
+    expect(await urlProblem('https://169.254.169.254/latest/meta-data')).toMatch(/private/)
+    expect(await urlProblem('https://[::1]/x')).toMatch(/private/)
+    expect(await urlProblem('https://user:pw@example.com/x')).toMatch(/user name/)
+    expect(await urlProblem('not a url')).toMatch(/full URL/)
+  })
+  it('signs deliveries with a timestamped HMAC the receiver can recompute', async () => {
+    const { sign } = await import('./webhooks')
+    const { createHmac } = await import('crypto')
+    const sig = sign('whsec_test', '{"a":1}', 1_790_000_000)
+    expect(sig).toBe(`t=1790000000,v1=${createHmac('sha256', 'whsec_test').update('1790000000.{"a":1}').digest('hex')}`)
+  })
+  it('recognizes only well-formed API keys', async () => {
+    const { looksLikeApiKey, KEY_PREFIX } = await import('./api-keys')
+    expect(looksLikeApiKey(KEY_PREFIX + 'a'.repeat(43))).toBe(true)
+    expect(looksLikeApiKey('pk_live_short')).toBe(false)
+    expect(looksLikeApiKey('Bearer ' + KEY_PREFIX + 'a'.repeat(43))).toBe(false)
   })
 })

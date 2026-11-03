@@ -18,14 +18,14 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: drill
           POSTGRES_PASSWORD: drill
           POSTGRES_DB: postgres
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U drill" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U drill -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       HAS_SECRETS: ${{ secrets.BACKUP_DATABASE_URL != '' && secrets.BACKUP_PASSPHRASE != '' }}
     steps:
@@ -40,6 +40,13 @@ jobs:
           cache: npm
       - if: env.HAS_SECRETS == 'true'
         run: npm ci
+      - if: env.HAS_SECRETS == 'true'
+        name: PostgreSQL 18 client tools
+        # pg_dump refuses to dump a server newer than itself; production (Neon) runs PostgreSQL 18.
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+          echo "PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - if: env.HAS_SECRETS == 'true'
         name: Back up production
         env:
@@ -57,6 +64,6 @@ jobs:
       - if: env.HAS_SECRETS == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: planora-backup-${{ github.run_id }}
+          name: runf9-backup-${{ github.run_id }}
           path: backups/
           retention-days: 35
