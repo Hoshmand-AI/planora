@@ -125,10 +125,10 @@ export default function F9Demo() {
       <button
         type="button"
         onClick={run}
-        aria-label="Press F9 to run the sample schedule"
         className="group mx-auto mt-10 flex flex-col items-center select-none"
       >
         <span
+          aria-hidden="true"
           className="block w-[84px] h-[84px] md:w-[96px] md:h-[96px] rounded-[22px] bg-navy-900 border-[3px] border-accent-400 transition-transform duration-150"
           style={{ transform: pressed ? 'translateY(6px)' : 'none', boxShadow: pressed ? '0 2px 0 #06141B' : '0 8px 0 #06141B, 0 24px 40px -12px rgba(37,99,235,0.55)' }}
         >

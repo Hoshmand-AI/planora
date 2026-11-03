@@ -178,7 +178,7 @@ describe('SAML service provider', () => {
 
   it('rejects the wrong issuer', async () => {
     const { requestId } = await issue(mem.store)
-    await expectRejected(validate(signedResponse({ requestId, issuer: 'https://someone-else.test' }), requestId), /Issuer/)
+    await expectRejected(validate(signedResponse({ requestId, issuer: 'https://someone-else.test' }), requestId), /issuer/i) // node-saml (>=5.2) or our own check, whichever runs first
   })
 
   it('rejects a replayed response (request ID is one-time) and a replayed assertion ID', async () => {
@@ -263,6 +263,10 @@ describe('SAML configuration helpers', () => {
     expect(parsed).toMatchObject({ idpEntityId: IDP, ssoUrl: 'https://idp.example.test/sso' })
     expect(parsed.certs).toHaveLength(1)
     expect(() => parseIdpMetadata('<x>')).toThrow()
+    // Malformed documents are rejected with the friendly message (recoverable parser errors and fatal ones alike).
+    expect(() => parseIdpMetadata('<x>')).toThrow(/well-formed/)
+    expect(() => parseIdpMetadata(md.replace('</md:EntityDescriptor>', '</md:EntityDescriptor junk>'))).toThrow(/well-formed/)
+    expect(() => parseIdpMetadata(md.replace('<md:IDPSSODescriptor ', '<md:IDPSSODescriptor a="1" a="2" '))).toThrow(/well-formed/)
     expect(() => parseIdpMetadata(`<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>${md}`)).toThrow(/DOCTYPE/)
   })
 

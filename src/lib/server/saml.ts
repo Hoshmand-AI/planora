@@ -142,8 +142,13 @@ function elementsByLocalName(root: Node, name: string): Element[] {
 }
 
 function parseXml(xml: string): Document {
+  // xmldom 0.9: recoverable problems are reported to onError as 'warning' or 'error'; a fatal error throws.
+  // Treat anything above a warning as malformed, as before.
   let failed = false
-  const doc = new DOMParser({ errorHandler: { error: () => { failed = true }, fatalError: () => { failed = true } } }).parseFromString(xml, 'text/xml')
+  let doc: ReturnType<DOMParser['parseFromString']> | undefined
+  try {
+    doc = new DOMParser({ onError: level => { if (level !== 'warning') failed = true } }).parseFromString(xml, 'text/xml')
+  } catch { failed = true }
   if (failed || !doc?.documentElement) throw new ApiError(400, 'That is not well-formed XML.')
   return doc as unknown as Document
 }
