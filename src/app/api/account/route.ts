@@ -5,13 +5,16 @@ import { passwordProblem } from '@/lib/server/password'
 import { audit, listAudit } from '@/lib/server/audit'
 import { beginEnrollment, confirmEnrollment, consumeSecondFactor, disableMfa, regenerateRecoveryCodes } from '@/lib/server/mfa'
 import { hit, LIMITS } from '@/lib/server/rate-limit'
+import { sendVerificationEmail } from '@/lib/server/email-verification'
+import { appOrigin, emailConfigured } from '@/lib/server/email'
 
 /** Your account: profile, active sessions and two-step verification status. */
 export const GET = api({ permission: 'read', allowMfaSetup: true }, async (_req, { auth }) => {
   const user = await getUserById(auth.userId)
   if (!user) throw new ApiError(404, 'Account not found')
   return json({
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt, emailVerifiedAt: user.emailVerifiedAt },
+    emailDelivery: emailConfigured(),
     org: { id: auth.orgId, name: auth.orgName },
     mfa: { enabled: !!user.mfaEnabledAt, enabledAt: user.mfaEnabledAt, recoveryCodesLeft: user.mfaRecovery.length, required: auth.settings.requireMfa },
     sessions: (await listSessions(user.id)).map(s => ({ ...s, current: s.id === auth.sessionId })),
@@ -35,6 +38,15 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
   }
 
   switch (b.action) {
+    case 'resend_verification': {
+      if (user.emailVerifiedAt) return json({ success: true, alreadyVerified: true })
+      if (!emailConfigured()) throw new ApiError(400, 'Email delivery is not set up on this RunF9 installation yet.', 'email_unavailable')
+      const rl = await hit(`verify:resend:${user.id}`, 3, 60 * 60)
+      if (!rl.ok) throw new ApiError(429, 'We already sent a few links. Check your inbox and spam folder, or try again in an hour.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
+      const sent = await sendVerificationEmail(user, appOrigin(req))
+      if (!sent) throw new ApiError(502, 'We could not send the email right now. Try again shortly.')
+      return json({ success: true })
+    }
     case 'update_profile': {
       const name = typeof b.name === 'string' ? b.name.trim().slice(0, 120) : ''
       if (!name) throw new ApiError(400, 'Name required.')
@@ -53,7 +65,8 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
     }
     case 'revoke_session': {
       if (!b.sessionId) throw new ApiError(400, 'sessionId required')
-      await revokeSession(String(b.sessionId), user.id)
+      // Only this person's own active sessions; any other id (another member's, another firm's) is "not found".
+      if (!(await revokeSession(String(b.sessionId), user.id))) throw new ApiError(404, 'Session not found.')
       await audit({ action: 'account.session_revoked', targetType: 'user', targetId: user.id, detail: { sessionId: b.sessionId } })
       return json({ success: true })
     }
@@ -67,6 +80,11 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
       return json(await beginEnrollment(user))
     }
     case 'mfa_confirm': {
+      // Confirming only completes a pending enrollment; with MFA already on, recovery codes are
+      // rotated through mfa_recovery_codes (password + current second factor) instead.
+      if (user.mfaEnabledAt) throw new ApiError(400, 'Two-step verification is already on. To get new recovery codes, use “Generate new recovery codes” and confirm with your password.', 'mfa_already_enabled')
+      const rl = await hit(`mfa:enroll:${user.id}`, LIMITS.mfaPerUser.limit, LIMITS.mfaPerUser.windowSec)
+      if (!rl.ok) throw new ApiError(429, 'Too many attempts. Wait a few minutes.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
       const fresh = await getUserById(user.id)
       const codes = fresh ? await confirmEnrollment(fresh, String(b.code || '')) : null
       if (!codes) throw new ApiError(400, "That code didn't match. Make sure your phone's time is set automatically, then try the newest code.", 'mfa_invalid')
@@ -77,6 +95,7 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
     case 'mfa_recovery_codes': {
       await reauth(true)
       const codes = await regenerateRecoveryCodes(user)
+      if (!codes) throw new ApiError(400, 'Two-step verification is not on.')
       await audit({ action: 'account.mfa_recovery_regenerated', targetType: 'user', targetId: user.id })
       return json({ success: true, recoveryCodes: codes })
     }
@@ -88,7 +107,7 @@ export const POST = api({ permission: 'read', allowMfaSetup: true }, async (req,
       return json({ success: true })
     }
     case 'export_my_data': {
-      // Data subject access: everything Planora holds about this person as an individual.
+      // Data subject access: everything RunF9 holds about this person as an individual.
       const [sessions, events, chats] = await Promise.all([listSessions(user.id), listAudit(auth.orgId, { actorId: user.id, limit: 5000 }), getChatMessagesForUser(user.id)])
       await audit({ action: 'privacy.personal_data_exported', targetType: 'user', targetId: user.id })
       return json({

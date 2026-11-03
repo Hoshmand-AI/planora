@@ -31,9 +31,22 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // On-prem container image (Dockerfile): a self-contained server in .next/standalone. Only when
+  // RUNF9_STANDALONE=1 is set at build time, so Vercel builds are unchanged.
+  ...(process.env.RUNF9_STANDALONE === '1' ? { output: 'standalone' } : {}),
+  // pdf-parse (pdf.js) must load from node_modules at runtime: bundled, pdf.js evaluates browser-only
+  // globals (DOMMatrix) at module load and every PDF read fails (schedule PDFs and project documents).
+  serverExternalPackages: ['pdf-parse'],
   experimental: {},
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Brand images (logos used in emails, social previews) must load inside mail apps and other
+      // sites, so they alone may be embedded cross-origin. Later rules win for the same header.
+      { source: '/brand/:path*', headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }] },
+      // Deploy templates: the Azure portal reads the template from the browser ("Deploy to Azure").
+      { source: '/deploy/:path*', headers: [{ key: 'Access-Control-Allow-Origin', value: 'https://portal.azure.com' }, { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }, { key: 'Cache-Control', value: 'public, max-age=300' }] },
+    ]
   },
 }
 

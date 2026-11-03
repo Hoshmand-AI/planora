@@ -5,13 +5,14 @@ import type {
   CanonicalCategory, Answer, AnswerValue, Assumption, ElicitationResult, InterviewState, ProjectProfile, ProjectType,
   Question, SourceRef, WorkScope, DeliveryMethod, Classification, PermitSpec, LongLeadSpec, RegulationSpec,
 } from './types'
-import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from './types'
+import { PROJECT_TYPES, PROJECT_TYPE_LABELS, isCivilType } from './types'
 import { resolveRegional, SUPPORTED_STATES } from '@/lib/knowledge/regions'
 import { US_STATES } from '@/lib/knowledge/us-states'
 import { listLongLeadItems } from '@/lib/knowledge/long-lead'
-import { appliesTri } from '@/lib/knowledge/applicability'
+import { appliesTri, effectiveFederal } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
+import { civilOptionsFrom, civilQuestions, featuresFrom } from './civil-options'
 
 export interface HistorySummary {
   /** Firm's own past schedules with categorized activities */
@@ -36,17 +37,79 @@ export function known(answers: Record<string, Answer>, id: string): AnswerValue 
 }
 const num = (v: AnswerValue | undefined) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) ? Number(v) : undefined)
 const str = (v: AnswerValue | undefined) => (typeof v === 'string' && v ? v : undefined)
-const bool = (v: AnswerValue | undefined) => (typeof v === 'boolean' ? v : v === 'true' || v === 'yes' ? true : v === 'false' || v === 'no' ? false : undefined)
+/** Yes/no in any form a browser or API client sends: true/false, "Yes"/"No", "true"/"false", "y"/"n", 1/0. */
+export function parseBool(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v
+  if (v === 1 || v === 0) return v === 1
+  if (typeof v !== 'string') return undefined
+  const t = v.trim().toLowerCase()
+  if (['true', 'yes', 'y', '1'].includes(t)) return true
+  if (['false', 'no', 'n', '0'].includes(t)) return false
+  return undefined
+}
+const bool = (v: AnswerValue | undefined) => parseBool(v)
+/** A known yes/no answer, whatever form it was stored in (older answers may hold "false" or "No"). */
+export const knownBool = (answers: Record<string, Answer>, id: string): boolean | undefined => parseBool(known(answers, id))
+
+/** Square feet per square metre (gross area typed in m² is planned in sf, the catalogs' unit). */
+export const SQFT_PER_M2 = 10.7639
+
+const US_WORDS = /\b(usa|u\.s\.a?\.?|us|united states|america)\b/i
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/**
+ * The location typed instead of picking a US state ("Ontario, Canada", "Dubai") is outside the US
+ * unless it names the US or a US state.
+ */
+export function isOutsideUS(answers: Record<string, Answer>): boolean {
+  const a = answers['project.state']
+  if (!a || a.status !== 'known' || !a.custom || typeof a.value !== 'string') return false
+  const t = a.value.trim()
+  if (US_WORDS.test(t)) return false
+  const lower = t.toLowerCase()
+  return !US_STATES.some(st => new RegExp(`\\b${escapeRe(st.name.toLowerCase())}\\b`).test(lower))
+}
+
+/**
+ * Floor numbers typed for an interiors / TI project: "12-15", "3, 5, 7", "L2–L4", "Floors 10 to 12".
+ * Returned ascending and de-duplicated; a range spans at most 200 floors.
+ */
+export function parseFloors(v: AnswerValue | undefined): number[] | undefined {
+  if (v === undefined || v === null) return undefined
+  if (typeof v === 'number') return Number.isInteger(v) && v > 0 ? [v] : undefined
+  const text = (Array.isArray(v) ? v.join(',') : String(v)).toLowerCase().replace(/floors?|levels?|\bl(?=\d)/g, ' ')
+  const out = new Set<number>()
+  for (const part of text.split(/[,;&]|\band\b/)) {
+    const m = part.match(/(\d+)\s*(?:-|–|—|to|through|thru)\s*(\d+)/)
+    if (m) {
+      const a = Number(m[1]), b = Number(m[2])
+      const lo = Math.min(a, b), hi = Math.max(a, b)
+      if (hi - lo <= 200) for (let f = lo; f <= hi; f++) out.add(f)
+      continue
+    }
+    for (const n of part.match(/\d+/g) || []) out.add(Number(n))
+  }
+  const floors = [...out].filter(f => f > 0).sort((a, b) => a - b)
+  return floors.length ? floors : undefined
+}
 
 export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
   const type = str(known(answers, 'project.type')) as ProjectType | undefined
-  const federal = bool(known(answers, 'project.federal'))
-  const sqft = num(known(answers, 'project.gross_sqft'))
-  const stories = num(known(answers, 'project.stories'))
-  const acres = num(known(answers, 'site.acres_disturbed'))
+  const outsideUS = isOutsideUS(answers)
+  // Outside the US there is no US federal undertaking (a defense facility keeps its own rules).
+  const federal = outsideUS && type !== 'federal_defense' ? false : bool(known(answers, 'project.federal'))
+  const civil = isCivilType(type)
+  const ti = type === 'interiors_ti'
+  const area = civil ? undefined : num(known(answers, 'project.gross_sqft'))
+  const sqft = area !== undefined && known(answers, 'project.area_unit') === 'm2' ? Math.round(area * SQFT_PER_M2) : area
+  const floors = ti ? parseFloors(known(answers, 'project.floors')) : undefined
+  const stories = floors ? floors.length : ti ? undefined : num(known(answers, 'project.stories'))
+  const acres = ti ? undefined : num(known(answers, 'site.acres_disturbed'))
   const classification = str(known(answers, 'security.classification')) as Classification | undefined
+  const projectType = type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined
+  const state = answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase()
+  const civilOpts = civil && projectType ? civilOptionsFrom(projectType, answers, state, str(known(answers, 'project.scope'))) : undefined
   return {
-    projectType: type && (PROJECT_TYPES as readonly string[]).includes(type) ? type : undefined,
+    projectType,
     // A typed location ("Ontario, Canada") is kept for the record but uses generic permitting.
     state: answers['project.state']?.custom ? undefined : str(known(answers, 'project.state'))?.toUpperCase(),
     city: str(known(answers, 'project.city')),
@@ -54,10 +117,16 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     stories,
     scope: str(known(answers, 'project.scope')) as WorkScope | undefined,
     // Unknown disturbed area: estimate footprint ×2 for laydown/parking so NPDES-type rules can still fire.
-    siteAcresDisturbed: acres ?? (sqft && stories ? Math.round((sqft / stories / 43560) * 2 * 10) / 10 : undefined),
+    // An interiors / TI fit-out disturbs no ground.
+    siteAcresDisturbed: ti ? undefined : acres ?? (sqft && stories ? Math.round((sqft / stories / 43560) * 2 * 10) / 10 : undefined),
     isFederal: type === 'federal_defense' ? true : federal,
+    onFederalInstallation: type === 'federal_defense' ? true : federal === false ? false : bool(known(answers, 'project.federal_installation')),
     classification: classification ?? (answers['security.classification']?.status === 'withheld' ? 'classified' : undefined),
     deliveryMethod: str(known(answers, 'project.delivery')) as DeliveryMethod | undefined,
+    valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
+    ...(floors ? { floors } : {}),
+    ...(outsideUS ? { outsideUS } : {}),
+    ...(civilOpts && projectType ? { civil: civilOpts, features: featuresFrom(projectType, civilOpts) } : {}),
   }
 }
 
@@ -73,11 +142,14 @@ function addDays(iso: string, days: number): string {
 
 function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: ElicitationContext): Question[] {
   const today = ctx.today || new Date().toISOString().slice(0, 10)
+  const civil = isCivilType(p.projectType)
+  const ti = p.projectType === 'interiors_ti'
+  const intl = !!p.outsideUS
   const qs: Question[] = [
     {
       id: 'project.type', section: 'project', kind: 'choice', impact: 100, allowWithheld: false,
-      prompt: 'What type of facility is this?',
-      why: 'Facility type drives the activity network, commissioning rigor, required permits (e.g. healthcare/school state reviews) and long-lead equipment.',
+      prompt: 'What type of project is this?',
+      why: 'Project type drives the activity network, commissioning or startup rigor, required permits (e.g. healthcare/school state reviews, Section 404, utility interconnection) and long-lead equipment.',
       options: PROJECT_TYPES.map(t => ({ value: t, label: PROJECT_TYPE_LABELS[t] })),
     },
     {
@@ -95,24 +167,54 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     },
     {
       id: 'project.scope', section: 'project', kind: 'choice', impact: 80, allowWithheld: false,
-      prompt: 'Is this new construction, an addition, or a renovation?',
-      why: 'Renovations add demolition/abatement and, if occupied, phasing constraints; new construction adds full site and foundation work.',
-      options: [
-        { value: 'new_construction', label: 'New construction' }, { value: 'addition', label: 'Addition' },
-        { value: 'renovation', label: 'Renovation (vacant)' }, { value: 'renovation_occupied', label: 'Renovation (occupied / phased)' },
-      ],
+      prompt: civil ? 'Is this new work, an expansion, or rehabilitation / replacement of an existing asset?' : 'Is this new construction, an addition, or a renovation?',
+      why: civil
+        ? 'Rehabilitation and replacement add demolition and staging around the existing asset; work kept in service adds outages and traffic or shutdown windows.'
+        : 'Renovations add demolition/abatement and, if occupied, phasing constraints; new construction adds full site and foundation work.',
+      options: civil
+        ? [
+            { value: 'new_construction', label: 'New (greenfield / new alignment)' }, { value: 'addition', label: 'Expansion / widening' },
+            { value: 'renovation', label: 'Rehabilitation or replacement (out of service)' }, { value: 'renovation_occupied', label: 'Rehabilitation or replacement kept in service (staged)' },
+          ]
+        : ti
+        ? [
+            { value: 'new_construction', label: 'First-generation space (shell, no demolition)' },
+            { value: 'renovation', label: 'Second-generation space (demolish existing build-out)' },
+            { value: 'renovation_occupied', label: 'Occupied building or floor (phased, after-hours work)' },
+          ]
+        : [
+            { value: 'new_construction', label: 'New construction' }, { value: 'addition', label: 'Addition' },
+            { value: 'renovation', label: 'Renovation (vacant)' }, { value: 'renovation_occupied', label: 'Renovation (occupied / phased)' },
+          ],
     },
-    {
-      id: 'project.gross_sqft', section: 'project', kind: 'number', unit: 'sf', impact: 85, allowWithheld: true,
-      prompt: 'What is the gross building area?',
+    ...(civil ? [{
+      id: 'project.value_musd', section: 'project' as const, kind: 'number' as const, unit: 'USD millions', impact: 85, allowWithheld: true,
+      prompt: 'Roughly what is the construction value, in millions of dollars?',
+      why: 'Civil work packages are sized by construction value rather than floor area. Without it, durations use a $20M reference project.',
+    }] : [{
+      id: 'project.gross_sqft', section: 'project' as const, kind: 'number' as const,
+      unit: known(answers, 'project.area_unit') === 'm2' ? 'm²' : 'sf', impact: 85, allowWithheld: true,
+      prompt: ti ? 'What is the fit-out area?' : 'What is the gross building area?',
       why: 'Work-package durations scale with area. Without it every duration is a guess.',
     },
-    {
-      id: 'project.stories', section: 'project', kind: 'number', unit: 'stories', impact: 60, allowWithheld: true,
+    ...(intl ? [{
+      id: 'project.area_unit', section: 'project' as const, kind: 'choice' as const, impact: 30, allowWithheld: false,
+      prompt: 'Is the area in square metres or square feet?',
+      why: 'Durations are sized per 1,000 sf; an area in m² is converted (1 m² = 10.76 sf).',
+      options: [{ value: 'm2', label: 'Square metres (m²)' }, { value: 'sf', label: 'Square feet (sf)' }],
+      fallback: { value: 'sf', explanation: 'Assumed square feet.' },
+    }] : []),
+    ti ? {
+      id: 'project.floors', section: 'project' as const, kind: 'text' as const, impact: 60, allowWithheld: true,
+      prompt: 'Which floors are in the fit-out? Enter the floor numbers, for example 12-15 or 3, 5, 7.',
+      why: 'Demolition, rough-in, drywall and finishes move floor by floor; the plan sequences and labels the work by your actual floor numbers.',
+      fallback: { value: '1', explanation: 'Assumed a single floor.' },
+    } : {
+      id: 'project.stories', section: 'project' as const, kind: 'number' as const, unit: 'stories', impact: 60, allowWithheld: true,
       prompt: 'How many stories above grade?',
       why: 'Stories drive the structure cycle, elevator scope, and deep-foundation likelihood.',
       fallback: { value: 1, explanation: 'Assumed single story.' },
-    },
+    }]),
     {
       id: 'project.target_start', section: 'project', kind: 'date', impact: 70, allowWithheld: true,
       prompt: 'When is Notice to Proceed (or the target start)?',
@@ -138,12 +240,44 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     },
   ]
 
-  if (p.projectType !== 'federal_defense') {
+  // Outside the US there are no US federal funding / property questions (or their Davis-Bacon, NEPA follow-ups).
+  if (p.projectType !== 'federal_defense' && !intl) {
+    qs.push(civil
+      ? {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this a federal or federally funded project (for example FHWA federal-aid, FTA, FAA AIP, USACE or EPA funding)?',
+          why: 'Federal funding adds NEPA/Section 106 reviews, Davis-Bacon certified payrolls, Buy America and agency concurrence. Whether the work is on federal property (a base or federal campus) is asked separately: federal-aid work in public right-of-way needs no base access.',
+          fallback: { value: false, explanation: 'Assumed not federally funded.' },
+        }
+      : {
+          id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
+          prompt: 'Is this federally funded or on federal property?',
+          why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
+          fallback: { value: false, explanation: 'Assumed not federal.' },
+        })
+    // Federal money is not federal land: base access and installation work clearances only apply on an installation.
+    if (p.isFederal === true) {
+      qs.push({
+        id: 'project.federal_installation', section: 'regulatory', kind: 'boolean', impact: 35, allowWithheld: true,
+        prompt: 'Is the work on a federal installation or federal property (for example a military base or a federal campus with controlled access)?',
+        why: 'On an installation, work clearances, dig permits and base access (badging) replace local permits and gate mobilization. Federally funded work in public right-of-way or on non-federal land does not need them.',
+        fallback: civil
+          ? { value: false, explanation: 'Assumed built in public right-of-way, not on a federal installation (no base-access approvals).' }
+          : { value: true, explanation: 'Assumed on federal property: installation approvals and base access are planned.' },
+      })
+    }
+  }
+
+  // Civil networks: staging, utility owners, in-water windows, guideway type, facility and scope variants.
+  qs.push(...civilQuestions(p, answers))
+
+  // Data centers are usually precast or insulated-panel boxes; curtain wall only when the design has it.
+  if (p.projectType === 'data_center' && p.scope !== 'renovation' && p.scope !== 'renovation_occupied') {
     qs.push({
-      id: 'project.federal', section: 'regulatory', kind: 'boolean', impact: 55, allowWithheld: false,
-      prompt: 'Is this federally funded or on federal property?',
-      why: 'Federal projects add NEPA/Section 106 reviews, Davis-Bacon administration and agency design reviews.',
-      fallback: { value: false, explanation: 'Assumed not federal.' },
+      id: 'envelope.curtain_wall', section: 'design', kind: 'boolean', impact: 20, allowWithheld: true,
+      prompt: 'Does the data center have curtain wall (for example on an office or admin block), beyond entrance storefronts?',
+      why: 'Curtain wall adds engineering, a long fabrication lead and a glazing sequence before dry-in. A precast or insulated-panel data center only needs entrance and admin storefront.',
+      fallback: { value: false, explanation: 'Assumed a precast / insulated-panel envelope with entrance and admin storefront only.' },
     })
   }
 
@@ -190,7 +324,8 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     }
   }
 
-  qs.push(
+  // An interiors / TI fit-out has no site work: no disturbed-area or site-condition questions.
+  if (!ti) qs.push(
     {
       id: 'site.acres_disturbed', section: 'site', kind: 'number', unit: 'acres', impact: 40, allowWithheld: true,
       prompt: 'How many acres of ground will be disturbed (including laydown and parking)?',
@@ -203,6 +338,8 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       options: [{ value: 'greenfield', label: 'Greenfield' }, { value: 'previously_developed', label: 'Previously developed' }, { value: 'brownfield', label: 'Brownfield / known contamination' }, { value: 'poor_soils', label: 'Poor soils / high groundwater' }],
       fallback: { value: 'previously_developed', explanation: 'Assumed previously developed site with no remediation.' },
     },
+  )
+  qs.push(
     {
       id: 'calendar.workweek', section: 'calendar', kind: 'choice', impact: 50, allowWithheld: false,
       prompt: 'What is the planned work week for field work?',
@@ -210,22 +347,24 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       options: [{ value: '5x8', label: '5 days × 8 h (Mon–Fri)' }, { value: '5x10', label: '5 days × 10 h' }, { value: '4x10', label: '4 days × 10 h (Mon–Thu)' }, { value: '6x10', label: '6 days × 10 h (Mon–Sat)' }, { value: '7x12', label: '7 days (24/7 critical work)' }],
       fallback: { value: '5x8', explanation: 'Assumed a standard 5-day, 8-hour work week.' },
     },
-    {
-      id: 'calendar.holidays', section: 'calendar', kind: 'boolean', impact: 20, allowWithheld: false,
-      prompt: 'Observe US federal holidays as non-work days?',
-      why: 'About 11 non-work days per year that most schedules forget.',
-      fallback: { value: true, explanation: 'Federal holidays are non-work days.' },
-    },
-    {
-      id: 'calendar.weather', section: 'calendar', kind: 'boolean', impact: 30, allowWithheld: false,
-      prompt: 'Include regional weather days for exterior work?',
-      why: 'We add a weather allowance based on the region\'s adverse months that overlap earthwork through dry-in.',
-      fallback: { value: true, explanation: 'Regional weather allowance included.' },
-    },
   )
+  // US federal holidays only for US projects (outside the US, local holidays are added to the calendar).
+  if (!intl) qs.push({
+    id: 'calendar.holidays', section: 'calendar', kind: 'boolean', impact: 20, allowWithheld: false,
+    prompt: 'Observe US federal holidays as non-work days?',
+    why: 'About 11 non-work days per year that most schedules forget.',
+    fallback: { value: true, explanation: 'Federal holidays are non-work days.' },
+  })
+  // Interior fit-outs have no exterior exposure to carry weather days for.
+  if (!ti) qs.push({
+    id: 'calendar.weather', section: 'calendar', kind: 'boolean', impact: 30, allowWithheld: false,
+    prompt: 'Include regional weather days for exterior work?',
+    why: 'We add a weather allowance based on the region\'s adverse months that overlap earthwork through dry-in.',
+    fallback: { value: true, explanation: 'Regional weather allowance included.' },
+  })
 
   if (p.projectType) {
-    for (const m of MILESTONE_TARGETS) {
+    for (const m of milestoneTargetsFor(p)) {
       qs.push({
         id: `milestone.${m.key}.target`, section: 'milestones', kind: 'date', impact: m.impact, allowWithheld: true,
         prompt: `Is there a target or contractual date for “${m.label}”?`,
@@ -233,6 +372,23 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
         fallback: { value: '', explanation: 'No target; the date is whatever the logic produces.' },
       })
     }
+  }
+
+  // Cost basis: only matters once there is a date to protect. Never changes the schedule; it prices
+  // the recovery options (overtime, added crews) against delay costs. Commercial data, so withholdable.
+  if (known(answers, 'project.required_finish')) {
+    qs.push(
+      {
+        id: 'cost.labor_per_day', section: 'cost', kind: 'number', unit: 'USD per work day', impact: 10, allowWithheld: true,
+        prompt: 'Roughly what does field labor cost per work day on this project (all trades on site)?',
+        why: 'Prices the recovery options: overtime and added crews are a premium on this figure.',
+      },
+      {
+        id: 'cost.delay_per_day', section: 'cost', kind: 'number', unit: 'USD per calendar day', impact: 10, allowWithheld: true,
+        prompt: 'What does each day of late completion cost (liquidated damages plus extended general conditions)?',
+        why: 'Shows whether accelerating pays for itself: days saved × this figure versus the cost of the recovery option.',
+      },
+    )
   }
 
   if (ctx.history && ctx.history.projectCount > 0) {
@@ -247,9 +403,13 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
   return qs
 }
 
-function permitQuestions(permits: PermitSpec[], answers: Record<string, Answer>): Question[] {
+function permitQuestions(permits: PermitSpec[], answers: Record<string, Answer>, profile: ProjectProfile): Question[] {
   const qs: Question[] = []
+  // Federal-only reviews (NEPA, Section 106…) are asked only once the project is known to be federal:
+  // a private project should never be asked about them before "Is this federally funded?".
+  const federalUnknown = effectiveFederal(profile) === undefined
   for (const pm of permits) {
+    if (federalUnknown && pm.appliesWhen?.federalOnly && known(answers, `permit.${pm.id}.status`) === undefined) continue
     const rw = pm.reviewWeeks
     const grounded = [src('catalog', pm.name, `${pm.authority} — ${pm.source}`)]
     qs.push({
@@ -311,7 +471,8 @@ function regulationQuestions(regs: RegulationSpec[], p: ProjectProfile): Questio
 
 /* ─── Milestone targets & date logic ─────────────────── */
 
-export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string }[] = [
+/** `activityKey`: the template activity (key) that reaches the milestone, when its category has several. */
+export const MILESTONE_TARGETS: { key: string; label: string; category: CanonicalCategory; rank: number; impact: number; why: string; activityKey?: string }[] = [
   { key: 'foundations', label: 'Foundations complete', category: 'foundations', rank: 1, impact: 22, why: 'Foundations gate the structure.' },
   { key: 'structure', label: 'Structure complete (topped out)', category: 'structure_steel', rank: 2, impact: 22, why: 'Topping out gates the envelope and roof.' },
   { key: 'dry_in', label: 'Building dried-in', category: 'dry_in', rank: 3, impact: 24, why: 'Interior finishes and sensitive equipment wait for a watertight building.' },
@@ -320,6 +481,64 @@ export const MILESTONE_TARGETS: { key: string; label: string; category: Canonica
   { key: 'substantial_completion', label: 'Substantial completion', category: 'substantial_completion', rank: 5, impact: 30, why: 'The owner can occupy at substantial completion; it is usually the contractual date.' },
 ]
 
+type MilestoneTarget = (typeof MILESTONE_TARGETS)[number]
+const SC_TARGET = MILESTONE_TARGETS[MILESTONE_TARGETS.length - 1]
+const CIVIL_MILESTONES: Partial<Record<ProjectType, MilestoneTarget[]>> = {
+  highway_bridge: [
+    { key: 'substructure', label: 'Substructure complete', category: 'substructure', rank: 1, impact: 22, why: 'Abutments and piers gate girder erection.' },
+    { key: 'deck', label: 'Deck complete', category: 'deck', rank: 2, impact: 24, why: 'The deck gates approach work and the traffic switch.' },
+    { key: 'traffic_switch', label: 'Final traffic switch', category: 'cutover', rank: 4, impact: 26, why: 'Traffic switches are often contractual (lane-rental or incentive/disincentive dates).' },
+    SC_TARGET,
+  ],
+  transit_rail: [
+    { key: 'track', label: 'Track complete', category: 'track_systems', rank: 2, impact: 24, why: 'Track gates systems installation and testing.' },
+    { key: 'systems_testing', label: 'Systems integration testing complete', category: 'startup_testing', rank: 4, impact: 26, why: 'Revenue service waits on integrated testing and safety certification.' },
+    SC_TARGET,
+  ],
+  water_wastewater: [
+    { key: 'process_structures', label: 'Process structures complete', category: 'process_structures', rank: 2, impact: 22, why: 'Structures (and leak tests) gate equipment installation.' },
+    { key: 'startup', label: 'Startup & performance testing complete', category: 'startup_testing', rank: 4, impact: 26, why: 'Regulatory permits and consent decrees often set the date the plant must be operating.' },
+    SC_TARGET,
+  ],
+  utility_power: [
+    { key: 'energization', label: 'Energization', category: 'cutover', rank: 4, impact: 28, why: 'Energization dates are set with the utility / ISO and are hard to move.' },
+    SC_TARGET,
+  ],
+  industrial_process: [
+    { key: 'mechanical_completion', label: 'Mechanical completion', category: 'pipeline', rank: 3, impact: 24, why: 'Mechanical completion hands the plant to commissioning.' },
+    { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
+    SC_TARGET,
+  ],
+  aviation: [
+    { key: 'airfield_reopen', label: 'Runway / taxiway reopened to aircraft', category: 'cutover', rank: 4, impact: 28, why: 'Closures are negotiated with the airport and airlines; reopening dates usually carry liquidated damages.' },
+    SC_TARGET,
+  ],
+  marine_civil_works: [
+    { key: 'cofferdam_removed', label: 'In-water work complete', category: 'in_water_work', rank: 3, impact: 24, why: 'In-water work must finish inside the permit window.' },
+    SC_TARGET,
+  ],
+  environmental_remediation: [
+    { key: 'excavation_complete', label: 'Excavation & disposal complete', category: 'remediation', rank: 3, impact: 24, why: 'Regulators and consent orders often set the date contaminated material must be removed.' },
+    SC_TARGET,
+  ],
+  epc_industrial: [
+    { key: 'mechanical_completion', label: 'Mechanical completion', category: 'inspections', activityKey: 'mc', rank: 3, impact: 24, why: 'Mechanical completion hands each system to commissioning.' },
+    { key: 'startup', label: 'Startup complete', category: 'startup_testing', rank: 4, impact: 26, why: 'First production is usually the owner\'s business date.' },
+    SC_TARGET,
+  ],
+}
+/** Milestone targets the interview asks about for this project type. */
+export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
+  // Interiors / TI: no foundations, structure or dry-in to target.
+  if (p.projectType === 'interiors_ti') return MILESTONE_TARGETS.filter(m => m.key === 'commissioning' || m.key === 'substantial_completion')
+  const list = (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
+  // Transit with trackwork out of scope (e.g. a station rehabilitation): there is no track to complete.
+  if (p.projectType === 'transit_rail' && p.civil?.trackwork === false && p.civil.guideway !== 'elevated_segmental') return list.filter(m => m.key !== 'track')
+  return list
+}
+/** Every milestone target key across project types (for date checks on stored answers). */
+const ALL_MILESTONE_TARGETS: MilestoneTarget[] = [...MILESTONE_TARGETS, ...Object.values(CIVIL_MILESTONES).flat()].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)
+
 /** Which milestone a gated category must precede, for delivery/permit vs target checks. */
 const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   earthwork: 'foundations', deep_foundations: 'foundations', foundations: 'foundations',
@@ -327,6 +546,10 @@ const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
   roofing: 'dry_in', exterior_skin: 'dry_in', windows_curtainwall: 'dry_in',
   electrical_service: 'electrical_service', mechanical_equipment: 'commissioning', fire_protection: 'commissioning',
   elevators: 'substantial_completion', finishes: 'substantial_completion', specialties: 'substantial_completion', low_voltage: 'commissioning',
+  substructure: 'substructure', superstructure: 'deck', deck: 'deck', track_systems: 'track', process_structures: 'process_structures',
+  process_equipment: 'startup', power_equipment: 'energization', conductors: 'energization', controls_scada: 'startup', pipeline: 'mechanical_completion',
+  remediation: 'excavation_complete', tunneling: 'substantial_completion', mass_concrete: 'substantial_completion',
+  substantial_completion: 'substantial_completion',
 }
 
 export interface DateIssue { questionIds: string[]; text: string; severity: 'error' | 'warning' }
@@ -341,10 +564,13 @@ export function checkAnswerDates(answers: Record<string, Answer>, permits: Permi
   type Pt = { id: string; label: string; date: string; rank: number }
   const pts: Pt[] = []
   if (start) pts.push({ id: 'project.target_start', label: 'Notice to Proceed', date: start, rank: 0 })
-  for (const m of MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
+  for (const m of ALL_MILESTONE_TARGETS) { const x = d(`milestone.${m.key}.target`); if (x) pts.push({ id: `milestone.${m.key}.target`, label: m.label, date: x, rank: m.rank }) }
   if (finish) pts.push({ id: 'project.required_finish', label: 'Required completion', date: finish, rank: 6 })
   for (const a of pts) for (const b of pts) {
-    if (a.rank < b.rank && b.date <= a.date) {
+    // The required completion is usually the Substantial Completion date itself (and may equal the
+    // other completion-stage milestones), so only a required completion BEFORE them is a conflict.
+    const sameDayOk = b.id === 'project.required_finish' && a.rank >= 4
+    if (a.rank < b.rank && (sameDayOk ? b.date < a.date : b.date <= a.date)) {
       out.push({ questionIds: [a.id, b.id], severity: 'error', text: `“${b.label}” (${f(b.date)}) is on or before “${a.label}” (${f(a.date)}). ${b.label} can't happen until ${a.label.toLowerCase()} — one of these dates needs to change.` })
     }
   }
@@ -380,14 +606,42 @@ export function questionBank(state: InterviewState, ctx: ElicitationContext = {}
   const regulations = regional.regulations
   const all = [
     ...baseQuestions(profile, answers, ctx),
-    ...permitQuestions(permits, answers),
+    ...permitQuestions(permits, answers, profile),
     ...procurementQuestions(longLead, answers),
     ...regulationQuestions(regulations, profile),
     ...(ctx.extraQuestions || []),
   ].map(q => (q.kind === 'choice' || q.kind === 'multi') && q.allowOther === undefined
-    ? { ...q, allowOther: true, otherPrompt: q.otherPrompt || 'Not listed? Type your answer' }
+    ? (STRICT_CHOICE(q.id) ? { ...q, allowOther: false } : { ...q, allowOther: true, otherPrompt: q.otherPrompt || 'Not listed? Type your answer' })
     : q)
   return { all, permits, longLead, regulations, profile }
+}
+
+/**
+ * Choices the plan's logic branches on (facility type, scope, delivery, permit and procurement status):
+ * only a listed option is a valid answer. A typed value there used to be kept as a "custom" answer and
+ * silently planned as the default (e.g. procure.escalators.status = "not_required" stayed in scope).
+ */
+const STRICT_CHOICE = (id: string) =>
+  ['project.type', 'project.scope', 'project.delivery', 'security.classification', 'project.area_unit'].includes(id) || /^(permit|procure)\.[^.]+\.status$/.test(id)
+
+/** history.use when the firm has no completed projects yet: accepted as a preference (no effect until history exists). */
+export const HISTORY_USE_QUESTION: Question = {
+  id: 'history.use', section: 'history', kind: 'boolean', impact: 0, allowWithheld: false,
+  prompt: "Use how your firm's past projects actually performed to set durations?",
+  why: 'Recorded as a preference. It takes effect once your firm has uploaded completed schedules.',
+}
+
+/**
+ * The question an incoming answer belongs to. Answers saved together can make each other irrelevant
+ * (answering "federal: no" removes "does Davis-Bacon apply?"), so a question offered with the answers
+ * the user was looking at (`offered`) is still accepted.
+ */
+export function answerableQuestion(id: string, answers: Record<string, Answer>, ctx: ElicitationContext = {}, offered?: Record<string, Answer>): Question | null {
+  const now = questionBank({ answers }, ctx).all.find(q => q.id === id)
+  if (now) return now
+  const before = offered ? questionBank({ answers: offered }, ctx).all.find(q => q.id === id) : undefined
+  if (before) return before
+  return id === 'history.use' ? HISTORY_USE_QUESTION : null
 }
 
 const WEIGHT: Record<Answer['status'], number> = { known: 1, withheld: 0.6, unknown: 0.3 }
@@ -410,7 +664,7 @@ export function elicit(state: InterviewState, ctx: ElicitationContext = {}): Eli
   }
 
   // Ask the highest-impact gaps first; keep sections together for ties so the interview reads naturally.
-  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'milestones', 'history']
+  const order: Question['section'][] = ['project', 'design', 'security', 'permits', 'procurement', 'site', 'regulatory', 'calendar', 'milestones', 'cost', 'history']
   open.sort((a, b) => b.impact - a.impact || order.indexOf(a.section) - order.indexOf(b.section))
 
   return {
@@ -453,17 +707,19 @@ function assumptionFor(q: Question, a: Answer, permits: PermitSpec[], longLead: 
 /** An open question at generation time: planned with its default, buffered like "don't know". */
 export function unansweredAssumption(q: Question, permits: PermitSpec[], longLead: LongLeadSpec[]): Assumption {
   const a = assumptionFor(q, { status: 'unknown', answeredAt: '' }, permits, longLead, {})
-  return { ...a, text: `Not answered yet: ${q.prompt} ${q.fallback?.explanation || 'Planora uses its default for this item.'}` }
+  return { ...a, text: `Not answered yet: ${q.prompt} ${q.fallback?.explanation || 'RunF9 uses its default for this item.'}` }
 }
 
 /** A typed answer outside the catalog: recorded verbatim, planned with the default, flagged for review. */
 function customAssumption(q: Question, a: Answer): Assumption {
   const fallback = q.id === 'project.state'
-    ? 'Generic US permitting and climate are used — add local permits as activities if needed.'
+    ? (isOutsideUS({ [q.id]: a })
+      ? 'Treated as outside the US: no US permits, federal questions or US holidays; a generic local building approval and utility connection are planned — add the local approvals and holidays.'
+      : 'Generic US permitting and climate are used — add local permits as activities if needed.')
     : q.id === 'project.type'
       ? 'A generic building template is used; review the activity list for this facility type.'
-      : q.fallback?.explanation || 'Planora plans with its default for this item.'
-  return { questionId: q.id, text: `${q.prompt} — you entered “${String(a.value)}”, which is not in Planora's catalog. ${fallback}`, bufferDays: q.impact >= 60 ? 10 : q.impact >= 40 ? 5 : 0, kind: 'custom' }
+      : q.fallback?.explanation || 'RunF9 plans with its default for this item.'
+  return { questionId: q.id, text: `${q.prompt} — you entered “${String(a.value)}”, which is not in RunF9's catalog. ${fallback}`, bufferDays: q.impact >= 60 ? 10 : q.impact >= 40 ? 5 : 0, kind: 'custom' }
 }
 
 function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permits: PermitSpec[], ctx: ElicitationContext): string[] {
@@ -476,11 +732,10 @@ function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permi
   if ((p.scope === 'renovation' || p.scope === 'renovation_occupied') && (p.siteAcresDisturbed ?? 0) >= 5) out.push('Renovation scope but 5+ acres of site disturbance — is there significant sitework in scope?')
   if (p.projectType === 'multifamily' && (p.stories ?? 0) > 12 && p.scope === 'new_construction') out.push('High-rise multifamily: confirm structural system; the template assumes concrete above 5 stories.')
   if (known(answers, 'project.federal') === false && p.projectType === 'federal_defense') out.push('Project type is federal/defense but marked as not federal.')
-  if (p.classification === 'classified' && ctx.aiMode === 'cloud') out.push('Classified project while AI runs in cloud mode. Switch this deployment to air-gapped mode (PLANORA_AIRGAPPED=true with an on-prem model) before entering any controlled information.')
+  if (p.classification === 'classified' && ctx.aiMode === 'cloud') out.push('Classified project while AI runs in cloud mode. Switch this deployment to air-gapped mode (RUNF9_AIRGAPPED=true with an on-prem model) before entering any controlled information.')
 
   const start = str(known(answers, 'project.target_start'))
-  const finish = str(known(answers, 'project.required_finish'))
-  if (start && finish && finish <= start) out.push(`Required finish ${finish} is on or before the target start ${start}.`)
+  // A required finish on or before the start is reported once, by checkAnswerDates (dateIssues).
   if (start && pct !== undefined && pct < 90) {
     const bp = permits.find(pm => pm.gates === 'foundations' && known(answers, `permit.${pm.id}.status`) === 'not_submitted')
     if (bp) out.push(`The ${bp.name} is not submitted and drawings are ${pct}% complete; construction cannot start at ${start} — the schedule will show NTP for design/preconstruction, with field work gated by the permit.`)
@@ -506,10 +761,62 @@ export function validateAnswer(q: Question, a: Answer): string | null {
     case 'choice':
       if (q.options?.some(o => o.value === v)) return null
       if (q.allowOther && typeof v === 'string' && v.trim().length >= 2) return v.length > 200 ? 'Keep it under 200 characters.' : null
-      return q.allowOther ? 'Pick an option or type your own answer.' : 'Pick one of the options.'
+      return q.allowOther ? 'Pick an option or type your own answer.' : `${v === undefined || v === '' ? 'No answer given' : `“${String(v)}” is not a valid answer`}. Valid options: ${(q.options || []).map(o => o.value).join(', ')}.`
     case 'multi': return Array.isArray(v) ? null : 'Pick one or more options.'
     default: return typeof v === 'string' && v.trim() ? null : 'Enter an answer.'
   }
+}
+
+export interface AppliedAnswers {
+  answers: Record<string, Answer>
+  /** Questions that don't exist or no longer apply (skipped, not fatal) */
+  errors: Record<string, string>
+  /** Invalid values: the caller rejects the whole request */
+  invalid: Record<string, string>
+  applied: { id: string; detail: string }[]
+}
+
+/**
+ * Apply a batch of interview answers. Order doesn't matter: dependent questions (design % after
+ * "drawings: yes", an elevator's status after the story count) are retried once the answers they depend
+ * on are in, and a question the user was offered that another answer in the same batch made irrelevant
+ * (e.g. "Does Davis-Bacon apply?" saved together with "federal: no") is still accepted.
+ */
+export function applyAnswers(current: Record<string, Answer>, incoming: Record<string, Partial<Answer> | null>, ctx: ElicitationContext = {}, now = new Date().toISOString()): AppliedAnswers {
+  let answers = { ...current }
+  const errors: Record<string, string> = {}
+  const invalid: Record<string, string> = {}
+  const applied: AppliedAnswers['applied'] = []
+  const apply = (qid: string, raw: Partial<Answer>, q: Question) => {
+    const status = raw.status === 'withheld' || raw.status === 'unknown' ? raw.status : 'known'
+    // A note qualifies the answer in the team's own words; never kept on withheld answers.
+    const note = status !== 'withheld' && typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 1000) : undefined
+    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: 'user' })
+    const err = validateAnswer(q, a)
+    if (err) { invalid[qid] = err; return }
+    answers = { ...answers, [qid]: a }
+    applied.push({ id: qid, detail: `${qid} = ${status === 'known' ? JSON.stringify(a.value) : status}` })
+  }
+  let queue = Object.entries(incoming)
+  while (queue.length) {
+    const retry: typeof queue = []
+    for (const [qid, raw] of queue) {
+      if (raw === null || typeof raw !== 'object') { delete answers[qid]; continue }
+      const q = questionBank({ answers }, ctx).all.find(x => x.id === qid)
+      if (q) apply(qid, raw, q)
+      else retry.push([qid, raw])
+    }
+    if (retry.length === queue.length) {
+      for (const [qid, raw] of retry) {
+        const q = answerableQuestion(qid, answers, ctx, current)
+        if (q) apply(qid, raw as Partial<Answer>, q)
+        else errors[qid] = 'Unknown or no longer relevant question.'
+      }
+      break
+    }
+    queue = retry
+  }
+  return { answers, errors, invalid, applied }
 }
 
 /** Normalize raw answer values from the browser (numbers/booleans arrive as strings). */

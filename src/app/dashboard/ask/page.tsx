@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { useApp } from '../layout'
-import { Send, Upload } from 'lucide-react'
+import { Markdown } from '@/components/Markdown'
+import { Send } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import { fmtDates } from '@/lib/format'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: string }
@@ -15,11 +17,19 @@ const SUGGESTED = [
 ]
 
 export default function AskPage() {
-  const { selectedSchedule } = useApp()
+  const { selectedSchedule, openUpload, can } = useApp()
   const [messages, setMessages] = useState<Message[]>([])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  // "Use project documents": answers cite the project's contracts and specifications (Documents tab).
+  const [useDocs,  setUseDocs]  = useState(false)
+  const [withUnreviewed, setWithUnreviewed] = useState(false)
+  const docsId = useId()
+  const unrevId = useId()
   const bottomRef = useRef<HTMLDivElement>(null)
+  // Without an AI model, answers are a readout of the schedule facts: say so before anyone asks.
+  const [aiOff, setAiOff] = useState(false)
+  useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
 
   useEffect(() => {
     if (!selectedSchedule) return
@@ -45,7 +55,7 @@ export default function AskPage() {
       const res  = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id }),
+        body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
       const data = await res.json()
       const aiMsg: Message = {
@@ -66,13 +76,9 @@ export default function AskPage() {
 
   if (!selectedSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-        <div className="w-12 h-12 bg-warm-100 border border-warm-200 rounded-lg flex items-center justify-center mb-4">
-          <Upload size={20} className="text-warm-400" />
-        </div>
-        <div className="text-[17px] font-semibold text-navy-950 mb-2">Upload a schedule to ask questions</div>
-        <p className="text-[14px] text-warm-500 max-w-[340px]">AI-powered Q&A works with your actual schedule data.</p>
-      </div>
+      <EmptyState title="Upload a schedule to ask questions" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
+        AI-powered Q&amp;A works with your actual schedule data.
+      </EmptyState>
     )
   }
 
@@ -80,13 +86,14 @@ export default function AskPage() {
     <div className="flex flex-col" style={{ height: 'calc(100dvh - 104px)' }} /* desktop: 48px header + 40px tab row = 88px; mobile: 48px header + 64px bottom bar = 112px, dvh handles notch */>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-auto p-5 md:p-6">
+      <div className="flex-1 overflow-auto p-5 md:p-6" tabIndex={0} role="region" aria-label="Conversation">
 
         {messages.length === 0 && (
           <div className="max-w-[560px] mx-auto">
             <div className="mb-6">
               <h2 className="font-display text-[22px] text-navy-950 mb-1">Ask about your schedule</h2>
               <p className="text-[13.5px] text-warm-500">Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</p>
+              {aiOff && <p className="text-[13px] text-warm-600 mt-2 border-l-2 border-warm-300 pl-3">AI is turned off, so answers are a readout of the schedule facts (status, critical path, what starts next) rather than a written reply to your question.</p>}
             </div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
@@ -108,7 +115,7 @@ export default function AskPage() {
                   ? 'bg-navy-900 text-white'
                   : 'bg-warm-100 border border-warm-200 text-warm-700'
               }`}>
-                <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div>
+                {msg.role === 'user' ? <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div> : <Markdown text={msg.content} />}
               </div>
               <div className="text-[10px] text-warm-400 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -128,19 +135,34 @@ export default function AskPage() {
       </div>
 
       {/* Input bar */}
-      <div className="bg-warm-50 border-t border-warm-200 px-5 py-3 flex gap-3 items-center">
+      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-warm-700">
+        <label htmlFor={docsId} className="flex items-center gap-1.5">
+          <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
+          Use project documents
+        </label>
+        {useDocs && (
+          <label htmlFor={unrevId} className="flex items-center gap-1.5">
+            <input id={unrevId} type="checkbox" checked={withUnreviewed} onChange={e => setWithUnreviewed(e.target.checked)} />
+            Include unreviewed documents
+          </label>
+        )}
+        {useDocs && <span className="text-warm-500">Answers cite passages as [document §section p.N]. Document text is treated as data, never as instructions.</span>}
+      </div>
+      <div className="bg-warm-50 px-5 py-3 flex gap-3 items-center">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Ask about your schedule…"
+          aria-label="Ask about your schedule"
           className="flex-1 bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
           disabled={loading}
         />
         <button
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
-          className="w-9 h-9 bg-accent-500 rounded-md flex items-center justify-center text-navy-950 hover:bg-accent-400 transition-colors disabled:opacity-40"
+          aria-label="Send"
+          className="w-9 h-9 bg-accent-600 rounded-md flex items-center justify-center text-white hover:bg-accent-700 transition-colors disabled:opacity-40 pressable shadow-sm"
         >
           <Send size={15} />
         </button>

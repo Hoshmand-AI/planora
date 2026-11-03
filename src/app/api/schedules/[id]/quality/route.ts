@@ -1,33 +1,42 @@
 import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
-import { getDataQuestionResponses, getScheduleById, saveDataQuestionResponse } from '@/lib/db'
+import { getDataQuestionResponses, getReviewState, getScheduleById, saveDataQuestionResponse } from '@/lib/db'
 import { runDcma } from '@/lib/analysis/dcma'
 import { checkInputs } from '@/lib/analysis/input-checks'
-import { analyzableFromDb, loadScheduleData } from '@/lib/planning/service'
+import { analyzableFromDb, basisFrom, basisLabel, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { guidanceFor } from '@/lib/analysis/dcma-guidance'
+import { scheduleResourceCounts } from '@/lib/planning/resource-service'
 
 /** DCMA 14-point assessment + the tool's own questions about the imported data. */
-export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { params, auth: ctx }) => {
-  const data = await loadScheduleData(params.id, ctx.orgId)
+export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth: ctx }) => {
+  // DCMA of the schedule as submitted; ?basis=scenario assesses the what-if scenario with the RunF9 edits.
+  const data = await loadScheduleData(params.id, ctx.orgId, { basis: basisFrom(req.nextUrl.searchParams) })
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { schedule, activities, relationships } = data
-  const responses = await getDataQuestionResponses(schedule.id)
-  const a = analyzableFromDb(schedule, activities, relationships)
-  const dcma = runDcma(a)
+  const [responses, review] = await Promise.all([getDataQuestionResponses(schedule.id), getReviewState(schedule.id, ctx.orgId)])
+  // Resource assignments are not stored per activity; they are read from the original file (P6
+  // TASKRSRC / ResourceAssignment rows, MS Project Assignments, spreadsheet resource columns).
+  const resourceCounts = await scheduleResourceCounts(schedule, ctx.orgId, activities).catch(() => null)
+  const a = analyzableFromDb(schedule, activities, relationships, resourceCounts)
+  const dcma = runDcma(a, ctx.settings.quality)
   const questions = checkInputs(a)
   const byId = new Map(responses.map(r => [r.questionId, r]))
   const guidance = dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({
-    ...guidanceFor(c, { generated: false }),
+    // Uploads with logic have what-if / recovery options and RunF9 edits on the schedule dashboard.
+    ...guidanceFor(c, { generated: false, uploadedRecoveryHref: data.cpm && schedule.sourceType !== 'generated' ? `/dashboard/project?schedule=${encodeURIComponent(schedule.id)}#recovery` : undefined }),
     decision: byId.get(`dcma:${c.id}`) ?? null,
   }))
   return NextResponse.json({
+    basis: data.basis, basisLabel: basisLabel(data.basis, data.editsApplied), editsApplied: data.editsApplied,
+    basisNote: basisWarning(data.basis, data.editsApplied),
     guidance,
     brief: data.brief,
-    schedule: { id: schedule.id, name: schedule.name, version: schedule.version, sourceType: schedule.sourceType, calendars: schedule.calendars, warnings: schedule.warnings },
+    schedule: { id: schedule.id, name: schedule.name, version: schedule.version, sourceType: schedule.sourceType, calendars: schedule.calendars, warnings: schedule.warnings, importExceptions: schedule.importExceptions ?? null },
     dcma,
     dataQuestions: questions.map(q => ({ ...q, response: byId.get(q.id) ?? null })),
     classification: summarizeCategories(activities.map(x => x.category || 'other')),
+    review,
   })
 })
 

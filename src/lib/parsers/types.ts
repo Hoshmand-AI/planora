@@ -1,16 +1,24 @@
 // Shared result type for all schedule-file parsers, plus small helpers the parsers share.
 
 import type { Activity, Relationship } from '@/lib/db'
-import type { ConstraintType, WorkCalendar } from '@/lib/planning/types'
+import type { ConstraintType, ProgressMode, WorkCalendar } from '@/lib/planning/types'
+import type { EmbeddedBaseline } from '@/lib/analysis/baseline'
+import type { ResourceData } from '@/lib/planning/resource-types'
+import type { ExceptionReport } from './exceptions'
 import { randomUUID as uuid } from 'crypto'
 
-export type ParsedSourceType = 'p6_xer' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
+export type ParsedSourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
 
 export interface ParsedSchedule {
   projectName: string
   dataDate: string | null
   projectStart: string | null
+  /** Finish date the file reports (P6 scheduled finish / MSP finish); RunF9 recalculates its own */
   projectFinish: string | null
+  /** Required finish the file imposes (P6 PROJECT.plan_end_date "Must Finish By") */
+  mustFinishBy?: string | null
+  /** Stable project identity across updates (P6 proj_short_name, MSP title) */
+  projectKey?: string | null
   /** Activity.id is a fresh uuid; Activity.sourceId is the source-system id (P6 task_id, MSP UID, row code) */
   activities: Activity[]
   /** predecessorId / successorId reference Activity.id (uuid) */
@@ -18,7 +26,24 @@ export interface ParsedSchedule {
   calendars: WorkCalendar[]
   defaultCalendarId: string | null
   warnings: string[]
+  /**
+   * Structured import exception report: every table / field / element the parser saw but did not map,
+   * and every value it converted or defaulted (src/lib/parsers/exceptions.ts). Stored with the upload.
+   */
+  exceptions?: ExceptionReport
   sourceType: ParsedSourceType
+  /** P6 only: resource assignments per source task id (XER TASKRSRC rows / P6 XML ResourceAssignment); undefined when the file has none */
+  resourceCounts?: Record<string, number>
+  /** Resources and assignments (XER RSRC/TASKRSRC, MSP Resources/Assignments, spreadsheet resource columns); null when the file has none */
+  resources?: ResourceData | null
+  /** P6 only: every table present in the file */
+  sourceTables?: string[]
+  /** P6 only: the file's out-of-sequence progress option (SCHEDOPTIONS); null when absent or "Actual Dates" */
+  progressMode?: ProgressMode | null
+  /** The file was written by RunF9's own exporter (a re-import of RunF9 output, not a project record) */
+  runf9Export?: boolean
+  /** P6 only: the project baseline exported in the same file (per-activity baseline by activity id) */
+  embeddedBaseline?: EmbeddedBaseline | null
 }
 
 /* ─── helpers shared by the parsers (not part of the public contract) ─── */
@@ -100,8 +125,10 @@ export function constraintFromLabel(label: string | null | undefined): Constrain
     snlt: 'SNLT', startnolaterthan: 'SNLT', startonorbefore: 'SNLT', csmsob: 'SNLT',
     fnet: 'FNET', finishnoearlierthan: 'FNET', finishonorafter: 'FNET', csmeoa: 'FNET',
     fnlt: 'FNLT', finishnolaterthan: 'FNLT', finishonorbefore: 'FNLT', csmeob: 'FNLT',
-    mso: 'MSO', muststarton: 'MSO', starton: 'MSO', mandatorystart: 'MSO', csmso: 'MSO', csmandstart: 'MSO',
-    mfo: 'MFO', mustfinishon: 'MFO', finishon: 'MFO', mandatoryfinish: 'MFO', csmeo: 'MFO', csmandfin: 'MFO', csmandfinish: 'MFO',
+    // P6 "Start On" / "Finish On" (CS_MSO / CS_MEO) keep logic in charge; only the mandatory types overrule it.
+    starton: 'SO', csmso: 'SO', finishon: 'FO', csmeo: 'FO',
+    mso: 'MSO', muststarton: 'MSO', mandatorystart: 'MSO', csmandstart: 'MSO',
+    mfo: 'MFO', mustfinishon: 'MFO', mandatoryfinish: 'MFO', csmandfin: 'MFO', csmandfinish: 'MFO',
   }
   return table[n] ?? null
 }

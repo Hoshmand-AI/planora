@@ -1,5 +1,5 @@
 // Semantic normalization across firms: maps heterogeneous activity names and calendar labels
-// (as seen in P6 / MS Project exports) onto Planora's canonical categories, phases and work weeks.
+// (as seen in P6 / MS Project exports) onto RunF9's canonical categories, phases and work weeks.
 
 import type { CanonicalCategory, Classified, Phase, Weekday } from '@/lib/planning/types'
 
@@ -47,6 +47,31 @@ const PHASE: Record<CanonicalCategory, Phase> = {
   substantial_completion: 'closeout',
   closeout: 'closeout',
   final_completion: 'closeout',
+  row_utilities: 'sitework',
+  traffic_control: 'sitework',
+  in_water_work: 'sitework',
+  substructure: 'structure',
+  superstructure: 'structure',
+  deck: 'structure',
+  roadway: 'sitework',
+  drainage: 'sitework',
+  pipeline: 'sitework',
+  process_structures: 'structure',
+  process_equipment: 'mep',
+  power_equipment: 'mep',
+  controls_scada: 'mep',
+  track_systems: 'mep',
+  conductors: 'mep',
+  startup_testing: 'commissioning',
+  cutover: 'commissioning',
+  signals_lighting: 'sitework',
+  erosion_control: 'sitework',
+  restoration: 'sitework',
+  concrete_cure: 'structure',
+  tunneling: 'sitework',
+  mass_concrete: 'structure',
+  remediation: 'sitework',
+  sampling_analysis: 'commissioning',
   contingency: 'closeout',
   other: 'preconstruction',
 }
@@ -93,6 +118,31 @@ const LABEL: Record<CanonicalCategory, string> = {
   substantial_completion: 'Substantial completion',
   closeout: 'Closeout',
   final_completion: 'Final completion',
+  row_utilities: 'Right-of-way & utility relocation',
+  traffic_control: 'Traffic control / staging',
+  in_water_work: 'In-water work & cofferdams',
+  substructure: 'Substructure',
+  superstructure: 'Superstructure',
+  deck: 'Bridge deck',
+  roadway: 'Roadway & paving',
+  drainage: 'Drainage',
+  pipeline: 'Pipelines & yard piping',
+  process_structures: 'Process structures & tanks',
+  process_equipment: 'Process equipment',
+  power_equipment: 'Power equipment',
+  controls_scada: 'Controls, instrumentation & SCADA',
+  track_systems: 'Track & rail systems',
+  conductors: 'Bus work & conductors',
+  startup_testing: 'Startup & testing',
+  cutover: 'Cutover, tie-ins & outages',
+  signals_lighting: 'Signals, lighting & ITS',
+  erosion_control: 'Erosion & sediment control',
+  restoration: 'Seeding & site restoration',
+  concrete_cure: 'Concrete curing',
+  tunneling: 'Tunneling',
+  mass_concrete: 'Mass concrete',
+  remediation: 'Remediation (excavation, transport & disposal)',
+  sampling_analysis: 'Sampling & laboratory analysis',
   contingency: 'Contingency',
   other: 'Other',
 }
@@ -137,6 +187,33 @@ export const TAXONOMY_RULES: TaxonomyRule[] = [
   r('permit-site', /(grading|site|civil|land[\s-]?disturb(ance)?|excavation|stormwater|erosion|e\s*&\s*s|sitework|demo(lition)?)\s+permit|\bswppp\b|\bnpdes\b|\bnoi\b|\bsite\s+plan\s+approval\b/, 'permit_site', 0.85),
   r('permit-building', /(bldg|building|construction|foundation|structural|core\s*(&|and)\s*shell|shell|ti)\s+permit|permit\s*[-–:]\s*(bldg|building)|\bplan\s+check\b|\bplan\s+review\b|\bdob\b\s+(approval|permit|filing)/, 'permit_building', 0.85),
   r('permit-other', /\bpermits?\b|\bhcai\b|\boshpd\b|\bdsa\b|\bfaa\b|\b7460\b|\bnepa\b|\bshpo\b|\bsection\s+106\b|\bceqa\b|\bsepa\b|\bseqra\b|\bentitlements?\b|\bzoning\b|\bvariance\b|\bcertificate\s+of\s+need\b|\bcopn\b/, 'permit_other', 0.75),
+
+  // Civil / infrastructure (specific terms, before the generic building rules)
+  r('signals-lighting', /traffic\s+signals?|signal\s+(poles?|heads?|mast\s+arms?|foundations?|turn[\s-]?on|timing)|mast\s+arms?|\bits\s+(devices?|equipment|cabinets?)|dynamic\s+message\s+signs?|\bdms\b|(highway|roadway|street)\s+lighting|light(ing)?\s+poles?|high[\s-]?mast|airfield\s+lighting|runway\s+(edge\s+)?lights?|taxiway\s+(edge\s+)?lights?|\balcms\b|\bccrs?\b|constant\s+current\s+regulators?/, 'signals_lighting', 0.85),
+  r('erosion-control', /erosion\s*(&|and)?\s*(sediment(ation)?\s*)?control|\be\s*&\s*s\s+(controls?|measures|bmps?|install)|\bescp?\b|silt\s+fenc|inlet\s+protection|sediment\s+(basins?|traps?|controls?)|turbidity\s+curtains?|(stabilized\s+)?construction\s+entrances?|\bcompost\s+filter\s+socks?/, 'erosion_control', 0.85),
+  r('restoration', /(permanent|temporary|final)\s+seed(ing)?|seed(ing)?\s*(,|&|and)\s*mulch|hydro[\s-]?seed|turf\s+establishment|(site|lawn|turf|surface|landscape|disturbed[\s-]area|roadside|slope)\s+restoration|restor(e|ation)\s+(of\s+)?(the\s+)?(site|disturbed|lawns?|turf|surfaces?|slopes?)|topsoil(ing)?\s*(,|&|and)\s*seed/, 'restoration', 0.85),
+  r('cure', /^(?!.*\b(pour|place|placement|form|forms|forming)\b).*\bcur(e|ing)\b(?!\s+compound)|strength\s+gain|\bcylinder\s+breaks?\b/, 'concrete_cure', 0.85),
+  r('remediation', /contaminated\s+(soil|material|sediment)|\bt\s*&\s*d\b|transport(ation)?\s*(&|and)\s*disposal|waste\s+(load[\s-]?out|disposal|manifest)|\bremedial\s+(action|excavation)|hot[\s-]?spot\s+(removal|excavation)/, 'remediation', 0.85),
+  r('sampling', /confirmation\s+sampl|waste\s+characteri[sz]ation|\bsampling\b|\blab(oratory)?\s+(analysis|results|turnaround|tat)\b|data\s+validation|\bqapp\b/, 'sampling_analysis', 0.85),
+  r('tunneling', /\btbm\b|tunnel\s+boring|drill[\s-]?(and|&)[\s-]?blast|\bheading\s*(&|and)\s*bench|\bmining\b|segmental\s+lining|\btunnel\s+(excavation|lining|portal)/, 'tunneling', 0.85),
+  r('mass-concrete', /mass\s+concrete|\bmonoliths?\b|lock\s+walls?|spillway\s+(piers?|ogee)|\bgravity\s+dam\b/, 'mass_concrete', 0.85),
+  r('row-utilities', /right[\s-]of[\s-]way|\brow\s+(acquisition|clearance|certification)|utility\s+relocat|(water|gas|sewer|power|electric|telecom|fiber|overhead|underground)\s+(main\s+|mains\s+|line\s+|lines\s+|service\s+)?relocat|railroad\s+(agreement|force\s+account|flagging\s+agreement)/, 'row_utilities', 0.85),
+  r('traffic-control', /\bmot\b|maintenance\s+of\s+traffic|traffic\s+(control|switch|shift|staging)|\bdetours?\b|lane\s+closures?|\bstage\s+\d+\s+traffic\b|temporary\s+(barrier|crossover)/, 'traffic_control', 0.85),
+  r('in-water', /cofferdams?|in[\s-]water|\btremie\b|\bseal\s+course\b|fish\s+window|work\s+window/, 'in_water_work', 0.85),
+  r('substructure', /abutments?|pier\s+(caps?|columns?|stems?|footings?)|\bbents?\b|wing\s*walls?|retaining\s+walls?|\bmse\s+walls?/, 'substructure', 0.85),
+  r('superstructure', /girders?|\bbearings?\b|diaphragms?|beam\s+(set|erection|placement)|bulb[\s-]?t|box\s+beams?|\bstringers?\b/, 'superstructure', 0.85),
+  r('deck', /bridge\s+deck|deck\s+(form(s|ing)?|rebar|pour|overlay|placement)|barrier\s+rails?|parapets?|expansion\s+joints?|approach\s+slabs?/, 'deck', 0.85),
+  r('roadway', /(aggregate\s+)?base\s+course|\bhma\b|\bpccp?\b|mill(ing)?\s*(&|and)\s*overlay|\bsubbase\b|roadway|travel\s+lanes?|\bmainline\b|\bshoulders?\b|guard\s*rail/, 'roadway', 0.8),
+  r('drainage', /culverts?|\binlets?\b|catch\s+basins?|head\s*walls?|underdrains?|\bswales?\b|storm\s+drainage/, 'drainage', 0.8),
+  r('pipeline', /transmission\s+main|yard\s+piping|force\s+main|pipe\s*line|\bhdd\b|directional\s+drill|jack(ing)?\s*(&|and)\s*bore|micro[\s-]?tunnel|tunnel(l?ing)?\b|process\s+piping|pipe\s+(spool|rack\s+piping)/, 'pipeline', 0.85),
+  r('process-structures', /clarifiers?|digesters?|aeration|\bbasins?\b|wet\s*wells?|reservoirs?|\b(concrete|storage|process)\s+tanks?|leak(age)?\s+test|headworks|filter\s+(building|gallery)/, 'process_structures', 0.85),
+  r('process-equipment', /(?<!fire\s)(?<!heat\s)\bpumps?\b|\bvalves?\b|\bblowers?\b|\bscreens?\b|(filtration|treatment|\buf|\bro|\bmbr)\s+membranes?|process\s+(mechanical|equipment)|\bvessels?\b|compressors?|heat\s+exchangers?|\bskids?\b|\bset\s+equipment\b/, 'process_equipment', 0.8),
+  r('controls-scada', /\bscada\b|\bplcs?\b|\bi\s*&\s*c\b|instrumentation|\bdcs\b|relay\s+(panels?|testing|settings)|protection\s*(&|and)\s*control|train\s+control|\bcbtc\b|\bptc\b|signal(s|ing)?\s+(system|install|cutover|equipment)|wayside/, 'controls_scada', 0.85),
+  r('track', /\btrack(work)?\b|\bballast\b|\bcross\s*ties\b|\bties\b|rail\s+(install|welding|destress)|special\s+trackwork|turnouts?|\bocs\b|catenary|third\s+rail/, 'track_systems', 0.85),
+  r('power-equipment', /traction\s+power|\btpss\b|circuit\s+breakers?|power\s+transformers?|\bgsu\b|\bgis\b|capacitor\s+banks?|reactors?\b/, 'power_equipment', 0.85),
+  r('conductors', /stringing|\bconductors?\b|bus\s*work|\bopgw\b|insulators?|dead[\s-]?ends?/, 'conductors', 0.8),
+  r('startup-testing', /performance\s+test|acceptance\s+test|\bsat\b|\bfat\b|pre[\s-]?revenue|trial\s+running|(biological|process|digester|reactor|plant)\s+seeding|seed(ing)?\s+(the\s+)?(digesters?|reactors?|aeration\s+basins?)|wet\s+test|process\s+start[\s-]?up|pre[\s-]?commission/, 'startup_testing', 0.85),
+  r('cutover', /cut[\s-]?over|tie[\s-]?ins?\b|\bshut\s*downs?\b|\boutages?\b|track\s+possession|weekend\s+(closure|outage)/, 'cutover', 0.85),
 
   // Commissioning & inspections
   r('cx', /\bcx\b|commission|\btab\b|test(ing)?\s*(&|and)\s*balanc|\bfpts?\b|functional\s+(performance\s+)?test|\bist\b|integrated\s+systems?\s+test|start[\s-]?up|pre[\s-]?functional|\bl[1-5]\s+(test|cx)|load\s+bank/, 'commissioning', 0.85),
@@ -198,10 +275,40 @@ function normalizeText(s: string): string {
     .trim()
 }
 
-function matchRules(text: string): { rule: TaxonomyRule; matched: string } | undefined {
+/**
+ * Road and airfield work (highway / bridge, aviation): words that mean something else on a building
+ * schedule. Paving is the roadway, electrical is signals and lighting, steel and paint are the bridge
+ * superstructure, membranes waterproof the deck and seeding restores the right-of-way (pilot finding:
+ * highway uploads were labeled envelope, MEP and commissioning).
+ */
+const ROADWAY_CONTEXT_RULES: TaxonomyRule[] = [
+  r('road-paving', /\bpav(e|ing|ement)\b|asphalt|\bcurbs?\b|\bgutters?\b|sidewalks?|\bmilling\b|striping|pavement\s+markings?|\bsigns?\b|\bsigning\b|\bsignage\b|\bmarkings?\b/, 'roadway', 0.8),
+  r('road-electrical', /\belectrical\b|\bconduits?\b|\blighting\b|(pull|junction)\s+boxes?|luminaires?|controller\s+cabinets?/, 'signals_lighting', 0.75),
+  r('road-steel', /structural\s+steel|\bsteel\b|\bpaint(ing)?\b/, 'superstructure', 0.75),
+  r('road-precast', /\bprecast\b|prestressed/, 'superstructure', 0.75),
+  r('road-membrane', /membrane|waterproof/, 'deck', 0.75),
+  r('road-deck', /\bdecks?\b|\boverlay\b/, 'deck', 0.75),
+  r('road-landscape', /landscap|\bplant(ing|s)\b|\bsod\b|\bseed(ing)?\b|\bmulch\b|\btopsoil\b|\bfinal\s+grade\b/, 'restoration', 0.8),
+  r('road-utilities', /\butilit(y|ies)\b|water\s+(main|line)|\bsewer\b|gas\s+(main|line)|duct\s*banks?/, 'utilities_site', 0.8),
+  r('road-testing', /\bcommission|\bstart[\s-]?up\b|\bburn[\s-]?in\b/, 'signals_lighting', 0.6),
+]
+const CIVIL_BLOCK_END = TAXONOMY_RULES.findIndex((x) => x.id === 'cutover') + 1
+const ROADWAY_RULES: TaxonomyRule[] = [...TAXONOMY_RULES.slice(0, CIVIL_BLOCK_END), ...ROADWAY_CONTEXT_RULES, ...TAXONOMY_RULES.slice(CIVIL_BLOCK_END)]
+
+/** Project types whose uploads are read with the road / airfield vocabulary. */
+export const ROADWAY_PROJECT_TYPES: readonly string[] = ['highway_bridge', 'aviation']
+/** Categories that mark a schedule as road or bridge work when its project type is not given. */
+const ROADWAY_SIGNALS = new Set<CanonicalCategory>(['traffic_control', 'roadway', 'deck', 'superstructure', 'substructure', 'drainage', 'signals_lighting', 'erosion_control', 'restoration', 'in_water_work'])
+
+export interface ClassifyContext {
+  /** Read the name with the road / airfield vocabulary (highway, bridge, airfield) */
+  roadway?: boolean
+}
+
+function matchRules(text: string, rules: TaxonomyRule[] = TAXONOMY_RULES): { rule: TaxonomyRule; matched: string } | undefined {
   const s = normalizeText(text)
   if (!s) return undefined
-  for (const rule of TAXONOMY_RULES) {
+  for (const rule of rules) {
     const m = s.match(rule.re)
     if (m) return { rule, matched: m[0].trim() || rule.id }
   }
@@ -212,9 +319,10 @@ function matchRules(text: string): { rule: TaxonomyRule; matched: string } | und
  * Classify an activity name (and optionally its WBS path/name) into a canonical category.
  * The name is the primary signal; WBS text is a secondary signal used to confirm or fill in.
  */
-export function classifyActivity(name: string, wbs?: string): Classified {
-  const byName = matchRules(name ?? '')
-  const byWbs = wbs ? matchRules(wbs) : undefined
+export function classifyActivity(name: string, wbs?: string, ctx: ClassifyContext = {}): Classified {
+  const rules = ctx.roadway ? ROADWAY_RULES : TAXONOMY_RULES
+  const byName = matchRules(name ?? '', rules)
+  const byWbs = wbs ? matchRules(wbs, rules) : undefined
 
   if (byName) {
     let confidence = byName.rule.confidence
@@ -234,6 +342,20 @@ export function classifyActivity(name: string, wbs?: string): Classified {
   }
 
   return { category: 'other', phase: phaseOf('other'), confidence: 0.1 }
+}
+
+/**
+ * Classify every activity of an uploaded schedule. Highway / bridge and airfield schedules (by project
+ * type, or — when no type is given — because at least 15% of the activities are clearly road or bridge
+ * work) are read with the road vocabulary.
+ */
+export function classifySchedule(items: { name: string; wbs?: string | null }[], projectType?: string | null): { results: Classified[]; roadway: boolean } {
+  let roadway = !!projectType && ROADWAY_PROJECT_TYPES.includes(projectType)
+  if (!projectType && items.length) {
+    const hits = items.filter((a) => ROADWAY_SIGNALS.has(classifyActivity(a.name, a.wbs ?? undefined).category)).length
+    roadway = hits / items.length >= 0.15
+  }
+  return { results: items.map((a) => classifyActivity(a.name, a.wbs ?? undefined, { roadway })), roadway }
 }
 
 function clamp01(n: number): number {

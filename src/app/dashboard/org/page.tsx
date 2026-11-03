@@ -1,9 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import type { DataLocation } from '@/lib/server/data-location'
+import { CloudStorage } from '@/components/CloudStorage'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
+import { Integrations } from '@/components/Integrations'
+import { EnterpriseIdentity } from '@/components/EnterpriseIdentity'
+import { Workspaces } from '@/components/Workspaces'
 import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
@@ -11,6 +16,9 @@ interface Invitation { id: string; email: string; role: string; expiresAt: strin
 interface Settings {
   requireMfa: boolean; requireIndependentReview: boolean; requireApprovalToPublish: boolean
   aiEnabled: boolean; aiDailyLimit: number; sessionIdleHours: number; chatRetentionDays: number; projectRetentionDays: number
+  quality: { maxPct: number; minFsPct: number; highFloatDays: number; highDurationDays: number; indexTarget: number }
+  standards?: { defaultFrameworks: string[]; gao: Record<string, number> }
+  historyExcludeUploads: boolean
 }
 interface OrgData {
   org: { id: string; name: string; createdAt: string }
@@ -21,6 +29,7 @@ interface OrgData {
   settings?: Settings
   aiUsageToday?: number
   plan: { id: string; label: string; maxUploadedSchedules: number | null; aiPerDay: number; reports: string[]; exports: string[]; sso: boolean; uploadedSchedules: number }
+  service?: { deployment: string; cuiWarning?: string; dataLocation?: DataLocation }
   sso?: { enabled: boolean; issuer: string; clientId: string; hasSecret: boolean; domains: string[]; defaultRole: string; enforce: boolean; verification: { host: string; value: string } | null }
 }
 interface AuditEvent { seq: number; at: string; actorEmail: string | null; action: string; targetType: string | null; targetId: string | null; detail: Record<string, unknown>; ip: string | null; hash: string }
@@ -31,21 +40,27 @@ const ACTION_LABELS: Record<string, string> = {
   'member.invited': 'Invited a member', 'member.joined': 'Joined', 'member.role_changed': 'Changed a role', 'member.removed': 'Removed a member', 'member.invite_revoked': 'Revoked an invitation', 'member.unlocked': 'Unlocked a member',
   'plan.created': 'Created plan', 'plan.deleted': 'Deleted plan', 'plan.answer': 'Answered', 'plan.note': 'Added a note', 'plan.generate': 'Generated schedule', 'plan.generate_fresh': 'Rebuilt schedule',
   'plan.review': 'Reviewed', 'plan.publish': 'Published baseline', 'plan.decision': 'Quality decision', 'plan.recovery': 'Applied recovery option', 'plan.export': 'Exported', 'plan.ai_suggest': 'AI follow-up questions',
-  'schedule.upload': 'Uploaded schedule', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.dcma_decision': 'Quality decision',
+  'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.activity_category': 'Corrected activity category', 'schedule.dcma_decision': 'Quality decision',
   'account.password_changed': 'Changed password', 'account.mfa_enabled': 'Turned on 2-step', 'account.mfa_disabled': 'Turned off 2-step', 'account.sessions_revoked': 'Signed out other devices', 'account.session_revoked': 'Signed out a device',
-  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'ai.request': 'AI request', 'audit.verified': 'Verified audit log', 'audit.chain_broken': 'Audit log verification FAILED', 'apikey.created': 'Created API key', 'apikey.revoked': 'Revoked API key', 'webhook.created': 'Added webhook', 'webhook.deleted': 'Removed webhook', 'webhook.enabled': 'Re-enabled webhook', 'webhook.tested': 'Sent webhook test', 'account.email_verified': 'Verified email address', 'org.quality_rules_changed': 'Changed quality rules', 'audit.exported': 'Exported audit log', 'privacy.organization_exported': 'Exported organization data', 'privacy.personal_data_exported': 'Exported personal data', 'privacy.account_deleted': 'Deleted account', 'retention.purge': 'Retention clean-up',
+  'org.sso_changed': 'Changed single sign-on', 'org.saml_changed': 'Changed SAML single sign-on', 'org.saml_tested': 'Tested SAML sign-in', 'auth.sso_failed': 'Failed single sign-on',
+  'scim.user_created': 'Provisioned a member (SCIM)', 'scim.user_updated': 'Updated a member (SCIM)', 'scim.user_deprovisioned': 'Deprovisioned a member (SCIM)', 'scim.user_reactivated': 'Reactivated a member (SCIM)', 'scim.user_deleted': 'Deleted a member (SCIM)', 'scim.token_created': 'Created SCIM token', 'scim.token_revoked': 'Revoked SCIM token',
+  'standards.run': 'Recorded a standards assessment',
+  'workspace.created': 'Created workspace', 'workspace.updated': 'Changed workspace', 'workspace.deleted': 'Deleted workspace', 'workspace.member_added': 'Added to workspace', 'workspace.member_removed': 'Removed from workspace', 'workspace.member_restriction_changed': 'Changed workspace limit', 'workspace.item_assigned': 'Moved to workspace',
 }
 // Download links come from this fixed table, never from page text.
-const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'ai.', 'privacy.'] as const
+const AUDIT_FILTERS = ['', 'auth.', 'plan.', 'schedule.', 'member.', 'org.', 'scim.', 'workspace.', 'ai.', 'privacy.'] as const
 const AUDIT_CSV: Record<string, string> = Object.fromEntries(AUDIT_FILTERS.map(f => [f, f ? `/api/audit?format=csv&action=${f}` : '/api/audit?format=csv']))
 
 const actionLabel = (a: string) => ACTION_LABELS[a] || (a.startsWith('plan.override') ? 'Override' : a)
 
 function summarize(e: AuditEvent): string {
   const d = e.detail as Record<string, unknown>
-  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.model ?? ''}`]
+  const bits = [d.plan, d.name, d.email, d.detail, d.format, d.role && `role ${d.role}`, d.before !== undefined && d.after !== undefined && typeof d.before !== 'object' ? `${d.before} → ${d.after}` : null, d.purpose && `${d.purpose} · ${d.provider ? `${d.provider} ` : ''}${d.model ?? ''}${d.refused ? ' (declined)' : ''}`]
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
+
+const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -105,7 +120,7 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDate(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact sales@hoshmand.ai.">
+      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-navy-950 font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
@@ -116,9 +131,12 @@ export default function OrgPage() {
         </dl>
       </Section>
 
+      {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} />}
+      <CloudStorage manage={manage} />
+
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Organization members</caption>
             <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
@@ -152,6 +170,8 @@ export default function OrgPage() {
           </table>
         </div>
       </Section>
+
+      {manage && <Workspaces members={data.members} />}
 
       {manage && (
         <Section title="Invite someone" description="Invitations are single-use and expire in 7 days. Send the link yourself (email, Teams, Slack); it only works for the address you enter.">
@@ -188,12 +208,18 @@ export default function OrgPage() {
       {manage && settings && (
         <Section title="Policies" description="Apply to everyone in the organization. Changes are recorded in the audit log.">
           {note('settings')}
+          {data.service?.cuiWarning && (
+            <div role="note" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-4">
+              <strong className="font-semibold text-navy-950">Controlled information.</strong> {data.service.cuiWarning}
+            </div>
+          )}
           <div className="space-y-3">
             {([
               ['requireMfa', 'Require two-step verification', 'Members without it are asked to set it up before they can continue. Turn it on for your own account first.'],
               ['requireIndependentReview', 'Independent review', "The person who created a plan can't approve it."],
               ['requireApprovalToPublish', 'Approval before publishing', 'A baseline can only be published after someone other than its author approves the current version.'],
-              ['aiEnabled', 'Allow AI features', 'Off = rules-only: nothing is sent to any AI model. Scheduling, CPM, quality checks and reports still work.'],
+              ['historyExcludeUploads', 'Never use our uploads for firm history', 'Uploaded schedules never calibrate durations, risk ranges or backtests, whatever is set on each upload. Off = only your own as-built projects that are marked for firm history are used (one per project, never RunF9 re-imports or third-party schedules).'],
+              ['aiEnabled', 'Allow AI features', 'Off by default for new organizations. Off = rules-only: nothing is sent to any AI model. On = interview suggestions, Ask AI and report wording are sent to the configured model (Anthropic Claude by default on the cloud service; see the subprocessor list). Scheduling, CPM, quality checks and reports work either way. Projects marked CUI or classified are never sent to a cloud model.'],
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={settings[k]} onChange={e => setSettings({ ...settings, [k]: e.target.checked })} />
@@ -206,13 +232,44 @@ export default function OrgPage() {
               <Field label="Keep Ask AI history (days)" hint="0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.chatRetentionDays} onChange={e => setSettings({ ...settings, chatRetentionDays: Number(e.target.value) })} />}</Field>
               <Field label="Delete inactive projects after (days)" hint="Plans and uploaded schedules unchanged this long are deleted. 0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.projectRetentionDays} onChange={e => setSettings({ ...settings, projectRetentionDays: Number(e.target.value) })} />}</Field>
             </div>
+            <fieldset className="pt-2">
+              <legend className="text-[13.5px] font-medium text-navy-950">Quality check thresholds (DCMA 14-point)</legend>
+              <p className="text-[12.5px] text-warm-500 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Field label="Max share of offenders (%)" hint="Logic, lags, hard constraints, high float, high duration, missed tasks. 1–25.">{p => <input {...p} type="number" min={1} max={25} className={inputClass} value={settings.quality.maxPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, maxPct: Number(e.target.value) } })} />}</Field>
+                <Field label="Min finish-to-start links (%)" hint="Relationship types. 50–100.">{p => <input {...p} type="number" min={50} max={100} className={inputClass} value={settings.quality.minFsPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, minFsPct: Number(e.target.value) } })} />}</Field>
+                <Field label="High float above (work days)" hint="10–260.">{p => <input {...p} type="number" min={10} max={260} className={inputClass} value={settings.quality.highFloatDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highFloatDays: Number(e.target.value) } })} />}</Field>
+                <Field label="High duration above (work days)" hint="5–260.">{p => <input {...p} type="number" min={5} max={260} className={inputClass} value={settings.quality.highDurationDays} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, highDurationDays: Number(e.target.value) } })} />}</Field>
+                <Field label="Min CPLI and BEI" hint="0.80–1.00.">{p => <input {...p} type="number" min={0.8} max={1} step={0.01} className={inputClass} value={settings.quality.indexTarget} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, indexTarget: Number(e.target.value) } })} />}</Field>
+              </div>
+            </fieldset>
+            <fieldset className="pt-2">
+              <legend className="text-[13.5px] font-medium text-navy-950">Default standards framework</legend>
+              <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
+              <div className="space-y-1.5">
+                {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
+                  const current = settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']
+                  const on = current.includes(fw)
+                  return (
+                    <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
+                        onChange={e => {
+                          const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
+                          setSettings({ ...settings, standards: { gao: settings.standards?.gao ?? {}, defaultFrameworks: next.length ? next : ['RUNF9_COMPOSITE'] } })
+                        }} />
+                      {label}
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
             <Button disabled={busy === 'settings'} onClick={async () => { const d = await act('settings', { action: 'update_settings', settings }, 'Policies saved.'); if (d) load() }}>Save policies</Button>
           </div>
         </Section>
       )}
 
       {manage && (
-        <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider). People with an allowed email domain are added on first sign-in with the default role.">
+        <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider; for SAML 2.0 see below). People with an allowed email domain are added on first sign-in with the default role.">
           {note('sso')}
           {!data.plan.sso ? <p className="text-[13px] text-warm-600">Single sign-on is part of the Enterprise plan.</p> : (
             <form className="space-y-3" onSubmit={async e => {
@@ -245,6 +302,10 @@ export default function OrgPage() {
         </Section>
       )}
 
+      {manage && <EnterpriseIdentity roles={data.roles} />}
+
+      {manage && <Integrations />}
+
       {can('audit.read') && (
         <Section title="Audit log" description="Every sign-in, change, review, export and AI request, with who, when and from where. Records are chained by hash and the database refuses edits or deletions, so tampering is both blocked and detectable.">
           {note('audit')}
@@ -252,7 +313,7 @@ export default function OrgPage() {
             <Field label="Filter">{p => (
               <select {...p} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
                 <option value="">All activity</option><option value="auth.">Sign-ins</option><option value="plan.">Plans</option><option value="schedule.">Schedules</option>
-                <option value="member.">Members</option><option value="org.">Organization</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
+                <option value="member.">Members</option><option value="org.">Organization</option><option value="scim.">Provisioning (SCIM)</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
               </select>
             )}</Field>
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {
@@ -266,7 +327,7 @@ export default function OrgPage() {
               : <Alert tone="error"><XCircle size={14} className="inline mr-1" aria-hidden="true" />Integrity check failed at record #{verify.brokenAt?.seq}: {verify.brokenAt?.reason}</Alert>}
             </div>
           )}
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <caption className="sr-only">Audit log, newest first</caption>
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
@@ -297,7 +358,7 @@ export default function OrgPage() {
             setBusy(null)
             if (!res.ok) { setMsg({ tone: 'error', text: 'Export failed.', section: 'data' }); return }
             const url = URL.createObjectURL(await res.blob())
-            const a = document.createElement('a'); a.href = url; a.download = `planora-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+            const a = document.createElement('a'); a.href = url; a.download = `runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
           }}><Download size={13} className="inline mr-1" aria-hidden="true" />{busy === 'data' ? 'Preparing…' : 'Export organization data'}</Button>
         </Section>
       )}
@@ -331,5 +392,21 @@ export default function OrgPage() {
         </Section>
       )}
     </div>
+  )
+}
+
+/** Where this deployment keeps the firm's data. */
+function DataLocationSection({ loc }: { loc: DataLocation }) {
+  return (
+    <Section id="data-location" title="Where your data lives" description="Schedules, analysis and the document-search index are stored in this deployment's database. Original files can be kept in your own cloud storage (below).">
+      <dl className="grid gap-4 md:grid-cols-3 text-[13.5px]">
+        <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-navy-950">{loc.label}</dd></div>
+        <div><dt className="text-warm-600">Database</dt><dd className="mt-1 text-warm-700">{loc.database}</dd></div>
+        <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
+      </dl>
+      <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
+        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? <a href="/deploy" className="text-accent-600 underline">Run RunF9 in that cloud</a> from one template: the app, database, documents and search index all stay there, with the same company sign-in (SSO).
+      </p>
+    </Section>
   )
 }

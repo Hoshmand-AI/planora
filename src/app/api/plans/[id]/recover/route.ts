@@ -5,6 +5,7 @@ import { recoveryPlan } from '@/lib/planning/recovery'
 import { applyEdit, EditError } from '@/lib/planning/overrides'
 import { generateSchedule } from '@/lib/planning/generator'
 import { loadFirmHistory } from '@/lib/planning/service'
+import { historyForPlan } from '@/lib/planning/history'
 import type { ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
 
@@ -14,7 +15,8 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
   const { plan, ctx } = r
   if (!plan.generated) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
   const { optionId } = await req.json().catch(() => ({}))
-  const history = await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType)
+  // history.use = No: firm history shapes neither the recovery options nor the regenerated schedule.
+  const history = historyForPlan(await loadFirmHistory(ctx.orgId, plan.answers['project.type']?.value as ProjectType), plan.answers)
   const rec = recoveryPlan(plan.generated, plan.answers, history)
   const opt = rec?.options.find(o => o.id === optionId)
   if (!opt) return NextResponse.json({ error: 'That option is no longer available — the schedule may already meet the date.' }, { status: 400 })

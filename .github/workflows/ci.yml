@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,58 +42,115 @@ jobs:
           path: sbom.cdx.json
           retention-days: 90
 
-  # The real app against Postgres: end-to-end flows, security controls, backup + restore drill,
-  # and the WCAG 2.2 AA accessibility check.
+  # The real app against Postgres: end-to-end flows, security controls, cross-tenant isolation,
+  # backup + restore drill, and the WCAG 2.2 AA accessibility check.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
-          POSTGRES_USER: planora
-          POSTGRES_PASSWORD: planora
-          POSTGRES_DB: planora
+          POSTGRES_USER: runf9
+          POSTGRES_PASSWORD: runf9
+          POSTGRES_DB: runf9
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U planora" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U runf9" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://planora:planora@localhost:5432/planora
+      DATABASE_URL: postgres://runf9:runf9@localhost:5432/runf9
       JWT_SECRET: ci-only-secret
-      PLANORA_AI_MODE: offline
-      PLANORA_DEFAULT_PLAN: pro
-      PLANORA_ALLOW_INSECURE_OIDC: '1'
+      RUNF9_AI_MODE: offline
+      RUNF9_DEFAULT_PLAN: pro
+      # The suites below create their own firms, so the main test server re-opens self sign-up. The
+      # private beta gate (the default, invite-only) is tested against a second server further down.
+      RUNF9_SIGNUP: open
+      RUNF9_ALLOW_INSECURE_OIDC: '1'
+      # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
+      RUNF9_ALLOW_INSECURE_WEBHOOKS: '1'
+      RUNF9_EMAIL_OUTBOX: /tmp/runf9-outbox
+      # Test-only: cloud storage connections may use the local S3 and Azure Blob emulators.
+      RUNF9_STORAGE_CUSTOM_ENDPOINTS: 'true'
+      # Test-only RunF9 cloud identities, pointed at scripts/mock-cloud.mjs (sign-in instead of keys).
+      RUNF9_AZURE_CLIENT_ID: azure-test-client
+      RUNF9_AZURE_CLIENT_SECRET: azure-test-secret
+      RUNF9_AZURE_AUTHORITY: http://127.0.0.1:4040/ms
+      RUNF9_GOOGLE_CLIENT_ID: google-test-client
+      RUNF9_GOOGLE_CLIENT_SECRET: google-test-secret
+      RUNF9_GOOGLE_AUTH_URL: http://127.0.0.1:4040/google/auth
+      RUNF9_GOOGLE_TOKEN_URL: http://127.0.0.1:4040/google/token
+      RUNF9_AWS_ACCOUNT_ID: '999988887777'
+      RUNF9_AWS_ACCESS_KEY_ID: AKIARUNF9TESTKEY0001
+      RUNF9_AWS_SECRET_ACCESS_KEY: test-secret-for-runf9-sts-calls
+      RUNF9_AWS_STS_ENDPOINT: http://127.0.0.1:4040/sts
+      RUNF9_AWS_TEMPLATE_URL: https://runf9-public.s3.amazonaws.com/aws-storage-role.yaml
+      MOCK_CLOUD_URL: http://127.0.0.1:4040
+      WEBHOOK_RECEIVER_PORT: '4020'
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: PostgreSQL 17 client tools (same major version as production)
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
       - run: npm run build
       - name: Start test identity provider and app
         run: |
           PORT=4010 nohup node scripts/mock-oidc.mjs > oidc.log 2>&1 &
+          MOCK_ACCESS_TTL=30 PORT=4040 nohup node scripts/mock-cloud.mjs > mock-cloud.log 2>&1 &
           nohup npm start > app.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://localhost:3000/api/health && break; sleep 2; done
           curl -sf http://localhost:3000/api/health
       - name: End-to-end smoke test
         run: node scripts/e2e-smoke.mjs
+      - name: Project documents (retrieval, tenant isolation, injection, deletion)
+        run: |
+          node scripts/e2e-rag.mjs
+          RAG_TEST_DATABASE_URL="$DATABASE_URL" npx vitest run src/lib/rag/rag.db.test.ts
+      - name: Password reset tokens on Postgres
+        run: AUTH_TEST_DATABASE_URL="$DATABASE_URL" npx vitest run src/lib/server/password-reset.test.ts
       - name: Backup and restore drill
         run: |
           node scripts/backup.mjs backups
-          ADMIN_DATABASE_URL=postgres://planora:planora@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
+          ADMIN_DATABASE_URL=postgres://runf9:runf9@localhost:5432/postgres node scripts/restore-drill.mjs backups/*.dump
       - name: Security and governance checks
         run: node scripts/e2e-security.mjs
+      - name: Cross-tenant isolation checks
+        run: node scripts/e2e-tenant-isolation.mjs
+      - name: SAML single sign-on and SCIM provisioning checks
+        run: node scripts/e2e-scim.mjs
+      - name: Cloud storage connections (S3 and Azure Blob emulators)
+        run: |
+          mkdir -p /tmp/s3 /tmp/az
+          # Bind both to 127.0.0.1 ("localhost" can resolve to IPv6 only on the runner).
+          nohup npx -y s3rver@3.7.1 -a 127.0.0.1 -d /tmp/s3 -p 4569 --configure-bucket runf9-e2e > s3.log 2>&1 &
+          nohup npx -y -p azurite@3.37.0 azurite-blob --blobHost 127.0.0.1 --blobPort 10000 -l /tmp/az --skipApiVersionCheck --disableTelemetry > azurite.log 2>&1 &
+          up=0
+          for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4569 && curl -s -o /dev/null http://127.0.0.1:10000 && up=1 && break; sleep 2; done
+          if [ "$up" != 1 ]; then echo "Storage emulators did not start"; tail -n 50 s3.log azurite.log; exit 1; fi
+          node scripts/e2e-cloud-storage.mjs
+      - name: Private beta gate (second server in the default invite-only mode)
+        run: |
+          RUNF9_SIGNUP= RUNF9_PLATFORM_ADMINS=ops@beta.test nohup npx next start -p 3001 > app-beta.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3001/api/health && break; sleep 2; done
+          curl -sf http://localhost:3001/api/health
+          BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/e2e-beta.mjs
+      - name: Air-gapped install sends nothing outside the network (egress guard)
+        run: node scripts/e2e-no-egress.mjs
       - name: Accessibility (WCAG 2.2 AA)
         run: |
           npx playwright install --with-deps chromium
-          node scripts/a11y-check.mjs
+          BETA_BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/a11y-check.mjs
       - name: App log
         if: failure()
-        run: tail -n 200 app.log; tail -n 50 oidc.log
+        run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log; tail -n 30 s3.log azurite.log mock-cloud.log || true
 
   # Static analysis for common vulnerability classes (OWASP Top 10) and committed secrets.
   sast:
@@ -102,5 +159,5 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: semgrep scan --config p/owasp-top-ten --config p/secrets --config p/nodejs --severity ERROR --error --metrics off src scripts

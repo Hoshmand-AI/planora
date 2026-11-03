@@ -1,0 +1,54 @@
+# Claims register
+
+Every public claim about RunF9 (website, sales decks, proposals) must be listed here with its evidence before it is published. The standard is the one the FTC applies to advertising: an objective claim needs "competent and reliable evidence" in hand *before* it is made. A claim that can't be shown here gets reworded or removed. Owner: founder. Review: before each release that changes the website, and quarterly.
+
+**Status:** ✅ evidenced · 👤 needs the founder's confirmation or documents · 🗑 removed (and why)
+
+## Landing page (`src/app/page.tsx`), 10/05/2026
+
+| Claim | Status | Evidence / how to reproduce |
+|---|---|---|
+| "14 of 14 DCMA 14-Point checks, run automatically" | ✅ | `src/lib/analysis/dcma.ts` implements checks 1–14. `src/lib/analysis/dcma.test.ts` has a passing schedule for all 14 and a failing case for each. Checks without the needed data return "n/a", never "pass". Run `npx vitest run src/lib/analysis/dcma.test.ts` |
+| "100,000 activities scheduled by our CPM engine in automated tests" | ✅ | `src/lib/planning/perf.test.ts`: synthetic networks of 10k, 50k and 100k activities (FS/SS/FF, lags, two calendars), on every CI run, with budgets of 2/8/15 s. The test prints the measured time. This is the CPM calculation only; file upload and parsing are not part of the figure |
+| "0 days difference in dates and float when our P6 and MS Project exports are re-imported, in our test set" (reworded 10/23/2026 from "after a P6 or MS Project round trip", which could be read as parity with P6's own calculation) | ✅ | `src/lib/export/roundtrip.test.ts`: 5 schedules exported to XER and MSP XML, re-imported, re-scheduled from scratch; every activity's ES/EF/TF must match. Parity with P6/MSP calculating the same projects is **not** claimed (planned: `docs/governance/VALIDATION-PLAN.md`) |
+| "$0 to start. No credit card" | ✅ | Free plan in `src/lib/server/entitlements.ts`; no billing integration exists |
+| "Founded by a construction scheduling consultant with 13 years in the field and a degree in architecture" | 👤 | Founder to confirm the years (the founder has 22 years of total work experience, including teaching) and keep proof: CV, diploma, references. The title "architect" is **not** used because it is a licensed title in US states |
+| Former line: "managed schedules at Meta, USPS, and Applied Digital" | 🗑 👤 | Removed until the founder confirms (a) the work, (b) that naming the client is allowed by the contract or NDA, and (c) wording that doesn't imply endorsement (FTC Endorsement Guides). Suggested once confirmed: "has scheduled projects for clients including …" with written permission on file |
+| "Run it where your data lives": RunF9 Cloud, your AWS / Azure / Google Cloud account, or your own servers (deployment section, 10/27/2026) | ✅ | Cloud and air-gapped are labelled "Available now": the hosted service, and the container + [ON-PREM-INSTALL.md](../operations/ON-PREM-INSTALL.md). The three customer-cloud options are labelled "On request", and the page says the Bedrock / Azure OpenAI / Vertex AI connectors are built with the deployment (not yet in the code). Plan: [DEPLOYMENT-OPTIONS.md](../strategy/DEPLOYMENT-OPTIONS.md) |
+| "Connect your Amazon S3 / Azure Blob Storage / Google Cloud Storage": import schedules and documents from it and keep original files there (website deployment section, Organization > Cloud storage, upload dialogs; 10/29/2026) | ✅ | `src/lib/storage/*`, `/api/storage`; tested against S3- and Azure-protocol emulators in CI (`scripts/e2e-cloud-storage.mjs`) and against AWS's published SigV4 examples (`sigv4.test.ts`). Google Cloud Storage uses the same S3-compatible protocol with HMAC keys. Schedules, analysis and the search index stay in RunF9's database; running all of RunF9 in the customer's account is still "on request" and the page says so |
+| "Run all of RunF9 in your AWS / Azure / Google Cloud account, database included, from one template" (/deploy, website deployment section, Organization; 10/29/2026) | ✅ preview | `public/deploy/aws/runf9.yaml` (cfn-lint clean), `public/deploy/gcp/main.tf` (terraform validate, google provider 6.10), `public/deploy/azure/runf9.json` (JSON + review only). Bedrock / Azure OpenAI / Vertex adapters unit-tested against local stand-ins. The /deploy page says "preview" and that the first install is done together; not yet installed end to end in a real account |
+| "Sign in with Microsoft / Google" and one-click AWS role for cloud storage (Organization > Cloud storage; 10/29/2026) | ✅ when configured | `src/lib/storage/cloud-auth.ts`, `/api/storage/oauth/callback`, `public/cloud/aws-storage-role.yaml` (cfn-lint clean). Tested end to end against `scripts/mock-cloud.mjs` in CI (PKCE, refresh-token rotation, STS AssumeRole with external ID). Shown only when RunF9's Entra app, Google OAuth client and AWS identity are configured; not yet run against the real Microsoft, Google and AWS services |
+| "A different cloud for each client" (deployment section, hero cloud chips; updated 10/29/2026) | ✅ | Each client's storage is its own connection; uploaders pick the source and where the original is kept. A whole RunF9 per client cloud remains a private deployment ("ask us"); no cross-deployment portfolio is claimed |
+| "Every release is checked to send nothing outside your network" (air-gapped) | ✅ | `scripts/e2e-no-egress.mjs` runs in CI on every change ([WHERE-YOUR-DATA-GOES.md](../privacy/WHERE-YOUR-DATA-GOES.md)) |
+| "Your firm's data is kept separate from every other firm's" | ✅ | `scripts/e2e-tenant-isolation.mjs` (194 checks) and `src/lib/server/tenant-scope.test.ts`, in CI |
+| Former stat: "100K+ Activities Parsed" | 🗑 | Implied cumulative customer usage that didn't exist; replaced by the tested CPM figure above |
+| Former stat and heading: "$200/hr Consultant Replaced", "The $200/hour problem", "Senior scheduler: $150–250/hour" | 🗑 | No source for the rate; "replaced" can't be shown and alienates consultants, the first target customers (`docs/strategy/MARKET-RESEARCH.md`) |
+| Former line: "Single variance report: 2–3 days" | 🗑 | No source |
+| Former line: "No mobile access to schedule data" | 🗑 | False: Primavera Cloud and P6 have web and mobile access |
+| Former line: "20-year-old desktop software" | 🗑 | Disparaging and unprovable; P6 is actively developed |
+| Former line: "the same analysis/deliverable a consultant produces" | 🗑 | Unprovable equivalence claim |
+| Former: "AI identifies the critical path" | 🗑 | Wrong: the critical path comes from the CPM algorithm (`src/lib/planning/cpm.ts`), not AI. The page now says so |
+| Former: "Upload XER, XML, or PDF. Every activity, relationship, and constraint extracted" | 🗑 | PDF import has no logic (`src/lib/parsers/pdf-parser.ts` returns no relationships and says so). Reworded per format |
+| Former: "Most Popular" badge on Pro | 🗑 | No customer data to support it |
+| Former: Free plan listed "API keys & signed webhooks" | 🗑 | Wrong: integrations are Pro and Enterprise only (`entitlements.ts`). Fixed |
+| "Native P6 and MS Project files: import .xer and .xml with activities, logic, lags, constraints and calendars, and export the same formats" | ✅ | `src/lib/parsers/xer-parser.ts`, `xml-parser.ts`, `src/lib/export/xer.ts`, `msp-xml.ts`; tests in `xer-parser.test.ts`, `xml-parser.test.ts`, `formats.test.ts`, `export.test.ts`, `roundtrip.test.ts` |
+| "Questions are ranked by how far each answer can move your finish date" | ✅ | `src/lib/planning/adaptive.ts` re-schedules under each plausible answer; `adaptive.test.ts` |
+| "Each failing check lists the activities involved and a suggested fix" | ✅ | `DcmaCheck.offenders`; `src/lib/analysis/dcma-guidance.ts` |
+| "Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float" | ✅ | `src/lib/planning/cpm.ts`, `calendar.ts`; `cpm.test.ts`, `calendar.test.ts` |
+| "Monte Carlo risk analysis (200 to 1,000 iterations of the full network) gives P50 and P80" | ✅ | `src/lib/planning/sra.ts` (iteration budget 200–1,000 by network size); `sra.test.ts` |
+| "Recovery options are re-scheduled on the real network and priced from your labor cost" | ✅ | `src/lib/planning/recovery.ts`; `decisions.test.ts` |
+| "A version-pinned cloud model (Anthropic Claude by default, OpenAI as an approved alternate) … calculated figures come from the engine, not the model. AI can be switched off" | ✅ | `DEFAULT_CLOUD_MODEL = 'claude-opus-5-5'` and `MODEL_REGISTRY` in `src/lib/llm/gateway.ts` / `src/lib/llm/provider.ts`; DCMA results injected as computed text in `src/lib/openai.ts`; org AI switch in `settings.ts` |
+| "The CPM engine computes dates … This is arithmetic, not AI" | ✅ | `cpm.ts` is deterministic; no model call |
+| "See the DCMA 14-Point results in seconds" | ✅ | Upload, parse and DCMA run in one request (`src/app/api/schedules/route.ts`); the e2e smoke test measures uploads in well under a second locally. Re-measure on production before quoting a number |
+| Pricing: Free 3 uploaded schedules, Executive Summary, 10 AI requests/day, P6/MSP/CSV export; Pro all 4 reports, 1,000 AI/day, PDF and Excel export, integrations; Enterprise SSO | ✅ | `src/lib/server/entitlements.ts` (enforced server-side; e2e tests in `scripts/e2e-security.mjs`) |
+| Pro "$49/month" | 👤 | A price is an offer, not a fact claim, but there is no checkout yet: upgrades go through sales@ (Organization page). Market research suggests $149/mo (`docs/strategy/MARKET-RESEARCH.md`); founder decides |
+| Enterprise "On-premises / air-gapped deployment" | ✅ | `RUNF9_AIRGAPPED` mode in `src/lib/llm/provider.ts`, README "Air-gapped deployment" |
+| Enterprise "Support by email from the founder" | ✅ | Replaces "Dedicated support", which implied a staffed team |
+
+## Rules for new claims
+
+1. Numbers must come from a test, the product's own limits, or a cited public source with a date.
+2. Say what was measured ("in our test set", "CPM calculation only").
+3. No customer counts, usage totals, savings or "hours saved" until there is customer data to show; when there is, keep the dataset and method here.
+4. No client or employer names without written permission; no testimonials without consent and a record.
+5. No comparisons that disparage competitors' products; compare features with dated, sourced facts only.

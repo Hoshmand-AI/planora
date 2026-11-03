@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      URL: ${{ vars.PRODUCTION_URL || 'https://planora-chi.vercel.app' }}
+      URL: ${{ vars.PRODUCTION_URL || 'https://runf9.ai' }}
     steps:
       - id: probe
         continue-on-error: true

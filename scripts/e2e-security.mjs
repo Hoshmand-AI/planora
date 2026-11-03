@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end security and governance checks against a running Planora server.
+// End-to-end security and governance checks against a running RunF9 server.
 //   BASE_URL=http://localhost:3200 [DATABASE_URL=postgres://…] node scripts/e2e-security.mjs
 // Covers: password policy, generic sign-in errors, lockout, CSRF, sessions & revocation, roles and
 // invitations, two-step verification (incl. replay), org MFA policy, optimistic locking, separation
@@ -10,6 +10,12 @@ import { createHmac } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
+// This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
+// as in ci.yml). The private beta default (invite-only) is covered by scripts/e2e-beta.mjs.
+if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.signup?.mode === 'invite_only') {
+  console.error('✗ Start the server with RUNF9_SIGNUP=open for this suite (invite-only mode is checked by scripts/e2e-beta.mjs).')
+  process.exit(1)
+}
 const ORIGIN = new URL(BASE).origin
 let passed = 0
 
@@ -27,7 +33,7 @@ class Client {
     if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body) }
     const res = await fetch(BASE + url, { method, headers, body: payload, redirect: 'manual' })
     const set = res.headers.get('set-cookie')
-    if (set && set.startsWith('planora-token=')) this.cookie = set.split(';')[0]
+    if (set && set.startsWith('runf9-token=')) this.cookie = set.split(';')[0]
     const text = await res.text()
     let data = {}
     try { data = JSON.parse(text) } catch { data = { raw: text } }
@@ -54,6 +60,34 @@ function totp(secret, offsetSteps = 0) {
 }
 
 const PW = 'correct horse battery staple'
+const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
+
+/** Latest link matching re in the test outbox for this recipient. */
+async function mailLink(to, re) {
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  for (let i = 0; i < 30; i++) {
+    const files = (await fs.readdir(OUTBOX).catch(() => [])).filter(f => f.endsWith('.json')).sort().reverse()
+    for (const f of files) {
+      const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
+      const hit = m.to === to && re.exec(m.text)
+      if (hit) return hit[0]
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  throw new Error(`no email to ${to}`)
+}
+
+/** Latest message in the test outbox for this recipient. */
+async function lastMail(to) {
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  for (const f of (await fs.readdir(OUTBOX).catch(() => [])).filter(f => f.endsWith('.json')).sort().reverse()) {
+    const m = JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))
+    if (m.to === to) return m
+  }
+  return null
+}
 
 async function main() {
   const stamp = Date.now()
@@ -80,6 +114,111 @@ async function main() {
   r = await owner.post('/api/auth', { action: 'signup', email: email('owner'), password: PW, name: 'Olive Owner', company: 'Gamma Builders' })
   ok(r.status === 200 && r.data.user.role === 'owner', 'Founder becomes the organization owner')
 
+  /* ── Email verification (needs RUNF9_EMAIL_OUTBOX on the server and here) ── */
+  if (OUTBOX) {
+    r = await owner.get('/api/auth')
+    ok(r.data.security.emailDelivery === true && r.data.security.emailVerified === false, 'Self sign-up starts with an unconfirmed email')
+    r = await owner.post('/api/org', { action: 'invite', email: email('early'), role: 'viewer' })
+    ok(r.status === 403 && r.data.code === 'email_unverified', 'Inviting people waits for a confirmed email')
+    const link = await mailLink(email('owner'), /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/)
+    const mail = await lastMail(email('owner'))
+    ok(/^RunF9 <[^>]+@[^>]+>$/.test(mail?.from || '') && !/planora/i.test(`${mail?.subject}${mail?.text}${mail?.html}`) && /border-radius:999px/.test(mail?.html || '') && mail?.html.includes(link.replace(/&/g, '&amp;')),
+      'Emails come from "RunF9" with the branded HTML design and the same link in the plain-text part')
+    r = await new Client().get(new URL(link).pathname + '?token=nope')
+    ok(r.status === 303 && r.headers.get('location').includes('verified=0'), 'A bad confirmation token is refused')
+    r = await owner.get(new URL(link).pathname + new URL(link).search)
+    ok(r.status === 303 && r.headers.get('location').includes('/dashboard/account?verified=1'), 'The emailed link confirms the address')
+    r = await owner.get(new URL(link).pathname + new URL(link).search)
+    ok(r.headers.get('location').includes('verified=0'), 'A confirmation link works only once')
+    r = await owner.get('/api/auth')
+    ok(r.data.security.emailVerified === true, 'Email now shows as confirmed')
+  }
+
+  /* ── Forgot password (reset by emailed link) ── */
+  {
+    const resetter = new Client()
+    r = await resetter.post('/api/auth', { action: 'signup', email: email('resetter'), password: PW, name: 'Rhea Resetter', company: 'Reset Builders' })
+    ok(r.status === 200, 'A member signs up (password reset subject)')
+    const anon = new Client()
+    const known = await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+    const unknown = await anon.post('/api/auth', { action: 'request_password_reset', email: `nobody-reset${stamp}@example.com` })
+    const strip = d => JSON.stringify({ ...d, requestId: undefined })
+    ok(known.status === unknown.status && strip(known.data) === strip(unknown.data), 'Reset request answers the same for unknown and known emails (no account enumeration)', { known, unknown })
+    if (!OUTBOX) {
+      ok(known.status === 400 && known.data.code === 'email_unavailable', 'Without email delivery, reset says it is unavailable on this installation')
+    } else {
+      ok(known.status === 200 && /If an account exists/.test(known.data.message), 'Reset request gives the generic confirmation')
+      const resetRe = /https?:\/\/\S+\/auth\/reset\?token=[A-Za-z0-9_-]+/
+      const tokenOf = link => new URL(link).searchParams.get('token')
+      /** Waits for a reset link to this address other than the ones already seen. */
+      const nextResetToken = async (seen) => {
+        for (let i = 0; i < 50; i++) {
+          const t = tokenOf(await mailLink(email('resetter'), resetRe))
+          if (!seen.includes(t)) return t
+          await new Promise(res => setTimeout(res, 100))
+        }
+        throw new Error('no new reset email')
+      }
+      const token1 = await nextResetToken([])
+      ok(!!token1 && token1.length >= 40, 'The reset link is emailed to the account address')
+      {
+        const fs = await import('node:fs/promises')
+        const path = await import('node:path')
+        const mails = await Promise.all((await fs.readdir(OUTBOX)).filter(f => f.endsWith('.json')).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))
+        ok(!mails.some(m => m.to === `nobody-reset${stamp}@example.com`), 'Nothing is sent to an address without an account')
+        const mail = mails.find(m => m.to === email('resetter') && m.subject === 'Reset your RunF9 password')
+        ok(!!mail && /expires in 30 minutes/.test(mail.text) && /ignore this message/.test(mail.text), 'The reset email says it expires in 30 minutes and to ignore it if not requested')
+      }
+      await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+      let token = await nextResetToken([token1])
+      r = await anon.post('/api/auth', { action: 'reset_password', token: token1, password: 'superseded long passphrase' })
+      ok(r.status === 400 && r.data.code === 'reset_invalid', 'Requesting a new link makes the older one stop working')
+      r = await anon.post('/api/auth', { action: 'reset_password', token: 'garbage-token-that-was-never-issued-000000', password: 'another long passphrase' })
+      ok(r.status === 400 && r.data.error === 'This reset link is invalid or has expired. Request a new one.', 'A made-up reset token is refused')
+      if (process.env.DATABASE_URL) {
+        const { createHash } = await import('node:crypto')
+        const { default: pg } = await import('pg')
+        const db = new pg.Client({ connectionString: process.env.DATABASE_URL })
+        await db.connect()
+        await db.query(`UPDATE email_tokens SET expires_at = NOW() - INTERVAL '1 second' WHERE token_hash=$1`, [createHash('sha256').update(token).digest('hex')])
+        await db.end()
+        r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'expired link long passphrase' })
+        ok(r.status === 400 && r.data.code === 'reset_invalid', 'An expired reset link is refused')
+        await anon.post('/api/auth', { action: 'request_password_reset', email: email('resetter') })
+        token = await nextResetToken([token1, token])
+      }
+      const device2 = new Client()
+      r = await device2.post('/api/auth', { action: 'signin', email: email('resetter'), password: PW })
+      ok(r.status === 200, 'The member is also signed in on a second device')
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'short' })
+      ok(r.status === 400 && r.data.code === 'weak_password', 'A weak new password is refused (and the link still works)')
+      const NEW_PW = 'freshly chosen reset passphrase'
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: NEW_PW })
+      ok(r.status === 200 && r.data.success && !anon.cookie, 'The emailed link resets the password (no automatic sign-in)')
+      r = await anon.post('/api/auth', { action: 'reset_password', token, password: 'reused link long passphrase' })
+      ok(r.status === 400 && r.data.code === 'reset_invalid', 'A reset link works only once')
+      r = await device2.get('/api/plans')
+      const r2 = await resetter.get('/api/plans')
+      ok(r.status === 401 && r2.status === 401, 'Resetting the password signs the account out everywhere')
+      r = await new Client().post('/api/auth', { action: 'signin', email: email('resetter'), password: PW })
+      ok(r.status === 401, 'The old password no longer works')
+      const back = new Client()
+      r = await back.post('/api/auth', { action: 'signin', email: email('resetter'), password: NEW_PW })
+      ok(r.status === 200, 'The new password signs in')
+      r = await back.get('/api/audit?limit=100')
+      const resetEvents = r.data.events.filter(e => e.action === 'auth.password_reset_requested' || e.action === 'auth.password_reset')
+      ok(resetEvents.some(e => e.action === 'auth.password_reset') && resetEvents.some(e => e.action === 'auth.password_reset_requested'), 'Audit log records the reset request and the reset')
+      ok(!JSON.stringify(r.data.events).includes(token), 'The audit log never contains the reset token')
+      r = await back.get('/api/auth')
+      ok(r.data.security.emailVerified === true, 'Using the reset link also confirms the email address')
+    }
+    // Per-address limit, counted whether or not the account exists.
+    const flood = `flood-reset${stamp}@example.com`
+    const answers = []
+    for (let i = 0; i < 6; i++) answers.push((await anon.post('/api/auth', { action: 'request_password_reset', email: flood })).status)
+    ok(OUTBOX ? answers.slice(0, 5).every(s => s === 200) && answers[5] === 429 : answers.every(s => s === 400), `Reset requests are rate limited per email (${answers.join(',')})`)
+  }
+
   /* ── CSRF ── */
   r = await owner.post('/api/plans', { name: 'Evil' }, { origin: 'https://evil.example' })
   ok(r.status === 403 && r.data.code === 'csrf', 'Cross-site write is blocked')
@@ -96,6 +235,7 @@ async function main() {
   /* ── Invitations and roles ── */
   r = await owner.post('/api/org', { action: 'invite', email: email('viewer'), role: 'viewer' })
   ok(r.status === 200 && r.data.link.includes('/auth?invite='), 'Owner creates an invitation link')
+  if (OUTBOX) ok(r.data.emailed === true && (await mailLink(email('viewer'), /https?:\/\/\S+\/auth\?invite=\S+/)) === r.data.link, 'The invitation is emailed to the invitee')
   const viewerInvite = new URL(r.data.link).searchParams.get('invite')
   r = await owner.post('/api/org', { action: 'invite', email: email('rev'), role: 'reviewer' })
   const reviewerInvite = new URL(r.data.link).searchParams.get('invite')
@@ -161,6 +301,16 @@ async function main() {
   ok(r.status === 200, 'Independent reviewer approves')
   r = await scheduler.post(`/api/plans/${planId}/publish`, {})
   ok(r.status === 200 && r.data.schedule, 'Publish succeeds after independent approval')
+  {
+    const act = r.data.plan.generated.activities.find(a => a.duration > 1)
+    r = await scheduler.post(`/api/plans/${planId}/edit`, { edit: { kind: 'duration', activityId: act.id, value: act.duration + 3, reason: 'Edit after approval' } })
+    ok(r.status === 200 && r.data.approvalInvalidated === true, 'An edit after approval invalidates the approval')
+    r = await scheduler.post(`/api/plans/${planId}/publish`, {})
+    ok(r.status === 403 && r.data.code === 'approval_required' && r.data.reason === 'approval_stale', 'Edited schedule cannot be published on the stale approval')
+    r = await reviewer.post(`/api/plans/${planId}/review`, { verdict: 'approve' })
+    r = await scheduler.post(`/api/plans/${planId}/publish`, {})
+    ok(r.status === 200 && r.data.schedule, 'Publish succeeds after a fresh approval of the edited version')
+  }
 
   /* ── Sessions ── */
   const other = new Client()
@@ -189,6 +339,10 @@ async function main() {
   r = await owner.post('/api/account', { action: 'mfa_confirm', code: totp(secret) })
   ok(r.status === 200 && r.data.recoveryCodes.length === 10, 'Enrollment confirmed; 10 recovery codes issued')
   const recovery = r.data.recoveryCodes
+  r = await owner.post('/api/account', { action: 'mfa_confirm', code: totp(secret) })
+  ok(r.status === 400 && !r.data.recoveryCodes, 'Replaying the enrollment code is rejected and cannot rotate recovery codes')
+  r = await owner.post('/api/account', { action: 'mfa_recovery_codes' })
+  ok(r.status === 401 && !r.data.recoveryCodes, 'New recovery codes require the current password and a second factor')
   r = await owner.post('/api/org', { action: 'update_settings', settings: { requireMfa: true } })
   ok(r.status === 200, 'Owner requires MFA for the organization')
 
@@ -314,7 +468,7 @@ async function main() {
     if (process.env.OIDC_ISSUER) {
       const domain = `sso${stamp}.example`
       setPlan(email('owner'), 'enterprise')
-      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'planora-test', clientSecret: 'test-secret', domains: [domain], defaultRole: 'scheduler', enforce: false } })
+      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'runf9-test', clientSecret: 'test-secret', domains: [domain], defaultRole: 'scheduler', enforce: false } })
       ok(r.status === 200 && r.data.sso.enabled && r.data.sso.hasSecret && !JSON.stringify(r.data).includes('test-secret'), 'Admin configures SSO (secret never returned)')
       const ssoLogin = async (who, bad) => {
         const start = await fetch(`${BASE}/api/auth/sso`, { method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN }, body: JSON.stringify({ email: who }) })
@@ -323,7 +477,7 @@ async function main() {
         const stateCookie = start.headers.get('set-cookie').split(';')[0]
         const idp = await fetch(sdata.url + (bad ? `&bad=${bad}` : ''), { redirect: 'manual' })
         const cb = await fetch(idp.headers.get('location'), { redirect: 'manual', headers: { cookie: stateCookie } })
-        const session = (cb.headers.get('set-cookie') || '').split(/,(?=\s*planora)/).find(c => c.trim().startsWith('planora-token=') && !c.includes('planora-token=;'))
+        const session = (cb.headers.get('set-cookie') || '').split(/,(?=\s*runf9)/).find(c => c.trim().startsWith('runf9-token=') && !c.includes('runf9-token=;'))
         return { status: cb.status, location: cb.headers.get('location') || '', cookie: session ? session.trim().split(';')[0] : null }
       }
       r = await ssoLogin(`jane@${domain}`)
@@ -348,10 +502,19 @@ async function main() {
       r = await owner2.post('/api/org', { action: 'invite', email: `pw@${domain}`, role: 'viewer' })
       const pw = new Client()
       await pw.post('/api/auth', { action: 'signup', email: `pw@${domain}`, password: PW, name: 'Pat Password', invite: new URL(r.data.link).searchParams.get('invite') })
-      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'planora-test', domains: [domain], defaultRole: 'scheduler', enforce: true } })
+      r = await owner2.post('/api/org', { action: 'update_sso', sso: { enabled: true, issuer: process.env.OIDC_ISSUER, clientId: 'runf9-test', domains: [domain], defaultRole: 'scheduler', enforce: true } })
       ok(r.status === 200 && r.data.sso.enforce, 'Admin enforces SSO')
       r = await new Client().post('/api/auth', { action: 'signin', email: `pw@${domain}`, password: PW })
       ok(r.status === 403 && r.data.code === 'sso_required', 'With SSO enforced, members cannot use a password', r)
+      if (OUTBOX) {
+        const fs = await import('node:fs/promises')
+        const path = await import('node:path')
+        const resetMailsTo = async to => (await Promise.all((await fs.readdir(OUTBOX)).filter(f => f.endsWith('.json')).map(async f => JSON.parse(await fs.readFile(path.join(OUTBOX, f), 'utf8'))))).filter(m => m.to === to && m.subject === 'Reset your RunF9 password').length
+        r = await new Client().post('/api/auth', { action: 'request_password_reset', email: `pw@${domain}` })
+        ok(r.status === 200 && /If an account exists/.test(r.data.message), 'A reset request for an SSO-enforced member gets the generic answer')
+        await new Promise(res => setTimeout(res, 1500))
+        ok(await resetMailsTo(`pw@${domain}`) === 0, '…but no reset link is sent (they sign in through the identity provider)')
+      }
       r = await new Client().post('/api/auth', { action: 'signin', email: email('owner'), password: PW })
       ok(r.status === 200, 'The owner keeps password sign-in as a break-glass account')
       r = await owner2.get('/api/audit?action=org.sso_changed')
@@ -359,11 +522,78 @@ async function main() {
     }
   }
 
+  /* ── Portfolio, sample project, priced recovery, quality thresholds ── */
+  r = await owner2.post('/api/plans', { sample: true })
+  ok(r.status === 200 && /^Sample:/.test(r.data.plan.name), 'A sample project is created in one click')
+  const sampleId = r.data.plan.id
+  r = await owner2.get(`/api/plans/${sampleId}`)
+  ok(r.data.plan.generated && r.data.recovery && r.data.recovery.options.find(o => o.id === 'workweek').impact.cost.low > 0, 'The sample has a schedule and recovery options priced from its cost basis')
+  r = await owner2.get('/api/portfolio')
+  const row = r.data.rows?.find(x => x.id === sampleId)
+  ok(r.status === 200 && row && row.status === 'at_risk' && row.alerts.some(a => a.code === 'late'), 'Portfolio lists the sample as at risk with a "late" alert')
+  r = await owner2.post('/api/org', { action: 'update_settings', settings: { quality: { maxPct: 10, minFsPct: 85, highFloatDays: 60, highDurationDays: 60, indexTarget: 0.9 } } })
+  ok(r.status === 200 && r.data.settings.quality.highDurationDays === 60, 'Admins set the organization quality thresholds')
+  r = await owner2.get(`/api/plans/${sampleId}`)
+  ok(r.data.evaluation.dcma.checks.find(c => c.id === 8).threshold === '≤ 10% with remaining > 60d', 'Quality checks use the organization thresholds')
+
+  /* ── API keys ── */
+  r = await reviewer.post('/api/org/integrations', { action: 'create_key', name: 'Nope', role: 'viewer' })
+  ok(r.status === 403, 'Only admins can create API keys', r)
+  r = await owner2.post('/api/org/integrations', { action: 'create_key', name: 'Owner key', role: 'admin' })
+  ok(r.status === 400, 'API keys cannot have admin rights')
+  r = await owner2.post('/api/org/integrations', { action: 'create_key', name: 'BI dashboard', role: 'viewer', expiresInDays: 30 })
+  ok(r.status === 200 && /^pk_live_/.test(r.data.secret) && r.data.key.prefix && !JSON.stringify(r.data.key).includes(r.data.secret), 'Read-only API key created; secret shown once')
+  const keyId = r.data.key.id, keySecret = r.data.secret
+  const bearer = { authorization: `Bearer ${keySecret}`, origin: '' }
+  r = await new Client().get('/api/portfolio', bearer)
+  ok(r.status === 200 && r.data.rows.some(x => x.id === sampleId), 'The API key reads the portfolio')
+  r = await new Client().get(`/api/plans/${sampleId}/export?format=xer`, bearer)
+  ok(r.status === 200 && String(r.data.raw || '').startsWith('ERMHDR'), 'The API key exports a P6 schedule')
+  r = await new Client().patch(`/api/plans/${sampleId}`, { answers: {} }, bearer)
+  ok(r.status === 403 && r.data.code === 'forbidden', 'A read-only key cannot change plans')
+  r = await new Client().get('/api/org', bearer)
+  ok(r.status === 403 && r.data.code === 'api_key_not_allowed', 'API keys only work on the endpoints that allow them')
+  r = await new Client().get('/api/portfolio', { authorization: 'Bearer pk_live_' + 'x'.repeat(43), origin: '' })
+  ok(r.status === 401 && r.data.code === 'invalid_api_key', 'An unknown key is refused')
+  r = await owner2.get('/api/org/integrations')
+  ok(r.data.keys.find(k => k.id === keyId).lastUsedAt, 'Key usage is tracked')
+  r = await owner2.post('/api/org/integrations', { action: 'revoke_key', id: keyId })
+  r = await new Client().get('/api/portfolio', bearer)
+  ok(r.status === 401, 'A revoked key stops working immediately')
+
+  /* ── Webhooks (signed) ── */
+  if (process.env.WEBHOOK_RECEIVER_PORT) {
+    const { createServer } = await import('node:http')
+    const got = []
+    const srv = createServer((req, res) => { let b = ''; req.on('data', c => { b += c }); req.on('end', () => { got.push({ headers: req.headers, body: b }); res.end('ok') }) })
+    await new Promise(r2 => srv.listen(Number(process.env.WEBHOOK_RECEIVER_PORT), r2))
+    r = await owner2.post('/api/org/integrations', { action: 'create_webhook', url: 'ftp://example.com/x', events: ['plan.created'] })
+    ok(r.status === 400, 'Non-HTTP webhook URLs are refused')
+    r = await owner2.post('/api/org/integrations', { action: 'create_webhook', url: `http://localhost:${process.env.WEBHOOK_RECEIVER_PORT}/hook`, events: ['plan.created', 'plan.generate'] })
+    ok(r.status === 200 && /^whsec_/.test(r.data.secret), 'Webhook added; signing secret shown once')
+    const whSecret = r.data.secret, hookId = r.data.webhook.id
+    r = await owner2.post('/api/org/integrations', { action: 'test_webhook', id: hookId })
+    ok(r.status === 200 && r.data.ok, 'Test delivery succeeds')
+    await owner2.post('/api/plans', { name: `Webhook plan ${stamp}` })
+    for (let i = 0; i < 50 && !got.some(g => g.headers['x-runf9-event'] === 'plan.created'); i++) await new Promise(r2 => setTimeout(r2, 100))
+    const d = got.find(g => g.headers['x-runf9-event'] === 'plan.created')
+    ok(!!d && JSON.parse(d.body).data.detail.plan === `Webhook plan ${stamp}`, 'Creating a plan delivers a plan.created webhook')
+    const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(d.headers['x-runf9-signature']) || []
+    ok(t && v1 === createHmac('sha256', whSecret).update(`${t}.${d.body}`).digest('hex'), 'The delivery signature verifies with the secret')
+    ok(d.headers['x-planora-signature'] === d.headers['x-runf9-signature'] && d.headers['x-planora-event'] === 'plan.created' && d.headers['user-agent'] === 'RunF9-Webhooks/1',
+      'Deliveries carry X-RunF9-* headers, the legacy X-Planora-* copies, and the RunF9 user agent')
+    srv.close()
+    r = await owner2.post('/api/org/integrations', { action: 'delete_webhook', id: hookId })
+    ok(r.status === 200, 'Webhook removed')
+  }
+  r = await owner2.get('/api/audit?action=apikey.')
+  ok(r.data.events.some(e => e.action === 'apikey.created') && r.data.events.some(e => e.action === 'apikey.revoked') && !JSON.stringify(r.data.events).includes(keySecret), 'API key creation and revocation are audited without the secret')
+
   /* ── Privacy ── */
   r = await reviewer.post('/api/account', { action: 'export_my_data' })
   ok(r.status === 200 && r.data.account.email === email('rev') && Array.isArray(r.data.activity), 'Personal data export')
   const exp = await owner2.req('POST', '/api/org', { action: 'export_data' })
-  ok(exp.status === 200 && exp.data.format === 'planora-org-export' && exp.data.plans.length >= 1 && exp.data.auditEvents.length > 0 && !JSON.stringify(exp.data.members).includes('password'), 'Organization export (no secrets)')
+  ok(exp.status === 200 && exp.data.format === 'runf9-org-export' && exp.data.plans.length >= 1 && exp.data.auditEvents.length > 0 && !JSON.stringify(exp.data.members).includes('password'), 'Organization export (no secrets)')
 
   const solo = new Client()
   r = await solo.post('/api/auth', { action: 'signup', email: email('solo'), password: PW, name: 'Solo', company: 'Delta Temp' })

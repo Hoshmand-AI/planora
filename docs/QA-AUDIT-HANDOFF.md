@@ -1,8 +1,8 @@
-# Planora — QA/QC and Audit Handoff
+# RunF9 — QA/QC and Audit Handoff
 
 | | |
 |---|---|
-| **Product** | Planora — AI construction scheduling (build, analyze, monitor) |
+| **Product** | RunF9 — AI construction scheduling (build, analyze, monitor) |
 | **Owner** | Hoshmand AI |
 | **Repository** | `Hoshmand-AI/planora` (branch `main`) |
 | **Release under review** | Merge commit `d75f048` (PR #3), deployed to Vercel production 09/30/2026 |
@@ -15,7 +15,7 @@
 
 ## 1. Purpose and scope
 
-This document hands Planora over for independent **QA/QC testing** and **audit review**. It covers:
+This document hands RunF9 over for independent **QA/QC testing** and **audit review**. It covers:
 
 - what the product does and where each function lives in the code
 - how to set up a test environment and run the automated checks
@@ -25,13 +25,13 @@ This document hands Planora over for independent **QA/QC testing** and **audit r
 - known limitations and open risks
 - a sign-off sheet
 
-**Out of scope:** the accuracy of third-party reference data (permit review times, equipment lead times). Planora presents these as planning ranges that must be checked with the Authority Having Jurisdiction (AHJ) and suppliers before a schedule is baselined.
+**Out of scope:** the accuracy of third-party reference data (permit review times, equipment lead times). RunF9 presents these as planning ranges that must be checked with the Authority Having Jurisdiction (AHJ) and suppliers before a schedule is baselined.
 
 ---
 
 ## 2. Product overview
 
-Planora works in three stages:
+RunF9 works in three stages:
 
 1. **Build.** It interviews the scheduler (drawings, permits, long-lead equipment, site, calendar, security, milestone targets). It then generates a CPM schedule that explains every duration and link.
 2. **Analyze.** It imports existing schedules (P6 XER, MS Project XML, Excel/CSV, PDF) and runs DCMA 14-point checks, a critical-path review and input-data checks.
@@ -82,6 +82,11 @@ All endpoints below require an authenticated session except `POST /api/auth` (lo
 | `GET/POST /api/schedules/[id]/quality` | DCMA results, data questions, decisions |
 | `GET/POST /api/history` | Firm history and tagging |
 | `POST /api/ask`, `POST /api/reports` | Ask AI, narrative reports |
+| `GET /api/portfolio` | Portfolio: every plan and uploaded schedule with alerts |
+| `GET/POST /api/org/integrations` | API keys and webhooks (admins) |
+| `GET /api/auth/verify` | Email confirmation link (public) |
+
+Selected read endpoints (and answering/generating, for scheduler keys) also accept an organization API key. See [docs/API.md](API.md).
 
 ---
 
@@ -100,13 +105,16 @@ npm start                       # http://localhost:3000
 |---|---|---|
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `JWT_SECRET` | Yes | Auth refuses to start without it in production |
-| `PLANORA_AI_MODE` | No | `cloud`, `local` or `offline`. Default: cloud if `OPENAI_API_KEY` is set, else offline |
-| `OPENAI_API_KEY` | No | Cloud mode only |
+| `RUNF9_AI_MODE` | No | `cloud`, `local` or `offline`. Default: cloud if `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set, else offline |
+| `RUNF9_AI_PROVIDER` | No | `anthropic` or `openai`. Default: `anthropic` when `ANTHROPIC_API_KEY` is set, else `openai` when `OPENAI_API_KEY` is set |
+| `ANTHROPIC_API_KEY` | No | Cloud mode, Anthropic provider (default cloud provider) |
+| `RUNF9_AI_FALLBACK` | No | `off` disables Anthropic's server-side refusal fallback (on by default) |
+| `OPENAI_API_KEY` | No | Cloud mode, OpenAI provider (approved alternate) |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | No | On-prem model (OpenAI-compatible API) |
-| `PLANORA_AIRGAPPED` | No | `true` refuses cloud AI and any non-private model host |
-| `PLANORA_ALLOWED_HOSTS` | No | Extra model hosts allowed in air-gapped mode |
+| `RUNF9_AIRGAPPED` | No | `true` refuses cloud AI and any non-private model host |
+| `RUNF9_ALLOWED_HOSTS` | No | Extra model hosts allowed in air-gapped mode |
 
-> Recommended: test once with `PLANORA_AI_MODE=offline`, which exercises every deterministic function, and once with a model configured.
+> Recommended: test once with `RUNF9_AI_MODE=offline`, which exercises every deterministic function, and once with a model configured.
 
 ---
 
@@ -161,7 +169,7 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | SCH-01 | Generate a schedule | Every activity shows duration, dates, total float, confidence and a "why" explanation with its source |
 | SCH-02 | Set the start date on a weekend | NTP moves to the next working day and a note explains the move |
 | SCH-03 | Check field activities | No field segment is longer than 44 working days; no negative lags (leads) |
-| SCH-04 | Hand-check one path: start + durations + lags across calendars | Matches the dates and float Planora shows |
+| SCH-04 | Hand-check one path: start + durations + lags across calendars | Matches the dates and float RunF9 shows |
 | SCH-05 | Enter milestone targets the logic can't meet | The milestone is held as finish-no-later-than and shows negative float. "Your dates vs. what the logic can achieve" names the days late and the driving activities |
 | SCH-06 | All dates on screen and in exports | Shown as MM/DD/YYYY |
 
@@ -182,6 +190,22 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | REC-01 | Set a required finish earlier than the calculated finish | The header shows "Required finish N days late". A recovery panel explains the gap in calendar and work days, the negative float and the top drivers |
 | REC-02 | Review the options (6-day week, early packages, expedite, add crews, answer questions, move date) | Each shows its new finish, days saved, whether it meets the date, and its trade-off. A combined result is shown |
 | REC-03 | Apply one option | The schedule recalculates, the finish matches the modeled date, and an audit entry is written |
+| REC-04 | Answer the Cost basis questions (field labor per day, cost of each late day) | Each option shows its resources, an added-cost range and the delay cost avoided; without the answers it says "not priced" |
+| REC-05 | Build → "Open a sample project" (new organization) | A fully answered sample opens with a schedule, a missed required date and priced recovery options |
+
+### 5.5a Portfolio, integrations and email
+
+| ID | Steps | Expected result |
+|---|---|---|
+| POR-01 | Overview → "All projects and alerts (portfolio)" | Every plan and uploaded schedule, most urgent first, with status and alerts (late, milestone late, date conflict, review, stale data date) |
+| INT-01 | Organization → Integrations → create a read-only API key; call `GET /api/portfolio` with it | Works; the key is shown once; calling `/api/org` with it returns 403; after revoking it returns 401 |
+| INT-02 | Add a webhook to an HTTPS endpoint (e.g. a request-bin), "Send test", then create a plan | Signed deliveries arrive; `http://` and private addresses are refused |
+| EML-01 | With an email provider configured, sign up a new organization | A confirmation email arrives; inviting people is blocked until the link is clicked; the link works once |
+| QRL-01 | Organization → Policies → raise "High duration above" to 60 | Quality results state "remaining > 60d" and re-judge check 8 |
+| ADP-01 | New plan → Interview | Facility type, location, scope, size and start come first; permit and long-lead questions are held under "Waiting on an earlier answer" until type and location are known |
+| ADP-02 | Answer the foundations | Each next question shows how far it can move the finish ("up to N days"); questions that can't move it sit under "Optional details" |
+| ADP-03 | Data center in VA, 60% drawings | Parallel long-lead items appear as one checklist ("together they move the finish up to N days") instead of many questions |
+| ADP-04 | Open the sample project | Header says "Enough to build"; nothing left that moves the finish |
 
 ### 5.6 Quality (DCMA 14-point) and evaluation
 
@@ -201,16 +225,16 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | IMP-01 | Upload a P6 XER file | Activities, relationships, calendars, constraints and WBS are imported; calendars show "as labeled vs. as understood" |
 | IMP-02 | Upload MS Project XML, Excel/CSV with messy headers, and a PDF | Each imports; activity names are mapped to standard categories |
 | IMP-03 | Upload a file larger than 25 MB | Rejected with a clear message (HTTP 413) |
-| IMP-04 | Upload a file with logic but no float or dates | Planora calculates CPM before analysis, and a warning says so |
+| IMP-04 | Upload a file with logic but no float or dates | RunF9 calculates CPM before analysis, and a warning says so |
 | IMP-05 | Upload a file with no relationships | Activities are **not** all marked critical; a warning explains why |
 | IMP-06 | Open Overview for the uploaded schedule | "About this project" summary shows type, location, size, dates, scope by phase and next milestones |
-| IMP-07 | Upload a file with weekend work on a 5-day calendar, or out-of-sequence progress | Planora asks about each issue; answers are recorded |
+| IMP-07 | Upload a file with weekend work on a 5-day calendar, or out-of-sequence progress | RunF9 asks about each issue; answers are recorded |
 
 ### 5.8 Exports
 
 | ID | Steps | Expected result |
 |---|---|---|
-| EXP-01 | Export P6 XER and import it into Primavera P6 | Imports without errors; activity count, logic, calendars and dates match Planora |
+| EXP-01 | Export P6 XER and import it into Primavera P6 | Imports without errors; activity count, logic, calendars and dates match RunF9 |
 | EXP-02 | Export MS Project XML and open it in MS Project | Opens; tasks, links and dates match |
 | EXP-03 | Export the PDF | Readable, MM/DD/YYYY dates, matches the on-screen schedule |
 | EXP-04 | Export both Excel files (P6-style layout and import workbook) | The layout file shows WBS, indentation and colors; the import workbook re-imports into P6/MSP |
@@ -220,8 +244,8 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 
 | ID | Steps | Expected result |
 |---|---|---|
-| AI-01 | Run with `PLANORA_AI_MODE=offline` | Every function except AI follow-up questions and narrative Q&A works. The UI shows "AI offline — rules only" |
-| AI-02 | Set `PLANORA_AIRGAPPED=true` with a public model host (e.g. api.openai.com) | The model host is refused; no outbound call is made |
+| AI-01 | Run with `RUNF9_AI_MODE=offline` | Every function except AI follow-up questions and narrative Q&A works. The UI shows "AI offline — rules only" |
+| AI-02 | Set `RUNF9_AIRGAPPED=true` with a public model host (e.g. api.anthropic.com or api.openai.com) | The model host is refused; no outbound call is made |
 | AI-03 | Air-gapped with a private host (e.g. `*.internal`, 10.x.x.x) | Allowed |
 | AI-04 | Ask AI a status question on an uploaded schedule | The answer starts with "About this project", uses MM/DD/YYYY, and does not call activities critical when the file has no logic |
 
@@ -272,7 +296,7 @@ Record the result for each case: Pass, Fail or Blocked, plus notes and screensho
 | 6 | No role-based permissions | **Fixed:** owner, admin, scheduler, reviewer and viewer roles, enforced on every route |
 | 7 | Reference ranges | Unchanged by design (shown as ranges; verify with the AHJ and suppliers). Now also drive the Monte Carlo ranges |
 | 8 | `pg` SSL-mode warning | **Fixed:** verified TLS, and `sslmode` is stripped from the URL |
-| 9 | Recovery options are what-if models | Unchanged; the Monte Carlo analysis now gives the probability of meeting the date |
+| 9 | Recovery options are what-if models | Still what-if models; the Monte Carlo analysis gives the probability of meeting the date, and (round 2) each option shows resources, an added-cost range and the delay cost avoided |
 | 10 | DCMA checks 10–14 need extra data | Unchanged (N/A when the data is absent) |
 
 ## 8. Deliverables requested from QA/QC and audit

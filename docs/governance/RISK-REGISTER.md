@@ -9,7 +9,7 @@ Scored 1–5 for likelihood (L) and impact (I). Reviewed monthly by the founder.
 | R3 | Data loss | 1 | 5 | Neon PITR; nightly verified off-provider backup (once secrets set); restore drill in CI | Enable backup secrets (POA&M #4) | Founder |
 | R4 | Wrong schedule output relied on contractually | 3 | 4 | Deterministic CPM tests; DCMA tests; explainability; disclaimers; human review/approval policies | Independent P6 parity validation (POA&M #11) | Product |
 | R5 | AI hallucination in reports | 3 | 3 | AI can't set schedule data; computed facts in prompts; golden prompts; org AI switch | Monthly golden-prompt run | Product |
-| R6 | AI cost runaway / abuse | 2 | 3 | Per-org daily quota, per-user rate limit, plan caps | Provider spend cap in OpenAI dashboard | Founder |
+| R6 | AI cost runaway / abuse | 2 | 3 | Per-org daily quota, per-user rate limit, plan caps | Provider spend cap in the Anthropic Console (or OpenAI dashboard if selected); `estimatedCostUsd` on `ai.request` audit events | Founder |
 | R7 | Vulnerable dependency | 3 | 3 | Dependabot, npm audit gate, CodeQL, Semgrep, SLAs | — | Eng |
 | R8 | Outage undetected | 2 | 3 | 15-min uptime probe → incident issue | Log drain + alerting (POA&M #3) | Eng |
 | R9 | Unreviewed risky change reaches prod | 2 | 4 | Required CI gates; CODEOWNERS for sensitive paths | Turn on code-owner review (POA&M #5) | Founder |

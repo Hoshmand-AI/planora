@@ -243,6 +243,552 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS method TEXT;
     `,
   },
+  {
+    id: 4, name: 'api_keys_webhooks_email_verification',
+    sql: `
+    -- Organization API keys for integrations (read-only or scheduler); only a SHA-256 of the key is stored.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ,
+      last_used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS api_keys_org_idx ON api_keys(org_id);
+
+    -- Outbound webhooks; the signing secret is stored encrypted.
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      events JSONB NOT NULL DEFAULT '[]',
+      secret_enc TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      disabled_at TIMESTAMPTZ,
+      last_delivery_at TIMESTAMPTZ,
+      last_status TEXT,
+      consecutive_failures INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS webhooks_org_idx ON webhooks(org_id);
+
+    -- Email verification for self sign-up (single-use, hashed, expiring tokens).
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+    CREATE TABLE IF NOT EXISTS email_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS email_tokens_user_idx ON email_tokens(user_id);
+    `,
+  },
+  {
+    id: 5, name: 'schedule_analysis_versions_source_files',
+    sql: `
+    -- RunF9's own analysis of an uploaded schedule (forecast vs reported finish, finish-milestone
+    -- variance, status, recalculation differences) so lists and alerts don't depend on file headers.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS analysis JSONB;
+    -- Uploads of the same project (P6 project short name / MS Project title) form one update series.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS project_key TEXT;
+    CREATE INDEX IF NOT EXISTS schedules_project_key_idx ON schedules(org_id, project_key);
+    -- Whether this schedule's actuals may calibrate the firm's history (as-built projects only by default).
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS in_history BOOLEAN NOT NULL DEFAULT TRUE;
+    -- The original uploaded file and its SHA-256, kept for chain of custody.
+    CREATE TABLE IF NOT EXISTS schedule_files (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      content BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS schedule_files_org_idx ON schedule_files(org_id);
+    `,
+  },
+  {
+    id: 6, name: 'finish_milestone_designation',
+    sql: `
+    -- The contract/finish milestone a scheduler designated for an uploaded schedule (activity id or
+    -- activity code); NULL = RunF9 picks it. Additive: older code ignores the column.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS finish_milestone_id TEXT;
+    -- P6 milestone type (TT_FinMile = 'finish', TT_Mile = 'start') so the finish milestone can be
+    -- told apart from start milestones; NULL for sources without the distinction.
+    ALTER TABLE activities ADD COLUMN IF NOT EXISTS milestone_kind TEXT;
+    `,
+  },
+  {
+    id: 7, name: 'uploaded_schedule_edits_and_risk_inputs',
+    sql: `
+    -- Edits a scheduler makes to an uploaded schedule in RunF9 (remaining duration, relationship,
+    -- constraint), each with a reason. An override layer: the imported activities and relationships
+    -- are never changed; edits are applied in order on read. Reverting sets reverted_at (kept for the
+    -- record). Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS schedule_edits (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      change JSONB NOT NULL,
+      reason TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      option_id TEXT,
+      user_id TEXT,
+      user_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reverted_at TIMESTAMPTZ,
+      reverted_by TEXT,
+      revert_reason TEXT
+    );
+    CREATE INDEX IF NOT EXISTS schedule_edits_schedule_idx ON schedule_edits(org_id, schedule_id, created_at);
+    -- Schedule risk analysis inputs for an uploaded schedule: the scheduler's per-activity three-point
+    -- ranges (work days) and discrete risk events (probability, impact days, affected activity).
+    CREATE TABLE IF NOT EXISTS schedule_risk_inputs (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      ranges JSONB NOT NULL DEFAULT '[]',
+      events JSONB NOT NULL DEFAULT '[]',
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS schedule_risk_inputs_org_idx ON schedule_risk_inputs(org_id);
+    `,
+  },
+  {
+    id: 8, name: 'upload_history_series_cui',
+    sql: `
+    -- Security classification of an uploaded schedule (same values as plans: unclassified, cui,
+    -- classified); NULL = not set. CUI/classified uploads never reach a cloud model and their exports
+    -- carry CUI markings.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS classification TEXT;
+    -- Firm history: whose schedule it is ('own' / 'third_party', NULL = not stated), an explicit
+    -- override to include a schedule that is not as-built, and whether the file is a re-imported
+    -- RunF9 export (never used to calibrate history). Additive: older code ignores the columns.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS upload_origin TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS history_override BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS planora_export BOOLEAN NOT NULL DEFAULT FALSE;
+    `,
+  },
+  {
+    id: 9, name: 'submission_review_dispositions',
+    sql: `
+    -- Reviewer workflow for uploaded submissions. Additive: older code ignores both tables.
+    -- One disposition per DCMA finding ('dcma:<n>') or data question (its id) of an upload:
+    -- accepted / exception (with justification) / needs_revision.
+    CREATE TABLE IF NOT EXISTS review_dispositions (
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('accepted', 'exception', 'needs_revision')),
+      justification TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (schedule_id, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS review_dispositions_org_idx ON review_dispositions(org_id);
+    -- The overall disposition of the submission: approved / approved as noted / revise and resubmit.
+    CREATE TABLE IF NOT EXISTS submission_reviews (
+      schedule_id TEXT PRIMARY KEY REFERENCES schedules(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      disposition TEXT NOT NULL CHECK (disposition IN ('approved', 'approved_as_noted', 'revise_and_resubmit')),
+      comments TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS submission_reviews_org_idx ON submission_reviews(org_id);
+    `,
+  },
+  {
+    id: 10, name: 'workspaces_ethical_walls',
+    sql: `
+    -- Matter / engagement workspaces inside an organization, for project-level access control
+    -- (ethical walls). Enforcement lives in src/lib/server/workspaces.ts and the scoped reads in
+    -- src/lib/db.ts. Additive: older code ignores the new tables and columns, and every existing
+    -- schedule and plan stays organization-wide (workspace_id NULL) until an admin assigns it.
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      -- Walled: only the workspace's members (and owners/admins) can see its schedules and plans.
+      walled BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS workspaces_org_idx ON workspaces(org_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS workspaces_org_name_idx ON workspaces(org_id, LOWER(name));
+    CREATE TABLE IF NOT EXISTS workspace_members (
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      added_by TEXT,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (workspace_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members(org_id, user_id);
+    -- A restricted member sees only the schedules and plans of the workspaces they belong to.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS workspace_restricted BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    CREATE INDEX IF NOT EXISTS schedules_workspace_idx ON schedules(org_id, workspace_id);
+    CREATE INDEX IF NOT EXISTS plans_workspace_idx ON plans(org_id, workspace_id);
+    `,
+  },
+  {
+    id: 11, name: 'baseline_resolver',
+    sql: `
+    -- One baseline for every surface (src/lib/analysis/baseline.ts). Additive: older code ignores both
+    -- columns. baseline_schedule_id = the earlier upload of the series the scheduler designated as this
+    -- upload's baseline (NULL = the upload labelled Baseline); baseline_meta = the P6 project baseline
+    -- embedded in the uploaded XER and whether the file's own target dates may serve as a baseline.
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS baseline_schedule_id TEXT;
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS baseline_meta JSONB;
+    `,
+  },
+  {
+    id: 12, name: 'risk_inputs_committed_delivery_dates',
+    sql: `
+    -- Committed delivery dates on an uploaded schedule's risk inputs: a supplier's committed delivery
+    -- (finish) date per activity, held near-deterministic in the Monte Carlo and flagged when the
+    -- forecast is later. Additive: older code ignores the column.
+    ALTER TABLE schedule_risk_inputs ADD COLUMN IF NOT EXISTS commitments JSONB NOT NULL DEFAULT '[]';
+    `,
+  },
+  {
+    id: 13, name: 'standards_runs',
+    sql: `
+    -- Persisted standards-engine runs (src/lib/standards): the full result of running one or more
+    -- frameworks (GAO / DCMA 14-point / RunF9 Composite) against an uploaded schedule or a generated
+    -- plan, with the rules version hash and thresholds used, so a past assessment can be reproduced
+    -- exactly. Rows are written once and never updated. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS standards_runs (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      subject_type TEXT NOT NULL CHECK (subject_type IN ('schedule', 'plan')),
+      -- Exactly one subject; deleting the schedule or plan (user, retention, organization deletion) deletes its runs.
+      schedule_id TEXT REFERENCES schedules(id) ON DELETE CASCADE,
+      plan_id TEXT REFERENCES plans(id) ON DELETE CASCADE,
+      subject_version TEXT,
+      frameworks TEXT[] NOT NULL,
+      framework_versions JSONB NOT NULL DEFAULT '{}',
+      engine_version TEXT NOT NULL,
+      rules_version TEXT NOT NULL,
+      thresholds JSONB NOT NULL DEFAULT '{}',
+      basis TEXT,
+      results JSONB NOT NULL,
+      summary JSONB NOT NULL DEFAULT '{}',
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK ((schedule_id IS NULL) <> (plan_id IS NULL))
+    );
+    CREATE INDEX IF NOT EXISTS standards_runs_schedule_idx ON standards_runs(org_id, schedule_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS standards_runs_plan_idx ON standards_runs(org_id, plan_id, created_at DESC);
+    `,
+  },
+  {
+    id: 14, name: 'time_impact_analysis',
+    sql: `
+    -- Time Impact Analysis (src/lib/analysis/tia.ts). A delay event is modelled as a fragnet (new
+    -- activities and their ties to existing activity codes, stored as JSON) and inserted into an
+    -- accepted update (schedule_id) as of its data date. Responsibility is a label the user enters;
+    -- RunF9 makes no entitlement determination. Additive: older code ignores both tables.
+    CREATE TABLE IF NOT EXISTS delay_events (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      responsibility TEXT NOT NULL DEFAULT 'unassigned'
+        CHECK (responsibility IN ('owner', 'contractor', 'third_party', 'force_majeure', 'unassigned')),
+      event_start TEXT,
+      event_end TEXT,
+      notified_on TEXT,
+      evidence JSONB NOT NULL DEFAULT '[]',
+      fragnet JSONB NOT NULL DEFAULT '{"activities":[],"relationships":[]}',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'analyzed', 'accepted', 'rejected')),
+      status_note TEXT,
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS delay_events_schedule_idx ON delay_events(org_id, schedule_id, created_at);
+    -- One row per calculation. Immutable: a trigger rejects UPDATE (rows go only with their schedule
+    -- or organization). inputs_hash = SHA-256 of the canonical calculation inputs (network, fragnet,
+    -- event dates, previous update), so the same inputs give the same hash and the same results.
+    CREATE TABLE IF NOT EXISTS tia_runs (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      delay_event_id TEXT NOT NULL REFERENCES delay_events(id) ON DELETE CASCADE,
+      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+      inputs_hash TEXT NOT NULL,
+      result_hash TEXT NOT NULL,
+      engine TEXT NOT NULL,
+      inputs JSONB NOT NULL,
+      before_result JSONB NOT NULL,
+      after_result JSONB NOT NULL,
+      result JSONB NOT NULL,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS tia_runs_event_idx ON tia_runs(org_id, delay_event_id, created_at);
+    CREATE OR REPLACE FUNCTION planora_tia_run_immutable() RETURNS trigger AS $fn$
+    BEGIN
+      RAISE EXCEPTION 'tia_runs rows are immutable';
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS tia_runs_immutable ON tia_runs;
+    CREATE TRIGGER tia_runs_immutable BEFORE UPDATE ON tia_runs
+      FOR EACH ROW EXECUTE FUNCTION planora_tia_run_immutable();
+    `,
+  },
+  {
+    id: 15, name: 'import_exception_reports',
+    sql: `
+    -- The structured import exception report of an upload (src/lib/parsers/exceptions.ts): every table,
+    -- field or element the parser saw but did not map, and every value it converted or defaulted.
+    -- Additive: older code ignores the column; older uploads have none (NULL).
+    ALTER TABLE schedules ADD COLUMN IF NOT EXISTS import_exceptions JSONB;
+    `,
+  },
+  {
+    id: 16, name: 'saml_sso_and_scim_provisioning',
+    sql: `
+    -- SAML 2.0 single sign-on and SCIM 2.0 provisioning (src/lib/server/saml.ts, src/lib/server/scim.ts).
+    -- Additive: older code ignores the new column and tables.
+    -- SAML configuration per organization (IdP entity ID, SSO URL, signing certificates, mappings).
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS saml JSONB NOT NULL DEFAULT '{}';
+    CREATE INDEX IF NOT EXISTS organizations_saml_connection_idx ON organizations ((saml->>'connectionId'));
+    -- Email domains routed to an organization's SAML connection (unique across organizations, like sso_domains).
+    CREATE TABLE IF NOT EXISTS saml_domains (
+      domain TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE
+    );
+    -- AuthnRequest IDs we issued: a response must answer one of them, once, within ten minutes.
+    CREATE TABLE IF NOT EXISTS saml_requests (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      consumed_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS saml_requests_created_idx ON saml_requests(created_at);
+    -- Assertion IDs already accepted (replay protection) until the assertion itself expires.
+    CREATE TABLE IF NOT EXISTS saml_assertions (
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      assertion_id TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (org_id, assertion_id)
+    );
+    CREATE INDEX IF NOT EXISTS saml_assertions_expires_idx ON saml_assertions(expires_at);
+    -- SCIM bearer tokens: only a SHA-256 of the token is stored; shown once at creation.
+    CREATE TABLE IF NOT EXISTS scim_tokens (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS scim_tokens_org_idx ON scim_tokens(org_id);
+    -- SCIM bookkeeping on members: the identity provider's externalId, when SCIM last changed the
+    -- member, and SCIM DELETE (the account stays disabled; the firm keeps its project data).
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_external_id TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_modified_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_deleted_at TIMESTAMPTZ;
+    `,
+  },
+  {
+    id: 17, name: 'project_documents_retrieval',
+    sql: `
+    -- Retrieval-augmented grounding over customer project documents (contracts, scheduling
+    -- specifications, owner requirements). Only the EXTRACTED TEXT is stored, never the original file
+    -- bytes (sha256 + size are kept for chain of custody). Additive: older code ignores all four tables.
+    -- See src/lib/rag/* and docs/privacy/DATA-MAP.md (lifecycle).
+    CREATE TABLE IF NOT EXISTS project_documents (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      -- 'project': attached to an uploaded schedule and shared with every upload of its series
+      -- (same project_key); 'org': an organization standard / template (schedule_id NULL).
+      scope TEXT NOT NULL DEFAULT 'project' CHECK (scope IN ('project', 'org')),
+      schedule_id TEXT REFERENCES schedules(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      format TEXT NOT NULL,
+      doc_type TEXT NOT NULL CHECK (doc_type IN ('contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other')),
+      trust TEXT NOT NULL DEFAULT 'unreviewed' CHECK (trust IN ('approved', 'unreviewed')),
+      -- Inherited from the project at upload; the live project classification is also checked on use.
+      classification TEXT,
+      sha256 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      page_count INTEGER,
+      chunk_count INTEGER NOT NULL DEFAULT 0,
+      flagged_count INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT,
+      reviewed_by TEXT,
+      reviewed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      -- Deletion tombstone: chunks and derived rows are hard-deleted at once; the row keeps only
+      -- id, sha256, size and dates (title and file name are blanked).
+      deleted_at TIMESTAMPTZ,
+      CONSTRAINT project_documents_scope_anchor CHECK ((scope = 'project' AND (schedule_id IS NOT NULL OR deleted_at IS NOT NULL)) OR (scope = 'org' AND schedule_id IS NULL)),
+      UNIQUE (id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS project_documents_org_idx ON project_documents(org_id, schedule_id) WHERE deleted_at IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS project_documents_dedupe_idx ON project_documents(org_id, COALESCE(schedule_id, ''), sha256) WHERE deleted_at IS NULL;
+
+    -- Chunks carry org_id and a composite foreign key, so a chunk can never belong to a document of
+    -- another organization; deleting the document deletes its chunks.
+    CREATE TABLE IF NOT EXISTS document_chunks (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      ordinal INTEGER NOT NULL,
+      page INTEGER,
+      page_end INTEGER,
+      section TEXT,
+      heading TEXT,
+      text TEXT NOT NULL,
+      flagged BOOLEAN NOT NULL DEFAULT FALSE,
+      flag_reasons JSONB NOT NULL DEFAULT '[]',
+      tsv tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, COALESCE(heading, '') || ' ' || COALESCE(section, '') || ' ' || text)) STORED,
+      FOREIGN KEY (document_id, org_id) REFERENCES project_documents(id, org_id) ON DELETE CASCADE,
+      UNIQUE (document_id, ordinal)
+    );
+    CREATE INDEX IF NOT EXISTS document_chunks_tsv_idx ON document_chunks USING GIN (tsv);
+    CREATE INDEX IF NOT EXISTS document_chunks_org_doc_idx ON document_chunks(org_id, document_id);
+
+    -- A person's decision on a candidate scheduling requirement found in a document (never applied
+    -- automatically). Only the key is stored; the requirement text stays in the chunk.
+    CREATE TABLE IF NOT EXISTS document_requirement_reviews (
+      org_id TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      requirement_key TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('confirmed', 'dismissed')),
+      user_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (document_id, requirement_key),
+      FOREIGN KEY (document_id, org_id) REFERENCES project_documents(id, org_id) ON DELETE CASCADE
+    );
+
+    -- What each retrieval returned: ids and a hash of the query only (never query or passage text).
+    CREATE TABLE IF NOT EXISTS retrieval_log (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      user_id TEXT,
+      schedule_id TEXT,
+      purpose TEXT NOT NULL,
+      backend TEXT NOT NULL,
+      query_sha256 TEXT NOT NULL,
+      include_unreviewed BOOLEAN NOT NULL DEFAULT FALSE,
+      delivery TEXT NOT NULL,
+      document_ids TEXT[] NOT NULL DEFAULT '{}',
+      chunk_ids TEXT[] NOT NULL DEFAULT '{}',
+      flagged_chunk_ids TEXT[] NOT NULL DEFAULT '{}',
+      invalid_citations INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS retrieval_log_org_idx ON retrieval_log(org_id, created_at);
+    -- Ask AI answers that quoted project documents remember which ones, so deleting a document also
+    -- redacts the answers that quoted it.
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS document_ids TEXT[];
+    `,
+  },
+  {
+    id: 18, name: 'private_beta_access',
+    sql: `
+    -- Private beta (src/lib/server/signup-policy.ts, src/lib/server/beta.ts). Additive: older code
+    -- ignores the new columns and table.
+    -- Sign-in needs beta access while the instance is invite-only; revoking it signs the person out.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_revoked_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_access_via TEXT;
+    -- Grandfather every account that exists when this ships, so nobody already using RunF9 is locked out.
+    UPDATE users SET beta_access_at = NOW(), beta_access_via = 'grandfathered' WHERE beta_access_at IS NULL;
+
+    -- Beta invitations for NEW firms, created by platform operators (PLANORA_PLATFORM_ADMINS).
+    -- Operator data, not firm data: accepting one creates a new organization. Single-use, expiring,
+    -- and only the SHA-256 of the token is stored.
+    CREATE TABLE IF NOT EXISTS beta_invites (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      company TEXT,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      accepted_at TIMESTAMPTZ,
+      accepted_user_id TEXT,
+      accepted_org_id TEXT,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS beta_invites_email_idx ON beta_invites(LOWER(email));
+    `,
+  },
+  {
+    id: 19, name: 'document_chunk_embeddings',
+    sql: `
+    -- Meaning-based document search (src/lib/rag/embeddings.ts). Vectors come only from an embedding
+    -- model inside the customer's network and are compared inside Postgres (REAL[], no extension).
+    -- Each vector is deleted with its passage. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS chunk_embeddings (
+      chunk_id TEXT PRIMARY KEY REFERENCES document_chunks(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      embedding REAL[] NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS chunk_embeddings_org_model_idx ON chunk_embeddings(org_id, model);
+    `,
+  },
+  {
+    id: 20, name: 'cloud_storage_connections',
+    sql: `
+    -- Cloud storage a firm connects (Amazon S3, Azure Blob, Google Cloud Storage, S3-compatible):
+    -- schedules and documents can be imported from it, and original files kept in it instead of
+    -- RunF9's database (src/lib/storage/*). The secret is encrypted (src/lib/server/crypto.ts).
+    -- Additive: older code ignores the table and the new columns. A file kept in the firm's storage
+    -- has an empty content column plus the connection and object key.
+    CREATE TABLE IF NOT EXISTS storage_connections (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL CHECK (provider IN ('aws', 'azure', 'gcp', 's3')),
+      name TEXT NOT NULL,
+      config JSONB NOT NULL DEFAULT '{}'::jsonb,
+      secret TEXT NOT NULL,
+      can_read BOOLEAN NOT NULL DEFAULT FALSE,
+      can_write BOOLEAN NOT NULL DEFAULT FALSE,
+      status_detail TEXT,
+      checked_at TIMESTAMPTZ,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      -- Removed connections keep their row (without the secret) so stored files still say where they are.
+      deleted_at TIMESTAMPTZ,
+      UNIQUE (id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS storage_connections_org_idx ON storage_connections(org_id) WHERE deleted_at IS NULL;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS storage_connection_id TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS object_key TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS source_connection_id TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS source_key TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS storage_connection_id TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS object_key TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS source_connection_id TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS source_key TEXT;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

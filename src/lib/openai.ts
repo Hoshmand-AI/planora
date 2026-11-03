@@ -1,9 +1,14 @@
 import { Activity, Relationship, Schedule } from '@/lib/db'
-import { chat, llmStatus } from '@/lib/llm/provider'
+import { chat, llmStatus, AiRefusalError } from '@/lib/llm/provider'
 import { log } from '@/lib/server/log'
-import { runDcma } from '@/lib/analysis/dcma'
+import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
 import type { ProjectBrief } from '@/lib/analysis/brief'
+import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
+import type { ScheduleComparison } from '@/lib/analysis/compare'
+import { buildReport, reportSupplement, type ReportInput } from '@/lib/export/reports'
+import { withProvenance } from '@/lib/export/provenance'
+import { checkInputs } from '@/lib/analysis/input-checks'
 
 // Model calls go through the provider (cloud, on-prem, or offline). When no model is available,
 // answers and reports fall back to deterministic summaries computed from the schedule itself.
@@ -14,12 +19,23 @@ interface ScheduleContext {
   relationships: Relationship[]
   brief?: ProjectBrief
   hasLogic?: boolean
+  /** The organization's quality thresholds */
+  rules?: Partial<DcmaRules>
+  /** RunF9's recalculated analysis (forecast, variance basis, status, driving path) */
+  analysis?: ScheduleAnalysis
+  /** Change since the previous upload of the same project */
+  comparison?: ScheduleComparison | null
+  /** Evidence every report carries whether or not a model wrote it: provenance, windows, reviewer dispositions, relationship float */
+  evidence?: Pick<ReportInput, 'provenance' | 'windows' | 'review' | 'linkFloat' | 'evm' | 'evmTrend'>
+  /**
+   * Project-document grounding (src/lib/rag/grounding.ts): extra system rules, and the retrieved
+   * passages as a separate, delimited data message. Only set when the passages may go to this model.
+   */
+  grounding?: { system: string; data: string }
 }
 
-export async function askScheduleQuestion(
-  question: string,
-  context: ScheduleContext
-): Promise<string> {
+/** Ask AI: the system prompt (schedule facts) and the offline fallback for a question. */
+export function buildAskPrompt(question: string, context: ScheduleContext): { system: string; offline: () => string } {
   // Build smart context — don't send all activities, just relevant ones
   const { schedule, activities, relationships } = context
   
@@ -45,7 +61,7 @@ export async function askScheduleQuestion(
     missingSuccessors: findMissingSuccessors(activities, relationships).length,
   }
   
-  const systemPrompt = `You are an expert construction schedule analyst working for Planora. You analyze Primavera P6 and MS Project schedules with precision.
+  const systemPrompt = `You are an expert construction schedule analyst working for RunF9. You analyze Primavera P6 and MS Project schedules with precision.
 
 RULES:
 - Use exact data from the schedule. Never guess or make up activity names, dates, or float values.
@@ -114,18 +130,35 @@ Predecessors: ${preds.length} | Successors: ${succs.length}
     }
   }
   
+  return { system: systemPrompt + extraContext, offline: () => offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief) }
+}
+
+export async function askScheduleQuestion(
+  question: string,
+  context: ScheduleContext
+): Promise<string> {
+  const prompt = buildAskPrompt(question, context)
   try {
-    const answer = await chat([
-      { role: 'system', content: systemPrompt + extraContext },
-      { role: 'user', content: question },
-    ], { temperature: 0.3, maxTokens: 2000, purpose: 'ask_ai' })
+    const answer = await chat(askMessages(prompt.system, question, context.grounding), { temperature: 0.3, maxTokens: 2000, purpose: context.grounding ? 'ask_ai.documents' : 'ask_ai' })
     if (answer) return answer
-    return offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
+    return prompt.offline()
   } catch (error: unknown) {
     const err = error as Error
+    // A refusal is not an answer: say so plainly and give the schedule facts instead.
+    if (error instanceof AiRefusalError) return `${err.message}\n\n` + prompt.offline()
     log('warn', 'model call failed', { purpose: 'ask_ai', error: err.message })
-    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + offlineAnswer(stats, criticalActivities, nearTermActivities, extraContext, context.brief)
+    return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + prompt.offline()
   }
+}
+
+/** Messages for Ask AI; project-document passages travel in their own data message, never in the instructions. */
+export function askMessages(system: string, question: string, grounding?: ScheduleContext['grounding']) {
+  if (!grounding) return [{ role: 'system' as const, content: system }, { role: 'user' as const, content: question }]
+  return [
+    { role: 'system' as const, content: `${system}\n\n${grounding.system}` },
+    { role: 'user' as const, content: grounding.data },
+    { role: 'user' as const, content: `QUESTION (answer it using the schedule data and, with citations, the project document passages above):\n${question}` },
+  ]
 }
 
 function offlineAnswer(stats: Record<string, string | number>, critical: Activity[], nearTerm: Activity[], extra: string, brief?: ProjectBrief): string {
@@ -215,7 +248,7 @@ Use formal, professional language suitable for presentation to project executive
   }
   
   const prompt = prompts[reportType] || prompts.executive_summary
-  const dcma = runDcma(analyzableFromDb(schedule, activities, relationships))
+  const dcma = runDcma(analyzableFromDb(schedule, activities, relationships), context.rules)
   const dcmaText = `DCMA 14-POINT RESULTS (computed, authoritative — do not recompute): ${dcma.passed}/${dcma.applicable} applicable checks pass, score ${dcma.score}.\n` +
     dcma.checks.map(c => `#${c.id} ${c.name}: ${c.metric} (threshold ${c.threshold}) ${c.result.toUpperCase()}${c.offenders.length ? ' — e.g. ' + c.offenders.slice(0, 5).join(', ') : ''}`).join('\n')
   
@@ -223,7 +256,9 @@ Use formal, professional language suitable for presentation to project executive
 Data Date: ${schedule.dataDate} | Start: ${schedule.projectStart} | Finish: ${schedule.projectFinish}
 Activities: ${stats.total} | Critical: ${stats.critical} | Complete: ${stats.complete}
 In Progress: ${stats.inProgress} | Not Started: ${stats.notStarted}
-Variance: ${schedule.varianceDays || 'Unknown'} days
+${context.analysis?.baseline ? `${context.analysis.baseline.header}\n` : ''}Variance: ${context.analysis ? `${context.analysis.varianceDays ?? 'not measurable'} calendar days (${context.analysis.varianceBasis})` : `${schedule.varianceDays ?? 'not measurable'} calendar days`}
+${context.analysis ? `Status: ${context.analysis.status} — ${context.analysis.statusReasons.join(' ') || 'no issues'}\nForecast finish (recalculated): ${context.analysis.forecastFinish} | Header finish in file: ${context.analysis.reportedFinish ?? 'none'} | Required: ${context.analysis.mustFinishBy ?? 'none'}` : ''}
+${context.comparison ? `Since the previous update (${context.comparison.before.version}): ${context.comparison.summary.join(' ')}` : ''}
 Missing Predecessors: ${stats.missingPred} | Missing Successors: ${stats.missingSucc}
 Negative Float: ${stats.negFloat}
 
@@ -234,19 +269,36 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
 `
 
   try {
-    const report = await chat([
-      {
-        role: 'system',
-        content: `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
-      },
+    const system = `You are a senior construction scheduling consultant generating a formal report. Write in professional, formal language. Use proper section numbering. Include specific data from the schedule. This report should be suitable for presentation to project executives and could be used in contractual or claims contexts.\n\nSCHEDULE DATA:\n${contextStr}`
+    const g = context.grounding
+    const report = await chat(g ? [
+      { role: 'system', content: `${system}\n\n${g.system}` },
+      { role: 'user', content: g.data },
+      { role: 'user', content: `${prompt}\nWhere the project document passages above set requirements (contract time, milestones, update and schedule-quality requirements), compare the schedule against them and cite each passage you rely on.` },
+    ] : [
+      { role: 'system', content: system },
       { role: 'user', content: prompt },
-    ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}` })
-    if (report) return report
+    ], { temperature: 0.3, maxTokens: 3000, purpose: `report.${reportType}${g ? '.documents' : ''}` })
+    if (report) {
+      // The model writes the narrative; the evidence sections are RunF9's own calculation.
+      if (!context.analysis) return withProvenance(report, context.evidence?.provenance)
+      const sup = reportSupplement(reportType, {
+        schedule, activities, relationships, analysis: context.analysis, dcma, ...context.evidence,
+        dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)),
+      })
+      return sup ? `${report.trimEnd()}\n\n${sup}` : report
+    }
   } catch (error: unknown) {
     log('warn', 'model call failed', { purpose: 'report', error: (error as Error).message })
   }
-  // Deterministic report (offline / air-gapped / model failure).
-  return [
+  // Deterministic report (offline / air-gapped / model failure): each type has its own content.
+  if (context.analysis) {
+    return buildReport(reportType, {
+      schedule, activities, relationships, analysis: context.analysis, dcma, brief: context.brief, comparison: context.comparison ?? null,
+      dataQuestions: checkInputs(analyzableFromDb(schedule, activities, relationships)), ...context.evidence,
+    })
+  }
+  return withProvenance([
     `# ${reportType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${schedule.name}`,
     '',
     '_Generated from schedule data without an AI model._',
@@ -263,5 +315,5 @@ ${activities.filter(a => a.isCritical).slice(0, 20).map(a => `- ${a.activityId}:
     '',
     '## 3. Critical activities',
     ...activities.filter(a => a.isCritical).slice(0, 25).map(a => `- ${a.activityId} ${a.name} (${a.duration}d, float ${a.totalFloat}d, ${a.earlyStart} → ${a.earlyFinish})`),
-  ].join('\n')
+  ].join('\n'), context.evidence?.provenance)
 }

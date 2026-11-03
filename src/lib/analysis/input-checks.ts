@@ -16,6 +16,7 @@ import {
   isValidDate,
   toDayNumber,
   weekdayOf,
+  workDaysBetween,
 } from '@/lib/planning/calendar'
 
 export const MAX_PER_RULE = 20
@@ -229,12 +230,29 @@ export function checkInputs(s: AnalyzableSchedule): DataQuestion[] {
       }, (n) => `${n} more relationships point to activities that are not in the schedule — was the export complete?`)
       continue
     }
+    // Out-of-sequence progress: the successor's actual date is earlier than the relationship (with its
+    // lag, in work days on the predecessor's calendar) allows — now (predecessor still open) or
+    // historically (both actual dates recorded, in the wrong order).
+    const lag = Math.max(0, Math.round(l.lag ?? 0))
+    const wdFrom = (a: string, b: string) => (isValidDate(a) && isValidDate(b) ? workDaysBetween(a.slice(0, 10), b.slice(0, 10), calOf(from)) : 0)
+    const lagText = lag ? ` + ${lag} wd lag` : ''
+    const oos = (question: string) => push({
+      id: `out_of_sequence:${to.code}`, severity: 'warning', rule: 'out_of_sequence', activityCodes: [to.code, from.code], question,
+      detail: 'Out-of-sequence progress makes the remaining logic unreliable; fix the relationship or record the predecessor dates (P6 schedules it by Retained Logic or Progress Override).',
+    }, (n) => `${n} more activities progressed out of sequence with their predecessors — is the logic still valid?`)
     if (l.type === 'FS' && to.actualStart && !from.actualFinish && !isComplete(from)) {
-      push({
-        id: `out_of_sequence:${to.code}`, severity: 'warning', rule: 'out_of_sequence', activityCodes: [to.code, from.code],
-        question: `Activity ${label(to)} has started (${to.actualStart.slice(0, 10)}) although its finish-to-start predecessor ${label(from)} has not finished — is the logic wrong, or did work proceed out of sequence?`,
-        detail: 'Out-of-sequence progress makes the remaining logic unreliable; fix the relationship or record the predecessor finish.',
-      }, (n) => `${n} more activities started before their FS predecessors finished — is the logic still valid?`)
+      oos(`Activity ${label(to)} has started (${to.actualStart.slice(0, 10)}) although its finish-to-start predecessor ${label(from)} has not finished — is the logic wrong, or did work proceed out of sequence?`)
+    } else if (l.type === 'FS' && to.actualStart && from.actualFinish
+      && (to.actualStart.slice(0, 10) < from.actualFinish.slice(0, 10) || wdFrom(from.actualFinish, to.actualStart) < lag)) {
+      oos(`Activity ${label(to)} started ${to.actualStart.slice(0, 10)}, before its finish-to-start predecessor ${label(from)} allowed it (finished ${from.actualFinish.slice(0, 10)}${lagText}) — were the actual dates recorded correctly, or did work proceed out of sequence?`)
+    } else if (l.type === 'SS' && to.actualStart && (!from.actualStart ? !isComplete(from) : to.actualStart.slice(0, 10) < from.actualStart.slice(0, 10) || wdFrom(from.actualStart, to.actualStart) < lag)) {
+      oos(from.actualStart
+        ? `Activity ${label(to)} started ${to.actualStart.slice(0, 10)}, earlier than its start-to-start predecessor ${label(from)} allows (started ${from.actualStart.slice(0, 10)}${lagText}) — is the lag wrong, or did work proceed out of sequence?`
+        : `Activity ${label(to)} has started (${to.actualStart.slice(0, 10)}) although its start-to-start predecessor ${label(from)} has not started${lagText ? ` (lag ${lag} wd)` : ''} — is the logic wrong, or did work proceed out of sequence?`)
+    } else if (l.type === 'FF' && to.actualFinish && (!from.actualFinish ? !isComplete(from) : to.actualFinish.slice(0, 10) < from.actualFinish.slice(0, 10) || wdFrom(from.actualFinish, to.actualFinish) < lag)) {
+      oos(from.actualFinish
+        ? `Activity ${label(to)} finished ${to.actualFinish.slice(0, 10)}, earlier than its finish-to-finish predecessor ${label(from)} allows (finished ${from.actualFinish.slice(0, 10)}${lagText}) — is the lag wrong, or did work proceed out of sequence?`
+        : `Activity ${label(to)} has finished (${to.actualFinish.slice(0, 10)}) although its finish-to-finish predecessor ${label(from)} has not finished${lagText ? ` (lag ${lag} wd)` : ''} — is the logic wrong, or did work proceed out of sequence?`)
     }
   }
 

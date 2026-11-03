@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Restore drill: proves a backup can actually be restored, and measures how long it takes.
-//   ADMIN_DATABASE_URL=postgres://…/postgres node scripts/restore-drill.mjs backups/planora-….dump
+//   ADMIN_DATABASE_URL=postgres://…/postgres node scripts/restore-drill.mjs backups/runf9-….dump
 // Creates a scratch database, restores the dump into it, then checks: the file's SHA-256 matches
 // its manifest, every table's row count matches, the schema is at the backed-up migration, and
 // every organization's audit hash chain still verifies end to end. Drops the scratch database
@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import path from 'node:path'
 import pg from 'pg'
 
 const dump = process.argv[2]
@@ -20,7 +21,7 @@ const check = (ok, msg) => { console.log(`${ok ? '✓' : '✗'} ${msg}`); if (!o
 
 check(createHash('sha256').update(fs.readFileSync(dump)).digest('hex') === manifest.sha256, 'Backup file matches its SHA-256')
 
-const scratch = `planora_restore_drill_${Date.now()}`
+const scratch = `runf9_restore_drill_${Date.now()}`
 const adminDb = new pg.Client({ connectionString: admin })
 await adminDb.connect()
 await adminDb.query(`CREATE DATABASE ${scratch}`)
@@ -28,7 +29,7 @@ const target = new URL(admin); target.pathname = `/${scratch}`
 
 const started = Date.now()
 try {
-  execFileSync('pg_restore', ['--no-owner', '--no-privileges', '--exit-on-error', `--dbname=${target}`, dump], { stdio: 'inherit' })
+  execFileSync(process.env.PG_BIN ? path.join(process.env.PG_BIN, 'pg_restore') : 'pg_restore', ['--no-owner', '--no-privileges', '--exit-on-error', `--dbname=${target}`, dump], { stdio: 'inherit' })
   const seconds = (Date.now() - started) / 1000
   const db = new pg.Client({ connectionString: target.toString() })
   await db.connect()

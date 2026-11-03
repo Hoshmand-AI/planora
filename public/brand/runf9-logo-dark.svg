@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 440" width="1240" height="440"><g transform="translate(20 52) scale(1)" fill="none" stroke="#FFFFFF" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 32 V332 M32 32 H128 A84 84 0 0 1 128 200 H32 M120 200 L210 332"/>
+    <path d="M290 132 V258 A74 74 0 0 0 438 258 V132 M438 258 V332"/>
+    <path d="M530 332 V206 A74 74 0 0 1 678 206 V332 M530 206 V132"/>
+  </g><g transform="translate(760 -6) scale(0.9)">
+  <defs>
+    <linearGradient id="kcTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A4F8C"/><stop offset="1" stop-color="#1E3A6A"/></linearGradient>
+    <linearGradient id="kcSkirt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#162D54"/><stop offset="1" stop-color="#0C1B35"/></linearGradient>
+  </defs>
+  <rect x="48" y="56" width="416" height="416" rx="96" fill="url(#kcSkirt)" stroke="#60a5fa" stroke-width="10"/>
+  <rect x="84" y="80" width="344" height="316" rx="64" fill="url(#kcTop)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 158 V310 M150 158 H226 M150 230 H210"/>
+    <circle cx="308" cy="203" r="45"/>
+    <path d="M353 203 V250 C353 292 330 310 290 310"/>
+  </g>
+  <g>
+    <path d="M150 352 H358" stroke="#60a5fa" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="150" cy="352" r="12" fill="#60a5fa"/>
+    <circle cx="254" cy="352" r="12" fill="#60a5fa"/>
+    <circle cx="358" cy="352" r="17" fill="#FFFFFF" stroke="#60a5fa" stroke-width="8"/>
+  </g>
+</g></svg>

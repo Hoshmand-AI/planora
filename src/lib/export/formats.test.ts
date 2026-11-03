@@ -5,7 +5,7 @@ import type { Answer, AnswerValue } from '@/lib/planning/types'
 import { generateSchedule } from '@/lib/planning/generator'
 import { evaluatePlan } from '@/lib/planning/evaluation'
 import { parseXER } from '@/lib/parsers/xer-parser'
-import { exportXer, xerText } from './xer'
+import { exportXer, xerText, P6_NAME_MAX } from './xer'
 import { exportPdf, pdfSafe } from './pdf'
 import { exportImportXlsx, exportP6LayoutXlsx } from './xlsx'
 import { exportScheduleCsv } from './csv'
@@ -69,7 +69,7 @@ describe('Primavera P6 .xer export', () => {
     const byCode = new Map(p.activities.map(a => [a.activityId, a]))
     for (const a of g.activities) {
       const got = byCode.get(a.code)!
-      expect(got.name).toBe(xerText(a.name))
+      expect(got.name).toBe(xerText(a.name).slice(0, P6_NAME_MAX)) // P6 caps activity names at 120 characters
       expect(got.duration).toBeCloseTo(a.duration, 5)
       expect(got.earlyStart).toBe(g.cpm!.times[a.id].earlyStart)
     }

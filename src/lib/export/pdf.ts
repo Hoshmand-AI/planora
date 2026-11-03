@@ -5,9 +5,10 @@
 import type { SraResult } from '@/lib/planning/sra'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { GeneratedSchedule } from '@/lib/planning/types'
-import type { Evaluation } from '@/lib/planning/evaluation'
+import { findingsFor, headlineForecast, type Evaluation } from '@/lib/planning/evaluation'
 import { buildWbs } from './wbs'
 import { fmtDate, fmtDates } from '@/lib/format'
+import type { ExportMarking } from './markings'
 
 const W = 1224, H = 792 // 17 × 11 in
 const M = 28
@@ -45,10 +46,11 @@ function wrap(text: string, font: PDFFont, size: number, max: number): string[] 
   return out
 }
 
-export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string; sra?: SraResult } = {}): Promise<Uint8Array> {
+export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: Evaluation | null, opts: { preparedBy?: string; sra?: SraResult; marking?: ExportMarking | null } = {}): Promise<Uint8Array> {
+  const mk = opts.marking ?? null
   const doc = await PDFDocument.create()
   doc.setTitle(`${projectName} — Schedule`)
-  doc.setProducer('Planora')
+  doc.setProducer('RunF9')
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const t = s.cpm?.times || {}
@@ -56,8 +58,14 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   const printed = fmtDate(new Date().toISOString())
 
   const footer = (p: PDFPage, n: number) => {
+    if (mk) {
+      // CUI banner marking, centered at the top and bottom of every page.
+      const bw = bold.widthOfTextAtSize(mk.banner, 10)
+      p.drawText(mk.banner, { x: (W - bw) / 2, y: H - 16, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
+      p.drawText(mk.banner, { x: (W - bw) / 2, y: 27, size: 10, font: bold, color: rgb(0.48, 0.12, 0.07) })
+    }
     p.drawLine({ start: { x: M, y: 24 }, end: { x: W - M, y: 24 }, thickness: 0.5, color: LINE })
-    p.drawText(pdfSafe(`${projectName} · Data date ${fmtDate(s.projectStart)} · Printed ${printed} · Planora`), { x: M, y: 12, size: 7, font, color: GREY })
+    p.drawText(pdfSafe(`${projectName} · Data date ${fmtDate(s.projectStart)} · Printed ${printed} · RunF9`), { x: M, y: 12, size: 7, font, color: GREY })
     p.drawText(`Page ${n}`, { x: W - M - 40, y: 12, size: 7, font, color: GREY })
   }
   let pageNo = 0
@@ -66,13 +74,18 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   {
     const p = doc.addPage([W, H]); pageNo++
     let y = H - M - 10
-    p.drawText(fit(projectName, bold, 22, W - 2 * M), { x: M, y, size: 22, font: bold, color: NAVY }); y -= 20
+    p.drawText(fit(projectName, bold, 22, W - 2 * M - (mk ? 330 : 0)), { x: M, y, size: 22, font: bold, color: NAVY })
+    if (mk) {
+      // Designation indicator block, top right of the first page.
+      mk.designation.forEach((l, i) => p.drawText(fit(l, i === 0 ? bold : font, 7.5, 320), { x: W - M - 320, y: y + 12 - i * 10, size: 7.5, font: i === 0 ? bold : font, color: rgb(0.29, 0.27, 0.24) }))
+    }
+    y -= 20
     p.drawText(pdfSafe(`Schedule report · prepared ${printed}${opts.preparedBy ? ' by ' + opts.preparedBy : ''}`), { x: M, y, size: 10, font, color: GREY }); y -= 30
+    // One forecast: Monte Carlo when available, otherwise the rule-based estimate, labeled as such.
+    const fc = headlineForecast(ev?.forecast, opts.sra)
     const stats: [string, string][] = [
       ['Start (NTP)', fmtDate(s.projectStart)], ['Deterministic finish', fmtDate(finish)],
-      opts.sra
-        ? ['Monte Carlo P50 / P80', `${fmtDate(opts.sra.percentiles.p50)} / ${fmtDate(opts.sra.percentiles.p80)}`]
-        : ['Scenario P50 / P80', ev ? `${fmtDate(ev.forecast.p50)} / ${fmtDate(ev.forecast.p80)}` : '—'],
+      [`P50 / P80 (${fc?.label ?? 'forecast'})`, fc ? `${fmtDate(fc.p50)} / ${fmtDate(fc.p80)}` : '—'],
       ['Activities', `${s.activities.length} (${s.activities.filter(a => t[a.id]?.critical).length} critical)`],
       ['Quality', ev ? `${ev.grade} (${ev.score}/100) · DCMA ${ev.dcma.passed}/${ev.dcma.applicable}` : '—'],
     ]
@@ -102,7 +115,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
       }
       y -= 12
     }
-    if (ev) section('Findings', ev.findings, 14)
+    if (ev) section('Findings', findingsFor(ev, opts.sra), 14)
     section('Assumptions and open items', s.assumptions.filter(a => a.kind !== 'inferred').map(a => `${a.text}${a.bufferDays ? ` (+${a.bufferDays} work days)` : ''}`), 18)
     section('Notes', s.notes || [], 6)
     footer(p, pageNo)
@@ -158,7 +171,7 @@ export async function exportPdf(s: GeneratedSchedule, projectName: string, ev: E
   const newPage = () => { if (p) footer(p, pageNo); p = doc.addPage([W, H]); pageNo++; pageHeader(p); y = top - ROW }
   newPage()
   for (const r of rows) {
-    if (y < 34) newPage()
+    if (y < (mk ? 44 : 34)) newPage()
     const pg = p as unknown as PDFPage
     const isWbs = r.kind === 'wbs'
     const lvl = r.level

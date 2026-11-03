@@ -1,9 +1,9 @@
 // Scheduler overrides. The tool proposes; the scheduler disposes. Every edit records who, when, why,
 // and what the tool had reasoned, then the network is recomputed and the impact reported.
 
-import type { GeneratedSchedule, LinkType, Override, PlanActivity, PlanLink } from './types'
+import type { ConstraintType, GeneratedSchedule, LinkType, Override, PlanActivity, PlanLink } from './types'
 import { runCpm } from './cpm'
-import { overriddenRationale, removeActivityBridging } from './generator'
+import { fmtConstraint, overriddenRationale, removeActivityBridging } from './generator'
 
 export type Edit =
   | { kind: 'duration'; activityId: string; value: number; reason: string }
@@ -14,6 +14,13 @@ export type Edit =
   | { kind: 'link'; linkId: string; type?: LinkType; lag?: number; reason: string }
   /** Add work the tool didn't know about, e.g. "Owner-furnished kitchen equipment install" */
   | { kind: 'add_activity'; name: string; duration: number; after: string; before?: string; reason: string }
+  /** Set (or clear, with null) the activity's date constraint, e.g. a contractual access date or an outage window */
+  | { kind: 'constraint'; activityId: string; constraint: { type: PlanConstraintType; date: string } | null; reason: string }
+
+/** Date constraints the plan editor can set (P6 primary constraints). */
+export type PlanConstraintType = Extract<ConstraintType, 'SNET' | 'SNLT' | 'FNET' | 'FNLT' | 'MSO' | 'MFO'>
+export const PLAN_CONSTRAINT_TYPES: readonly PlanConstraintType[] = ['SNET', 'SNLT', 'FNET', 'FNLT', 'MSO', 'MFO']
+const isIsoDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + 'T00:00:00Z')) && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v
 
 export interface EditImpact {
   finishBefore: string
@@ -27,6 +34,46 @@ export interface EditImpact {
 export class EditError extends Error {}
 
 const LINK_TYPES: LinkType[] = ['FS', 'SS', 'FF', 'SF']
+
+/**
+ * Activity ID for an added activity that follows the schedule's own numbering: the dominant
+ * prefix + numeric width series (e.g. A1000, A1010, … → step 10) continues with the next free number
+ * after the highest one (A1000, A1010 → A1020). Only when the IDs show no such series (fewer than two
+ * codes sharing a prefix and width) does it fall back to RunF9's U0001-style codes.
+ */
+export function nextActivityCode(existing: string[]): string {
+  const used = new Set(existing)
+  const series = new Map<string, { prefix: string; width: number; nums: number[] }>()
+  for (const c of existing) {
+    const m = /^(.*?)(\d+)$/.exec(c || '')
+    if (!m) continue
+    const key = `${m[1]}\u0000${m[2].length}`
+    const g = series.get(key) || { prefix: m[1], width: m[2].length, nums: [] }
+    g.nums.push(Number(m[2]))
+    series.set(key, g)
+  }
+  // Dominant series: most members; ties go to the one with the higher numbers (the main sequence).
+  const top = (g: { nums: number[] }) => g.nums.reduce((m, v) => (v > m ? v : m), -Infinity)
+  const best = [...series.values()].sort((a, b) => b.nums.length - a.nums.length || top(b) - top(a))[0]
+  if (best && best.nums.length >= 2) {
+    const nums = [...new Set(best.nums)].sort((a, b) => a - b)
+    // Step: the most common gap between consecutive IDs (A1000, A1010, A1020 → 10).
+    const gaps = new Map<number, number>()
+    for (let k = 1; k < nums.length; k++) {
+      const d = nums[k] - nums[k - 1]
+      if (d > 0) gaps.set(d, (gaps.get(d) || 0) + 1)
+    }
+    const step = [...gaps.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] || 1
+    const fmt = (n: number) => `${best.prefix}${String(n).padStart(best.width, '0')}`
+    let n = nums[nums.length - 1] + step
+    while (used.has(fmt(n))) n += step
+    return fmt(n)
+  }
+  let n = existing.length
+  const fallback = (k: number) => `U${String(k).padStart(4, '0')}`
+  while (used.has(fallback(n))) n++
+  return fallback(n)
+}
 
 export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { schedule: GeneratedSchedule; impact: EditImpact; summary: string } {
   if (!edit.reason || edit.reason.trim().length < 3) throw new EditError('Give a short reason for the change — it is kept in the audit trail and the basis of schedule.')
@@ -91,7 +138,7 @@ export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { sched
       const o: Override = { field: 'name', to: name, reason, by, at }
       const src = [{ kind: 'override' as const, label: `Added by ${by}`, detail: at }]
       acts.set(id, {
-        id, code: `U${String(acts.size).padStart(4, '0')}`, name, duration: v, type: v === 0 ? 'milestone' : 'task',
+        id, code: nextActivityCode([...acts.values()].map(a => a.code)), name, duration: v, type: v === 0 ? 'milestone' : 'task',
         calendarId: s.defaultCalendarId, category: 'other', phase: after.phase,
         rationale: { summary: `Added by ${by}: ${reason}`, sources: src, confidence: 'high' }, overrides: [o],
       })
@@ -146,6 +193,28 @@ export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { sched
       }
       if (!parts.length) throw new EditError('Nothing changed.')
       summary = `Link ${acts.get(l.from)?.code} → ${acts.get(l.to)?.code}: ${parts.join(', ')}`
+      break
+    }
+    case 'constraint': {
+      const a = getAct(edit.activityId)
+      const c = edit.constraint
+      let next: PlanActivity['constraint'] | undefined
+      if (c === null || c === undefined) {
+        if (!a.constraint) throw new EditError('This activity has no constraint to clear.')
+        next = undefined
+      } else {
+        if (typeof c !== 'object' || !PLAN_CONSTRAINT_TYPES.includes(c.type)) throw new EditError(`Constraint type must be one of ${PLAN_CONSTRAINT_TYPES.join(', ')}.`)
+        if (!isIsoDate(c.date)) throw new EditError('Give the constraint date as YYYY-MM-DD.')
+        if (c.date < s.projectStart) throw new EditError('The constraint date cannot be before the project start (Notice to Proceed).')
+        if (a.constraint && a.constraint.type === c.type && a.constraint.date === c.date) throw new EditError('Nothing changed.')
+        next = { type: c.type, date: c.date }
+      }
+      const o: Override = { field: 'constraint', from: a.constraint ? { ...a.constraint } : null, to: next ? { ...next } : null, reason, by, at }
+      a.overrides = [...(a.overrides || []), o]
+      a.rationale = overriddenRationale(a.rationale, { ...o, from: fmtConstraint(o.from), to: fmtConstraint(o.to) })
+      if (next) a.constraint = next
+      else delete a.constraint
+      summary = `${a.code} ${a.name}: constraint ${fmtConstraint(o.from)} → ${fmtConstraint(o.to)}`
       break
     }
     default:
