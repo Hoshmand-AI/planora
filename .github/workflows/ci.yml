@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -36,7 +36,7 @@ jobs:
         run: npm audit || true
       - name: Software bill of materials (CycloneDX)
         run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.cdx.json
@@ -89,7 +89,7 @@ jobs:
       BASE_URL: http://localhost:3000
       OIDC_ISSUER: http://localhost:4010
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -159,5 +159,5 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: semgrep scan --config p/owasp-top-ten --config p/secrets --config p/nodejs --severity ERROR --error --metrics off src scripts
