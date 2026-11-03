@@ -13,6 +13,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { log } from './log'
+import { airgapped } from './egress'
 
 export interface Email { to: string; subject: string; text: string; html?: string }
 
@@ -41,6 +42,11 @@ export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: st
   const provider = emailProvider()
   const domain = m.to.split('@')[1] || ''
   try {
+    if ((provider === 'resend' || provider === 'postmark') && airgapped()) {
+      // Hosted email providers are on the internet; an air-gapped install never calls them.
+      log('error', 'email refused', { provider, toDomain: domain, error: 'Air-gapped install: hosted email providers are outside the network.' })
+      return { sent: false, provider }
+    }
     if (provider === 'resend') {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST', signal: AbortSignal.timeout(8000),
@@ -58,7 +64,10 @@ export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: st
     } else if (provider === 'outbox') {
       const dir = process.env.RUNF9_EMAIL_OUTBOX!
       await fs.mkdir(dir, { recursive: true })
-      await fs.writeFile(path.join(dir, `${Date.now()}-${randomUUID()}.json`), JSON.stringify({ from: FROM(), replyTo: REPLY_TO(), ...m }, null, 2))
+      // Write then rename, so a reader never sees a half-written message.
+      const file = path.join(dir, `${Date.now()}-${randomUUID()}.json`)
+      await fs.writeFile(`${file}.tmp`, JSON.stringify({ from: FROM(), replyTo: REPLY_TO(), ...m }, null, 2))
+      await fs.rename(`${file}.tmp`, file)
     } else {
       return { sent: false, provider: null }
     }

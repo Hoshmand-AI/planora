@@ -20,12 +20,12 @@ export interface EmailContent {
 }
 
 const T = {
-  page: '#F5F5F7',
+  page: '#F4F6F6',
   card: '#FFFFFF',
-  line: '#E8E8ED',
-  heading: '#0A1628',
-  text: '#433D36',
-  muted: '#575047',
+  line: '#E2E6E6',
+  heading: '#06141B',
+  text: '#253745',
+  muted: '#3F4E5A',
   accent: '#2563eb',
   accentHover: '#1d4ed8',
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import F9Demo from '@/components/landing/F9Demo'
 import Pillars from '@/components/landing/Pillars'
+import Deployment from '@/components/landing/Deployment'
 import { CountUp, Reveal } from '@/components/landing/motion'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
@@ -20,6 +21,9 @@ const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-
  * Marketing page. While RunF9 is in private beta (RUNF9_SIGNUP not "open") the sign-up calls to
  * action become "Request access" / "Sign in" and the page says access is by invitation.
  */
+// Hero chips: id matches an option in src/components/landing/Deployment.tsx.
+const DEPLOY_CHIPS: [string, string][] = [['cloud', 'RunF9 Cloud'], ['aws', 'AWS'], ['azure', 'Microsoft Azure'], ['gcp', 'Google Cloud'], ['mixed', 'A different cloud per client'], ['onprem', 'Your servers']]
+
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -36,7 +40,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const nav = [['#features', 'Features'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
+  const nav = [['#features', 'Features'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
 
   return (
     <div className="min-h-screen bg-[#FBFBFD] text-warm-600">
@@ -81,6 +85,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               ? <Link href="/auth" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>Sign in</Link>
               : <a href="#how-it-works" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See how it works</a>}
           </div>
+          {/* Where it runs, up front: each chip opens that option in "Run it where your data lives" */}
+          <nav aria-label="Where RunF9 runs" className="hero-rise [animation-delay:280ms] mt-8 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[14px] text-warm-600 mr-1">Runs where your data lives:</span>
+            {DEPLOY_CHIPS.map(([id, label]) => (
+              <a key={id} href={`#deployment-${id}`} className="pressable rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900">{label}</a>
+            ))}
+          </nav>
         </div>
         <div className="hero-rise [animation-delay:340ms] max-w-[760px] mx-auto mt-16 md:mt-20 px-2 md:px-0">
           <F9Demo />
@@ -104,6 +115,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </div>
         <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[14px] text-accent-600 hover:underline">Where these numbers come from</a></div>
       </section>
+
+      {/* Choose the cloud: RunF9 Cloud, the firm's own AWS / Azure / Google account, a different cloud per client, or air-gapped */}
+      <div className="pt-24 md:pt-36">
+        <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} />
+      </div>
 
       {/* Build. Check. Forecast. */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36">
@@ -194,7 +210,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             { name: 'Free', price: '$0', per: '/month', blurb: 'For trying RunF9 on real projects.', yes: ['Up to 3 uploaded schedules', 'Unlimited interview-built schedules', 'Executive Summary report', '10 AI requests/day', 'Export to P6, MS Project & CSV', 'Roles, 2-step verification & audit log'], no: ['Critical Path, Variance & QA/QC reports', 'Export to PDF & Excel', 'API keys & webhooks'], cta: inviteOnly ? 'Request access' : 'Start free', href: primaryHref, featured: false },
             { name: 'Pro', price: '$49', per: '/month', blurb: 'For schedulers and consultants who need every report and export.', yes: ['Unlimited uploaded schedules', 'All 4 report types', 'Up to 1,000 AI requests/day', 'Export to P6, MS Project, PDF & Excel', 'Monte Carlo schedule risk analysis', 'API keys & signed webhooks', 'Roles, 2-step verification & audit log'], no: [], cta: inviteOnly ? 'Request access' : 'Start free, then upgrade', href: primaryHref, featured: true },
-            { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'On-premises / air-gapped deployment', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
+            { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (OpenID Connect)', 'Enforced 2-step & approval policies', 'Deploy in your AWS, Azure or Google Cloud account, or air-gapped', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
           ].map((p, i) => (
             <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 bg-white border flex flex-col ${p.featured ? 'border-accent-600 shadow-[0_30px_60px_-30px_rgba(37,99,235,0.35)]' : 'border-warm-200'}`}>
               <div className="text-[15px] font-semibold text-navy-950">{p.name}</div>
@@ -209,6 +225,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           ))}
         </div>
       </section>
+
+      {/* Where RunF9 runs: our cloud, the customer's cloud account, or their own servers */}
 
       {/* Evidence: how each figure on this page can be checked */}
       <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32">

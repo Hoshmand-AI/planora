@@ -37,7 +37,7 @@ export function EmptyState({ title, children, action, secondary, mood = 'idle', 
   )
 }
 
-const PRIMARY = 'inline-flex items-center gap-1.5 bg-accent-500 hover:bg-accent-400 text-navy-950 px-5 py-2.5 rounded-full text-[14px] font-semibold transition-colors pressable'
+const PRIMARY = 'inline-flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-full text-[14px] font-semibold transition-colors pressable'
 const QUIET = 'text-[13px] font-medium text-accent-600 hover:underline'
 
 function ActionEl({ a, primary = false }: { a: Action; primary?: boolean }) {

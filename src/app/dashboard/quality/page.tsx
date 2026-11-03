@@ -39,6 +39,7 @@ export default function QualityPage() {
   const [loading, setLoading] = useState(false)
   const [hideAnswered, setHideAnswered] = useState(true)
   const [tab, setTab] = useState<QualityTab>('checks')
+  const [selected, setSelected] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedSchedule) return
@@ -70,13 +71,6 @@ export default function QualityPage() {
     return null
   }
   const dispose: Dispose = (itemId, disposition, justification) => postReview({ itemId, disposition, justification })
-  const [stickyTop, setStickyTop] = useState(0)
-  useEffect(() => {
-    const measure = () => setStickyTop(document.querySelector('header')?.getBoundingClientRect().height ?? 0)
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
 
   if (!selectedSchedule) {
     return <EmptyState schedules={schedules} onPick={setSelectedSchedule} canUpload={can('schedule.write')} onUpload={openUpload} />
@@ -84,11 +78,7 @@ export default function QualityPage() {
   if (tab === 'standards') {
     return (
       <div className="px-4 md:px-6 pt-4 pb-8 space-y-5">
-        <div>
-          <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
-          <p className="text-[12.5px] text-warm-500 truncate">{selectedSchedule.name}</p>
-          <QualityTabs tab={tab} onChange={setTab} />
-        </div>
+        <QualityTabs tab={tab} onChange={setTab} />
         <div role="tabpanel" id="quality-panel-standards" aria-labelledby="quality-tab-standards">
           <StandardsPanel key={selectedSchedule.id} endpoint={`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/standards`} canRecord={can('schedule.write')} />
         </div>
@@ -120,38 +110,88 @@ export default function QualityPage() {
     (resultOf(a.id) === 'fail' ? 0 : 1) - (resultOf(b.id) === 'fail' ? 0 : 1) || Number(!!a.decision) - Number(!!b.decision) || a.id - b.id)
   const flagged = data.dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn')
     .sort((a, b) => (a.result === 'fail' ? 0 : 1) - (b.result === 'fail' ? 0 : 1) || a.id - b.id)
-  const clean = data.dcma.checks.filter(c => c.result !== 'fail' && c.result !== 'warn')
+  const selectedCheck = selected == null ? null : data.dcma.checks.find(c => c.id === selected) ?? null
+  const openCheck = (id: number) => {
+    setSelected(id)
+    requestAnimationFrame(() => document.getElementById('dcma-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
+  }
   const grade = gradeOf(data.dcma, open.length)
   const importNotes = data.schedule.warnings.length + (data.schedule.importExceptions ? 1 : 0)
   return (
     <div id="quality-panel-checks" className="px-4 md:px-6 pb-8">
-      {/* Frozen header: the schedule and the views stay visible while scrolling */}
-      <div style={{ top: stickyTop }} className="sticky z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200">
-        <div className="min-w-0">
-          <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight">Schedule quality</h1>
-          <p className="text-[12.5px] text-warm-500 truncate">{data.schedule.name} · {data.schedule.version}</p>
-          <QualityTabs tab={tab} onChange={setTab} />
-        </div>
-      </div>
+      <div className="pt-4"><QualityTabs tab={tab} onChange={setTab} /></div>
 
       <div className="max-w-5xl space-y-6 mt-5">
-        {/* One sentence sums up the grade in one sentence; the key numbers sit underneath */}
-        <MoodTile mood={grade.mood} as="section" className="space-y-3">
-          <div className="flex items-start gap-3.5">
-            <Robot mood={grade.mood} size={64} className="flex-shrink-0 -mt-1" />
+        {/* The score, then the few things to fix first */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
+          <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-3xl p-6 flex items-center gap-5">
+            <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} tone={grade.mood} />
             <div className="min-w-0">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">How this schedule looks</h2>
-              <p className="text-[16px] md:text-[17px] font-medium text-navy-950 leading-snug mt-0.5">{grade.title}</p>
-              <p className="text-[13px] text-warm-600 mt-0.5">{grade.sub}</p>
+              <h2 className="text-[19px] font-bold tracking-[-0.02em] text-navy-950 leading-snug">{grade.short}</h2>
+              <p className="text-[13.5px] text-warm-600 mt-1 leading-relaxed">{grade.title} {grade.sub}</p>
             </div>
+          </section>
+          <section aria-labelledby="fix-first-h" className="rise-in bg-white border border-warm-200 rounded-3xl p-6">
+            <h2 id="fix-first-h" className="text-[17px] font-semibold text-navy-950">Fix these first</h2>
+            {flagged.length === 0 ? (
+              <p className="text-[14px] text-warm-600 mt-2"><CheckCircle2 size={15} className="inline mr-1.5 -mt-0.5 text-status-on-track" aria-hidden />Nothing to fix: every applicable check passes.</p>
+            ) : (
+              <ol className="mt-1 divide-y divide-warm-200">
+                {flagged.slice(0, 3).map(c => (
+                  <li key={c.id} className="flex items-start gap-3 py-3">
+                    <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[12px] font-bold ${c.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{c.result === 'fail' ? 'Fails' : 'Warning'}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14.5px] font-semibold text-navy-950">{c.name}: {c.metric} <span className="font-normal text-warm-600">(target {c.threshold})</span></div>
+                      <p className="text-[13px] text-warm-600 mt-0.5 line-clamp-2">{c.explanation}</p>
+                    </div>
+                    <button type="button" onClick={() => openCheck(c.id)} className="flex-shrink-0 text-[13px] font-semibold text-accent-600 hover:underline whitespace-nowrap">{c.offenders.length ? `Show ${c.offenders.length}` : 'Details'}</button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {flagged.length > 3 && <p className="text-[12.5px] text-warm-600 pt-1">+{flagged.length - 3} more in the checks below.</p>}
+          </section>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
+          <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
+          <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+          <Card label="Findings decided" value={`${guidance.filter(g => g.decision).length}/${guidance.length}`} sub="accepted or marked to fix" />
+        </div>
+
+        {/* All checks at a glance: failing ones outlined in red; select one for its detail */}
+        <section aria-labelledby="dcma-h" className="space-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-2.5">
+            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">All {data.dcma.checks.length} DCMA checks</h2>
+            <span className="text-[13px] text-warm-600">select one to see what it found</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Card label="DCMA 14-point" value={`${data.dcma.passed}/${data.dcma.applicable}`} sub={failing ? `${failing} to fix — see below` : 'all applicable checks pass'} />
-            <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
-            <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
-            <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            {data.dcma.checks.map((c, i) => (
+              <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls="dcma-detail"
+                style={{ animationDelay: `${i * 25}ms` }}
+                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
+                <span className="text-[11.5px] font-bold text-warm-500 tabular-nums">{c.id}</span>
+                <span className="text-[13.5px] font-semibold text-navy-950 leading-tight">{c.name}</span>
+                <span className={`text-[19px] font-bold tracking-[-0.02em] tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
+                <span className="text-[11.5px] text-warm-600">target {c.threshold}</span>
+              </button>
+            ))}
           </div>
-        </MoodTile>
+          {selectedCheck && (
+            <div id="dcma-detail" role="region" aria-label={`Check ${selectedCheck.id}: ${selectedCheck.name}`} className="rise-in bg-white border border-warm-200 rounded-2xl p-5">
+              <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
+                <span className={`font-semibold uppercase text-[12px] ${resultStyle(selectedCheck.result)}`}>{selectedCheck.result}</span>
+                <span className="text-navy-950 font-semibold">#{selectedCheck.id} {selectedCheck.name}</span>
+                <span className="text-warm-600 tabular-nums">{selectedCheck.metric} (target {selectedCheck.threshold})</span>
+              </div>
+              <p className="text-[13.5px] text-warm-700 mt-1.5">{selectedCheck.explanation}</p>
+              {selectedCheck.offenders.length > 0 && (
+                <p className="text-[12.5px] text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
+              )}
+              {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" className="inline-block mt-2 text-[13px] font-semibold text-accent-600 hover:underline">How to fix it</a>}
+            </div>
+          )}
+        </section>
 
         {data.brief && (
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
@@ -206,43 +246,6 @@ export default function QualityPage() {
           })}
         </section>
 
-        <section aria-labelledby="dcma-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <h2 id="dcma-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">DCMA 14-point</h2>
-          {flagged.length > 0 ? (
-            <ul className="divide-y divide-warm-200">
-              {flagged.map(c => (
-                <li key={c.id} className="py-2">
-                  <div className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
-                    <span className={`font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</span>
-                    <span className="text-warm-500 tabular-nums">#{c.id}</span>
-                    <span className="text-navy-950 font-medium">{c.name}</span>
-                    <span className="text-warm-600 tabular-nums">{c.metric} <span className="text-warm-500">(target {c.threshold})</span></span>
-                  </div>
-                  <p className="text-[12.5px] text-warm-700 mt-0.5">{c.explanation}{c.offenders.length ? <span className="text-warm-500"> e.g. <span className="font-mono">{c.offenders.slice(0, 6).join(', ')}</span></span> : null}</p>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="text-[13px] text-warm-700"><CheckCircle2 size={14} className="inline mr-1.5 -mt-0.5 text-status-on-track" />Every applicable check passes.</p>}
-          {clean.length > 0 && (
-            <div className="mt-2">
-              <Disclosure title={`${clean.length} check${clean.length === 1 ? '' : 's'} pass or do not apply`} meta={`${data.dcma.passed} pass`}>
-                <table className="w-full text-[12.5px]">
-                  <tbody>
-                    {clean.map(c => (
-                      <tr key={c.id} className="border-b border-warm-200 last:border-0" title={`${c.explanation}${c.offenders.length ? ' e.g. ' + c.offenders.slice(0, 6).join(', ') : ''}`}>
-                        <td className="py-1.5 pr-2 text-warm-500 tabular-nums">{c.id}</td>
-                        <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
-                        <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
-                        <td className={`py-1.5 font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Disclosure>
-            </div>
-          )}
-        </section>
-
         <Disclosure tone="card" title="Calendars — as labeled vs. as understood" meta={`${data.schedule.calendars.length} calendar${data.schedule.calendars.length === 1 ? '' : 's'}${importNotes ? ` · ${importNotes} import note${importNotes === 1 ? '' : 's'}` : ''}`}>
           {data.schedule.calendars.length === 0 && <p className="text-[12.5px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
           <ul className="space-y-2">
@@ -270,16 +273,16 @@ export default function QualityPage() {
 }
 
 /** A one-sentence read of the DCMA grade: all good, a few things to fix, or needs work. */
-function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; title: string; sub: string } {
+function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; short: string; title: string; sub: string } {
   const fail = dcma.checks.filter(c => c.result === 'fail').length
   const warn = dcma.checks.filter(c => c.result === 'warn').length
   const questions = openQuestions ? `${openQuestions} question${openQuestions === 1 ? '' : 's'} about the data ${openQuestions === 1 ? 'is' : 'are'} waiting for you.` : 'No open questions about the data.'
-  if (fail === 0 && warn === 0) return { mood: 'done', title: `In good shape: all ${dcma.applicable} applicable DCMA checks pass.`, sub: questions }
+  if (fail === 0 && warn === 0) return { mood: 'done', short: 'In good shape', title: `In good shape: all ${dcma.applicable} applicable DCMA checks pass.`, sub: questions }
   if (fail <= 3 && dcma.passed >= 0.7 * dcma.applicable) {
     const n = fail + warn
-    return { mood: 'waiting', title: `A few things to fix: ${n} of ${dcma.applicable} checks need${n === 1 ? 's' : ''} attention.`, sub: `Start with the first item under “What to fix”. ${questions}` }
+    return { mood: 'waiting', short: `Good, with ${n} to fix`, title: `A few things to fix: ${n} of ${dcma.applicable} checks need${n === 1 ? 's' : ''} attention.`, sub: `Start with the first item under “What to fix”. ${questions}` }
   }
-  return { mood: 'worried', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with the first item under “What to fix”; each says what it means and how to fix it. ${questions}` }
+  return { mood: 'worried', short: 'Needs work', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with the first item under “What to fix”; each says what it means and how to fix it. ${questions}` }
 }
 
 /** No schedule yet: an idle status and one clear next step. */
@@ -453,6 +456,22 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
         </button>
       ))}
     </div>
+  )
+}
+
+const RING_TONE: Record<RobotMood, string> = { done: '#2F7358', waiting: '#94601C', worried: '#A64848', working: '#2563eb', idle: '#56656F' }
+
+/** Checks passing as a ring that fills on load. */
+function ScoreRing({ passed, applicable, tone }: { passed: number; applicable: number; tone: RobotMood }) {
+  const r = 48, c = 2 * Math.PI * r
+  const share = applicable ? passed / applicable : 0
+  return (
+    <svg width="112" height="112" viewBox="0 0 112 112" className="flex-shrink-0" role="img" aria-label={`${passed} of ${applicable} checks pass`}>
+      <circle cx="56" cy="56" r={r} fill="none" stroke="#EBEEEE" strokeWidth="10" />
+      <circle cx="56" cy="56" r={r} fill="none" stroke={RING_TONE[tone]} strokeWidth="10" strokeLinecap="round" transform="rotate(-90 56 56)"
+        strokeDasharray={c} strokeDashoffset={c * (1 - share)} className="ring-draw" style={{ ['--ring-c' as string]: c }} />
+      <text x="56" y="62" textAnchor="middle" fontSize="24" fontWeight="700" fill="#06141B">{passed}/{applicable}</text>
+    </svg>
   )
 }
 

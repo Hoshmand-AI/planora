@@ -215,7 +215,7 @@ function AuthForm() {
                   <p className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-[13.5px] px-4 py-3 rounded-md">{resetNote}</p>
                 )}
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 {loading ? 'Sending…' : resetNote ? 'Send another link' : 'Send reset link'}
               </button>
               <button type="button" onClick={closeForgot} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Back to sign in</button>
@@ -227,7 +227,7 @@ function AuthForm() {
                 <input id="sso-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50">
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 pressable shadow-sm">
                 {loading ? 'Redirecting…' : 'Continue with single sign-on'}
               </button>
               <button type="button" onClick={() => { setSsoMode(false); setError('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Use email and password instead</button>
@@ -243,7 +243,7 @@ function AuthForm() {
                 />
               </div>
               <button type="submit" disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="w-full flex items-center justify-center gap-2 bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 <ShieldCheck size={16} aria-hidden="true" /> {loading ? 'Checking…' : 'Verify and sign in'}
               </button>
               <button type="button" onClick={() => { setChallenge(null); setError(''); setPassword('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">
@@ -302,7 +302,7 @@ function AuthForm() {
               {mode === 'signup' && <p id="password-hint" className="text-[11.5px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>}
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create Account'}
             </button>
           </form>

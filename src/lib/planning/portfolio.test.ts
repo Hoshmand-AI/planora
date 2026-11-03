@@ -82,7 +82,7 @@ describe('portfolio', () => {
     expect(latestUpdates(series).map(x => [x.schedule.id, x.updates])).toEqual([['solo1', 1], ['solo2', 1], ['u3b', 4]])
     const p = buildPortfolio([], series, TODAY)
     expect(p.rows.map(r => r.id).sort()).toEqual(['solo1', 'solo2', 'u3b'])
-    expect(p.rows.find(r => r.id === 'u3b')).toMatchObject({ updates: 4, href: '/dashboard?schedule=u3b', status: 'on_track' })
+    expect(p.rows.find(r => r.id === 'u3b')).toMatchObject({ updates: 4, href: '/dashboard/project?schedule=u3b', title: expect.any(String), source: 'uploaded', status: 'on_track' })
     expect(p.totals).toMatchObject({ projects: 3, atRisk: 0 })
   })
   it('orders the most urgent first, skips published copies and totals the alerts', () => {

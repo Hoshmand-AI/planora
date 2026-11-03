@@ -179,8 +179,8 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         </defs>
         {ticks.map(t => (
           <g key={t}>
-            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#E2DDD5" strokeWidth="1" />
-            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#575047">{t}</text>
+            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#CCD0CF" strokeWidth="1" />
+            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#3F4E5A">{t}</text>
           </g>
         ))}
         {bars.map((b, i) => {
@@ -192,11 +192,11 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
               <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />
               {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : '#3b82f6'} />}
               {isOver && <text x={x + w / 2} y={y(b.demand) - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#A64848">!</text>}
-              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="10" fill="#575047">{fmtDate(b.start).slice(0, 5)}</text>}
+              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="10" fill="#3F4E5A">{fmtDate(b.start).slice(0, 5)}</text>}
             </g>
           )
         })}
-        {line && <path d={line} fill="none" stroke="#0A1628" strokeWidth="2" strokeDasharray="5 3" />}
+        {line && <path d={line} fill="none" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" />}
       </svg>
       {h && (
         <div className="absolute top-1 right-1 bg-white border border-warm-300 rounded-md px-2 py-1 text-[12px] text-warm-700 shadow-sm pointer-events-none">
@@ -209,7 +209,7 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
       <figcaption className="flex flex-wrap gap-4 text-[12px] text-warm-700 mt-1">
         <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ({unit})</span>
         <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>Over-allocated (hatched, marked “!”)</span>
-        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#0A1628" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
+        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
       </figcaption>
     </figure>
   )

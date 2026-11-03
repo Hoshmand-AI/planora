@@ -193,22 +193,22 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-labelledby={`${titleId} ${descId}`}>
             {ticksY.map((v, i) => (
               <g key={i}>
-                <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="#E2DDD5" strokeWidth={1} />
-                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={10} fill="#575047">{$(v)}</text>
+                <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="#CCD0CF" strokeWidth={1} />
+                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={10} fill="#3F4E5A">{$(v)}</text>
               </g>
             ))}
-            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={10} fill="#575047">{fmtDate(d)}</text>)}
+            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={10} fill="#3F4E5A">{fmtDate(d)}</text>)}
             {dd && t(dd) >= x0 && t(dd) <= x1 && (
-              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#736A60" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={10} fill="#433D36">Data date</text></g>
+              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#56656F" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={10} fill="#253745">Data date</text></g>
             )}
-            <path d={path(pvPts)} fill="none" stroke="#0F2140" strokeWidth={2.25} />
+            <path d={path(pvPts)} fill="none" stroke="#11212D" strokeWidth={2.25} />
             <path d={path(evPts)} fill="none" stroke="#2563eb" strokeWidth={2.25} strokeDasharray="7 4" />
             {evPts.slice(1).map((p, i) => <circle key={i} cx={sx(p.date!)} cy={sy(p.v)} r={4} fill="#2563eb" />)}
             {acPts.length > 0 && <path d={path(acPts)} fill="none" stroke="#94601C" strokeWidth={2.25} strokeDasharray="2 3" />}
             {acPts.slice(1).map((p, i) => <rect key={i} x={sx(p.date!) - 3.5} y={sy(p.v) - 3.5} width={7} height={7} fill="#94601C" />)}
           </svg>
           <ul className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-[12px] text-warm-700" aria-label="Legend">
-            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#0F2140" strokeWidth="2.25" /></svg>PV, planned value (solid)</li>
+            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#11212D" strokeWidth="2.25" /></svg>PV, planned value (solid)</li>
             <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#2563eb" strokeWidth="2.25" strokeDasharray="7 4" /><circle cx="14" cy="5" r="3.5" fill="#2563eb" /></svg>EV, earned value (dashed, circles)</li>
             {acPts.length > 0 && <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#94601C" strokeWidth="2.25" strokeDasharray="2 3" /><rect x="10.5" y="1.5" width="7" height="7" fill="#94601C" /></svg>AC, actual cost (dotted, squares)</li>}
           </ul>

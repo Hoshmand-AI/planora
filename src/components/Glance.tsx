@@ -5,7 +5,7 @@
 
 import { MoodTile, type RobotMood } from '@/components/Robot'
 
-const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#B86E1A', done: '#2F7358', worried: '#A64848', idle: '#736A60' }
+const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#B86E1A', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
 
 /** A share as a ring with the percentage in the middle; the label says what it is a share of. */
 export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; percent: number; label: string; sub?: React.ReactNode }) {
@@ -14,7 +14,7 @@ export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; perce
   return (
     <MoodTile mood={mood} className="flex items-center gap-4">
       <svg viewBox="0 0 64 64" width="64" height="64" className="flex-shrink-0 -rotate-90" role="img" aria-label={`${p}% ${label}`}>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="#E2DDD5" strokeWidth="7" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="#CCD0CF" strokeWidth="7" />
         {p > 0 && <circle cx="32" cy="32" r={r} fill="none" stroke={RING[mood]} strokeWidth="7" strokeLinecap="round"
           strokeDasharray={`${(p / 100) * c} ${c}`} className="meter-fill" />}
       </svg>

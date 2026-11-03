@@ -91,8 +91,19 @@ dismiss them (`document.requirement_confirmed` / `_dismissed` in the audit log, 
 | Organization deleted | Passages, documents (including tombstones), requirement reviews and the retrieval log are deleted with everything else. |
 | Backups | Follow the database backup window ([../operations/BACKUP-AND-RECOVERY.md](../operations/BACKUP-AND-RECOVERY.md)). |
 
-## Extending retrieval
+## Search: keyword, construction vocabulary, and meaning
 
-Retrieval sits behind the `Retriever` interface (`src/lib/rag/types.ts`). A vector backend (for
-example pgvector on an on-prem deployment) can be added as another implementation, but it must apply
-the same scope in its own query; nothing may filter results after retrieval.
+Retrieval sits behind the `Retriever` interface (`src/lib/rag/types.ts`). Every backend applies the
+scope above inside its own SQL; nothing filters results after retrieval.
+
+- **Keyword** (always on): Postgres full-text search, plus a fixed construction vocabulary
+  (`src/lib/rag/vocabulary.ts`) so "LDs" also finds "liquidated damages" and "NTP" the "Notice to
+  Proceed". No model, nothing leaves the database.
+- **Meaning-based** (optional, `RUNF9_EMBEDDINGS_MODEL`; `src/lib/rag/embeddings.ts`): passages and
+  questions become vectors through an embedding model **inside the customer's network only**: a
+  public address, including any cloud AI provider, is refused in every deployment, and nothing is
+  embedded while the organization's AI switch is off. Vectors are stored in `chunk_embeddings`
+  (deleted with their passage) and compared inside Postgres under the same scoped SQL
+  (`buildVectorSearchSql`). Flagged passages are never embedded. Results are blended with keyword
+  results (reciprocal-rank fusion) and ordered by grounding tier; if the model is down, search is
+  keyword-only. Passages uploaded before AI was turned on are indexed on the next search.

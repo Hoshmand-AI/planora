@@ -1,3 +1,4 @@
+import { CUSTOMER_CLOUD_PROVIDERS, customerCloudConfig, type CustomerCloudConfig } from './customer-cloud-adapter'
 import { createHash } from 'crypto'
 import { currentRequest } from '@/lib/server/context'
 import { log } from '@/lib/server/log'
@@ -89,9 +90,9 @@ export const DEFAULT_CLOUD_MODEL = DEFAULT_ANTHROPIC_MODEL
 export const DEFAULT_APPROVED_MODELS = MODEL_REGISTRY.map(m => m.id)
 
 /** Default model for each provider. */
-export const DEFAULT_MODEL: Record<ProviderName, string> = { anthropic: DEFAULT_ANTHROPIC_MODEL, openai: DEFAULT_OPENAI_MODEL, local: DEFAULT_LOCAL_MODEL }
+export const DEFAULT_MODEL: Record<ProviderName, string> = { anthropic: DEFAULT_ANTHROPIC_MODEL, openai: DEFAULT_OPENAI_MODEL, local: DEFAULT_LOCAL_MODEL, azure_openai: '', bedrock: '', vertex: '' }
 
-const CLOUD: Record<CloudProvider, { keyVar: 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY'; host: string }> = {
+const CLOUD: Record<'anthropic' | 'openai', { keyVar: 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY'; host: string }> = {
   anthropic: { keyVar: 'ANTHROPIC_API_KEY', host: 'api.anthropic.com' },
   openai: { keyVar: 'OPENAI_API_KEY', host: 'api.openai.com' },
 }
@@ -105,8 +106,8 @@ export function approvedModels(env: Record<string, string | undefined> = process
 export function selectCloudProvider(env: Record<string, string | undefined> = process.env): { provider: CloudProvider | null; error?: string } {
   const requested = (env.RUNF9_AI_PROVIDER || '').trim().toLowerCase()
   if (requested) {
-    if (requested === 'anthropic' || requested === 'openai') return { provider: requested }
-    return { provider: null, error: `Unknown RUNF9_AI_PROVIDER "${requested}" (use anthropic or openai).` }
+    if (requested === 'anthropic' || requested === 'openai' || (CUSTOMER_CLOUD_PROVIDERS as readonly string[]).includes(requested)) return { provider: requested as CloudProvider }
+    return { provider: null, error: `Unknown RUNF9_AI_PROVIDER "${requested}" (use anthropic, openai, azure_openai, bedrock or vertex).` }
   }
   if (env.ANTHROPIC_API_KEY) return { provider: 'anthropic' }
   if (env.OPENAI_API_KEY) return { provider: 'openai' }
@@ -123,10 +124,10 @@ export function isAllowedAirgapHost(host: string, extra: string[] = []): boolean
   return PRIVATE_HOST.test(h) || extra.map(x => x.trim().toLowerCase()).filter(Boolean).includes(h)
 }
 
-export function resolveLlmConfig(env: Record<string, string | undefined> = process.env): LlmStatus & { baseURL?: string; apiKey?: string } {
+export function resolveLlmConfig(env: Record<string, string | undefined> = process.env): LlmStatus & { baseURL?: string; apiKey?: string; customerCloud?: CustomerCloudConfig } {
   const airgapped = /^(1|true|yes)$/i.test(env.RUNF9_AIRGAPPED || '')
   const requested = (env.RUNF9_AI_MODE || '').toLowerCase() as AiMode | ''
-  const hasCloudKey = !!(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
+  const hasCloudKey = !!(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY) || (CUSTOMER_CLOUD_PROVIDERS as readonly string[]).includes((env.RUNF9_AI_PROVIDER || '').trim().toLowerCase())
   let mode: AiMode = requested || (airgapped ? (env.LLM_BASE_URL ? 'local' : 'offline') : hasCloudKey ? 'cloud' : env.LLM_BASE_URL ? 'local' : 'offline')
   const off = (error: string, host: string | null = null) => ({ mode: 'offline' as const, airgapped, provider: null, model: null, host, smallModel: true, error })
 
@@ -135,6 +136,14 @@ export function resolveLlmConfig(env: Record<string, string | undefined> = proce
     const sel = selectCloudProvider(env)
     if (sel.error) return off(sel.error)
     if (!sel.provider) return off('No cloud AI key is set (ANTHROPIC_API_KEY or OPENAI_API_KEY).')
+    if (sel.provider !== 'anthropic' && sel.provider !== 'openai') {
+      // The customer's own cloud AI (private deployment): its model is the customer's choice; an explicit
+      // RUNF9_APPROVED_MODELS list still applies when set.
+      const c = customerCloudConfig(sel.provider, env)
+      if ('error' in c) return off(c.error)
+      if (env.RUNF9_APPROVED_MODELS && !approvedModels(env).includes(c.model)) return off(`Model ${c.model} is not in the approved model registry (RUNF9_APPROVED_MODELS).`)
+      return { mode, airgapped, provider: sel.provider, model: c.model, certified: isCertifiedModel(c.model), host: c.host, smallModel: false, customerCloud: c }
+    }
     const { keyVar, host } = CLOUD[sel.provider]
     const apiKey = env[keyVar]
     if (!apiKey) return off(`${keyVar} is not set.`)
@@ -167,7 +176,7 @@ function orgAiOff(): boolean {
 }
 
 export function llmStatus(): LlmStatus {
-  const { baseURL: _b, apiKey: _k, ...status } = resolveLlmConfig()
+  const { baseURL: _b, apiKey: _k, customerCloud: _c, ...status } = resolveLlmConfig()
   const deployment = deploymentKind()
   const where = { deployment, ...(deployment === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}) }
   if (orgAiOff()) return { mode: 'offline', airgapped: status.airgapped, provider: null, model: null, host: null, smallModel: true, error: 'AI is turned off for your organization', ...where }
@@ -212,16 +221,19 @@ let cached: { provider: ProviderName; baseURL: string; apiKey: string; fallback:
 /** Build (or reuse) the adapter for the route. SDKs are loaded lazily, so an unused provider's SDK is never initialized. */
 async function adapterFor(cfg: Route): Promise<LlmAdapter> {
   const fallback = cfg.provider === 'anthropic' && aiFallbackEnabled()
-  const baseURL = cfg.baseURL ?? '', apiKey = cfg.apiKey ?? ''
+  const baseURL = cfg.baseURL ?? cfg.customerCloud?.endpoint ?? '', apiKey = cfg.apiKey ?? cfg.customerCloud?.azure?.apiKey ?? ''
   // Reuse the adapter while the route is unchanged (compared in memory; the key is never hashed or stored elsewhere).
   if (cached && cached.provider === cfg.provider && cached.baseURL === baseURL && cached.apiKey === apiKey && cached.fallback === fallback) return cached.adapter
   let adapter: LlmAdapter
-  if (cfg.provider === 'anthropic') {
+  if (cfg.customerCloud) {
+    const { createCustomerCloudAdapter } = await import('./customer-cloud-adapter')
+    adapter = createCustomerCloudAdapter(cfg.customerCloud)
+  } else if (cfg.provider === 'anthropic') {
     const { createAnthropicAdapter } = await import('./anthropic-adapter')
     adapter = createAnthropicAdapter({ apiKey: cfg.apiKey ?? '', fallback })
   } else {
     const { createOpenAiCompatibleAdapter } = await import('./openai-adapter')
-    adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL })
+    adapter = createOpenAiCompatibleAdapter({ provider: cfg.provider as 'openai' | 'local', apiKey: cfg.apiKey, baseURL: cfg.baseURL })
   }
   cached = { provider: cfg.provider, baseURL, apiKey, fallback, adapter }
   return adapter

@@ -74,7 +74,7 @@ function ResetForm() {
           )}
 
           {done ? (
-            <Link href="/auth" className="block w-full text-center bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors">
+            <Link href="/auth" className="block w-full text-center bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
               Sign in
             </Link>
           ) : token && !linkDead ? (
@@ -95,7 +95,7 @@ function ResetForm() {
                 <p id="password-hint" className="text-[11.5px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>
               </div>
               <button type="submit" disabled={loading}
-                className="w-full bg-accent-500 text-navy-950 py-3 rounded-md text-[15px] font-semibold hover:bg-accent-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 {loading ? 'Please wait…' : 'Reset password'}
               </button>
             </form>

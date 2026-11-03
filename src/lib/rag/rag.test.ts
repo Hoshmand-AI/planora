@@ -271,10 +271,12 @@ describe('retrieval SQL is scoped before ranking', () => {
   })
 
   it('builds "any term" queries from plain words only', () => {
-    expect(anyTermsQuery("What's the max activity-duration? (20 days) & | !")).toBe('what | the | max | activity | duration | 20 | days')
-    const b = buildSearchSql({ orgId: 'o', scheduleId: 's', access: full }, 'max duration', { ...opts, match: 'any' })
+    // User text contributes plain words only; construction synonyms are appended from the fixed vocabulary.
+    expect(anyTermsQuery("What's the max activity-duration? (20 days) & | !")).toBe('what | the | max | activity | duration | 20 | days | (working <-> days) | (calendar <-> days)')
+    expect(anyTermsQuery('max activity length')).toBe('max | activity | length')
+    const b = buildSearchSql({ orgId: 'o', scheduleId: 's', access: full }, 'max length', { ...opts, match: 'any' })
     expect(b.text).toMatch(/to_tsquery\('english', \$3\)/)
-    expect(b.values[2]).toBe('max | duration')
+    expect(b.values[2]).toBe('max | length')
   })
 
   it('hashes queries per organization (no text stored)', () => {

@@ -30,6 +30,17 @@ export interface PortfolioRow {
   dataDate?: string | null
   /** Uploaded schedules: what the variance was measured against (RunF9's analysis) */
   varianceBasis?: string | null
+  /** The project's own name (without the upload's version label) */
+  title: string
+  /** Uploaded in a file, or built in RunF9 through the interview */
+  source: 'uploaded' | 'built'
+  /** Version label of the upload shown (Baseline, Update 3, ...); null for plans */
+  version: string | null
+  start: string | null
+  /** Progress by duration, 0–100; null when unknown */
+  percentComplete: number | null
+  activities: number | null
+  critical: number | null
 }
 
 export interface Portfolio {
@@ -82,6 +93,8 @@ export function planRow(p: Plan, today: string): PortfolioRow {
   return {
     kind: 'plan', id: p.id, name: p.name, href: `/dashboard/plan/${p.id}`, finish, required, gapDays, readiness: elic.readiness,
     updatedAt: isNaN(updated.getTime()) ? p.updatedAt : updated.toISOString(), status: statusOf(alerts, !!g), alerts,
+    title: p.name, source: 'built', version: null, start: g?.projectStart ?? null, percentComplete: g ? 0 : null,
+    activities: g ? g.activities.length : null, critical: g?.cpm ? Object.values(g.cpm.times).filter(t => t.critical).length : null,
   }
 }
 
@@ -108,9 +121,11 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
   // Exactly the analysis status (the overview badge); 'not_started' = not analyzed yet.
   const status: PortfolioRow['status'] = an ? an.status : 'not_started'
   return {
-    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
+    kind: 'schedule', id: s.id, name: `${s.name} (${s.version})`, href: `/dashboard/project?schedule=${s.id}`, finish, required: an?.mustFinishBy ?? null,
     gapDays: v, readiness: null, updatedAt: isNaN(Date.parse(s.uploadedAt)) ? s.uploadedAt : new Date(s.uploadedAt).toISOString(), status, alerts,
     updates, dataDate: s.dataDate, varianceBasis: an ? fmtDates([an.baseline?.header ? `${an.baseline.header}.` : '', an.varianceBasis].filter(Boolean).join(' ')) || null : null,
+    title: s.name, source: 'uploaded', version: s.version || null, start: s.projectStart, percentComplete: Number.isFinite(s.percentComplete) ? s.percentComplete : null,
+    activities: s.activityCount, critical: s.criticalCount,
   }
 }
 

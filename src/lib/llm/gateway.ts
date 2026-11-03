@@ -3,10 +3,10 @@
 // Adding a provider means adding an adapter + registry entries — callers never change.
 
 /** Which adapter served a call. 'local' is any OpenAI-compatible endpoint (Ollama, vLLM, …). */
-export type ProviderName = 'anthropic' | 'openai' | 'local'
+export type ProviderName = 'anthropic' | 'openai' | 'local' | 'azure_openai' | 'bedrock' | 'vertex'
 
 /** Cloud providers selectable with RUNF9_AI_PROVIDER. */
-export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai'>
+export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai' | 'azure_openai' | 'bedrock' | 'vertex'>
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -103,4 +103,4 @@ export function aiFallbackEnabled(env: Record<string, string | undefined> = proc
 }
 
 /** Display names for the UI and docs. */
-export const PROVIDER_LABEL: Record<ProviderName, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', local: 'On-prem endpoint' }
+export const PROVIDER_LABEL: Record<ProviderName, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', local: 'On-prem endpoint', azure_openai: 'Azure OpenAI (your subscription)', bedrock: 'Amazon Bedrock (your account)', vertex: 'Google Vertex AI (your project)' }

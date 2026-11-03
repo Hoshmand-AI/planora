@@ -245,7 +245,7 @@ export default function PlanPage() {
     <div className="px-4 md:px-6 pb-8">
       {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
       <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
-        <Link href="/dashboard/plan" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> All plans</Link>
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> Projects</Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
           <h1 className="font-display text-[22px] md:text-[26px] text-navy-950 leading-tight min-w-0 md:truncate">{plan.name}</h1>
           <div className="flex flex-wrap items-center gap-1 flex-shrink-0">

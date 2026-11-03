@@ -13,6 +13,7 @@ import { initSchema, query } from '@/lib/db'
 import { decrypt, encrypt } from './crypto'
 import { ApiError } from './api'
 import { isRole, type Role } from './permissions'
+import { egressProblem } from './egress'
 
 export interface SsoConfig {
   enabled: boolean
@@ -71,6 +72,8 @@ export function validateIssuer(issuer: string): void {
   let u: URL
   try { u = new URL(issuer) } catch { throw new ApiError(400, 'Issuer must be a URL, e.g. https://login.microsoftonline.com/<tenant>/v2.0') }
   if (u.protocol !== 'https:' && !(insecureAllowed() && u.protocol === 'http:')) throw new ApiError(400, 'The issuer must use https.')
+  const outside = egressProblem(issuer)
+  if (outside) throw new ApiError(400, outside)
 }
 
 interface Discovery { issuer: string; authorization_endpoint: string; token_endpoint: string; jwks_uri: string }
@@ -78,6 +81,8 @@ const discoveryCache = new Map<string, { at: number; d: Discovery }>()
 const jwksCache = new Map<string, { at: number; keys: Record<string, unknown>[] }>()
 
 async function getJson(url: string): Promise<unknown> {
+  const outside = egressProblem(url)
+  if (outside) throw new ApiError(400, outside)
   const res = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new ApiError(502, `The identity provider returned ${res.status} for ${new URL(url).pathname}.`)
   return res.json()
@@ -161,6 +166,8 @@ export async function finishSso(params: URLSearchParams, stateCookie: string | u
   const config = await ssoConfigFor(st.orgId)
   if (!config.enabled || !config.clientSecretEnc) throw new ApiError(400, 'Single sign-on is not set up for this organization.')
   const d = await discover(config.issuer)
+  const outside = egressProblem(d.token_endpoint)
+  if (outside) throw new ApiError(400, outside)
   const res = await fetch(d.token_endpoint, {
     method: 'POST', signal: AbortSignal.timeout(10_000),
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },

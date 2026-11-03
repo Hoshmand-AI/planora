@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import type { DataLocation } from '@/lib/server/data-location'
+import { CloudStorage } from '@/components/CloudStorage'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
 import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
@@ -27,7 +29,7 @@ interface OrgData {
   settings?: Settings
   aiUsageToday?: number
   plan: { id: string; label: string; maxUploadedSchedules: number | null; aiPerDay: number; reports: string[]; exports: string[]; sso: boolean; uploadedSchedules: number }
-  service?: { deployment: string; cuiWarning?: string }
+  service?: { deployment: string; cuiWarning?: string; dataLocation?: DataLocation }
   sso?: { enabled: boolean; issuer: string; clientId: string; hasSecret: boolean; domains: string[]; defaultRole: string; enforce: boolean; verification: { host: string; value: string } | null }
 }
 interface AuditEvent { seq: number; at: string; actorEmail: string | null; action: string; targetType: string | null; targetId: string | null; detail: Record<string, unknown>; ip: string | null; hash: string }
@@ -128,6 +130,9 @@ export default function OrgPage() {
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Roles, 2-step, audit log</dt><dd className="text-navy-950 font-medium">Included</dd></div>
         </dl>
       </Section>
+
+      {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} />}
+      <CloudStorage manage={manage} />
 
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
@@ -387,5 +392,21 @@ export default function OrgPage() {
         </Section>
       )}
     </div>
+  )
+}
+
+/** Where this deployment keeps the firm's data. */
+function DataLocationSection({ loc }: { loc: DataLocation }) {
+  return (
+    <Section id="data-location" title="Where your data lives" description="Schedules, analysis and the document-search index are stored in this deployment's database. Original files can be kept in your own cloud storage (below).">
+      <dl className="grid gap-4 md:grid-cols-3 text-[13.5px]">
+        <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-navy-950">{loc.label}</dd></div>
+        <div><dt className="text-warm-600">Database</dt><dd className="mt-1 text-warm-700">{loc.database}</dd></div>
+        <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
+      </dl>
+      <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
+        Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? <a href="/deploy" className="text-accent-600 underline">Run RunF9 in that cloud</a> from one template: the app, database, documents and search index all stay there, with the same company sign-in (SSO).
+      </p>
+    </Section>
   )
 }

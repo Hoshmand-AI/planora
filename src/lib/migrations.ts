@@ -736,6 +736,59 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS beta_invites_email_idx ON beta_invites(LOWER(email));
     `,
   },
+  {
+    id: 19, name: 'document_chunk_embeddings',
+    sql: `
+    -- Meaning-based document search (src/lib/rag/embeddings.ts). Vectors come only from an embedding
+    -- model inside the customer's network and are compared inside Postgres (REAL[], no extension).
+    -- Each vector is deleted with its passage. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS chunk_embeddings (
+      chunk_id TEXT PRIMARY KEY REFERENCES document_chunks(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      embedding REAL[] NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS chunk_embeddings_org_model_idx ON chunk_embeddings(org_id, model);
+    `,
+  },
+  {
+    id: 20, name: 'cloud_storage_connections',
+    sql: `
+    -- Cloud storage a firm connects (Amazon S3, Azure Blob, Google Cloud Storage, S3-compatible):
+    -- schedules and documents can be imported from it, and original files kept in it instead of
+    -- RunF9's database (src/lib/storage/*). The secret is encrypted (src/lib/server/crypto.ts).
+    -- Additive: older code ignores the table and the new columns. A file kept in the firm's storage
+    -- has an empty content column plus the connection and object key.
+    CREATE TABLE IF NOT EXISTS storage_connections (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL CHECK (provider IN ('aws', 'azure', 'gcp', 's3')),
+      name TEXT NOT NULL,
+      config JSONB NOT NULL DEFAULT '{}'::jsonb,
+      secret TEXT NOT NULL,
+      can_read BOOLEAN NOT NULL DEFAULT FALSE,
+      can_write BOOLEAN NOT NULL DEFAULT FALSE,
+      status_detail TEXT,
+      checked_at TIMESTAMPTZ,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      -- Removed connections keep their row (without the secret) so stored files still say where they are.
+      deleted_at TIMESTAMPTZ,
+      UNIQUE (id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS storage_connections_org_idx ON storage_connections(org_id) WHERE deleted_at IS NULL;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS storage_connection_id TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS object_key TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS source_connection_id TEXT;
+    ALTER TABLE schedule_files ADD COLUMN IF NOT EXISTS source_key TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS storage_connection_id TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS object_key TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS source_connection_id TEXT;
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS source_key TEXT;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

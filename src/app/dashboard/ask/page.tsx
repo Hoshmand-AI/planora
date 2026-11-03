@@ -162,7 +162,7 @@ export default function AskPage() {
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
           aria-label="Send"
-          className="w-9 h-9 bg-accent-500 rounded-md flex items-center justify-center text-navy-950 hover:bg-accent-400 transition-colors disabled:opacity-40"
+          className="w-9 h-9 bg-accent-600 rounded-md flex items-center justify-center text-white hover:bg-accent-700 transition-colors disabled:opacity-40 pressable shadow-sm"
         >
           <Send size={15} />
         </button>

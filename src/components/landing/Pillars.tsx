@@ -34,7 +34,7 @@ function CheckArt({ on }: { on: boolean }) {
       <div className="grid grid-cols-7 gap-2.5 w-full">
         {Array.from({ length: 14 }, (_, i) => (
           <div key={i} className="aspect-square rounded-xl flex items-center justify-center"
-            style={{ background: on ? (i === 9 ? '#FFF1E0' : '#E6F4EC') : '#F0EDE8', transition: `background-color 400ms ease ${i * 90}ms` }}>
+            style={{ background: on ? (i === 9 ? '#FFF1E0' : '#E6F4EC') : '#EBEEEE', transition: `background-color 400ms ease ${i * 90}ms` }}>
             <svg viewBox="0 0 24 24" width="60%" height="60%">
               {i === 9
                 ? <path d="M12 6 V13 M12 17.5 V18" stroke="#B86E1A" strokeWidth="3" strokeLinecap="round" fill="none" style={{ opacity: on ? 1 : 0, transition: `opacity 300ms ease ${i * 90 + 200}ms` }} />
@@ -53,7 +53,7 @@ function ForecastArt({ on }: { on: boolean }) {
   return (
     <div className="h-[200px] relative flex items-end gap-1.5 pb-6" aria-hidden="true">
       {h.map((v, i) => (
-        <div key={i} className="flex-1 rounded-t-md" style={{ height: on ? `${v}%` : '0%', background: i < 7 ? '#B8C4D6' : '#2563eb', opacity: i < 7 ? 1 : 0.85, transition: `height 700ms ${ease} ${i * 60}ms` }} />
+        <div key={i} className="flex-1 rounded-t-md" style={{ height: on ? `${v}%` : '0%', background: i < 7 ? '#CCD0CF' : '#2563eb', opacity: i < 7 ? 1 : 0.85, transition: `height 700ms ${ease} ${i * 60}ms` }} />
       ))}
       {[['P50', 50], ['P80', 71]].map(([label, x]) => (
         <div key={label} className="absolute bottom-0 top-0 flex flex-col items-center" style={{ left: `${x}%`, opacity: on ? 1 : 0, transition: `opacity 500ms ease ${label === 'P50' ? 1000 : 1250}ms` }}>

@@ -145,6 +145,8 @@ export function stringLiterals(src: string): { text: string; line: number }[] {
 // SQL in this codebase is written with upper-case keywords; matching case-sensitively keeps UI prose out.
 const SQL_RE = /^\s*(WITH|SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*\b(FROM|INTO|SET)\b/
 const TABLE_RE = /\b(?:FROM|JOIN|INTO|UPDATE|USING)\s+(?!SET\b)([a-z_]+)\b/g
+/** Set-returning SQL functions that can follow FROM/JOIN; they read no table. */
+const SQL_FUNCTIONS = new Set(['unnest', 'generate_series'])
 
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
@@ -164,7 +166,7 @@ function statements(): Statement[] {
     for (const lit of stringLiterals(fs.readFileSync(file, 'utf8'))) {
       const sql = lit.text.replace(/\s+/g, ' ').trim()
       if (!SQL_RE.test(sql)) continue
-      const tables = [...new Set([...sql.matchAll(TABLE_RE)].map(m => m[1].toLowerCase()))]
+      const tables = [...new Set([...sql.matchAll(TABLE_RE)].map(m => m[1].toLowerCase()))].filter(t => !SQL_FUNCTIONS.has(t))
       out.push({ file: rel, line: lit.line, sql, tables })
     }
   }

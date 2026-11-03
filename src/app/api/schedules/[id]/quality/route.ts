@@ -24,7 +24,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const byId = new Map(responses.map(r => [r.questionId, r]))
   const guidance = dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn').map(c => ({
     // Uploads with logic have what-if / recovery options and RunF9 edits on the schedule dashboard.
-    ...guidanceFor(c, { generated: false, uploadedRecoveryHref: data.cpm && schedule.sourceType !== 'generated' ? `/dashboard?schedule=${encodeURIComponent(schedule.id)}#recovery` : undefined }),
+    ...guidanceFor(c, { generated: false, uploadedRecoveryHref: data.cpm && schedule.sourceType !== 'generated' ? `/dashboard/project?schedule=${encodeURIComponent(schedule.id)}#recovery` : undefined }),
     decision: byId.get(`dcma:${c.id}`) ?? null,
   }))
   return NextResponse.json({
