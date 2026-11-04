@@ -230,7 +230,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
   })
 
   return (
-    <div ref={ref} className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(10,22,40,0.04),0_8px_24px_-12px_rgba(10,22,40,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div ref={ref} className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13.5px] text-navy-950">{insight?.swingDays ? 'This one matters: it can move your finish.' : 'Next question — quick one.'}</div>
         <div className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-warm-500 mt-0.5">
@@ -333,7 +333,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
     if (Object.keys(out).length) onSave(out)
   }
   return (
-    <div className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(10,22,40,0.04),0_8px_24px_-12px_rgba(10,22,40,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13.5px] text-navy-950">A few that go together — answer the ones you know.</div>
         <div className="text-[12.5px] text-warm-500 mt-0.5">{group.label} · together they move the finish up to <span className="font-semibold text-navy-950 tabular-nums">{group.swingDays} days</span></div>

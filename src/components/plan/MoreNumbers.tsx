@@ -37,7 +37,7 @@ export function MoreNumbers({ rows, align = 'right' }: { rows: NumberRow[]; alig
       </button>
       {open && (
         <div id={id} role="region" aria-label="More numbers"
-          className={`rise-in absolute z-40 mt-2 w-[min(calc(100vw-2rem),420px)] rounded-2xl border border-warm-200 bg-white shadow-[0_12px_40px_-12px_rgba(10,22,40,0.25)] p-2 max-h-[min(70vh,560px)] overflow-y-auto overscroll-contain ${align === 'right' ? 'right-0' : 'left-0'}`}>
+          className={`rise-in absolute z-40 mt-2 w-[min(calc(100vw-2rem),420px)] rounded-2xl border border-warm-200 bg-white shadow-[0_12px_40px_-12px_rgba(6,20,27,0.25)] p-2 max-h-[min(70vh,560px)] overflow-y-auto overscroll-contain ${align === 'right' ? 'right-0' : 'left-0'}`}>
           <ul className="divide-y divide-warm-200">
             {rows.map(r => (
               <li key={r.key} className="flex items-start gap-4 px-3 py-2.5">

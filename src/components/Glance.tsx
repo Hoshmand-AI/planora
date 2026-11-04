@@ -1,11 +1,13 @@
 'use client'
 
-// Glanceable tiles in the spirit of home-screen widgets: a progress ring and a big counter,
-// each on a tinted status tile. Every value is also written out as text.
+// Glanceable tiles in the spirit of home-screen widgets: a progress ring and a big counter on a plain
+// surface; the figure takes the status color. Every value is also written out as text.
 
 import { MoodTile, type RobotMood } from '@/components/Robot'
 
-const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#B86E1A', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
+// Palette colors only: accent for work in progress, the status colors for attention / on track / at risk.
+const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#94601C', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
+const FIGURE: Record<RobotMood, string> = { working: 'text-navy-950', idle: 'text-navy-950', waiting: 'text-status-attention', done: 'text-status-on-track', worried: 'text-status-at-risk' }
 
 /** A share as a ring with the percentage in the middle; the label says what it is a share of. */
 export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; percent: number; label: string; sub?: React.ReactNode }) {
@@ -31,7 +33,7 @@ export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; perce
 export function CounterTile({ mood, value, label, sub }: { mood: RobotMood; value: React.ReactNode; label: string; sub?: React.ReactNode }) {
   return (
     <MoodTile mood={mood} className="flex flex-col justify-center">
-      <div className="text-[34px] font-bold text-navy-950 tabular-nums leading-none">{value}</div>
+      <div className={`text-[34px] font-bold tabular-nums leading-none ${FIGURE[mood]}`}>{value}</div>
       <div className="text-[13px] text-warm-700 mt-1.5">{label}</div>
       {sub && <div className="text-[12px] text-warm-600 mt-0.5">{sub}</div>}
     </MoodTile>

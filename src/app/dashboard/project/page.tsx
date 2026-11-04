@@ -107,7 +107,7 @@ export default function ProjectPage() {
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')
             : null}
           note={undatedNote} />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
           <CounterTile mood={varianceTone}
             value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}

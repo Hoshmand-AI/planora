@@ -53,6 +53,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 
+/* Touch screens (phones, iPads): form text is at least 16px. iOS Safari zooms the whole page when a smaller
+   field is focused, which leaves the layout looking cut off on the right until the user pinches back. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea { font-size: max(16px, 1em) !important; }
+}
+
 .skip-link {
   position: absolute; left: 8px; top: -48px; z-index: 100;
   background: var(--navy-950); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 14px; font-weight: 600;
@@ -107,12 +113,9 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 .status-pulse { animation: status-pulse 2.4s ease-in-out infinite; }
 
 /* Mood tiles: a soft tint and glow per status */
-.mood-tile { position: relative; isolation: isolate; background: var(--tile-bg, #FAFBFB); border-color: var(--tile-line, #EBEEEE); box-shadow: 0 10px 30px -18px var(--tile-glow, transparent); }
-.mood-tile[data-mood='working'] { --tile-bg: #F5F9FF; --tile-line: #DCE8FB; --tile-glow: #3b82f6; }
-.mood-tile[data-mood='waiting'] { --tile-bg: #FFF8F0; --tile-line: #F6DFC2; --tile-glow: #E0902F; }
-.mood-tile[data-mood='done']    { --tile-bg: #F3FBF6; --tile-line: #CDEBD8; --tile-glow: #2F9E6A; }
-.mood-tile[data-mood='worried'] { --tile-bg: #FFF5F5; --tile-line: #F3D3D3; --tile-glow: #C25B5B; }
-.mood-tile[data-mood='idle']    { --tile-bg: #F7F9F9; --tile-line: #DDE2E2; --tile-glow: #7D8B90; }
+/* Status tiles use the palette's plain surface for every state: white, divider border and the standard card shadow.
+   Status is carried by the palette's status colors on the figure or label, never by a tinted or glowing tile. */
+.mood-tile { position: relative; isolation: isolate; background: #FFFFFF; border-color: var(--warm-200); box-shadow: 0 1px 2px rgb(6 20 27 / 0.06), 0 14px 32px -24px rgb(6 20 27 / 0.16); }
 
 
 /* ── Marketing page motion (src/components/landing): fade up on first view, nothing loops ── */

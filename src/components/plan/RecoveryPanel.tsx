@@ -30,7 +30,7 @@ function Chip({ o }: { o: RecoveryOption }) {
 
 function OptionCard({ o, best, busy, onRecover, onInterview }: { o: RecoveryOption; best: boolean; busy: string | null; onRecover: (id: string) => void; onInterview: () => void }) {
   return (
-    <li className={`rounded-2xl bg-white px-4 pt-4 flex flex-col ${best ? 'border-2 border-navy-900/70 shadow-[0_8px_24px_-14px_rgba(10,22,40,0.35)]' : 'border border-warm-200'}`}>
+    <li className={`rounded-2xl bg-white px-4 pt-4 flex flex-col ${best ? 'border-2 border-navy-900/70 shadow-[0_8px_24px_-14px_rgba(6,20,27,0.35)]' : 'border border-warm-200'}`}>
       {best && <div className="text-[11.5px] font-semibold text-accent-600 mb-1">Suggested first step</div>}
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-[14px] font-semibold text-navy-950 leading-snug">{o.title}</h4>

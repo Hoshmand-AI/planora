@@ -7,8 +7,14 @@ import { fmtDate } from '@/lib/format'
 
 type Status = 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline'
 
-// Light status tones that keep AA contrast on the navy panel.
-const TONE: Record<Status, string> = { at_risk: '#F4A6A6', attention: '#F2C77B', on_track: '#8FD4B4', complete: '#8FD4B4', no_baseline: '#CCD0CF' }
+// The verdict is a pill in the palette's status colors (status text on its tint, AA contrast);
+// with nothing to compare against it is plain light text on the navy panel.
+const PILL: Record<Status, string> = {
+  at_risk: 'bg-status-at-risk-bg text-status-at-risk', attention: 'bg-status-attention-bg text-status-attention',
+  on_track: 'bg-status-on-track-bg text-status-on-track', complete: 'bg-status-complete-bg text-status-complete', no_baseline: 'text-navy-200',
+}
+// Ribbon marks (palette): progress to the data date in blue with a white tick, target light steel, forecast sky blue.
+const FORECAST = '#60A5FA', TARGET = '#CCD0CF', DATA_DATE = '#2563EB'
 
 const day = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000
 const plural = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
@@ -32,7 +38,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
     : diff > 0 ? `${plural(diff)} after ${what} ${fmtDate(target!.date)}`
     : diff < 0 ? `${plural(-diff)} ahead of ${what} ${fmtDate(target!.date)}`
     : `On ${what} ${fmtDate(target!.date)}`
-  const tone = diff == null && status !== 'complete' ? TONE.no_baseline : TONE[status]
+  const pill = diff == null && status !== 'complete' ? PILL.no_baseline : PILL[status]
 
   // Ribbon: start to the latest of forecast, target and data date.
   const start = projectStart?.slice(0, 10) ?? null
@@ -49,7 +55,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</span>
-        <span role="status" className="text-[16px] font-semibold" style={{ color: tone }}>{verdict}</span>
+        <span role="status" className={`text-[15px] md:text-[16px] font-semibold ${pill === PILL.no_baseline ? '' : 'rounded-full px-3 py-1'} ${pill}`}>{verdict}</span>
       </div>
       {reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
       {note && <p className="mt-2 text-[13px] text-warm-200 leading-relaxed max-w-3xl">{note}</p>}
@@ -60,14 +66,14 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
             {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
             {late && <div className="absolute inset-y-0 rounded-r-full" style={{ left: `${at(target!.date)}%`, right: `${100 - at(forecast!)}%`, background: '#A64848' }} />}
             {dd && <Tick left={at(dd)} color="#FFFFFF" />}
-            {target && <Tick left={at(target.date)} color="#FFFFFF" />}
-            {forecast && <Tick left={at(forecast)} color={tone} />}
+            {target && <Tick left={at(target.date)} color={TARGET} />}
+            {forecast && <Tick left={at(forecast)} color={FORECAST} />}
           </div>
           <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-[13px]">
             {start && <Item label="Start" date={start} />}
-            {dd && <Item label="Data date" date={dd} dot="#2563EB" />}
-            {target && <Item label={target.label} date={target.date} dot="#FFFFFF" />}
-            {forecast && <Item label="Forecast" date={forecast} dot={tone} />}
+            {dd && <Item label="Data date" date={dd} dot={DATA_DATE} />}
+            {target && <Item label={target.label} date={target.date} dot={TARGET} />}
+            {forecast && <Item label="Forecast" date={forecast} dot={FORECAST} />}
           </dl>
         </div>
       )}

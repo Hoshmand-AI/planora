@@ -10,15 +10,17 @@ interface LogoProps {
   variant?: 'light' | 'dark'
   /** Tailwind text size class, e.g. 'text-xl'; the logo is 1.5em tall */
   size?: string
+  /** The F9 key mark alone (collapsed sidebar, small spaces) */
+  mark?: boolean
 }
 
-export function Logo({ variant = 'light', size = 'text-[18px]' }: LogoProps) {
+export function Logo({ variant = 'light', size = 'text-[18px]', mark = false }: LogoProps) {
   const word = variant === 'light' ? '#FFFFFF' : '#06141B'
   return (
     <span className={`inline-flex items-center leading-none select-none ${size}`}>
-      <svg viewBox="10 34 1182 394" role="img" aria-label="RunF9" className="h-[1.5em] w-auto">
+      <svg viewBox={mark ? '798 40 386 386' : '10 34 1182 394'} role="img" aria-label="RunF9" className="h-[1.5em] w-auto">
         <title>RunF9</title>
-        <g transform="translate(20 52)" fill="none" stroke={word} strokeWidth="64" strokeLinecap="round" strokeLinejoin="round">
+        <g transform="translate(20 52)" display={mark ? 'none' : undefined} fill="none" stroke={word} strokeWidth="64" strokeLinecap="round" strokeLinejoin="round">
           <path d="M32 32 V332 M32 32 H128 A84 84 0 0 1 128 200 H32 M120 200 L210 332" />
           <path d="M290 132 V258 A74 74 0 0 0 438 258 V132 M438 258 V332" />
           <path d="M530 332 V206 A74 74 0 0 1 678 206 V332 M530 206 V132" />

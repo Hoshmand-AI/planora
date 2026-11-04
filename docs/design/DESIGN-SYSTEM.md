@@ -38,9 +38,16 @@ below in code; never hard-code the hex values.
 | Accessibility | Scrollable tables and code blocks are keyboard-reachable regions (Organization, Beta access, SSO/SCIM, API keys, Firm data, Deploy, cloud policy); Firm-data inputs are labelled; DCMA tiles only reference the detail panel when it exists | WCAG 2.2 AA gates |
 | CI | `scripts/a11y-check.mjs` also runs every screen at phone width (390×844) | Responsive: 320–768 px checks |
 
+## UI release 2: palette, collapsibles, phone/iPad
+| Area | Change |
+|---|---|
+| Palette | Status tiles (`.mood-tile`) were tinted peach/green/blue with colored glows from colors outside the palette (#FFF8F0, #F6DFC2, #E0902F and others), and the amber ring color #B86E1A wasn't the palette's either. Tiles are now the palette's white surface with the #EBEEEE divider and the standard card shadow; status shows as the figure's palette status color. The dark finish card's verdict is a pill in the palette's status colors (it used three off-palette pastels). The remaining stray literals now use their palette equivalents. `src/lib/palette.test.ts` fails the build if a hex color outside `tailwind.config.js` appears in a component or stylesheet (logo artwork and generated icons excepted). |
+| Collapsibles | Projects: “Data stored in … · Connect AWS, Azure or Google Cloud” is now one chip; opening it explains where data and document search live and offers the cloud connection. Sidebar: collapse/expand button; a 72 px icon rail by default on tablets (768–1023 px), the full 240 px panel on desktops; the choice is remembered in the browser. |
+| Phone and iPad | Form text is 16 px on touch screens, so iOS Safari no longer zooms the page when a field is tapped (the zoom made pages look cut off on the right). Projects status tiles wrap into a grid (3 across on phones, 5 from 768 px) instead of a sideways strip. Overview tiles are 2 across until 1024 px. Landing figures fit 320 px phones. |
+| CI | `scripts/a11y-check.mjs` checks every screen at desktop (1280), iPad (820×1180) and phone (390×844) widths, and fails if a page is wider than the screen. |
+
 ## Not implemented: needs an owner decision
 - **Marketing hero redesign** (dark navy hero, new headline “Know the finish. Show the logic.”). It changes public copy and positioning, so the owner should decide.
-- **Collapsible 72 px icon rail** and **tablet icon-rail sidebar.** These are proposals in the package, not existing behavior.
 - **Mockup simplifications that would remove information.** The package's own rule (“do not remove functional density”) wins over its previews:
   - the Projects page keeps “Needs an update”, sort, and the cards/table switch
   - the Schedule keeps its phase grouping and progress bars

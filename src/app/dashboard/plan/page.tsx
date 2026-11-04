@@ -54,7 +54,7 @@ export default function PlansPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4 mb-8">
-        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-3xl p-5 md:p-6 shadow-[0_1px_2px_rgba(10,22,40,0.04),0_8px_24px_-16px_rgba(10,22,40,0.18)]">
+        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-3xl p-5 md:p-6 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-16px_rgba(6,20,27,0.18)]">
           <h2 id="build-h" className="text-[17px] font-semibold text-navy-950 flex items-center gap-2"><Sparkles size={16} aria-hidden className="text-accent-600" /> Build with an interview</h2>
           <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">
             RunF9 interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.

@@ -92,6 +92,9 @@ for (const [name, url, prepare] of pages) {
     return { tag: el.tagName, visible: r.width > 0 && r.height > 0, outline: getComputedStyle(el).outlineStyle !== 'none' || getComputedStyle(el).boxShadow !== 'none' }
   })
   if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `${name.replace(/\W+/g, '-').toLowerCase()}.png`), fullPage: !!process.env.FULL_PAGE }) }
+  // Responsive: the page must fit the screen width (wide tables and the Gantt scroll inside their own containers).
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  if (overflow > 0) { console.log(`✗ ${name}: page is ${overflow}px wider than the ${page.viewportSize()?.width}px screen`); failed++ }
   const kbOk = !!focus?.visible
   console.log(`${blocking.length || !kbOk ? '✗' : '✓'} ${name}: ${result.length} issue types (${blocking.length} serious/critical); keyboard focus ${kbOk ? `on ${focus.tag}${focus.outline ? ' (visible indicator)' : ''}` : 'NOT reachable'}`)
   for (const v of result) console.log(`    [${v.impact}] ${v.id}: ${v.help} (${v.count}) e.g. ${v.nodes[0]}`)
@@ -100,11 +103,15 @@ for (const [name, url, prepare] of pages) {
 }
 await check(page, BASE, PAGES)
 
-// The same screens at phone width (390×844): responsive layouts must pass too. The table view is desktop-only,
-// and the documents page is already populated (its setup uploads a schedule).
-await page.setViewportSize({ width: 390, height: 844 })
-await check(page, BASE, PAGES.filter(([name]) => name !== 'Home table view')
-  .map(([name, url, prepare]) => [`${name} (phone)`, url, name === 'Project documents' ? undefined : prepare]))
+// The same screens on an iPad (820×1180, icon-rail sidebar) and a phone (390×844): responsive layouts must pass
+// too. The table view is desktop-only, and the documents page is already populated (its setup uploads a schedule).
+for (const [label, width, height] of [['tablet', 820, 1180], ['phone', 390, 844]]) {
+  await page.setViewportSize({ width, height })
+  // Start from the default views (the desktop pass leaves the projects page in its table view).
+  await page.goto(BASE + '/dashboard'); await page.evaluate(() => { try { localStorage.clear() } catch {} })
+  await check(page, BASE, PAGES.filter(([name]) => name !== 'Home table view' || label === 'tablet')
+    .map(([name, url, prepare]) => [`${name} (${label})`, url, name === 'Project documents' ? undefined : prepare]))
+}
 await page.setViewportSize({ width: 1280, height: 900 })
 
 // Private beta screens on the invite-only server: as a visitor, then as the platform operator.
