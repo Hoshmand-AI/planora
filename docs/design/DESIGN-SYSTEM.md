@@ -20,7 +20,7 @@ below in code; never hard-code the hex values.
 | `--rf-warm-50` / canvas | `warm-50` | #FAFBFB | page background |
 | `--rf-warm-100/200/300` | `warm-100/200/300` | #F4F6F6 #EBEEEE #CCD0CF | soft surface, dividers, input borders |
 | `--rf-warm-400/500/600/700` | `warm-400/500/600/700` | #56656F #4C5B66 #3F4E5A #253745 | muted → body text (all AA on light surfaces) |
-| `--rf-status-*` and `*-bg` | `status-on-track`, `status-attention`, `status-at-risk`, `status-info`, `status-complete` (+ `-bg`) | #2F7358 #94601C #A64848 #3A6A9C #4F7F61 | data meaning only, always with a word label |
+| `--rf-status-*` and `*-bg` | `status-on-track`, `status-attention`, `status-at-risk`, `status-info`, `status-complete` (+ `-bg`) | #2F7358 **#1D4ED8** #A64848 #3A6A9C #4F7F61 | data meaning only, always with a word label. *Attention* was amber #94601C in the handoff; the owner's palette has no amber, so it uses the palette's deep blue (#1D4ED8 on #EFF6FF). |
 
 - **Motion:** the package's timings are the ones in `src/app/globals.css` (`.pressable` 120 ms, color 160 ms,
   `.page-enter` 420 ms, disclosure 320 ms, `cubic-bezier(.22,1,.36,1)`), with `prefers-reduced-motion` honored.
@@ -45,6 +45,8 @@ below in code; never hard-code the hex values.
 | Collapsibles | Projects: “Data stored in … · Connect AWS, Azure or Google Cloud” is now one chip; opening it explains where data and document search live and offers the cloud connection. Sidebar: collapse/expand button; a 72 px icon rail by default on tablets (768–1023 px), the full 240 px panel on desktops; the choice is remembered in the browser. |
 | Phone and iPad | Form text is 16 px on touch screens, so iOS Safari no longer zooms the page when a field is tapped (the zoom made pages look cut off on the right). Projects status tiles wrap into a grid (3 across on phones, 5 from 768 px) instead of a sideways strip. Overview tiles are 2 across until 1024 px. Landing figures fit 320 px phones. |
 | CI | `scripts/a11y-check.mjs` checks every screen at desktop (1280), iPad (820×1180) and phone (390×844) widths, and fails if a page is wider than the screen. |
+| Device journeys | `scripts/e2e-devices.mjs` runs one user path on iPhone SE, iPhone 15, iPhone 15 Pro Max, iPad Mini, iPad Pro 11 (portrait and landscape) and desktop profiles (screen size, pixel density, touch): data-location chip, search without zoom, status tiles on screen, open a project by tap, all eight project tabs, schedule zoom, bottom navigation or sidebar collapse. Every page must fit the screen. Uses Chromium's device emulation, not physical devices. |
+| Palette | “Needs attention” is the palette's deep blue (#1D4ED8 on #EFF6FF), not amber: the owner's palette has no amber. |
 
 ## Not implemented: needs an owner decision
 - **Marketing hero redesign** (dark navy hero, new headline “Know the finish. Show the logic.”). It changes public copy and positioning, so the owner should decide.

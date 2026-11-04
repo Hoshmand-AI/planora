@@ -148,6 +148,8 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           BETA_BASE_URL=http://localhost:3001 BETA_ADMIN_EMAIL=ops@beta.test node scripts/a11y-check.mjs
+      - name: Device journeys (iPhone, iPad and desktop profiles)
+        run: node scripts/e2e-devices.mjs
       - name: App log
         if: failure()
         run: tail -n 200 app.log; tail -n 50 oidc.log; tail -n 100 app-beta.log; tail -n 30 s3.log azurite.log mock-cloud.log || true

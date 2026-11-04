@@ -471,7 +471,7 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
   )
 }
 
-const RING_TONE: Record<RobotMood, string> = { done: '#2F7358', waiting: '#94601C', worried: '#A64848', working: '#2563eb', idle: '#56656F' }
+const RING_TONE: Record<RobotMood, string> = { done: '#2F7358', waiting: '#1D4ED8', worried: '#A64848', working: '#2563eb', idle: '#56656F' }
 
 /** Checks passing as a ring that fills on load. */
 function ScoreRing({ passed, applicable, tone }: { passed: number; applicable: number; tone: RobotMood }) {
