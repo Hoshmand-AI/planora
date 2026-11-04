@@ -98,7 +98,7 @@ export function BetaAdmin() {
       <Section title={`Invitations (${data.invites.length})`}>
         {note('invites')}
         {data.invites.length === 0 ? <p className="text-[13px] text-warm-600">No beta invitations yet.</p> : (
-          <div className="relative overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Beta invitations" className="relative overflow-x-auto">
             <table className="w-full text-[13px]">
               <caption className="sr-only">Beta invitations</caption>
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
@@ -132,7 +132,7 @@ export function BetaAdmin() {
         <div className="mb-3 max-w-sm">
           <Field label="Filter">{p => <input {...p} type="search" className={inputClass} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Email, name or organization" />}</Field>
         </div>
-        <div className="relative overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Accounts and their beta access" className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Accounts and their beta access</caption>
             <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">

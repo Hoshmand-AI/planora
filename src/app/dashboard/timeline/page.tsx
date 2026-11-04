@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronRight, Search, X } from 'lucide-react'
+import { ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
 import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
 import { fmtDate } from '@/lib/format'
+import { axisTicks } from '@/lib/timeline-axis'
 
 interface ActivityData {
   id: string; name: string; activityId: string; duration: number; remainingDuration: number
@@ -40,6 +41,8 @@ const startOf = (a: ActivityData) => a.actualStart || a.earlyStart
 const finishOf = (a: ActivityData) => a.actualFinish || a.earlyFinish || a.actualStart || a.earlyStart
 // Rows shown per phase before "Show all"; keeps very large schedules responsive.
 const PAGE = 60
+// Explicit zoom steps (chart width relative to the panel). Zoom only widens the chart; the time span stays the same.
+const ZOOMS = [1, 1.5, 2, 3, 4]
 
 export default function TimelinePage() {
   const { selectedSchedule, openUpload, can } = useApp()
@@ -49,6 +52,7 @@ export default function TimelinePage() {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [full, setFull] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1)
 
   useEffect(() => {
     setActivities(null); setSelected(null); setOpen({}); setFull({})
@@ -115,6 +119,14 @@ export default function TimelinePage() {
   const dataDate = selectedSchedule.dataDate?.slice(0, 10) ?? null
   const ddLeft = dataDate && span && t(dataDate) >= span.lo && t(dataDate) <= span.hi ? pos(dataDate) : null
   const current = selected ? work.find(a => a.id === selected) ?? null : null
+  const ruler = (() => {
+    if (!span) return []
+    const ticks = axisTicks(span.lo, span.lo + span.range, zoom).ticks.filter(x => x.t < span.lo + span.range)
+    // Drop the leading partial-period label when the first boundary is too close for both to fit.
+    const firstBoundary = ticks.find(x => !x.lead)
+    return ticks[0]?.lead && firstBoundary && ((firstBoundary.t - span.lo) / span.range) * zoom < 0.08 ? ticks.slice(1) : ticks
+  })()
+  const zi = ZOOMS.indexOf(zoom)
   const matches = groups.reduce((s, g) => s + g.acts.length, 0)
 
   return (
@@ -128,7 +140,15 @@ export default function TimelinePage() {
             </button>
           ))}
         </div>
-        <label className="relative ml-auto w-full sm:w-64">
+        <div role="group" aria-label="Zoom the timeline" className="ml-auto flex items-center rounded-full border border-warm-300 bg-white">
+          <button type="button" onClick={() => setZoom(ZOOMS[zi - 1])} disabled={zi <= 0} aria-label="Zoom out"
+            className="pressable grid place-items-center w-9 h-9 rounded-l-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Minus size={15} aria-hidden /></button>
+          <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} title="Fit the whole schedule"
+            className="px-2 h-9 text-[12.5px] font-semibold tabular-nums text-warm-700 hover:text-navy-950 disabled:hover:text-warm-700 border-x border-warm-200"><span className="sr-only">Fit the whole schedule, now zoomed </span>{zoom}×</button>
+          <button type="button" onClick={() => setZoom(ZOOMS[zi + 1])} disabled={zi >= ZOOMS.length - 1} aria-label="Zoom in"
+            className="pressable grid place-items-center w-9 h-9 rounded-r-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Plus size={15} aria-hidden /></button>
+        </div>
+        <label className="relative w-full sm:w-64">
           <span className="sr-only">Find an activity</span>
           <Search size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an activity"
@@ -141,13 +161,26 @@ export default function TimelinePage() {
       ) : (
         <div className="lg:flex lg:items-start lg:gap-4">
           <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-warm-200 bg-white">
-            <div className="min-w-[720px]">
-              {/* Axis */}
-              <div className="flex items-center h-9 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
+            <div className="min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
+              {/* Time ruler: calendar-aligned periods, then the data date */}
+              <div className="flex h-14 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
                 <div className="sticky left-0 z-10 self-stretch flex items-center bg-warm-100 w-[200px] md:w-[260px] flex-shrink-0 px-4">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</div>
-                <div className="flex-1 flex justify-between pr-4 tabular-nums">
-                  {span && <><span>{fmtDate(new Date(span.lo).toISOString())}</span>{dataDate && <span>Data date {fmtDate(dataDate)}</span>}<span>{fmtDate(new Date(span.hi - DAY).toISOString())}</span></>}
+                <div className="flex-1 relative tabular-nums">
+                  {span && ruler.map(x => (
+                    <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{x.label}</span>
+                  ))}
+                  {ddLeft != null && dataDate && (
+                    <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 px-2 py-px text-[11px] font-semibold text-white"
+                      style={{ left: `${ddLeft}%`, transform: `translateX(${ddLeft > 85 ? '-100%' : ddLeft < 12 ? '0' : '-50%'})` }}>Data date {fmtDate(dataDate)}</span>
+                  )}
                 </div>
+              </div>
+
+              <div className="relative">
+              {/* Period gridlines and the data date, drawn once behind the bars */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[200px] md:left-[260px] right-0">
+                {span && ruler.filter(x => !x.lead).map(x => <span key={x.t} className="absolute inset-y-0 w-px bg-warm-200/70" style={{ left: `${pos(new Date(x.t).toISOString())}%` }} />)}
+                {ddLeft != null && <DataDateLine left={ddLeft} />}
               </div>
 
               {groups.map(g => {
@@ -156,7 +189,7 @@ export default function TimelinePage() {
                 return (
                   <div key={g.name} className="border-b border-warm-200 last:border-0">
                     <button type="button" aria-expanded={expanded} onClick={() => setOpen(o => ({ ...o, [g.name]: !expanded }))}
-                      className="group w-full flex items-center h-12 text-left hover:bg-warm-50 transition-colors">
+                      className="group w-full flex items-center h-12 text-left hover:bg-warm-50 transition-colors focus-visible:outline-offset-[-2px]">
                       <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors w-[200px] md:w-[260px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0">
@@ -171,12 +204,11 @@ export default function TimelinePage() {
                             <span className="block h-full bg-navy-800" style={{ width: `${g.pct}%` }} />
                           </span>
                         )}
-                        {ddLeft != null && <DataDateLine left={ddLeft} />}
                       </div>
                     </button>
                     {expanded && (
                       <div className="rise-in">
-                        {rows.map(a => <ActivityRow key={a.id} a={a} pos={pos} span={span} ddLeft={ddLeft} active={selected === a.id} onSelect={() => setSelected(selected === a.id ? null : a.id)} />)}
+                        {rows.map(a => <ActivityRow key={a.id} a={a} pos={pos} span={span} active={selected === a.id} onSelect={() => setSelected(selected === a.id ? null : a.id)} />)}
                         {g.acts.length > rows.length && (
                           <button type="button" onClick={() => setFull(f => ({ ...f, [g.name]: true }))} className="w-full px-4 py-2 text-left text-[13px] font-semibold text-accent-600 hover:underline">
                             Show all {g.acts.length}
@@ -188,6 +220,7 @@ export default function TimelinePage() {
                 )
               })}
               {groups.length === 0 && <p className="px-4 py-10 text-center text-[14px] text-warm-600">{filtering ? 'No activities match.' : 'No activities with dates in this schedule.'}</p>}
+              </div>
             </div>
           </div>
 
@@ -206,8 +239,8 @@ export default function TimelinePage() {
   )
 }
 
-function ActivityRow({ a, pos, span, ddLeft, active, onSelect }: {
-  a: ActivityData; pos: (iso: string) => number; span: { range: number } | null; ddLeft: number | null; active: boolean; onSelect: () => void
+function ActivityRow({ a, pos, span, active, onSelect }: {
+  a: ActivityData; pos: (iso: string) => number; span: { range: number } | null; active: boolean; onSelect: () => void
 }) {
   const s = startOf(a), f = finishOf(a)
   const prog = progressOf(a)
@@ -217,10 +250,12 @@ function ActivityRow({ a, pos, span, ddLeft, active, onSelect }: {
   const width = s && f && span ? Math.max(0.5, pos(f) - left + (DAY / span.range) * 100) : 0
   return (
     <button type="button" onClick={onSelect} aria-pressed={active}
-      className={`group w-full flex items-center h-10 text-left border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
+      className={`group w-full flex items-center h-[42px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
       <div className={`sticky left-0 z-10 self-stretch flex flex-col justify-center transition-colors w-[200px] md:w-[260px] flex-shrink-0 pl-10 pr-3 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
         <span className="block truncate text-[13px] text-navy-950">{a.name}</span>
         <span className="block text-[11px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? ` · float ${a.totalFloat}d` : ''}</span>
+        {/* The bar's meaning in words, so its length and color are not the only signal */}
+        <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>
       </div>
       <div className="flex-1 relative h-full pr-4" aria-hidden="true">
         {s && (milestone
@@ -228,7 +263,6 @@ function ActivityRow({ a, pos, span, ddLeft, active, onSelect }: {
           : <span className={`absolute top-1/2 -translate-y-1/2 h-3 rounded-full overflow-hidden ${color}`} style={{ left: `${left}%`, width: `${width}%` }}>
               {prog === 'in_progress' && a.percentComplete > 0 && <span className="block h-full bg-navy-800" style={{ width: `${a.percentComplete}%` }} />}
             </span>)}
-        {ddLeft != null && <DataDateLine left={ddLeft} />}
       </div>
     </button>
   )

@@ -67,7 +67,7 @@ export default function HistoryPage() {
             <Database size={14} className="inline mr-1 -mt-0.5" aria-hidden="true" />Upload past P6 / MS Project / Excel schedules with actual dates.
           </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Past schedules" className="overflow-x-auto">
             <table className="w-full text-[12.5px] min-w-[640px]">
               <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-400"><th className="py-1.5">Schedule</th><th className="py-1.5">Facility type</th><th className="py-1.5">State</th><th className="py-1.5">Gross sf</th><th className="py-1.5 text-right">Activities</th></tr></thead>
               <tbody>
@@ -76,12 +76,12 @@ export default function HistoryPage() {
                     <td className="py-2 pr-2 text-navy-950">{s.name} <span className="text-warm-500">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
                       <span className="block text-[11.5px] text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
                     <td className="py-2 pr-2">
-                      <select value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]">
+                      <select aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]">
                         <option value="">—</option>{PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                       </select>
                     </td>
-                    <td className="py-2 pr-2"><input defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px] uppercase" /></td>
-                    <td className="py-2 pr-2"><input type="number" defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]" /></td>
+                    <td className="py-2 pr-2"><input aria-label={`State for ${s.name}`} defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px] uppercase" /></td>
+                    <td className="py-2 pr-2"><input type="number" aria-label={`Gross square feet for ${s.name}`} defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]" /></td>
                     <td className="py-2 text-right tabular-nums text-warm-600">{s.activityCount.toLocaleString()}</td>
                   </tr>
                 ))}

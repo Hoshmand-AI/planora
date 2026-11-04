@@ -129,6 +129,18 @@ export default function QualityPage() {
             <div className="min-w-0">
               <h2 className="text-[19px] font-bold tracking-[-0.02em] text-navy-950 leading-snug">{grade.short}</h2>
               <p className="text-[13.5px] text-warm-600 mt-1 leading-relaxed">{grade.title} {grade.sub}</p>
+              {/* Each outcome counted on its own: a check that could not run is never shown as passed */}
+              <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+                {([['pass', 'Pass', 'text-status-on-track'], ['fail', 'Fail', 'text-status-at-risk'], ['warn', 'Warning', 'text-status-attention'], ['n/a', 'Not applicable', 'text-warm-600']] as const)
+                  .map(([r, label, cls]) => ({ label, cls, n: data.dcma.checks.filter(c => c.result === r).length }))
+                  .filter(x => x.n > 0 || x.label !== 'Warning')
+                  .map(x => (
+                    <div key={x.label} className="flex items-baseline gap-1.5">
+                      <dt className="text-warm-600">{x.label}</dt>
+                      <dd className={`order-first text-[15px] font-bold tabular-nums ${x.cls}`}>{x.n}</dd>
+                    </div>
+                  ))}
+              </dl>
             </div>
           </section>
           <section aria-labelledby="fix-first-h" className="rise-in bg-white border border-warm-200 rounded-3xl p-6">
@@ -167,7 +179,7 @@ export default function QualityPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
             {data.dcma.checks.map((c, i) => (
-              <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls="dcma-detail"
+              <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
                 className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
                 <span className="text-[11.5px] font-bold text-warm-500 tabular-nums">{c.id}</span>
