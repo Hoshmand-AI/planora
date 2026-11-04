@@ -276,7 +276,7 @@ export default function PlanPage() {
         <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/60 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(10,22,40,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
+              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(6,20,27,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
               {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[11.5px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
@@ -386,7 +386,7 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
       {open && (
-        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(10,22,40,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
+        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(6,20,27,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
           {group('Scheduling software')}
           {item('xer', 'Primavera P6 (.xer)', 'Native P6 file: WBS, calendars, logic, constraints')}
           {item('xml', 'MS Project (.xml)', 'Opens in MS Project; P6 can import it too')}

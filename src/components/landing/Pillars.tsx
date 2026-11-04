@@ -34,10 +34,10 @@ function CheckArt({ on }: { on: boolean }) {
       <div className="grid grid-cols-7 gap-2.5 w-full">
         {Array.from({ length: 14 }, (_, i) => (
           <div key={i} className="aspect-square rounded-xl flex items-center justify-center"
-            style={{ background: on ? (i === 9 ? '#FFF1E0' : '#E6F4EC') : '#EBEEEE', transition: `background-color 400ms ease ${i * 90}ms` }}>
+            style={{ background: on ? (i === 9 ? '#FDF5EC' : '#EDF7F2') : '#EBEEEE', transition: `background-color 400ms ease ${i * 90}ms` }}>
             <svg viewBox="0 0 24 24" width="60%" height="60%">
               {i === 9
-                ? <path d="M12 6 V13 M12 17.5 V18" stroke="#B86E1A" strokeWidth="3" strokeLinecap="round" fill="none" style={{ opacity: on ? 1 : 0, transition: `opacity 300ms ease ${i * 90 + 200}ms` }} />
+                ? <path d="M12 6 V13 M12 17.5 V18" stroke="#94601C" strokeWidth="3" strokeLinecap="round" fill="none" style={{ opacity: on ? 1 : 0, transition: `opacity 300ms ease ${i * 90 + 200}ms` }} />
                 : <path d="M6 12.5 l4 4 l8 -9" stroke="#2F7358" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"
                     strokeDasharray="22" strokeDashoffset={on ? 0 : 22} style={{ transition: `stroke-dashoffset 400ms ${ease} ${i * 90 + 150}ms` }} />}
             </svg>
@@ -81,7 +81,7 @@ function Pillar({ p, flip }: { p: typeof PILLARS[number]; flip: boolean }) {
         <p className="text-[21px] md:text-[24px] font-semibold tracking-[-0.015em] text-navy-950 mt-4">{p.lead}</p>
         <p className="text-[16px] md:text-[17px] text-warm-600 leading-relaxed mt-3 max-w-[460px]">{p.text}</p>
       </div>
-      <div className={`rounded-[28px] bg-white border border-warm-200 p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(10,22,40,0.3)] ${flip ? 'md:order-1' : ''}`}>
+      <div className={`rounded-[28px] bg-white border border-warm-200 p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,20,27,0.3)] ${flip ? 'md:order-1' : ''}`}>
         <Art on={inView} />
       </div>
     </div>

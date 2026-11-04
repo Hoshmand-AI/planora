@@ -8,7 +8,7 @@ export type RobotMood = 'working' | 'waiting' | 'done' | 'worried' | 'idle'
 
 const COLOR: Record<RobotMood, string> = {
   working: '#2563eb',
-  waiting: '#B86E1A',
+  waiting: '#94601C',
   done: '#2F7358',
   worried: '#A64848',
   idle: '#56656F',

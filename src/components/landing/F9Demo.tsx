@@ -58,7 +58,7 @@ export default function F9Demo() {
 
   return (
     <div ref={ref} className="relative flex flex-col">
-      <figure className="rounded-[28px] bg-white border border-warm-200 shadow-[0_40px_80px_-40px_rgba(10,22,40,0.35)] p-5 md:p-7">
+      <figure className="rounded-[28px] bg-white border border-warm-200 shadow-[0_40px_80px_-40px_rgba(6,20,27,0.35)] p-5 md:p-7">
         <div className="flex items-center justify-between mb-5">
           <div>
             <div className="text-[12px] font-medium text-warm-600">Sample schedule</div>
@@ -88,7 +88,7 @@ export default function F9Demo() {
                   />
                   {a.float ? (
                     <div
-                      className="absolute top-[3px] h-[12px] rounded-full border border-dashed border-[#9BA8AB]"
+                      className="absolute top-[3px] h-[12px] rounded-full border border-dashed border-navy-400"
                       style={{
                         left: `${((a.es + a.dur) / SPAN) * 100}%`,
                         width: `${(a.float / SPAN) * 100}%`,

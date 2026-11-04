@@ -7,14 +7,15 @@
 // card/table view and pinned projects are remembered in this browser.
 // Research behind the choices: docs/strategy/HOME-DASHBOARD-RESEARCH.md.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Star, LayoutGrid, Rows3, Plus, Cloud, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { useApp } from '@/app/dashboard/layout'
 import { fmtDate, fmtDay } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
 import { EmptyState } from '@/components/EmptyState'
+import type { DataLocation } from '@/lib/server/data-location'
 
 type Filter = 'all' | 'at_risk' | 'attention' | 'stale' | 'on_track'
 type Sort = 'attention' | 'recent' | 'finish' | 'name'
@@ -152,12 +153,7 @@ export function ProjectsDashboard() {
       <div>
         <p className="text-[13px] font-medium text-warm-600">{first ? `Hi ${first}` : 'Welcome'}</p>
         <h1 className="text-[30px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">Projects</h1>
-        {org?.dataLocation && (
-          <Link href="/dashboard/org#cloud-storage" className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] text-warm-600 hover:text-navy-950">
-            <Cloud size={14} aria-hidden /> Data stored in <span className="font-semibold text-navy-950">{org.dataLocation.label}</span>
-            <span className="text-accent-600 font-medium">· Connect AWS, Azure or Google Cloud</span>
-          </Link>
-        )}
+        {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
       <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold shadow-sm">
         <Plus size={15} aria-hidden /> New project
@@ -169,7 +165,7 @@ export function ProjectsDashboard() {
     <div className="px-5 md:px-6 py-6 md:py-8 space-y-6" aria-busy="true">
       {header}
       <p className="sr-only" role="status">Loading your projects…</p>
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">{Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton h-[74px] rounded-2xl" />)}</div>
+      <div className="grid gap-2 grid-cols-3 md:grid-cols-5">{Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton h-[74px] rounded-2xl" />)}</div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="skeleton h-[188px] rounded-[22px]" />)}</div>
     </div>
   )
@@ -201,15 +197,15 @@ export function ProjectsDashboard() {
       {header}
 
       {/* Summary strip: each number is a filter */}
-      <div role="group" aria-label="Filter projects by status" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 md:mx-0 md:px-0 md:pb-0 md:grid md:gap-2.5 md:grid-cols-5">
+      <div role="group" aria-label="Filter projects by status" className="grid grid-cols-3 gap-2 md:grid-cols-5 md:gap-2.5">
         {FILTERS.map(f => {
           const on = filter === f.id
           const n = counts[f.id]
           return (
             <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
-              className={`card-lift flex-shrink-0 text-left rounded-2xl border px-3.5 py-2.5 md:px-4 md:py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'}`}>
+              className={`card-lift min-w-0 text-left rounded-2xl border px-3 py-2.5 md:px-4 md:py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'}`}>
               <div className={`text-[20px] md:text-[26px] font-semibold tracking-[-0.03em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
-              <div className="text-[12px] md:text-[12.5px] font-medium text-warm-600 mt-1 md:mt-1.5 whitespace-nowrap">{f.label}</div>
+              <div className="text-[12px] md:text-[12.5px] font-medium text-warm-600 mt-1 md:mt-1.5 leading-tight">{f.label}</div>
             </button>
           )
         })}
@@ -397,6 +393,40 @@ function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: Portfo
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/**
+ * Where this organization's data lives, collapsed to one chip. Opening it explains the storage and offers
+ * the cloud connections (AWS, Azure, Google Cloud), so the header stays one line on every screen size.
+ */
+function DataLocationPicker({ loc }: { loc: DataLocation }) {
+  const [open, setOpen] = useState(false)
+  const pid = useId()
+  return (
+    <div className="mt-2">
+      <button type="button" aria-expanded={open} aria-controls={pid} onClick={() => setOpen(o => !o)}
+        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-full border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-navy-950">
+        <Cloud size={14} aria-hidden className="flex-shrink-0" />
+        <span className="sr-only">Data storage: </span>
+        <span className="truncate font-semibold text-navy-950">{loc.label}</span>
+        <ChevronDown size={14} aria-hidden className={`flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div id={pid} role="region" aria-label="Data storage" data-open={open} className="disclosure-panel" inert={!open || undefined}>
+        <div className="disclosure-inner">
+          <div className="mt-2 max-w-xl rounded-2xl border border-warm-200 bg-white p-4 text-[13px] leading-relaxed">
+            <dl className="space-y-2">
+              <div><dt className="font-semibold text-navy-950">Stored in</dt><dd className="text-warm-700">{loc.database}</dd></div>
+              <div><dt className="font-semibold text-navy-950">Document search</dt><dd className="text-warm-700">{loc.documentSearch}</dd></div>
+            </dl>
+            <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-accent-700">
+              Connect AWS, Azure or Google Cloud
+            </Link>
+            <p className="mt-2 text-[12px] text-warm-600">Keep schedule files and originals in your own cloud storage. Organization admins set this up.</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

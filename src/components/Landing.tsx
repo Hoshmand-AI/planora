@@ -14,7 +14,7 @@ function Cta({ href, className, children }: { href: string; className: string; c
   return href.startsWith('mailto:') ? <a href={href} className={className}>{children}</a> : <Link href={href} className={className}>{children}</Link>
 }
 
-const primaryBtn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-[#1d4ed8] transition-colors'
+const primaryBtn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors'
 const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-full text-accent-600 font-semibold hover:bg-accent-100 transition-colors'
 
 /**
@@ -43,9 +43,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
   const nav = [['#features', 'Features'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
 
   return (
-    <div className="min-h-screen bg-[#FBFBFD] text-warm-600">
+    <div className="min-h-screen bg-warm-50 text-warm-600">
       {/* Navbar: translucent, quiet, the logo carries it */}
-      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white/80 backdrop-blur-xl border-warm-200' : 'bg-[#FBFBFD] border-transparent'}`}>
+      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white/80 backdrop-blur-xl border-warm-200' : 'bg-warm-50 border-transparent'}`}>
         <div className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
           <Link href="/" aria-label="RunF9 home" className="flex items-center">
             <Logo variant="dark" size="text-[26px]" />
@@ -108,7 +108,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             inviteOnly ? [<>Beta</>, 'Private beta · by invitation'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
-              <div className="text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 tabular-nums leading-none">{value}</div>
+              <div className="text-[32px] min-[360px]:text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 tabular-nums leading-none">{value}</div>
               <div className="text-[13.5px] text-warm-600 mt-3 leading-snug max-w-[200px] mx-auto">{label}</div>
             </Reveal>
           ))}
@@ -260,9 +260,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
             <h2 className="text-[36px] md:text-[60px] font-semibold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 in Your Next Schedule</h2>
-            <p className="text-[17px] md:text-[20px] text-[#C7D2E3] mt-5 max-w-[620px] mx-auto">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
+            <p className="text-[17px] md:text-[20px] text-navy-200 mt-5 max-w-[620px] mx-auto">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
             <Cta href={primaryHref} className={`${primaryBtn} mt-10 px-8 py-4 text-[17px]`}>{inviteOnly ? 'Request access' : 'Get started free'}</Cta>
-            <p className="text-[14px] text-[#C7D2E3] mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>
+            <p className="text-[14px] text-navy-200 mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>
           </div>
         </Reveal>
       </section>
