@@ -136,7 +136,7 @@ export default function OrgPage() {
 
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
-        <div className="relative overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Organization members" className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Organization members</caption>
             <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
@@ -327,7 +327,7 @@ export default function OrgPage() {
               : <Alert tone="error"><XCircle size={14} className="inline mr-1" aria-hidden="true" />Integrity check failed at record #{verify.brokenAt?.seq}: {verify.brokenAt?.reason}</Alert>}
             </div>
           )}
-          <div className="relative overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Audit log, newest first" className="relative overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <caption className="sr-only">Audit log, newest first</caption>
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">

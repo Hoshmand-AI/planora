@@ -42,7 +42,7 @@ export default function DeployPage() {
                 <div><dt className="text-warm-600">AI</dt><dd className="mt-0.5 font-medium text-navy-950">{o.ai}</dd></div>
               </dl>
               <ol className="mt-5 list-decimal ml-5 space-y-1.5 text-[14px] text-warm-700">{o.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-              {o.commands && <pre className="mt-4 overflow-x-auto rounded-xl bg-navy-950 p-4 text-[13px] text-white"><code>{o.commands}</code></pre>}
+              {o.commands && <pre tabIndex={0} aria-label="Commands" className="mt-4 overflow-x-auto rounded-xl bg-navy-950 p-4 text-[13px] text-white"><code>{o.commands}</code></pre>}
               <p className="mt-4 text-[13px] text-warm-600">Template: <a href={o.template} className="text-accent-600 underline">{o.template.replace(/^https?:\/\//, '')}</a></p>
             </section>
           ))}

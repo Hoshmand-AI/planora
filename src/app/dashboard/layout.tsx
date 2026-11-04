@@ -281,8 +281,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               return (
                 <div key={n.href}>
                   <Link href={n.href} aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] transition-colors ${active ? 'bg-navy-800 text-white font-semibold' : 'text-warm-200 font-medium hover:bg-navy-800/70 hover:text-white'}`}>
-                    <n.icon size={17} aria-hidden="true" />{n.label}
+                    className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] transition-colors ${active ? 'bg-navy-800 text-white font-semibold' : 'text-warm-200 font-medium hover:bg-navy-800/70 hover:text-white'}`}>
+                    {active && <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent-400" />}
+                    <n.icon size={17} aria-hidden="true" className={active ? 'text-accent-400' : undefined} />{n.label}
                   </Link>
                   {n.href === '/dashboard' && recent.length > 0 && (
                     <ul aria-label="Recent projects" className="mt-1 mb-2 ml-[38px] flex flex-col">

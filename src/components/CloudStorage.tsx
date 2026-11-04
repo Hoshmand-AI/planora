@@ -231,7 +231,7 @@ function ConnectForm({ provider, onCancel, onConnected, onSignIn }: { provider: 
       {f.policy && (
         <details className="mt-2">
           <summary className="cursor-pointer text-[13px] font-semibold text-accent-600">IAM policy for this bucket</summary>
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-warm-100 p-3 text-[12px] text-navy-950">{f.policy(values)}</pre>
+          <pre tabIndex={0} aria-label="Policy" className="mt-2 overflow-x-auto rounded-lg bg-warm-100 p-3 text-[12px] text-navy-950">{f.policy(values)}</pre>
         </details>
       )}
       <div className="mt-4 grid gap-3 md:grid-cols-2">

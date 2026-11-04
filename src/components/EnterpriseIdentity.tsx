@@ -191,7 +191,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
               </div>
             )}
             {scim.tokens.length > 0 ? (
-              <div className="relative overflow-x-auto">
+              <div tabIndex={0} role="region" aria-label="SCIM tokens" className="relative overflow-x-auto">
                 <table className="w-full text-[12.5px]">
                   <caption className="sr-only">SCIM tokens</caption>
                   <thead><tr className="text-left text-warm-500"><th scope="col" className="py-1.5 pr-3 font-medium">Name</th><th scope="col" className="pr-3 font-medium">Token</th><th scope="col" className="pr-3 font-medium">Created</th><th scope="col" className="pr-3 font-medium">Last used</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -220,7 +220,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
             <div>
               <h3 className="text-[13px] font-semibold text-navy-950 mb-2">Latest provisioning events</h3>
               {scim.events.length ? (
-                <div className="relative overflow-x-auto">
+                <div tabIndex={0} role="region" aria-label="Latest SCIM provisioning events, newest first" className="relative overflow-x-auto">
                   <table className="w-full text-[12.5px]">
                     <caption className="sr-only">Latest SCIM provisioning events, newest first</caption>
                     <thead><tr className="text-left text-warm-500"><th scope="col" className="py-1.5 pr-3 font-medium">When</th><th scope="col" className="pr-3 font-medium">What</th><th scope="col" className="pr-3 font-medium">Member</th><th scope="col" className="font-medium">By</th></tr></thead>

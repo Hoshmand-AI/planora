@@ -100,6 +100,13 @@ for (const [name, url, prepare] of pages) {
 }
 await check(page, BASE, PAGES)
 
+// The same screens at phone width (390×844): responsive layouts must pass too. The table view is desktop-only,
+// and the documents page is already populated (its setup uploads a schedule).
+await page.setViewportSize({ width: 390, height: 844 })
+await check(page, BASE, PAGES.filter(([name]) => name !== 'Home table view')
+  .map(([name, url, prepare]) => [`${name} (phone)`, url, name === 'Project documents' ? undefined : prepare]))
+await page.setViewportSize({ width: 1280, height: 900 })
+
 // Private beta screens on the invite-only server: as a visitor, then as the platform operator.
 if (process.env.BETA_BASE_URL) {
   const betaBase = process.env.BETA_BASE_URL
