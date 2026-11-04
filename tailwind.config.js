@@ -45,12 +45,13 @@ module.exports = {
         },
         status: {
           'on-track':     '#2F7358',
-          'attention':    '#94601C',
+          // Needs attention: the palette's deep blue (no amber in the RunF9 palette); distinct from at-risk red and on-track green.
+          'attention':    '#1D4ED8',
           'at-risk':      '#A64848',
           'info':         '#3A6A9C',
           'complete':     '#4F7F61',
           'on-track-bg':  '#EDF7F2',
-          'attention-bg': '#FDF5EC',
+          'attention-bg': '#EFF6FF',
           'at-risk-bg':   '#FBF0F0',
           'info-bg':      '#EEF4FA',
           'complete-bg':  '#F0F7F2',

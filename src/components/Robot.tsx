@@ -1,5 +1,5 @@
 // Status mark: a quiet, abstract ring that says what state something is in before any number
-// does: working (blue, a slow sweep), needs you (amber), all good (green, a check), behind (rose),
+// does: working (blue, a slow sweep), needs you (deep blue), all good (green, a check), behind (rose),
 // idle (grey). It replaced the old robot face; the exports keep their names so call sites stay put.
 // Motion is CSS-only and stops under prefers-reduced-motion. The mark is decorative: always pair
 // it with a text status (or pass `label`).
@@ -8,7 +8,7 @@ export type RobotMood = 'working' | 'waiting' | 'done' | 'worried' | 'idle'
 
 const COLOR: Record<RobotMood, string> = {
   working: '#2563eb',
-  waiting: '#94601C',
+  waiting: '#1D4ED8',
   done: '#2F7358',
   worried: '#A64848',
   idle: '#56656F',

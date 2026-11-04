@@ -6,7 +6,7 @@
 import { MoodTile, type RobotMood } from '@/components/Robot'
 
 // Palette colors only: accent for work in progress, the status colors for attention / on track / at risk.
-const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#94601C', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
+const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#1D4ED8', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
 const FIGURE: Record<RobotMood, string> = { working: 'text-navy-950', idle: 'text-navy-950', waiting: 'text-status-attention', done: 'text-status-on-track', worried: 'text-status-at-risk' }
 
 /** A share as a ring with the percentage in the middle; the label says what it is a share of. */
