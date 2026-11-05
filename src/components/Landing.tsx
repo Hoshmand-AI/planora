@@ -7,6 +7,7 @@ import { Logo } from '@/components/Logo'
 import F9Demo from '@/components/landing/F9Demo'
 import Pillars from '@/components/landing/Pillars'
 import Deployment from '@/components/landing/Deployment'
+import { UpdatesAndDelays } from '@/components/landing/UpdatesAndDelays'
 import { CountUp, Reveal } from '@/components/landing/motion'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
@@ -40,7 +41,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const nav = [['#features', 'Features'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
+  const nav = [['#features', 'Features'], ['#updates', 'Updates & delays'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
 
   return (
     <div className="min-h-screen bg-warm-50 text-warm-600">
@@ -77,7 +78,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             Construction schedules, calculated and explained.
           </h1>
           <p className="hero-rise [animation-delay:120ms] text-[19px] md:text-[23px] leading-snug text-warm-600 max-w-[660px] mx-auto mt-6 tracking-[-0.01em]">
-            Answer a few questions and RunF9 builds the schedule with you. Already have one? Upload it and RunF9 checks it.
+            Answer a few questions and RunF9 builds the schedule with you. Already have one? Upload it and RunF9 checks it, compares every update and models delays.
           </p>
           <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-9">
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
@@ -130,6 +131,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         <Pillars />
       </section>
 
+      {/* After the baseline: monthly update comparison and Time Impact Analysis */}
+      <UpdatesAndDelays />
+
       {/* The rest of the toolkit, without the noise */}
       <section className="bg-white border-y border-warm-200">
         <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
@@ -165,7 +169,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
               { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
               { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
-              { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative.' },
+              { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
             ].map(({ title, desc }, i) => (
               <li key={title} className="text-center">
                 <div className="step-dot mx-auto w-11 h-11 rounded-full bg-white border-2 border-accent-600 text-accent-600 font-semibold text-[16px] flex items-center justify-center" style={{ transitionDelay: `${300 + i * 250}ms` }}>{i + 1}</div>
@@ -190,6 +194,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               ['Critical Path Report', 'Driving activities, float and low-float paths from the CPM calculation.'],
               ['Baseline vs Current Variance', 'Compares current dates with the baseline stored in your P6 or MS Project file.'],
               ['Schedule QA/QC Report', 'The DCMA 14-Point results, with the issues and suggested fixes.'],
+              ['Time Impact Analysis', 'The delay event, its fragnet, the impact on each milestone and the driving path before and after, with input and result hashes.'],
             ].map(([t, d], i) => (
               <Reveal as="li" key={t} delay={i * 80} className="py-5">
                 <div className="text-[17px] font-semibold text-navy-950">{t}</div>
