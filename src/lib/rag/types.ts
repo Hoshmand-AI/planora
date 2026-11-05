@@ -1,12 +1,15 @@
 // Shared types for retrieval-augmented grounding over customer project documents.
 
-export const DOC_TYPES = ['contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other'] as const
+export const DOC_TYPES = ['contract', 'scheduling_spec', 'owner_requirement', 'specification', 'change_order', 'rfi', 'drawing', 'other'] as const
 export type DocType = typeof DOC_TYPES[number]
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
   contract: 'Contract',
   scheduling_spec: 'Scheduling specification',
   owner_requirement: 'Owner requirements',
   specification: 'Specification',
+  change_order: 'Change order / directive',
+  rfi: 'RFI',
+  drawing: 'Drawing',
   other: 'Other',
 }
 export const isDocType = (v: unknown): v is DocType => typeof v === 'string' && (DOC_TYPES as readonly string[]).includes(v)

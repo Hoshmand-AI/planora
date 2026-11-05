@@ -13,6 +13,7 @@ import { fmtDate, fmtDateTime } from '@/lib/format'
 import { Alert, postJson } from '@/components/ui'
 import { EmptyState } from '@/components/EmptyState'
 import type { DelayEvent, Fragnet, FragnetActivity, FragnetLink, Responsibility, TiaResult, TiaRun } from '@/lib/analysis/tia'
+import type { FragnetDraft } from '@/lib/analysis/tia-draft'
 
 interface Pick { code: string; name: string; type: string; status: string; start: string | null; finish: string | null; totalFloat: number }
 interface Overview {
@@ -42,6 +43,41 @@ export default function TimeImpactPage() {
   const [busy, setBusy] = useState(false)
   const canWrite = can('schedule.write')
   const sid = selectedSchedule?.id
+  // Drafting a fragnet from a change document (change order, RFI, directive) among the project documents.
+  const [docs, setDocs] = useState<{ id: string; title: string; docType: string }[] | null>(null)
+  const [docId, setDocId] = useState('')
+  const [draft, setDraft] = useState<FragnetDraft | null>(null)
+  const [drafting, setDrafting] = useState(false)
+  useEffect(() => {
+    setDocs(null); setDraft(null); setDocId('')
+    if (!sid || !canWrite) return
+    fetch(`/api/schedules/${sid}/documents`).then(r => r.json()).then(d => {
+      const list = ((d.documents ?? []) as { id: string; title: string; docType: string; scope: string }[]).filter(x => x.scope === 'project')
+      // Change documents first.
+      const rank = (t: string) => (t === 'change_order' ? 0 : t === 'rfi' ? 1 : 2)
+      setDocs(list.sort((a, b) => rank(a.docType) - rank(b.docType) || a.title.localeCompare(b.title)))
+    }).catch(() => setDocs([]))
+  }, [sid, canWrite])
+  const runDraft = async () => {
+    if (!sid || !docId) return
+    setDrafting(true); setErr('')
+    const r = await postJson(`/api/schedules/${sid}/time-impact/draft`, { documentId: docId })
+    setDrafting(false)
+    if (!r.ok) { setErr(r.data.error || 'The fragnet could not be drafted.'); return }
+    setDraft(r.data.draft as FragnetDraft); setSelected(null)
+  }
+  const createFromDraft = async (d: FragnetDraft, title: string) => {
+    if (!sid) return
+    setBusy(true)
+    const r = await postJson(`/api/schedules/${sid}/time-impact`, {
+      title, description: d.description || null, responsibility: 'unassigned', eventStart: d.eventStart, evidence: d.evidence, fragnet: d.fragnet,
+    })
+    setBusy(false)
+    if (!r.ok) { setErr(r.data.error || 'The delay event was not created.'); return }
+    setDraft(null)
+    await load()
+    setSelected((r.data.event as DelayEvent).id)
+  }
 
   const load = useCallback(async () => {
     if (!sid) return
@@ -107,9 +143,29 @@ export default function TimeImpactPage() {
               <button type="submit" className={primary} disabled={busy || newTitle.trim().length < 3}>Add event</button>
             </form>
           )}
+          {canWrite && (
+            <div className="space-y-2 pt-3 border-t border-warm-200">
+              <label htmlFor="draft-doc" className="block text-[12px] font-semibold text-warm-700">Draft from a change document</label>
+              {docs === null ? <p className="text-[12px] text-warm-600">Loading documents…</p> : docs.length === 0 ? (
+                <p className="text-[12px] text-warm-600">Add the change order or RFI on the <Link href="/dashboard/documents" className="underline">Documents</Link> page first.</p>
+              ) : (
+                <>
+                  <select id="draft-doc" className={`${input} w-full`} value={docId} onChange={e => setDocId(e.target.value)}>
+                    <option value="">Choose a document…</option>
+                    {docs.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                  </select>
+                  <button type="button" className={secondary} disabled={!docId || drafting} onClick={runDraft}>
+                    {drafting ? <><Loader2 size={13} className="inline animate-spin mr-1" aria-hidden />Reading…</> : 'Draft fragnet'}
+                  </button>
+                  <p className="text-[11.5px] text-warm-600">RunF9 proposes the new activities and ties, each with the sentence it relies on. Nothing is saved until you create the event.</p>
+                </>
+              )}
+            </div>
+          )}
         </section>
 
-        {event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use')} onChanged={load} />
+        {draft ? <DraftReview draft={draft} busy={busy} onCreate={createFromDraft} onDiscard={() => setDraft(null)} />
+          : event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use')} onChanged={load} />
           : <p className="text-[13px] text-warm-600 py-6">Select a delay event{canWrite ? ' or add one' : ''} to model its fragnet and run the analysis.</p>}
       </div>
     </div>
@@ -438,5 +494,69 @@ function PathList({ title, steps }: { title: string; steps: TiaResult['drivingPa
         </ol>
       )}
     </div>
+  )
+}
+
+/* ─── A drafted fragnet, for review before the event is created ─────────── */
+
+function DraftReview({ draft, busy, onCreate, onDiscard }: { draft: FragnetDraft; busy: boolean; onCreate: (d: FragnetDraft, title: string) => void; onDiscard: () => void }) {
+  const [title, setTitle] = useState(draft.title)
+  const errors = draft.validation.errors
+  return (
+    <section aria-labelledby="draft-h" className="space-y-4 min-w-0">
+      <div>
+        <h2 id="draft-h" className="text-[17px] font-semibold text-navy-950">Drafted fragnet: review before saving</h2>
+        <p className="text-[13px] text-warm-700 mt-1">
+          {draft.method === 'model'
+            ? 'Proposed by the AI model from the document. Each activity below quotes the sentence it relies on; anything it could not back with a quote was left out.'
+            : `A rules-based starting point (no AI): ${draft.reason ?? ''}`}
+        </p>
+      </div>
+      <label className="block text-[13px] text-warm-700">Event title
+        <input className={`${input} w-full mt-1`} value={title} onChange={e => setTitle(e.target.value)} maxLength={200} />
+      </label>
+      {draft.description && <p className="text-[13px] text-warm-700">{draft.description}</p>}
+      {draft.eventStart && <p className="text-[13px] text-warm-700">Event start stated in the document: <strong className="text-navy-950">{fmtDate(draft.eventStart)}</strong></p>}
+
+      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Proposed fragnet activities">
+        <table className="w-full text-[12.5px]">
+          <caption className="text-left font-semibold text-navy-950 mb-1">New activities ({draft.fragnet.activities.length})</caption>
+          <thead><tr><th className={th}>Code</th><th className={th}>Activity</th><th className={th}>Duration</th><th className={th}>Source</th></tr></thead>
+          <tbody>
+            {draft.sources.length === 0 ? <tr><td className={td} colSpan={4}>None proposed: add the change work in the fragnet editor after creating the event.</td></tr>
+              : draft.sources.map(s => (
+                <tr key={s.code}>
+                  <td className={`${td} font-medium text-navy-950 tabular-nums whitespace-nowrap`}>{s.code}</td>
+                  <td className={td}>{s.name}</td>
+                  <td className={`${td} tabular-nums whitespace-nowrap`}>{s.duration} wd <span className="text-warm-600">({s.basis === 'stated' ? 'stated' : 'estimate'})</span></td>
+                  <td className={td}><q className="text-warm-700">{s.quote}</q> <span className="text-warm-600 whitespace-nowrap">{s.citation}</span></td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+
+      {draft.ties.length > 0 && (
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Proposed ties">
+          <table className="w-full text-[12.5px]">
+            <caption className="text-left font-semibold text-navy-950 mb-1">Ties ({draft.ties.length})</caption>
+            <thead><tr><th className={th}>From</th><th className={th}>To</th><th className={th}>Type</th><th className={th}>Lag</th><th className={th}>Why</th></tr></thead>
+            <tbody>{draft.ties.map(t => (
+              <tr key={`${t.from}>${t.to}`}><td className={`${td} tabular-nums`}>{t.from}</td><td className={`${td} tabular-nums`}>{t.to}</td><td className={td}>{t.type}</td><td className={`${td} tabular-nums`}>{t.lag}</td><td className={td}>{t.reason || '—'}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+
+      {draft.related.length > 0 && <p className="text-[12.5px] text-warm-700"><span className="font-semibold text-navy-950">Activities the document mentions: </span>{draft.related.map(r => `${r.code} ${r.name}`).join(' · ')}</p>}
+      {errors.length > 0 && <Alert tone="warning"><strong>Fix in the fragnet editor before running the analysis:</strong> {errors.join(' ')}</Alert>}
+      {draft.validation.warnings.length > 0 && <Alert tone="info">{draft.validation.warnings.join(' ')}</Alert>}
+      {draft.warnings.length > 0 && <Alert tone="info">{draft.warnings.join(' ')}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={primary} disabled={busy || title.trim().length < 3} onClick={() => onCreate(draft, title.trim())}>Create delay event</button>
+        <button type="button" className={secondary} onClick={onDiscard}>Discard</button>
+      </div>
+      <p className="text-[12px] text-warm-600">The event is created as a draft with this fragnet and the document as evidence. Edit the fragnet, then run the analysis as usual. Responsibility starts as Unassigned.</p>
+    </section>
   )
 }
