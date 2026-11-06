@@ -54,7 +54,7 @@ export default function PlansPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4 mb-8">
-        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-3xl p-5 md:p-6 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-16px_rgba(6,20,27,0.18)]">
+        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-16px_rgba(6,20,27,0.18)]">
           <h2 id="build-h" className="text-[17px] font-semibold text-navy-950 flex items-center gap-2"><Sparkles size={16} aria-hidden className="text-accent-600" /> Build with an interview</h2>
           <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">
             RunF9 interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.
@@ -72,7 +72,7 @@ export default function PlansPage() {
             </button>
           </form>
         </section>
-        <section aria-labelledby="upload-h" className="bg-white border border-warm-200 rounded-3xl p-5 md:p-6 flex flex-col">
+        <section aria-labelledby="upload-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 flex flex-col">
           <h2 id="upload-h" className="text-[17px] font-semibold text-navy-950 flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
           <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF. RunF9 checks it and opens it as a project.</p>
           {can('schedule.write') ? (
@@ -89,7 +89,7 @@ export default function PlansPage() {
       {plans === null ? (
         <div className="text-warm-500 text-[14px] flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</div>
       ) : plans.length === 0 ? (
-        <div className="mood-tile rounded-3xl border px-6 py-10 text-center" data-mood="idle">
+        <div className="mood-tile rounded-[14px] border px-6 py-10 text-center" data-mood="idle">
           <Robot mood="idle" size={80} className="mx-auto mb-3" />
           <p className="text-[16px] font-semibold text-navy-950">No plans yet</p>
           <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview, or upload a schedule.</p>

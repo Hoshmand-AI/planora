@@ -474,12 +474,30 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
 
 function Table({ caption, head, rows }: { caption: string; head: string[]; rows: (string | number)[][] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12.5px]">
-        <caption className="text-left font-semibold text-navy-950 mb-1">{caption}</caption>
-        <thead><tr>{head.map(h => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
-        <tbody>{rows.length ? rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={td}>{c}</td>)}</tr>) : <tr><td className={td} colSpan={head.length}>None.</td></tr>}</tbody>
-      </table>
+    <div>
+      {/* Phones: one card per row (design system v2: tables become cards below 768px) */}
+      <div className="md:hidden">
+        <h3 className="text-[12.5px] font-semibold text-navy-950 mb-1">{caption}</h3>
+        {rows.length === 0 ? <p className="text-[12.5px] text-warm-600">None.</p> : (
+          <ul className="space-y-2">
+            {rows.map((r, i) => (
+              <li key={i} className="rounded-[14px] border border-warm-200 bg-white p-3">
+                <div className="text-[13px] font-semibold text-navy-950">{r[0]} {r[1]}</div>
+                <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12.5px]">
+                  {r.slice(2).map((c, j) => <div key={j} className="contents"><dt className="text-warm-600">{head[j + 2]}</dt><dd className="text-warm-700 tabular-nums">{c}</dd></div>)}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <caption className="text-left font-semibold text-navy-950 mb-1">{caption}</caption>
+          <thead><tr>{head.map(h => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
+          <tbody>{rows.length ? rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={td}>{c}</td>)}</tr>) : <tr><td className={td} colSpan={head.length}>None.</td></tr>}</tbody>
+        </table>
+      </div>
     </div>
   )
 }
