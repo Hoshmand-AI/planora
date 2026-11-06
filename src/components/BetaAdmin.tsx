@@ -64,7 +64,7 @@ export function BetaAdmin() {
   return (
     <div className="px-4 md:px-6 py-6 max-w-5xl space-y-5">
       <div>
-        <h1 className="font-display text-[26px] text-navy-950">Beta access</h1>
+        <h1 className="page-title">Beta access</h1>
         <p className="text-[13.5px] text-warm-600">
           {data.signup.mode === 'invite_only'
             ? 'RunF9 is in private beta: sign-up needs an invitation, and signing in needs beta access.'

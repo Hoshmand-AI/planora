@@ -152,7 +152,7 @@ export function ProjectsDashboard() {
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-[13px] font-medium text-warm-600">{first ? `Hi ${first}` : 'Welcome'}</p>
-        <h1 className="text-[30px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">Projects</h1>
+        <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
       <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold shadow-sm">

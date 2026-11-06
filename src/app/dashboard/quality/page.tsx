@@ -304,7 +304,7 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
     <div className="px-4 md:px-6 py-12 flex justify-center">
       <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
         <Robot mood="idle" size={80} className="mx-auto" />
-        <h1 className="font-display text-[22px] text-navy-950 mt-3">Schedule quality</h1>
+        <h1 className="page-title mt-3">Schedule quality</h1>
         <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
         <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">

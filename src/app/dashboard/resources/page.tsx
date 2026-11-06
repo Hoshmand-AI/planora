@@ -16,7 +16,7 @@ export default function ResourcesPage() {
   return (
     <div className="p-5 md:p-6 space-y-4">
       <div>
-        <h1 className="text-[17px] font-semibold text-navy-950">Resources</h1>
+        <h1 className="page-title">Resources</h1>
         <p className="text-[13px] text-warm-600">{selectedSchedule.name} · {selectedSchedule.version}</p>
       </div>
       <ResourcesPanel key={selectedSchedule.id} kind="schedule" id={selectedSchedule.id} canEdit={can('schedule.write') && selectedSchedule.sourceType !== 'generated'} />

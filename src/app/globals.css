@@ -160,3 +160,10 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
 /* Loading placeholder: a soft sheen moving across */
 @keyframes skeleton-sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .skeleton { background: linear-gradient(90deg, var(--warm-100) 25%, var(--warm-200) 50%, var(--warm-100) 75%); background-size: 200% 100%; animation: skeleton-sheen 1.4s ease-in-out infinite; }
+
+/* Design system v2: one page-title style on every app page (25px phone / 30px desktop, weight 750,
+   -0.032em, line-height 1.22). Marketing and legal pages keep their own display sizes. */
+@layer components {
+  .page-title { font-size: 25px; line-height: 1.25; font-weight: 750; letter-spacing: -0.032em; color: theme('colors.navy.950'); }
+  @media (min-width: 768px) { .page-title { font-size: 30px; line-height: 1.22; } }
+}

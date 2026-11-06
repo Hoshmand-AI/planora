@@ -74,7 +74,7 @@ export default function DocumentsPage() {
   return (
     <div className="p-5 md:p-6 space-y-5">
       <div>
-        <h1 className="font-display text-[22px] text-navy-950 mb-1">Project documents</h1>
+        <h1 className="page-title mb-1">Project documents</h1>
         <p className="text-[13.5px] text-warm-500 max-w-[720px]">
           Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
           Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.
