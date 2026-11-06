@@ -93,7 +93,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
   return (
     <section aria-labelledby="tools-h" className="space-y-1">
-      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, edits, risk and exports</h2>
+      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, delays, edits, risk and exports</h2>
       {editsCount > 0 && (
         <fieldset className="text-[13px] text-warm-700 mb-2">
           <legend className="font-semibold text-navy-950 mb-1">Basis for recovery, comparison, risk and exports</legend>
@@ -103,20 +103,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         </fieldset>
       )}
 
-      <Disclosure title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
-        <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
-      </Disclosure>
-
-      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with RunF9 edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
-        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
-      </Disclosure>
-
-      <Disclosure title="Time impact analysis (delay events)">
-        <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
-        <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
-      </Disclosure>
-
-      <Disclosure title="Compare with another update"meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
+      <Disclosure id="compare" title="What changed since the last update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
           <label className="block text-[13px] text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>
@@ -149,6 +136,19 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             {(cmp.added.length + cmp.deleted.length) > 0 && <p><span className="font-semibold text-navy-950">Added:</span> {cmp.added.map(a => a.code).join(', ') || 'none'} · <span className="font-semibold text-navy-950">Deleted:</span> {cmp.deleted.map(a => a.code).join(', ') || 'none'}</p>}
           </div>
         )}
+      </Disclosure>
+
+      <Disclosure id="delays" title="Time impact analysis (delay events)">
+        <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
+        <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
+      </Disclosure>
+
+      <Disclosure title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
+        <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
+      </Disclosure>
+
+      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with RunF9 edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
+        <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
       </Disclosure>
 
       <Disclosure title="Schedule risk analysis (Monte Carlo)" meta={sra ? `P80 ${fmtDate(sra.percentiles.p80)}` : undefined}>
