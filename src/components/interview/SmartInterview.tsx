@@ -77,7 +77,7 @@ export function SmartInterview(p: SmartInterviewProps) {
 
       <div className="mt-5">
         {!current ? (
-          <MoodTile mood="done" className="rise-in !rounded-3xl !px-6 !py-8 text-center">
+          <MoodTile mood="done" className="rise-in !rounded-[14px] !px-6 !py-8 text-center">
             <Robot mood="done" size={84} className="mx-auto mb-2" />
             <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em]">Nothing left that changes your finish date</div>
             <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">
@@ -162,7 +162,7 @@ export function SmartInterview(p: SmartInterviewProps) {
 function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }: { ad: AdaptiveInterview; progress: number; hasSchedule: boolean; canWrite: boolean; busy: string | null; onGenerate: () => void }) {
   const settled = ad.enoughToBuild
   return (
-    <section aria-label="Interview progress" className="rounded-3xl bg-white border border-warm-200 px-6 py-5">
+    <section aria-label="Interview progress" className="rounded-[14px] bg-white border border-warm-200 px-6 py-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
           <div className="text-[12.5px] text-warm-500">{settled ? 'Your brief is ready' : 'Questions that can still move your finish'}</div>
@@ -230,7 +230,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
   })
 
   return (
-    <div ref={ref} className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13.5px] text-navy-950">{insight?.swingDays ? 'This one matters: it can move your finish.' : 'Next question — quick one.'}</div>
         <div className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-warm-500 mt-0.5">
@@ -333,7 +333,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
     if (Object.keys(out).length) onSave(out)
   }
   return (
-    <div className="rise-in rounded-3xl bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13.5px] text-navy-950">A few that go together — answer the ones you know.</div>
         <div className="text-[12.5px] text-warm-500 mt-0.5">{group.label} · together they move the finish up to <span className="font-semibold text-navy-950 tabular-nums">{group.swingDays} days</span></div>

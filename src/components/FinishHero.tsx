@@ -51,7 +51,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   const late = target && forecast && diff != null && diff > 0
 
   return (
-    <section aria-label="Finish forecast" className="rise-in rounded-3xl bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
+    <section aria-label="Finish forecast" className="rise-in rounded-[14px] bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</span>
