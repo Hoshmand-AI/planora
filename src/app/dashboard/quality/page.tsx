@@ -164,6 +164,15 @@ export default function QualityPage() {
             {flagged.length > 3 && <p className="text-[12.5px] text-warm-600 pt-1">+{flagged.length - 3} more in the checks below.</p>}
           </section>
         </div>
+        {/* Design system v2: say plainly what the number is and is not. */}
+        <Disclosure tone="card" title="What this score means" meta={`${data.dcma.passed} of ${data.dcma.applicable} applicable checks pass`}>
+          <ul className="space-y-1.5 text-[13.5px] text-warm-700 list-disc pl-5">
+            <li>It counts the DCMA 14-Point checks that <strong>apply</strong> to this schedule and pass. Checks marked “Not applicable” are left out of the count, never counted as passes; a check that needs data the file doesn&apos;t have says so instead of passing.</li>
+            <li>Thresholds are the DCMA defaults, as adjusted by an admin under Organization → “Quality check thresholds (DCMA 14-point)”.</li>
+            <li>A high score is not an approval. Each finding still needs a decision (accept with a reason, or mark to fix), and the submission review records the reviewer&apos;s verdict.</li>
+            <li>Unless you choose the “With RunF9 edits” scenario, the score is for the file as submitted; edits made in RunF9 don&apos;t change it.</li>
+          </ul>
+        </Disclosure>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
           <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
