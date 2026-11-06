@@ -113,7 +113,7 @@ export default function TimeImpactPage() {
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
       <header>
         <p className="text-[12px] text-warm-600"><Link href="/dashboard/project" className="underline">Project overview</Link> / Time impact</p>
-        <h1 className="font-display text-[24px] text-navy-950">Time impact analysis</h1>
+        <h1 className="page-title">Time impact analysis</h1>
         <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}) · data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
       <Alert tone="info"><strong>Calculation, not conclusion.</strong> {data.disclaimer}</Alert>

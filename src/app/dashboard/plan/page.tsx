@@ -49,7 +49,7 @@ export default function PlansPage() {
   return (
     <div className="px-4 md:px-6 py-6 md:py-10">
       <div className="mb-6">
-        <h1 className="font-display text-[28px] md:text-[34px] text-navy-950 leading-tight">New project</h1>
+        <h1 className="page-title">New project</h1>
         <p className="text-[15px] text-warm-600 mt-2 max-w-2xl leading-relaxed">Build a schedule with a guided interview, or bring one you already have.</p>
       </div>
 

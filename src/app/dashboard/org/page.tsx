@@ -116,7 +116,7 @@ export default function OrgPage() {
   return (
     <div className="px-4 md:px-6 py-6 max-w-4xl space-y-5">
       <div>
-        <h1 className="font-display text-[26px] text-navy-950">{data.org.name}</h1>
+        <h1 className="page-title">{data.org.name}</h1>
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDate(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 

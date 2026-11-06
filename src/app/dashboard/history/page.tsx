@@ -52,7 +52,7 @@ export default function HistoryPage() {
   return (
     <div className="px-4 md:px-6 py-6 md:py-8 space-y-5">
       <div>
-        <h1 className="font-display text-[26px] md:text-[30px] text-navy-950 leading-tight">Firm data</h1>
+        <h1 className="page-title">Firm data</h1>
         <p className="text-[13.5px] text-warm-500 mt-1 max-w-3xl"><Lock size={13} className="inline mr-1.5 -mt-0.5" />{data.privacy} Workspace: <span className="font-medium text-navy-950">{data.organization?.name}</span></p>
       </div>
 

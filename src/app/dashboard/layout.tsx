@@ -377,7 +377,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </button>
                       </nav>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
-                        <h1 className="text-[22px] md:text-[26px] font-bold tracking-[-0.025em] text-navy-950 leading-tight">{selectedSchedule.name}</h1>
+                        <h1 className="page-title">{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
                           return st ? <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
