@@ -164,6 +164,15 @@ describe('one P50/P80 forecast', () => {
     expect(noSra).not.toMatch(/Monte Carlo P50/)
   })
 
+  it('labels a proposal schedule as planning-level in the Basis of Schedule', () => {
+    const asProposal = { ...answers, 'project.purpose': k('proposal') }
+    const md = basisOfSchedule({ planName: 'DC bid', profile: profileFrom(asProposal), schedule: g, evaluation: ev, reviews: [], generatedBy: 'Ana', aiMode: 'offline' })
+    expect(md).toMatch(/^# Basis of Schedule \(Proposal\) — DC bid/)
+    expect(md).toMatch(/Proposal schedule\.\*\* Prepared for a proposal or bid/)
+    const baseline = basisOfSchedule({ planName: 'DC', profile: profileFrom(answers), schedule: g, evaluation: ev, reviews: [], generatedBy: 'Ana', aiMode: 'offline' })
+    expect(baseline).not.toMatch(/Proposal/)
+  })
+
   it('states the required-date finding from the shown forecast only', () => {
     const sra = runSra(g, answers, null, { iterations: 200 })
     const required = { ...ev, forecast: { ...ev.forecast, requiredFinish: '2020-01-01', p80MeetsRequired: false }, findings: [...ev.findings, `At the P80 level (rule-based estimate) the project finishes ${ev.forecast.p80}, after the required 2020-01-01.`] }

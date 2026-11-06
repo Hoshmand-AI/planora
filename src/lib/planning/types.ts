@@ -255,6 +255,8 @@ export interface ProjectProfile {
   onFederalInstallation?: boolean
   classification?: Classification
   deliveryMethod?: DeliveryMethod
+  /** A schedule prepared for a proposal / bid (planning-level), rather than a construction baseline */
+  purpose?: 'proposal'
   /** Civil types: construction value in USD millions (their size measure instead of floor area) */
   valueMusd?: number
   /**

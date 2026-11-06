@@ -26,7 +26,17 @@ export function toAnthropicPayload(messages: ChatMessage[]): AnthropicPayload {
   const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n')
   const turns: Anthropic.MessageParam[] = messages
     .filter((m): m is ChatMessage & { role: 'user' | 'assistant' } => m.role !== 'system')
-    .map(m => ({ role: m.role, content: m.content }))
+    .map(m => ({
+      role: m.role,
+      content: m.attachments?.length && m.role === 'user'
+        ? [
+            ...m.attachments.map(a => a.kind === 'pdf'
+              ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: a.data } }
+              : { type: 'image' as const, source: { type: 'base64' as const, media_type: a.mediaType as 'image/png' | 'image/jpeg', data: a.data } }),
+            { type: 'text' as const, text: m.content },
+          ]
+        : m.content,
+    }))
   if (!turns.length || turns[0].role !== 'user') turns.unshift({ role: 'user', content: 'Please respond according to the instructions.' })
   // A trailing assistant turn would be a prefill, which current models reject.
   if (turns[turns.length - 1].role === 'assistant') turns.push({ role: 'user', content: 'Continue.' })
