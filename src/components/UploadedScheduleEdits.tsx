@@ -5,12 +5,13 @@
 // (three-point ranges and discrete risk events). Writing needs schedule.write; others see read-only.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fmtDate } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
 import { postJson } from './ui'
+import { PlainEnglishEdit, type EditPreview } from './PlainEnglishEdit'
 
 interface EditRow {
   id: string; label: string; before: string; after: string; reason: string; by: string; byName?: string | null; at: string
-  status: 'applied' | 'skipped'; note?: string; source?: 'manual' | 'recovery'
+  status: 'applied' | 'skipped'; note?: string; source?: 'manual' | 'recovery' | 'leveling' | 'instruction'
 }
 interface ActivityChoice { id: string; code: string; name: string; type: string; status: string; remaining: number; constraint: string | null }
 interface EditsData {
@@ -57,6 +58,8 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
   const [cDate, setCDate] = useState('')
   const [reason, setReason] = useState('')
   const listId = `acts-${scheduleId}`
+  const [pending, setPending] = useState<Change[]>([])
+  const [lastAdded, setLastAdded] = useState<string[]>([])
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/schedules/${scheduleId}/edits`)
@@ -93,6 +96,34 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     setData(d); onChanged()
   }
 
+  const previewText = async (instruction: string): Promise<EditPreview | { error: string }> => {
+    const r = await postJson(`/api/schedules/${scheduleId}/edits/interpret`, { instruction })
+    if (!r.ok) return { error: String(r.data.error || 'The change could not be read.') }
+    const d = r.data as unknown as {
+      clauses: { text: string; method?: 'rules' | 'model'; label?: string; before?: string; after?: string; error?: string }[]; changes: Change[]; note: string | null
+      preview: { finishBefore: string | null; finishAfter: string | null; finishDeltaDays: number | null; minFloatBefore: number | null; minFloatAfter: number | null; pathAdded: string[]; pathRemoved: string[] }
+    }
+    setPending(d.changes)
+    const pv = d.preview, details: string[] = []
+    if (pv.minFloatBefore != null && pv.minFloatAfter != null && pv.minFloatBefore !== pv.minFloatAfter) details.push(`Lowest total float ${pv.minFloatBefore} → ${pv.minFloatAfter} work days.`)
+    if (pv.pathAdded.length) details.push(`Now on the longest path: ${pv.pathAdded.join(', ')}.`)
+    if (pv.pathRemoved.length) details.push(`Off the longest path: ${pv.pathRemoved.join(', ')}.`)
+    return { clauses: d.clauses.map(c => ({ text: c.text, method: c.method, what: c.label, before: c.before, after: c.after, error: c.error })), count: d.changes.length, finishBefore: pv.finishBefore, finishAfter: pv.finishAfter, finishDeltaDays: pv.finishDeltaDays, details, note: d.note }
+  }
+  const applyText = async (why: string) => {
+    const r = await postJson(`/api/schedules/${scheduleId}/edits`, { changes: pending, reason: why, source: 'instruction' })
+    if (!r.ok) return { error: String(r.data.error || 'The change was not applied.') }
+    setData(r.data as unknown as EditsData); setLastAdded((r.data.added as string[]) || []); onChanged()
+    return { done: `Applied ${pending.length} edit${pending.length === 1 ? '' : 's'} to the "With RunF9 edits" scenario. Forecast finish ${fmtDate(String(r.data.forecastFinish ?? ''))}.` }
+  }
+  const undoText = async () => {
+    const r = await fetch(`/api/schedules/${scheduleId}/edits?${new URLSearchParams({ editIds: lastAdded.join(','), reason: 'Undone right after applying the plain-English change' })}`, { method: 'DELETE' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return { error: String(d.error || 'Could not undo the change.') }
+    setData(d); setLastAdded([]); onChanged()
+    return { done: `Undone (${(d.reverted as string[] | undefined)?.length ?? 0} edit${(d.reverted as string[] | undefined)?.length === 1 ? '' : 's'} reverted, kept in the audit log). Forecast finish ${fmtDate(String(d.forecastFinish ?? ''))}.` }
+  }
+
   if (!data) return <p className="text-[13px] text-warm-600">{err || 'Loading…'}</p>
   const applied = data.edits
   return (
@@ -103,14 +134,15 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
-              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">recovery</span>}{e.status === 'skipped' && <span className="block text-[11.5px] text-status-attention">Not applied: {e.note}</span>}</td>
-              <td className={td}>{e.before}</td><td className={td}>{e.after}</td><td className={td}>{e.reason}</td>
+              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">plain English</span>}{e.status === 'skipped' && <span className="block text-[11.5px] text-status-attention">Not applied: {e.note}</span>}</td>
+              <td className={td}>{fmtDates(e.before)}</td><td className={td}>{fmtDates(e.after)}</td><td className={td}>{e.reason}</td>
               <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDate(e.at)}</span></td>
               {canEdit && data.editable && <td className={td}><button type="button" disabled={busy} onClick={() => revert(e)} className="text-accent-600 hover:underline">Revert</button></td>}
             </tr>))}</tbody></table></div>
       )}
       {data.reverted.length > 0 && <p className="text-warm-600">{data.reverted.length} earlier edit{data.reverted.length === 1 ? ' was' : 's were'} reverted (kept in the audit log).</p>}
 
+      {canEdit && data.editable && <PlainEnglishEdit id={scheduleId} examples="For example: “extend A1030 by 5 days”, “start Framing 3 days after Footings start”, “Roofing must finish by 03/15/2027”, “remove the link between A1020 and A1030”." preview={previewText} apply={applyText} undo={undoText} />}
       {canEdit && data.editable ? (
         <form className="border border-warm-200 rounded-lg p-3 space-y-2 bg-warm-50" onSubmit={e => { e.preventDefault(); submit() }}>
           <datalist id={listId}>{data.activities.map(x => <option key={x.id} value={x.code}>{x.name}</option>)}</datalist>

@@ -73,8 +73,12 @@ export async function planView(plan: Plan, orgId: string) {
     }),
     decision: plan.decisions?.[`dcma:${c.id}`] ?? null,
   })) : []
+  // The undo snapshot stays on the server; the page only needs what the undo would revert.
+  const undo = plan.generated?.undo ? { at: plan.generated.undo.at, by: plan.generated.undo.by, summary: plan.generated.undo.summary } : null
+  const shown = plan.generated?.undo ? { ...plan, generated: { ...plan.generated, undo: undefined } } : plan
   return {
-    plan,
+    plan: shown,
+    undo,
     elicitation,
     adaptive,
     evaluation,

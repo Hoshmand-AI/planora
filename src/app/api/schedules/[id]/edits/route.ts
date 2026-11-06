@@ -14,13 +14,13 @@ const SCENARIO = { basis: 'scenario' as const }
 /**
  * Edits made in RunF9 to an uploaded schedule (override layer; the imported file is not changed).
  *   GET                       → { edits (active, as applied), reverted, editedActivityIds, forecastFinish (scenario), submittedForecastFinish, minFloat }
- *   POST { change | changes[], reason, source?: 'manual'|'recovery', optionId? }
+ *   POST { change | changes[], reason, source?: 'manual'|'recovery'|'instruction', optionId? }
  *        change: { kind: 'duration', activityId, remaining }
  *              | { kind: 'link_set', predecessorId, successorId, type: FS|SS|FF|SF, lag }
  *              | { kind: 'link_remove', predecessorId, successorId }
  *              | { kind: 'constraint', activityId, constraint: { type, date } | null }
  *        Activities by RunF9 id or activity code. Every edit needs a reason and is audited.
- *   DELETE ?editId=…&reason=… → revert one edit (kept in the record as reverted).
+ *   DELETE ?editId=…&reason=… → revert one edit (kept in the record as reverted); ?editIds=a,b,… reverts several (undo a plain-English change).
  * Writing needs schedule.write (owner, admin, scheduler); reviewers and viewers can read only.
  */
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth }) => {
@@ -39,7 +39,7 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
   const raw = Array.isArray(b.changes) ? b.changes : b.change ? [b.change] : []
   if (!raw.length || raw.length > 50) return NextResponse.json({ error: 'Send one edit as change, or up to 50 as changes.' }, { status: 400 })
   const reason = String(b.reason).trim().slice(0, 1000)
-  const source = b.source === 'recovery' ? 'recovery' : 'manual'
+  const source = b.source === 'recovery' || b.source === 'instruction' ? b.source : 'manual'
   const optionId = typeof b.optionId === 'string' ? b.optionId.slice(0, 200) : null
 
   // Validate each change against the network as the earlier changes of this request leave it.
@@ -69,20 +69,29 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
 })
 
 export const DELETE = api<{ id: string }>({ permission: 'schedule.write' }, async (req, { params, auth }) => {
-  const editId = req.nextUrl.searchParams.get('editId') || ''
-  const reason = (req.nextUrl.searchParams.get('reason') || '').trim()
+  const sp = req.nextUrl.searchParams
+  // One edit (editId), or the edits of one plain-English change (editIds=a,b,c — "Undo this change").
+  const ids = [...new Set((sp.get('editIds') || sp.get('editId') || '').split(',').map(x => x.trim()).filter(Boolean))].slice(0, 50)
+  const reason = (sp.get('reason') || '').trim()
   const reasonErr = reasonError(reason)
   if (reasonErr) return NextResponse.json({ error: reasonErr.replace('for the edit', 'for reverting the edit'), code: 'reason_required' }, { status: 400 })
   const data = await loadScheduleData(params.id, auth.orgId, SCENARIO)
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const edit = data.edits.find(e => e.id === editId)
-  if (!edit || !(await revertScheduleEdit(data.schedule.id, auth.orgId, editId, auth.userId, reason.slice(0, 1000)))) return NextResponse.json({ error: 'No active edit with that id.' }, { status: 404 })
+  const edits = ids.map(id => data.edits.find(e => e.id === id))
+  if (!ids.length || edits.some(e => !e)) return NextResponse.json({ error: ids.length > 1 ? 'One of those edits is not active.' : 'No active edit with that id.' }, { status: 404 })
+  const done: typeof data.edits = []
+  for (const edit of edits as typeof data.edits) {
+    if (await revertScheduleEdit(data.schedule.id, auth.orgId, edit.id, auth.userId, reason.slice(0, 1000))) done.push(edit)
+  }
+  if (!done.length) return NextResponse.json({ error: 'No active edit with that id.' }, { status: 404 })
   const after = await loadScheduleData(params.id, auth.orgId, SCENARIO)
-  await audit({ action: 'schedule.edit_revert', targetType: 'schedule', targetId: data.schedule.id, detail: {
-    schedule: data.schedule.name, version: data.schedule.version, editId, kind: edit.change.kind, what: edit.label, before: edit.before, after: edit.after,
-    originalReason: edit.reason, reason: reason.slice(0, 1000), forecastBefore: data.analysis.forecastFinish, forecastAfter: after?.analysis.forecastFinish ?? null,
-  } })
-  return NextResponse.json({ success: true, ...(after ? summary(after) : {}) })
+  for (const edit of done) {
+    await audit({ action: 'schedule.edit_revert', targetType: 'schedule', targetId: data.schedule.id, detail: {
+      schedule: data.schedule.name, version: data.schedule.version, editId: edit.id, kind: edit.change.kind, what: edit.label, before: edit.before, after: edit.after,
+      originalReason: edit.reason, reason: reason.slice(0, 1000), forecastBefore: data.analysis.forecastFinish, forecastAfter: after?.analysis.forecastFinish ?? null,
+    } })
+  }
+  return NextResponse.json({ success: true, reverted: done.map(e => e.id), ...(after ? summary(after) : {}) })
 })
 
 function summary(data: NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>) {

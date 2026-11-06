@@ -254,6 +254,25 @@ async function main() {
   const lastFin = r.data.plan.generated.activities.find(a => a.category === 'finishes')
   r = await A.post(`/api/plans/${planId}/edit`, { edit: { kind: 'add_activity', name: 'Owner IT fit-out', duration: 15, after: lastFin.id, reason: 'Owner scope' } })
   ok(r.status === 200 && r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), `Activity added: ${r.data.summary}`)
+
+  /* ── Plain-English edits: preview, apply, undo ── */
+  {
+    const pg = r.data.plan.generated
+    const t = pg.activities.find(a => a.id === target.id)
+    r = await A.post(`/api/plans/${planId}/edit/interpret`, { instruction: `extend ${t.code} by 1 week; make the schedule better` })
+    ok(r.status === 200 && r.data.edits.length === 1 && r.data.edits[0].kind === 'duration' && r.data.edits[0].value === t.duration + 5 && /could not read/.test(r.data.clauses[1].error) && r.data.method === 'rules',
+      `Plain-English preview: "${r.data.clauses?.[0]?.summary}"; the unreadable clause is shown, not guessed`, r.data)
+    ok(typeof r.data.impact?.finishDeltaDays === 'number' && r.data.impact.finishBefore === pg.cpm.projectFinish, `Preview recalculates the finish (${r.data.impact?.finishBefore} → ${r.data.impact?.finishAfter})`)
+    ok((await A.get(`/api/plans/${planId}`)).data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration, 'Preview changes nothing')
+    const edits = r.data.edits.map(e => ({ ...e, reason: 'Glazing crew split across two buildings' }))
+    r = await A.post(`/api/plans/${planId}/edit`, { edits, source: 'instruction' })
+    ok(r.status === 200 && r.data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration + 5 && r.data.undo?.summary && !r.data.plan.generated.undo, `Applied with a reason: ${r.data.summary}; the undo snapshot stays on the server`, r.data)
+    ok(r.data.plan.audit.some(e => e.action === 'override:duration' && /Glazing crew/.test(e.detail) && /plain-English/.test(e.detail)), 'Audit trail records the plain-English edit and its reason')
+    r = await A.post(`/api/plans/${planId}/edit/undo`)
+    ok(r.status === 200 && r.data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration && !r.data.undo && r.data.plan.audit.some(e => e.action === 'override:undo'), `Undo restores the schedule (${r.data.summary})`, r.data)
+    r = await A.post(`/api/plans/${planId}/edit/undo`)
+    ok(r.status === 400, 'Nothing left to undo')
+  }
   r = await A.post(`/api/plans/${planId}/generate`)
   ok(r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), 'Added activity survives regeneration')
   x = await A.req('GET', `/api/plans/${planId}/export?format=md`, undefined, true)

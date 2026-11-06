@@ -249,3 +249,16 @@ export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { sched
     },
   }
 }
+
+/** Finish and critical-path change from one schedule to another. */
+export function combinedImpact(before: { cpm?: { projectFinish: string; times: Record<string, { critical: boolean }> }; activities: { id: string; code: string }[] }, after: typeof before): EditImpact {
+  const code = new Map([...before.activities, ...after.activities].map(a => [a.id, a.code]))
+  const crit = (s: typeof before) => new Set(Object.entries(s.cpm?.times || {}).filter(([, t]) => t.critical).map(([id]) => id))
+  const cb = crit(before), ca = crit(after)
+  const fb = before.cpm?.projectFinish || after.cpm?.projectFinish || '', fa = after.cpm?.projectFinish || fb
+  return {
+    finishBefore: fb, finishAfter: fa, finishDeltaDays: fb && fa ? Math.round((Date.parse(fa) - Date.parse(fb)) / 86_400_000) : 0,
+    criticalAdded: [...ca].filter(x => !cb.has(x)).map(x => code.get(x) ?? x),
+    criticalRemoved: [...cb].filter(x => !ca.has(x)).map(x => code.get(x) ?? x),
+  }
+}
