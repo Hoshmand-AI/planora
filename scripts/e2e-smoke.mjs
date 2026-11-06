@@ -57,7 +57,9 @@ function pastProjectCsv(seed, overrun) {
   for (const [id, name, dur] of acts) {
     const planned = Math.round(dur * 7 / 5)
     const actual = Math.round(planned * overrun)
-    rows.push([`A${id}`, `"${name}"`, dur, day(t), day(t + planned), day(t), day(t + actual), prev, '"Standard 5 Day"'].join(','))
+    // The firm overlaps drywall with the last MEP rough-in (SS +10d): a sequencing habit RunF9 should learn.
+    const pred = id === '1110' ? `"${prev} SS 10d"` : prev
+    rows.push([`A${id}`, `"${name}"`, dur, day(t), day(t + planned), day(t), day(t + actual), pred, '"Standard 5 Day"'].join(','))
     prev = `A${id}`
     t += Math.round(actual * 0.6)
   }
@@ -115,6 +117,19 @@ async function main() {
   r = await A.get('/api/history')
   ok(r.status === 200 && r.data.categories.length >= 5, `Firm history: ${r.data.categories.length} work categories, overrun ×${r.data.overallOverrunMedian?.toFixed(2)}`, r.data)
   ok(r.data.backtest.projects.length === 3, `Backtest (leave-one-out) over 3 projects: MAPE ${r.data.backtest.mape}%, bias ${r.data.backtest.biasPct}%`, r.data.backtest)
+  {
+    const seq = r.data.sequencing
+    const habit = seq?.patterns.find(p => p.from === 'mepRough' && p.to === 'drywall')
+    ok(seq?.projectCount === 3 && habit?.type === 'SS' && habit.lag === 10 && habit.projects === 3, `Firm sequencing learned from 3 projects (${seq?.patterns.length} ties): MEP rough-in → drywall SS +10d in ${habit?.projects} of ${habit?.of}`, seq)
+    // A new schedule with drywall left without a predecessor: the suggestion follows the firm's habit.
+    const fresh = ['Act ID,Activity Name,OD,Start,Finish,Preds', 'B100,NTP,0,2027-01-04,2027-01-04,', 'B110,OH MEP rough L5,20,2027-01-05,2027-02-01,B100',
+      'B120,Hang/Tape/Finish GWB L5,25,2027-02-02,2027-03-08,', 'B130,Sub Comp,0,2027-03-09,2027-03-09,B120'].join('\n')
+    r = await upload(A, 'new-tower.csv', fresh)
+    ok(r.status === 200, 'New schedule uploaded for logic suggestions', r.data)
+    r = await A.get(`/api/schedules/${r.data.schedule.id}/logic-suggestions`)
+    const sg = r.data.suggestions?.find(x => x.predecessor.code === 'B110' && x.successor.code === 'B120')
+    ok(r.status === 200 && r.data.firm.projects === 3 && sg?.type === 'SS' && sg.lag === 10 && sg.firm?.projects === 3 && /Your firm tied/.test(sg.reason), `Logic suggestion follows the firm's own pattern: B110 → B120 ${sg?.type} +${sg?.lag}d ("${sg?.reason}")`, r.data)
+  }
 
   /* ── Tenant isolation ── */
   r = await B.get(`/api/schedules?id=${xerId}`)
@@ -254,6 +269,25 @@ async function main() {
   const lastFin = r.data.plan.generated.activities.find(a => a.category === 'finishes')
   r = await A.post(`/api/plans/${planId}/edit`, { edit: { kind: 'add_activity', name: 'Owner IT fit-out', duration: 15, after: lastFin.id, reason: 'Owner scope' } })
   ok(r.status === 200 && r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), `Activity added: ${r.data.summary}`)
+
+  /* ── Plain-English edits: preview, apply, undo ── */
+  {
+    const pg = r.data.plan.generated
+    const t = pg.activities.find(a => a.id === target.id)
+    r = await A.post(`/api/plans/${planId}/edit/interpret`, { instruction: `extend ${t.code} by 1 week; make the schedule better` })
+    ok(r.status === 200 && r.data.edits.length === 1 && r.data.edits[0].kind === 'duration' && r.data.edits[0].value === t.duration + 5 && /could not read/.test(r.data.clauses[1].error) && r.data.method === 'rules',
+      `Plain-English preview: "${r.data.clauses?.[0]?.summary}"; the unreadable clause is shown, not guessed`, r.data)
+    ok(typeof r.data.impact?.finishDeltaDays === 'number' && r.data.impact.finishBefore === pg.cpm.projectFinish, `Preview recalculates the finish (${r.data.impact?.finishBefore} → ${r.data.impact?.finishAfter})`)
+    ok((await A.get(`/api/plans/${planId}`)).data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration, 'Preview changes nothing')
+    const edits = r.data.edits.map(e => ({ ...e, reason: 'Glazing crew split across two buildings' }))
+    r = await A.post(`/api/plans/${planId}/edit`, { edits, source: 'instruction' })
+    ok(r.status === 200 && r.data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration + 5 && r.data.undo?.summary && !r.data.plan.generated.undo, `Applied with a reason: ${r.data.summary}; the undo snapshot stays on the server`, r.data)
+    ok(r.data.plan.audit.some(e => e.action === 'override:duration' && /Glazing crew/.test(e.detail) && /plain-English/.test(e.detail)), 'Audit trail records the plain-English edit and its reason')
+    r = await A.post(`/api/plans/${planId}/edit/undo`)
+    ok(r.status === 200 && r.data.plan.generated.activities.find(a => a.id === t.id).duration === t.duration && !r.data.undo && r.data.plan.audit.some(e => e.action === 'override:undo'), `Undo restores the schedule (${r.data.summary})`, r.data)
+    r = await A.post(`/api/plans/${planId}/edit/undo`)
+    ok(r.status === 400, 'Nothing left to undo')
+  }
   r = await A.post(`/api/plans/${planId}/generate`)
   ok(r.data.plan.generated.activities.some(a => a.name === 'Owner IT fit-out'), 'Added activity survives regeneration')
   x = await A.req('GET', `/api/plans/${planId}/export?format=md`, undefined, true)

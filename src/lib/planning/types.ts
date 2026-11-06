@@ -601,6 +601,8 @@ export interface GeneratedSchedule {
   /** Resources and assignments (activity ids are this schedule's); exports write them out (XER RSRC/TASKRSRC, MSP Resources/Assignments) */
   resources?: import('./resource-types').ResourceData | null
   cpm?: CpmResult
+  /** The schedule before the latest scheduler change, so it can be undone (one step; not part of the approval fingerprint) */
+  undo?: { at: string; by: string; summary: string; previous: Omit<GeneratedSchedule, 'undo'> }
 }
 
 /* ─── Analysis ───────────────────────────────────────── */

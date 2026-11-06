@@ -269,6 +269,13 @@ async function main() {
   r = await A.post(`/api/schedules/${SA2}/edits`, { change: { kind: 'duration', activityId: ACT, remaining: open[1].duration + 3 }, reason: `Alpha what-if ${AMARK}` })
   if (r.status !== 200 || !r.data.added?.length) fatal('A makes a scenario edit', r.data)
   const EA = r.data.added[0]
+  // Plain-English edit of the upload: preview (nothing saved), apply as edits, undo them together.
+  r = await A.post(`/api/schedules/${SA2}/edits/interpret`, { instruction: `extend ${open[0].activityId} by 2 days` })
+  if (r.status !== 200 || r.data.changes?.length !== 1 || r.data.changes[0].kind !== 'duration' || !r.data.preview?.finishAfter) fatal('A previews a plain-English edit', r.data)
+  r = await A.post(`/api/schedules/${SA2}/edits`, { changes: r.data.changes, reason: `Alpha plain-English ${AMARK}`, source: 'instruction' })
+  if (r.status !== 200 || r.data.added?.length !== 1 || !r.data.edits.some(e => e.source === 'instruction')) fatal('A applies a plain-English edit', r.data)
+  r = await A.req('DELETE', `/api/schedules/${SA2}/edits?editIds=${r.data.added.join(',')}&reason=${encodeURIComponent('Undo the plain-English change')}`)
+  if (r.status !== 200 || r.data.reverted?.length !== 1 || !r.data.edits.some(e => e.id === EA)) fatal('A undoes the plain-English edit (other edits stay)', r.data)
   r = await A.put(`/api/schedules/${SA2}/risk`, { ranges: [{ activityId: ACT, optimistic: 5, mostLikely: 8, pessimistic: 14 }], events: [{ name: `Alpha risk ${AMARK}`, probability: 0.3, impactDays: 10, activityId: ACT }] })
   if (r.status !== 200) fatal('A saves risk inputs', r.data)
   r = await A.get(`/api/schedules/${SA2}/quality`)
@@ -367,6 +374,9 @@ async function main() {
   await b('answer data question', i => ['POST', `/api/schedules/${i.SA2}/quality`, { questionId, response: 'will_fix', note: 'cross-tenant' }])
   await b('read scenario edits', i => ['GET', `/api/schedules/${i.SA2}/edits`])
   await b('add scenario edit', i => ['POST', `/api/schedules/${i.SA2}/edits`, { change: { kind: 'duration', activityId: i.ACT, remaining: 1 }, reason: 'cross-tenant edit attempt' }])
+  await b('preview plain-English edit', i => ['POST', `/api/schedules/${i.SA2}/edits/interpret`, { instruction: `extend ${i.ACT} by 2 days` }])
+  await b('preview plain-English plan edit', i => ['POST', `/api/plans/${i.PA}/edit/interpret`, { instruction: 'extend A1000 by 2 days' }])
+  await b('undo plan change', i => ['POST', `/api/plans/${i.PA}/edit/undo`])
   await b('revert scenario edit', i => ['DELETE', `/api/schedules/${i.SA2}/edits?editId=${i.EA}&reason=${encodeURIComponent('cross-tenant revert attempt')}`])
   await b('risk analysis', i => ['GET', `/api/schedules/${i.SA2}/risk`])
   await b('risk analysis scenario', i => ['GET', `/api/schedules/${i.SA2}/risk?basis=scenario`])

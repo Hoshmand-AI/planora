@@ -22,6 +22,7 @@ import { useApp } from '../../layout'
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { SmartInterview } from '@/components/interview/SmartInterview'
 import { DocumentPrefill } from '@/components/interview/DocumentPrefill'
+import { PlainEnglishEdit, type EditPreview } from '@/components/PlainEnglishEdit'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 import { Disclosure } from '@/components/Disclosure'
 import { ResourcesPanel } from '@/components/ResourcesPanel'
@@ -39,6 +40,8 @@ interface View {
   answered: { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }[]
   recovery: RecoveryPlan | null
   guidance: (CheckGuidance & { decision: { decision: 'accept' | 'fix'; note: string; by: string; at: string } | null })[]
+  /** The latest scheduler change, which can be undone */
+  undo?: { at: string; by: string; summary: string } | null
 }
 
 type Tab = 'interview' | 'schedule' | 'evaluation' | 'audit'
@@ -111,6 +114,38 @@ export default function PlanPage() {
     setView(data)
   }, [id])
   useEffect(() => { load() }, [load])
+
+  const [pendingEdits, setPendingEdits] = useState<unknown[]>([])
+  const impactText = (im: EditImpact) => `Finish ${fmtDate(im.finishBefore)} → ${fmtDate(im.finishAfter)} (${im.finishDeltaDays >= 0 ? '+' : ''}${im.finishDeltaDays} days)${im.criticalAdded.length ? `; now critical: ${im.criticalAdded.slice(0, 6).join(', ')}` : ''}${im.criticalRemoved.length ? `; no longer critical: ${im.criticalRemoved.slice(0, 6).join(', ')}` : ''}.`
+  const previewText = async (instruction: string): Promise<EditPreview | { error: string }> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (view?.plan.version) headers['x-plan-version'] = String(view.plan.version)
+    const res = await fetch(`/api/plans/${id}/edit/interpret`, { method: 'POST', headers, body: JSON.stringify({ instruction }) }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : { error: 'Network error.' }
+    if (!res?.ok) return { error: String(d.error || 'The change could not be read.') }
+    setPendingEdits(d.edits)
+    const im = d.impact as EditImpact
+    const details = [
+      ...(im.criticalAdded.length ? [`Now critical: ${im.criticalAdded.slice(0, 12).join(', ')}.`] : []),
+      ...(im.criticalRemoved.length ? [`No longer critical: ${im.criticalRemoved.slice(0, 12).join(', ')}.`] : []),
+    ]
+    return {
+      clauses: (d.clauses as { text: string; method?: 'rules' | 'model'; summary?: string; error?: string }[]).map(c => ({ text: c.text, method: c.method, what: c.summary, error: c.error })),
+      count: (d.edits as unknown[]).length, finishBefore: im.finishBefore, finishAfter: im.finishAfter, finishDeltaDays: im.finishDeltaDays, details, note: d.note ?? null,
+    }
+  }
+  const applyText = async (reason: string) => {
+    const edits = pendingEdits.map(e => ({ ...(e as Record<string, unknown>), reason }))
+    const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edits, source: 'instruction' }) })
+    if (!data?.impact) return { error: 'The change was not applied; see the message above.' }
+    setPendingEdits([])
+    return { done: `${data.summary}. ${impactText(data.impact as EditImpact)}` }
+  }
+  const undoLast = async () => {
+    const data = await call('edit', `/api/plans/${id}/edit/undo`, { method: 'POST', body: '{}' })
+    if (!data?.impact) return { error: 'Nothing was undone; see the message above.' }
+    return { done: `${data.summary}. ${impactText(data.impact as EditImpact)}` }
+  }
 
   const call = async (key: string, url: string, init: RequestInit): Promise<Record<string, unknown> | null> => {
     setBusy(key); setError(''); setConflict(false)
@@ -319,7 +354,11 @@ export default function PlanPage() {
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
       </>)}
-      {tab === 'schedule' && g && <ScheduleTab plan={plan} onEdit={async (edit) => {
+      {tab === 'schedule' && g && <ScheduleTab plan={plan} textEdit={can('plan.write') ? (<>
+        <PlainEnglishEdit id={id} examples="For example: “extend Spread Footings by 5 days”, “start A1070 3 days after A1060 starts”, “add &quot;Owner move-in&quot; (10 days) after A1300”, “rename A1050 to &quot;Roof membrane&quot;”."
+          preview={previewText} apply={applyText} undo={undoLast} />
+        {view.undo && <p className="text-[12.5px] text-warm-600 mt-2">Last change: {view.undo.summary} ({view.undo.by}, {fmtDateTime(view.undo.at)}). <button type="button" disabled={!!busy} onClick={() => { void undoLast().then(r => { if ('done' in r && r.done) setNotice(r.done) }) }} className="text-accent-600 underline">Undo it</button></p>}
+      </>) : null} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
           const im = data.impact as EditImpact
@@ -409,8 +448,8 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
 
 type EditBody = Record<string, unknown>
 
-function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecover, onInterview, focusCodes, onClearFocus }: {
-  plan: Plan; onEdit: (e: EditBody) => Promise<boolean>; onRegenerateFresh: () => void; busy: string | null
+function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery, onRecover, onInterview, focusCodes, onClearFocus }: {
+  plan: Plan; textEdit: React.ReactNode; onEdit: (e: EditBody) => Promise<boolean>; onRegenerateFresh: () => void; busy: string | null
   recovery: RecoveryPlan | null; onRecover: (id: string) => void; onInterview: () => void
   focusCodes: string[] | null; onClearFocus: () => void
 }) {
@@ -454,6 +493,7 @@ function ScheduleTab({ plan, onEdit, onRegenerateFresh, busy, recovery, onRecove
         </div>
       )}
 
+      {textEdit && <div className="mb-4">{textEdit}</div>}
       <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">

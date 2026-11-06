@@ -20,7 +20,10 @@ function canonical(v: unknown): string {
 /** SHA-256 over the generated schedule's full content (activities, logic, overrides, CPM, calendars). */
 export function scheduleFingerprint(generated: Plan['generated']): string | null {
   if (!generated) return null
-  return createHash('sha256').update(canonical(JSON.parse(JSON.stringify(generated)))).digest('hex')
+  // The undo snapshot is not content: undoing a change restores the earlier fingerprint (and its approval).
+  const { undo: _undo, ...content } = generated
+  void _undo
+  return createHash('sha256').update(canonical(JSON.parse(JSON.stringify(content)))).digest('hex')
 }
 
 export interface ApprovalState {

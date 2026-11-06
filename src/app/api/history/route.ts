@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
-import { getOrgHistory, getOrganization, getSchedules } from '@/lib/db'
+import { getOrgHistory, getOrgHistoryLogic, getOrganization, getSchedules } from '@/lib/db'
+import { learnSequencing } from '@/lib/logic-assist/firm-patterns'
 import { computeFirmHistory } from '@/lib/planning/history'
 import { backtest } from '@/lib/planning/evaluation'
 import type { ProjectType } from '@/lib/planning/types'
 
-/** The firm's private knowledge base: what its own projects actually did, plus a leave-one-out backtest. */
+/** The firm's private knowledge base: what its own projects actually did (durations and sequencing), plus a leave-one-out backtest. */
 export const GET = api({ permission: 'read' }, async (_req, { auth: ctx }) => {
-  const [org, schedules, { rows, calendars, selection }] = await Promise.all([getOrganization(ctx.orgId), getSchedules(ctx.orgId), getOrgHistory(ctx.orgId)])
+  const [org, schedules, { rows, calendars, selection }, past] = await Promise.all([getOrganization(ctx.orgId), getSchedules(ctx.orgId), getOrgHistory(ctx.orgId), getOrgHistoryLogic(ctx.orgId)])
   const history = computeFirmHistory(rows, calendars)
   const uploaded = schedules.filter(s => s.sourceType !== 'generated')
   const bt = backtest(uploaded.map(s => ({ scheduleId: s.id, name: `${s.name} (${s.version})`, projectType: s.projectType as ProjectType | null, state: s.region, grossSqft: s.grossSqft })), rows, calendars)
@@ -23,5 +24,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth: ctx }) => {
     overallOverrunMedian: history.overallOverrunMedian,
     overallOverrunP80: history.overallOverrunP80,
     backtest: bt,
+    // How the firm sequences work: which kinds of work its past projects tie together, and how.
+    sequencing: learnSequencing(past),
   })
 })
