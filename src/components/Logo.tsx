@@ -69,7 +69,7 @@ export function Logo({ variant = 'light', size = 'text-[18px]', mark = false }: 
         </svg>
       ) : (
         // Master lockup: R at translate(10 18) scale(1.12), then the "unF9" outlines.
-        <svg viewBox="22 24 372 110" role="img" aria-label="RunF9" className="h-[1.5em] w-auto overflow-visible">
+        <svg viewBox="20 24 392 110" role="img" aria-label="RunF9" className="h-[1.5em] w-auto overflow-visible">
           <title>RunF9</title>
           <g transform="translate(10 18) scale(1.12)"><RMark id={id} onDark={onDark} /></g>
           <path d={WORD} fill={word} />
