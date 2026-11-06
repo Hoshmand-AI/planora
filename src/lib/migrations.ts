@@ -789,6 +789,17 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS source_key TEXT;
     `,
   },
+  {
+    id: 21, name: 'document_types_change_rfi_drawing',
+    sql: `
+    -- Project documents can also be change orders, RFIs and drawings (TIA fragnet drafts from change
+    -- documents; schedule building from drawing sets). Widening the allowed values only: every existing
+    -- row stays valid, and older code ignores the new types (they show as "Other").
+    ALTER TABLE project_documents DROP CONSTRAINT IF EXISTS project_documents_doc_type_check;
+    ALTER TABLE project_documents ADD CONSTRAINT project_documents_doc_type_check
+      CHECK (doc_type IN ('contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other', 'change_order', 'rfi', 'drawing'));
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

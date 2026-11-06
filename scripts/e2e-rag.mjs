@@ -156,6 +156,33 @@ async function main() {
   r = await A.get('/api/audit?limit=500')
   ok(!JSON.stringify(r.data).includes(SECRET), 'No audit record contains document text')
 
+  /* ── TIA fragnet drafted from a change document ── */
+  const CO = `CHANGE ORDER 004 - FOOTING REDESIGN AT GRID C
+The footing design at grid C is revised. The Engineer of Record shall issue revised footing drawings within 10 working days.
+Work on the Spread Footings at grid C is suspended until the revised drawings are received. Reference ${SECRET}.`
+  r = await A.req('POST', docs(sA), form('co-004.txt', CO, { docType: 'change_order', title: 'Change Order 004' }))
+  ok(r.status === 200 && r.data.document.docType === 'change_order', 'A change order is added as a project document (type change_order)', r.data)
+  const coId = r.data.document.id
+  r = await B.post(`/api/schedules/${sA}/time-impact/draft`, { documentId: coId })
+  ok(r.status === 404, 'Another firm cannot draft from this project (404)')
+  r = await A.post(`/api/schedules/${sA}/time-impact/draft`, { documentId: 'not-a-document' })
+  ok(r.status === 404, 'An unknown document is refused (404)')
+  r = await A.post(`/api/schedules/${sA}/time-impact/draft`, { documentId: coId })
+  const draft = r.data.draft
+  ok(r.status === 200 && draft.method === 'rules' && /offline|No AI model/i.test(draft.reason || ''), 'Offline, the fragnet draft is rules-based and says why', r.data)
+  ok(draft.fragnet.activities.length === 1 && draft.fragnet.activities[0].duration === 10, 'It sizes the change from the stated 10 working days')
+  ok(draft.fragnet.relationships.some(x => x.to === 'A1030'), 'It ties the change to the activity the document names (Spread Footings, A1030)')
+  ok(draft.sources[0].citation.includes('Change Order 004') && draft.sources[0].quote.includes('10 working days'), 'Each drafted activity carries its quote and citation')
+  ok(draft.validation.errors.length === 0, 'The drafted fragnet validates', draft.validation)
+  r = await A.post(`/api/schedules/${sA}/time-impact`, { title: draft.title, responsibility: 'unassigned', evidence: draft.evidence, fragnet: draft.fragnet })
+  ok(r.status === 201 && r.data.event.fragnet.activities.length === 1, 'The scheduler creates the delay event from the draft')
+  r = await A.post(`/api/schedules/${sA}/time-impact/${r.data.event.id}/runs`, {})
+  ok(r.status === 201 || r.status === 200, 'The drafted fragnet runs through the Time Impact Analysis', r.data)
+  r = await A.get('/api/audit?limit=500')
+  ok(JSON.stringify(r.data).includes('tia.fragnet_draft') && !JSON.stringify(r.data).includes('Engineer of Record'), 'The draft is audited without document text')
+  r = await A.req('DELETE', `${docs(sA)}/${coId}`)
+  ok(r.status === 200, 'The change order can be deleted (the delay event keeps its evidence label)')
+
   /* ── Deletion ── */
   r = await A.req('DELETE', `${docs(sA)}/${docId}`)
   ok(r.status === 200 && r.data.passagesDeleted >= 4, `Deleting the document removes its ${r.data.passagesDeleted} passages`)
