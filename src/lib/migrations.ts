@@ -800,6 +800,14 @@ export const MIGRATIONS: Migration[] = [
       CHECK (doc_type IN ('contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other', 'change_order', 'rfi', 'drawing'));
     `,
   },
+  {
+    id: 22, name: 'document_read_by',
+    sql: `
+    -- How a document's text was obtained: the file's own text layer, or read by AI from page images
+    -- (scanned pages, drawing sheets; src/lib/rag/vision.ts). Additive: older code ignores the column.
+    ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS read_by TEXT NOT NULL DEFAULT 'text';
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

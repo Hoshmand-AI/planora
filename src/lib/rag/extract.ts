@@ -46,21 +46,42 @@ function decodeText(buf: Buffer): string {
   return text
 }
 
-/** Extracts text page by page (pages are null for formats without pages). */
-export async function extractDocument(buf: Buffer, fileName: string): Promise<{ format: DocFormat; pages: PageText[]; pageCount: number | null }> {
+/** Reads PDF pages with the AI model's vision (rag/vision.ts), when the caller is allowed to. */
+export type ReadImages = (buf: Buffer, mode: 'scan' | 'drawing') => Promise<{ pages: PageText[]; pageCount: number }>
+
+/** How a document's text was obtained: its own text layer, or read by AI from the page images. */
+export type ReadBy = 'text' | 'ai_vision'
+
+/**
+ * Extracts text page by page (pages are null for formats without pages). A drawing set is read with AI
+ * when `readImages` is given (its text layer, if any, is the fallback); a scanned PDF is transcribed with
+ * AI when allowed, otherwise refused with guidance.
+ */
+export async function extractDocument(buf: Buffer, fileName: string, opts: { drawing?: boolean; readImages?: ReadImages; whyNoAi?: string | null } = {}): Promise<{ format: DocFormat; pages: PageText[]; pageCount: number | null; readBy: ReadBy }> {
   if (!buf.length) throw new DocumentRejected('The file is empty.', 'empty')
   if (buf.length > MAX_DOCUMENT_BYTES) throw new DocumentRejected(`The file is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MB. Split it (for example by specification section) and upload the parts.`, 'too_large')
   const format = formatOf(fileName, buf.subarray(0, 8))
   let pages: PageText[]
   let pageCount: number | null = null
+  let readBy: ReadBy = 'text'
   try {
     if (format === 'pdf') {
       const r = await extractPdfText(buf)
       pages = r.pages
       pageCount = r.pages.length
       if (pageCount > MAX_PAGES) throw new DocumentRejected(`The PDF has ${pageCount} pages; the limit is ${MAX_PAGES}. Split it and upload the parts.`, 'too_many_pages')
-      if (textDensity(pages) < MIN_CHARS_PER_PAGE) {
-        throw new DocumentRejected('This PDF has little or no selectable text, so it looks scanned (images of pages). Run it through OCR (for example "Recognize Text" in Acrobat) and upload the searchable PDF.', 'scanned_pdf')
+      const scanned = textDensity(pages) < MIN_CHARS_PER_PAGE
+      if (opts.readImages && (scanned || opts.drawing)) {
+        try {
+          const v = await opts.readImages(buf, opts.drawing ? 'drawing' : 'scan')
+          pages = v.pages; pageCount = v.pageCount; readBy = 'ai_vision'
+        } catch (err) {
+          // A drawing set with its own text layer is still usable without AI; a scan is not.
+          if (scanned) throw err
+          log('warn', 'AI page reading failed; using the text layer', { format, ...errorFields(err) })
+        }
+      } else if (scanned) {
+        throw new DocumentRejected(`This PDF has little or no selectable text, so it looks scanned (images of pages). Run it through OCR (for example "Recognize Text" in Acrobat) and upload the searchable PDF${opts.whyNoAi ? `. RunF9 can read scanned pages with AI, but not here: ${opts.whyNoAi}` : ''}.`, 'scanned_pdf')
       }
     } else if (format === 'docx') {
       pages = [{ page: null, text: extractDocxText(buf) }]
@@ -77,5 +98,5 @@ export async function extractDocument(buf: Buffer, fileName: string): Promise<{ 
   const chars = pages.reduce((n, p) => n + p.text.length, 0)
   if (!pages.some(p => p.text.trim())) throw new DocumentRejected('No text was found in this document.', 'empty')
   if (chars > MAX_DOCUMENT_CHARS) throw new DocumentRejected(`The document has more than ${MAX_DOCUMENT_CHARS.toLocaleString('en-US')} characters of text. Split it and upload the parts.`, 'too_long')
-  return { format, pages, pageCount }
+  return { format, pages, pageCount, readBy }
 }

@@ -13,6 +13,7 @@ import { auditTarget } from '@/lib/rag/scope'
 import { createHash } from 'crypto'
 import { keepInTarget, keepOriginal, readUploadSource } from '@/lib/storage/upload-source'
 import { recordDocumentStorage } from '@/lib/rag/store'
+import { readPdfWithAi, visionAllowed } from '@/lib/rag/vision'
 
 // Project documents (contracts, scheduling specifications, owner requirements) used to ground Ask AI
 // and AI reports. Documents belong to the project: the upload they were added to and every other
@@ -64,16 +65,19 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
 
   const sha256 = createHash('sha256').update(source.bytes).digest('hex')
   const kept = keepTarget ? await keepOriginal(keepTarget, 'documents', file.name || 'document', sha256, source.bytes) : null
+  // Scanned pages and drawing sheets can be read with the AI model's vision when allowed (rag/vision.ts).
+  const vision = visionAllowed({ canUseAi: can(auth.role, 'ai.use'), classification })
   try {
     const r = await ingestDocument({
       orgId: auth.orgId, scope, scheduleId: scope === 'project' ? schedule.id : null, title, fileName: file.name || 'document',
       docType, classification, uploadedBy: auth.userId, content: source.bytes,
+      ...(vision.ok ? { readImages: (buf: Buffer, mode: 'scan' | 'drawing') => readPdfWithAi(buf, mode) } : { whyNoAi: vision.reason }),
     })
     const d = r.document
     if (kept || source.from) await recordDocumentStorage(auth.orgId, d.id, kept, source.from)
     await audit({ action: 'document.uploaded', ...auditTarget(d), detail: {
       documentId: d.id, scope: d.scope, title: d.title, docType: d.docType, format: d.format, sha256: d.sha256, sizeBytes: d.sizeBytes,
-      pages: d.pageCount, passages: d.chunkCount, flaggedPassages: d.flaggedCount, classification: d.classification, storesOriginalFile: kept ? { connectionId: kept.connectionId, key: kept.objectKey } : false,
+      pages: d.pageCount, readBy: d.readBy, passages: d.chunkCount, flaggedPassages: d.flaggedCount, classification: d.classification, storesOriginalFile: kept ? { connectionId: kept.connectionId, key: kept.objectKey } : false,
       importedFrom: source.from ? { connectionId: source.from.connectionId, key: source.from.key } : null,
     } })
     return json({

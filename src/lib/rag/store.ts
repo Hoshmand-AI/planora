@@ -22,7 +22,7 @@ export function rowToDocument(r: Record<string, unknown>): StoredDocument & { an
     id: String(r.id), orgId: String(r.org_id), scope: r.scope as DocScope, scheduleId: (r.schedule_id as string) ?? null,
     title: String(r.title), fileName: String(r.file_name), format: String(r.format), docType: r.doc_type as DocType,
     trust: r.trust as Trust, classification: (r.classification as string) ?? null, sha256: String(r.sha256), sizeBytes: Number(r.size_bytes),
-    pageCount: r.page_count == null ? null : Number(r.page_count), chunkCount: Number(r.chunk_count), flaggedCount: Number(r.flagged_count),
+    pageCount: r.page_count == null ? null : Number(r.page_count), readBy: r.read_by === 'ai_vision' ? 'ai_vision' : 'text', chunkCount: Number(r.chunk_count), flaggedCount: Number(r.flagged_count),
     uploadedBy: (r.uploaded_by as string) ?? null, uploadedByName: (r.uploaded_by_name as string) ?? null,
     reviewedBy: (r.reviewed_by as string) ?? null, reviewedAt: iso(r.reviewed_at), createdAt: iso(r.created_at)!,
     ...(r.anchor_name !== undefined ? { anchorName: (r.anchor_name as string) ?? null, anchorVersion: (r.anchor_version as string) ?? null } : {}),
@@ -97,6 +97,10 @@ export interface IngestInput {
   classification: string | null
   uploadedBy: string
   content: Buffer
+  /** Read scanned pages / drawing sheets with AI (rag/vision.ts), when the uploader may */
+  readImages?: import('./extract').ReadImages
+  /** Why AI page reading is not available here (added to the scanned-PDF message) */
+  whyNoAi?: string | null
 }
 
 export interface IngestResult { document: StoredDocument; flaggedChunks: { ordinal: number; section: string | null; page: number | null; reasons: string[] }[] }
@@ -104,7 +108,7 @@ export interface IngestResult { document: StoredDocument; flaggedChunks: { ordin
 /** Extracts, chunks, screens and stores a document. Throws DocumentRejected with a user-facing message. */
 export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
   await initSchema()
-  const { format, pages, pageCount } = await extractDocument(i.content, i.fileName)
+  const { format, pages, pageCount, readBy } = await extractDocument(i.content, i.fileName, { drawing: i.docType === 'drawing', readImages: i.readImages, whyNoAi: i.whyNoAi })
   const drafts = chunkDocument(pages)
   if (!drafts.length) throw new DocumentRejected('No usable text was found in this document.', 'empty')
   if (drafts.length > MAX_CHUNKS_PER_DOCUMENT) throw new DocumentRejected('This document is too long to index in one piece. Split it and upload the parts.', 'too_long')
@@ -119,9 +123,9 @@ export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
     }
     const dup = await q(`SELECT id FROM project_documents WHERE org_id=$1 AND COALESCE(schedule_id,'')=COALESCE($2,'') AND sha256=$3 AND deleted_at IS NULL`, [i.orgId, i.scheduleId, sha256])
     if (dup.rows[0]) throw new DocumentRejected('This exact file is already attached here.', 'duplicate')
-    await q(`INSERT INTO project_documents (id, org_id, scope, schedule_id, title, file_name, format, doc_type, trust, classification, sha256, size_bytes, page_count, chunk_count, flagged_count, uploaded_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'unreviewed',$9,$10,$11,$12,$13,$14,$15)`,
-    [id, i.orgId, i.scope, i.scheduleId, i.title, i.fileName.slice(0, 255), format, i.docType, i.classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy])
+    await q(`INSERT INTO project_documents (id, org_id, scope, schedule_id, title, file_name, format, doc_type, trust, classification, sha256, size_bytes, page_count, chunk_count, flagged_count, uploaded_by, read_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'unreviewed',$9,$10,$11,$12,$13,$14,$15,$16)`,
+    [id, i.orgId, i.scope, i.scheduleId, i.title, i.fileName.slice(0, 255), format, i.docType, i.classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy, readBy])
     // Batched inserts (one statement per 200 passages).
     for (let k = 0; k < screened.length; k += 200) {
       const batch = screened.slice(k, k + 200)

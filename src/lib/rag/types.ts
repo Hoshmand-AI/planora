@@ -52,6 +52,8 @@ export interface StoredDocument {
   sha256: string
   sizeBytes: number
   pageCount: number | null
+  /** 'ai_vision' when the text was read by the AI model from page images (scans, drawings): verify it */
+  readBy: 'text' | 'ai_vision'
   chunkCount: number
   flaggedCount: number
   uploadedBy: string | null

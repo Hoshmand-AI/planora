@@ -11,7 +11,7 @@ import { formatMb, tooLargeMessage } from '@/lib/upload-limit'
 
 interface Doc {
   id: string; scope: 'project' | 'org'; title: string; fileName: string; format: string; docType: string; trust: 'approved' | 'unreviewed'
-  classification: string | null; sizeBytes: number; pageCount: number | null; chunkCount: number; flaggedCount: number
+  classification: string | null; sizeBytes: number; pageCount: number | null; chunkCount: number; flaggedCount: number; readBy?: 'text' | 'ai_vision'
   uploadedByName: string | null; createdAt: string; reviewedAt: string | null; anchorName?: string | null; anchorVersion?: string | null; scheduleId: string | null
 }
 interface Listing { documents: Doc[]; docTypes: { id: string; label: string }[]; limits: { maxBytes: number }; classification: string | null; cuiWarning?: string }
@@ -108,6 +108,9 @@ export default function DocumentsPage() {
                       {data.docTypes.find(t => t.id === d.docType)?.label ?? d.docType} · {d.format.toUpperCase()}{d.pageCount ? ` · ${d.pageCount} pages` : ''} · {d.chunkCount} passages · added {fmtDay(d.createdAt)}{d.uploadedByName ? ` by ${d.uploadedByName}` : ''}
                       {d.scope === 'project' && d.anchorName && d.scheduleId !== selectedSchedule.id ? ` · attached to ${d.anchorName}${d.anchorVersion ? ` (${d.anchorVersion})` : ''}` : ''}
                     </div>
+                    {d.readBy === 'ai_vision' && (
+                      <p className="mt-1 text-[12px] text-status-info">Text read by AI from the page images (scanned pages or drawing sheets): check it against the file before relying on it.</p>
+                    )}
                     {d.flaggedCount > 0 && (
                       <p className="mt-1 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> {d.flaggedCount} passage{d.flaggedCount === 1 ? '' : 's'} contain{d.flaggedCount === 1 ? 's' : ''} instruction-like text and {d.flaggedCount === 1 ? 'is' : 'are'} never sent to AI.</p>
                     )}

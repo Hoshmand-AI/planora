@@ -31,8 +31,10 @@ export function basisOfSchedule(opts: {
   const critical = (s.cpm?.criticalPath || []).map(id => byId.get(id)).filter(Boolean)
   const L: string[] = []
 
-  L.push(`# Basis of Schedule — ${planName}`, '')
+  const proposal = profile.purpose === 'proposal'
+  L.push(`# Basis of Schedule${proposal ? ' (Proposal)' : ''} — ${planName}`, '')
   L.push(`Prepared ${new Date().toISOString().slice(0, 10)} by ${opts.generatedBy} with RunF9 (AI mode: ${opts.aiMode}).`, '')
+  if (proposal) L.push('> **Proposal schedule.** Prepared for a proposal or bid. Durations and logic are planning-level, from the interview, the project documents and RunF9 reference data, not from subcontractor commitments. Revise it into a construction baseline after award.', '')
 
   L.push('## 1. Project description', '')
   L.push(`| Item | Value |`, `|---|---|`)

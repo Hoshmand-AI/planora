@@ -21,6 +21,7 @@ import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
 import { useApp } from '../../layout'
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { SmartInterview } from '@/components/interview/SmartInterview'
+import { DocumentPrefill } from '@/components/interview/DocumentPrefill'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 import { Disclosure } from '@/components/Disclosure'
 import { ResourcesPanel } from '@/components/ResourcesPanel'
@@ -314,6 +315,7 @@ export default function PlanPage() {
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
           <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
         )}
+        <DocumentPrefill planId={id} canWrite={can('plan.write')} onSave={saveAnswers} />
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
       </>)}

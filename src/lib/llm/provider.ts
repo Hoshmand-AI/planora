@@ -3,12 +3,12 @@ import { createHash } from 'crypto'
 import { currentRequest } from '@/lib/server/context'
 import { log } from '@/lib/server/log'
 import {
-  AiRefusalError, aiFallbackEnabled, DEFAULT_ANTHROPIC_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL, MODEL_REGISTRY, estimateCostUsd, registryEntry,
+  AiProviderError, AiRefusalError, aiFallbackEnabled, supportsAttachments, DEFAULT_ANTHROPIC_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL, MODEL_REGISTRY, estimateCostUsd, registryEntry,
   type ChatMessage, type CloudProvider, type LlmAdapter, type ProviderName,
 } from './gateway'
 
-export { AiProviderError, AiRefusalError, AI_REFUSAL_MESSAGE, MODEL_REGISTRY, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_LOCAL_MODEL, PROVIDER_LABEL } from './gateway'
-export type { ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, LlmUsage } from './gateway'
+export { AiProviderError, AiRefusalError, AI_REFUSAL_MESSAGE, MODEL_REGISTRY, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_LOCAL_MODEL, PROVIDER_LABEL, supportsAttachments } from './gateway'
+export type { ChatAttachment, ChatMessage, ProviderName, CloudProvider, LlmAdapter, LlmResult, LlmUsage } from './gateway'
 
 // One place decides where model calls go (the AI gateway). Adapters in ./anthropic-adapter.ts and
 // ./openai-adapter.ts only translate a call to one provider's API; everything here is provider-agnostic.
@@ -298,12 +298,16 @@ export async function chat(messages: ChatMessage[], opts: { temperature?: number
   if (!cfg) return null
   await guardRestrictedData(cfg, opts.purpose || 'chat')
   await enforceQuota()
+  const files = messages.flatMap(m => m.attachments ?? [])
+  // A model that can't read the files would answer without them: refuse instead (callers fall back).
+  if (files.length && !supportsAttachments(cfg.provider)) throw new AiProviderError(cfg.provider, 'bad_request', null, 'The configured AI model cannot read document pages or images.')
   const adapter = await adapterFor(cfg)
-  const prompt = messages.map(m => `${m.role}:${m.content}`).join('\n')
+  // Files count toward the prompt size and hash (their bytes, never logged).
+  const prompt = messages.map(m => `${m.role}:${m.content}${m.attachments?.length ? `\n[files:${m.attachments.map(a => createHash('sha256').update(a.data).digest('hex')).join(',')}]` : ''}`).join('\n')
   const started = Date.now()
   const base = {
     purpose: opts.purpose || 'chat', provider: cfg.provider, model: cfg.model, sdk: adapter.sdk, certified: cfg.certified ?? false,
-    mode: cfg.mode, host: cfg.host, promptChars: prompt.length, promptSha256: createHash('sha256').update(prompt).digest('hex'),
+    mode: cfg.mode, host: cfg.host, promptChars: prompt.length + files.reduce((n, a) => n + a.data.length, 0), promptSha256: createHash('sha256').update(prompt).digest('hex'),
   }
   try {
     const res = await adapter.complete({ model: cfg.model, messages, maxTokens: opts.maxTokens ?? 1500, temperature: opts.temperature })

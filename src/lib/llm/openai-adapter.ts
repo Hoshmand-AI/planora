@@ -27,7 +27,14 @@ export function createOpenAiCompatibleAdapter(opts: { provider: Extract<Provider
       try {
         res = await client.chat.completions.create({
           model: req.model,
-          messages: req.messages,
+          messages: req.messages.map(m => m.attachments?.length && m.role === 'user'
+            ? { role: 'user' as const, content: [
+                ...m.attachments.map(a => a.kind === 'pdf'
+                  ? { type: 'file' as const, file: { filename: 'pages.pdf', file_data: `data:application/pdf;base64,${a.data}` } }
+                  : { type: 'image_url' as const, image_url: { url: `data:${a.mediaType};base64,${a.data}` } }),
+                { type: 'text' as const, text: m.content },
+              ] }
+            : { role: m.role, content: m.content }),
           temperature: req.temperature ?? 0.3,
           max_tokens: req.maxTokens,
         })

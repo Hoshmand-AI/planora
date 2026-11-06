@@ -8,7 +8,19 @@ export type ProviderName = 'anthropic' | 'openai' | 'local' | 'azure_openai' | '
 /** Cloud providers selectable with RUNF9_AI_PROVIDER. */
 export type CloudProvider = Extract<ProviderName, 'anthropic' | 'openai' | 'azure_openai' | 'bedrock' | 'vertex'>
 
-export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
+/** A file a user turn carries for the model to read: a PDF (pages) or an image, base64-encoded. */
+export interface ChatAttachment { kind: 'pdf' | 'image'; mediaType: 'application/pdf' | 'image/png' | 'image/jpeg'; data: string }
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  /** User turns only, and only for providers that read files (see supportsAttachments) */
+  attachments?: ChatAttachment[]
+}
+
+/** Providers whose adapter sends attachments (PDF pages and images) to the model. */
+export const ATTACHMENT_PROVIDERS: readonly ProviderName[] = ['anthropic', 'openai']
+export const supportsAttachments = (p: ProviderName | null | undefined) => !!p && (ATTACHMENT_PROVIDERS as readonly string[]).includes(p)
 
 export interface LlmRequest {
   model: string

@@ -123,6 +123,7 @@ export function profileFrom(answers: Record<string, Answer>): ProjectProfile {
     onFederalInstallation: type === 'federal_defense' ? true : federal === false ? false : bool(known(answers, 'project.federal_installation')),
     classification: classification ?? (answers['security.classification']?.status === 'withheld' ? 'classified' : undefined),
     deliveryMethod: str(known(answers, 'project.delivery')) as DeliveryMethod | undefined,
+    ...(known(answers, 'project.purpose') === 'proposal' ? { purpose: 'proposal' as const } : {}),
     valueMusd: civil ? num(known(answers, 'project.value_musd')) : undefined,
     ...(floors ? { floors } : {}),
     ...(outsideUS ? { outsideUS } : {}),
@@ -232,6 +233,13 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
       why: 'Design-build and CMAR allow early packages (foundations, steel) to overlap design; design-bid-build does not.',
       options: [{ value: 'dbb', label: 'Design-bid-build' }, { value: 'db', label: 'Design-build' }, { value: 'cmar', label: 'CM at risk' }, { value: 'ipd', label: 'IPD' }],
       fallback: { value: 'dbb', explanation: 'Assumed design-bid-build (no design/construction overlap).' },
+    },
+    {
+      id: 'project.purpose', section: 'project', kind: 'choice', impact: 10, allowWithheld: false,
+      prompt: 'Is this a construction baseline, or a schedule for a proposal or bid?',
+      why: 'A proposal schedule is planning-level: it is labelled as such in the Basis of Schedule and exports, to be revised into a construction baseline after award.',
+      options: [{ value: 'baseline', label: 'Construction baseline' }, { value: 'proposal', label: 'Proposal / bid schedule' }],
+      fallback: { value: 'baseline', explanation: 'Assumed a construction baseline.' },
     },
     {
       id: 'design.drawings', section: 'design', kind: 'boolean', impact: 90, allowWithheld: false,
@@ -791,7 +799,8 @@ export function applyAnswers(current: Record<string, Answer>, incoming: Record<s
     const status = raw.status === 'withheld' || raw.status === 'unknown' ? raw.status : 'known'
     // A note qualifies the answer in the team's own words; never kept on withheld answers.
     const note = status !== 'withheld' && typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 1000) : undefined
-    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: 'user' })
+    // Provenance only: 'file' when the user took the answer from a document (DocumentPrefill).
+    const a = coerceAnswer(q, { status, value: raw.value, note, answeredAt: now, source: raw.source === 'file' ? 'file' : 'user' })
     const err = validateAnswer(q, a)
     if (err) { invalid[qid] = err; return }
     answers = { ...answers, [qid]: a }

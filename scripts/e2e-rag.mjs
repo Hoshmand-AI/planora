@@ -183,6 +183,40 @@ Work on the Spread Footings at grid C is suspended until the revised drawings ar
   r = await A.req('DELETE', `${docs(sA)}/${coId}`)
   ok(r.status === 200, 'The change order can be deleted (the delay event keeps its evidence label)')
 
+  /* ── Interview answers from a document; scanned pages and drawings ── */
+  r = await A.post('/api/plans', { name: 'Riverside MOB (from RFP)' })
+  ok(r.status === 200 || r.status === 201, 'Firm A starts a plan', r.data)
+  const planId = r.data.plan.id
+  const RFP = `REQUEST FOR PROPOSALS. The project is located at 1200 Riverside Drive, Austin, TX 78704. The work is new construction of a three-story medical office building of approximately 86,500 gross square feet.
+The project will be delivered by Construction Manager at Risk. Notice to Proceed is anticipated on March 1, 2027. Substantial Completion shall be achieved no later than June 30, 2028. Reference ${SECRET}.`
+  r = await B.req('POST', `/api/plans/${planId}/prefill`, form('rfp.txt', RFP))
+  ok(r.status === 404, 'Another firm cannot read documents into this plan (404)')
+  r = await A.req('POST', `/api/plans/${planId}/prefill`, form('rfp.txt', RFP))
+  const props = Object.fromEntries((r.data.proposals || []).map(p => [p.questionId, p]))
+  ok(r.status === 200 && r.data.method === 'rules', 'Offline, interview answers are proposed by rules', r.data)
+  ok(props['project.gross_sqft']?.value === 86500 && props['project.state']?.value === 'TX' && props['project.stories']?.value === 3, 'Area, state and stories are proposed from the RFP')
+  ok(props['project.delivery']?.value === 'cmar' && props['project.target_start']?.value === '2027-03-01' && props['project.required_finish']?.value === '2028-06-30', 'Delivery method, notice to proceed and required completion are proposed')
+  ok(props['project.gross_sqft'].quote.includes('86,500 gross square feet'), 'Each proposal carries the sentence it came from')
+  r = await A.req('PATCH', `/api/plans/${planId}`, { answers: { 'project.gross_sqft': { status: 'known', value: 86500, source: 'file', note: `From rfp.txt: "${props['project.gross_sqft'].quote}"` } } })
+  ok(r.status === 200, 'The scheduler saves a chosen answer')
+  r = await A.get(`/api/plans/${planId}`)
+  ok(r.data.plan.answers['project.gross_sqft']?.source === 'file' && r.data.plan.answers['project.gross_sqft']?.value === 86500, 'The saved answer records that it came from the document')
+  r = await A.get('/api/audit?limit=500')
+  ok(JSON.stringify(r.data).includes('plan.prefill_proposed') && !JSON.stringify(r.data).includes('Riverside Drive'), 'Reading a document into the interview is audited without its text')
+
+  const { PDFDocument, StandardFonts } = await import('pdf-lib')
+  const blank = await PDFDocument.create(); blank.addPage(); blank.addPage()
+  r = await A.req('POST', docs(sA), form('scan.pdf', Buffer.from(await blank.save()), { docType: 'specification', title: 'Scanned spec' }))
+  ok(r.status === 400 && r.data.code === 'scanned_pdf' && /not here: no AI model/i.test(r.data.error), `Without AI, a scanned PDF is refused with the reason: "${r.data.error}"`)
+  const dwg = await PDFDocument.create(); const font = await dwg.embedFont(StandardFonts.Helvetica)
+  dwg.addPage().drawText('SHEET S-101 FOUNDATION PLAN. GENERAL NOTES: SPREAD FOOTINGS AT GRID C BEAR ON 3000 PSF SOIL. FOOTING F1 6 FT X 6 FT. CONCRETE 4000 PSI AT 28 DAYS.', { x: 20, y: 700, size: 9, font })
+  r = await A.req('POST', docs(sA), form('S-101.pdf', Buffer.from(await dwg.save()), { docType: 'drawing', title: 'Structural drawings' }))
+  ok(r.status === 200 && r.data.document.docType === 'drawing' && r.data.document.readBy === 'text', 'Without AI, a drawing with a text layer is indexed from its text layer', r.data)
+  r = await A.post(`${docs(sA)}/search`, { query: 'spread footings grid', includeUnreviewed: true })
+  ok(r.data.results.some(x => x.title === 'Structural drawings'), 'Drawing text is searchable with a citation')
+  r = await A.req('DELETE', `${docs(sA)}/${r.data.results.find(x => x.title === 'Structural drawings').documentId}`)
+  ok(r.status === 200, 'The drawing can be deleted')
+
   /* ── Deletion ── */
   r = await A.req('DELETE', `${docs(sA)}/${docId}`)
   ok(r.status === 200 && r.data.passagesDeleted >= 4, `Deleting the document removes its ${r.data.passagesDeleted} passages`)
