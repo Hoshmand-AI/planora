@@ -29,6 +29,13 @@ describe('publish approval is bound to the reviewed content (separation of dutie
     expect(scheduleFingerprint(reordered)).toBe(scheduleFingerprint(p.generated))
   })
 
+  it('the undo snapshot is not content: undoing a change restores the earlier fingerprint', () => {
+    const p = plan()
+    const before = scheduleFingerprint(p.generated)
+    const withUndo = { ...p.generated!, undo: { at: 'x', by: 'y', summary: 'z', previous: p.generated! } }
+    expect(scheduleFingerprint(withUndo)).toBe(before)
+  })
+
   it('an independent approval of the current content allows publishing', () => {
     const p = plan()
     p.reviews = [review(p, 'approve')]
