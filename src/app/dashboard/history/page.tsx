@@ -5,6 +5,7 @@ import { Loader2, Database, Lock } from 'lucide-react'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import type { CategoryStats } from '@/lib/planning/history'
 import type { BacktestResult } from '@/lib/planning/evaluation'
+import type { FirmSequencing } from '@/lib/logic-assist/firm-patterns'
 import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
 
@@ -16,8 +17,11 @@ interface HistoryData {
   overallOverrunMedian: number | null
   overallOverrunP80: number | null
   backtest: BacktestResult
+  sequencing?: FirmSequencing
 }
 
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const linkText = (type: string, lag: number) => `${type}${lag ? ` ${lag > 0 ? '+' : '−'}${Math.abs(lag)}d` : ''}`
 const label = (c: string) => c.replace(/_/g, ' ').replace(/\b\w/g, m => m.toUpperCase())
 
 export default function HistoryPage() {
@@ -91,6 +95,8 @@ export default function HistoryPage() {
         )}
       </div>
 
+      {data.sequencing && <SequencingCard seq={data.sequencing} />}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What your projects actually took</div>
@@ -144,5 +150,36 @@ function Card({ label, value, sub }: { label: string; value: string; sub: string
       <div className="text-[20px] font-semibold text-navy-950 tabular-nums mt-1">{value}</div>
       <div className="text-[11px] text-warm-400 mt-0.5">{sub}</div>
     </div>
+  )
+}
+
+/** How the firm sequences work, learned from its own past schedules (the same ones firm history uses). */
+function SequencingCard({ seq }: { seq: FirmSequencing }) {
+  const own = seq.patterns.filter(p => !p.usual || p.type !== 'FS' || p.lag)
+  return (
+    <section aria-labelledby="seq-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
+      <h2 id="seq-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-600 mb-1">How your firm sequences work</h2>
+      <p className="text-[12.5px] text-warm-600 mb-3 max-w-3xl">Learned from the logic of {seq.projectCount} past project{seq.projectCount === 1 ? '' : 's'}: which kinds of work your schedules tie together, and how. Logic suggestions on new schedules favour these ties and use your link type and lag.{seq.overlapShare != null ? ` ${Math.round(seq.overlapShare * 100)}% of your ties between trades overlap the work (start-to-start or finish-to-finish).` : ''}</p>
+      {seq.patterns.length === 0 ? <p className="text-[13px] text-warm-600">{seq.projectCount < 2 ? 'Needs at least two past projects with logic to learn from.' : 'No tie appears in at least two of your projects yet.'}</p> : (
+        <>
+          {own.length > 0 && <p className="text-[12.5px] text-navy-950 mb-2"><span className="font-semibold">Your own habits</span> (differ from the general trade order): {own.slice(0, 4).map(p => `${p.fromLabel} → ${p.toLabel} ${linkText(p.type, p.lag)}`).join('; ')}.</p>}
+          <div tabIndex={0} role="region" aria-label="Sequencing patterns" className="overflow-x-auto">
+            <table className="w-full text-[12.5px] min-w-[520px]">
+              <thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-warm-600"><th className="py-1">From</th><th className="py-1">To</th><th className="py-1">Usually</th><th className="py-1 text-right">Projects</th></tr></thead>
+              <tbody>
+                {seq.patterns.slice(0, 25).map(p => (
+                  <tr key={`${p.from}>${p.to}`} className="border-t border-warm-200">
+                    <td className="py-1.5 text-navy-950">{cap(p.fromLabel)}</td>
+                    <td className="py-1.5 text-navy-950">{cap(p.toLabel)}</td>
+                    <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-[11px] font-semibold uppercase text-accent-600">your habit</span>}</td>
+                    <td className="py-1.5 text-right tabular-nums">{p.projects} of {p.of}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   )
 }

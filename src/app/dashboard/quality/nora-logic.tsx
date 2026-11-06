@@ -169,6 +169,8 @@ function LinkText({ s }: { s: LogicSuggestion }) {
       <span className="font-mono text-[11.5px] text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
       <ArrowRight size={12} className="inline mx-1 -mt-0.5 text-warm-500" aria-label="then" />
       <span className="font-mono text-[11.5px] text-warm-600">{s.successor.code}</span> {s.successor.name}
+      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[11.5px] text-navy-950">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
+      {s.firm && <span className="ml-1.5 text-[11px] font-semibold uppercase text-accent-600">your firm&apos;s pattern</span>}
     </>
   )
 }

@@ -57,7 +57,9 @@ function pastProjectCsv(seed, overrun) {
   for (const [id, name, dur] of acts) {
     const planned = Math.round(dur * 7 / 5)
     const actual = Math.round(planned * overrun)
-    rows.push([`A${id}`, `"${name}"`, dur, day(t), day(t + planned), day(t), day(t + actual), prev, '"Standard 5 Day"'].join(','))
+    // The firm overlaps drywall with the last MEP rough-in (SS +10d): a sequencing habit RunF9 should learn.
+    const pred = id === '1110' ? `"${prev} SS 10d"` : prev
+    rows.push([`A${id}`, `"${name}"`, dur, day(t), day(t + planned), day(t), day(t + actual), pred, '"Standard 5 Day"'].join(','))
     prev = `A${id}`
     t += Math.round(actual * 0.6)
   }
@@ -115,6 +117,19 @@ async function main() {
   r = await A.get('/api/history')
   ok(r.status === 200 && r.data.categories.length >= 5, `Firm history: ${r.data.categories.length} work categories, overrun ×${r.data.overallOverrunMedian?.toFixed(2)}`, r.data)
   ok(r.data.backtest.projects.length === 3, `Backtest (leave-one-out) over 3 projects: MAPE ${r.data.backtest.mape}%, bias ${r.data.backtest.biasPct}%`, r.data.backtest)
+  {
+    const seq = r.data.sequencing
+    const habit = seq?.patterns.find(p => p.from === 'mepRough' && p.to === 'drywall')
+    ok(seq?.projectCount === 3 && habit?.type === 'SS' && habit.lag === 10 && habit.projects === 3, `Firm sequencing learned from 3 projects (${seq?.patterns.length} ties): MEP rough-in → drywall SS +10d in ${habit?.projects} of ${habit?.of}`, seq)
+    // A new schedule with drywall left without a predecessor: the suggestion follows the firm's habit.
+    const fresh = ['Act ID,Activity Name,OD,Start,Finish,Preds', 'B100,NTP,0,2027-01-04,2027-01-04,', 'B110,OH MEP rough L5,20,2027-01-05,2027-02-01,B100',
+      'B120,Hang/Tape/Finish GWB L5,25,2027-02-02,2027-03-08,', 'B130,Sub Comp,0,2027-03-09,2027-03-09,B120'].join('\n')
+    r = await upload(A, 'new-tower.csv', fresh)
+    ok(r.status === 200, 'New schedule uploaded for logic suggestions', r.data)
+    r = await A.get(`/api/schedules/${r.data.schedule.id}/logic-suggestions`)
+    const sg = r.data.suggestions?.find(x => x.predecessor.code === 'B110' && x.successor.code === 'B120')
+    ok(r.status === 200 && r.data.firm.projects === 3 && sg?.type === 'SS' && sg.lag === 10 && sg.firm?.projects === 3 && /Your firm tied/.test(sg.reason), `Logic suggestion follows the firm's own pattern: B110 → B120 ${sg?.type} +${sg?.lag}d ("${sg?.reason}")`, r.data)
+  }
 
   /* ── Tenant isolation ── */
   r = await B.get(`/api/schedules?id=${xerId}`)

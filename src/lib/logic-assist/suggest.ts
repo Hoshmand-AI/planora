@@ -7,8 +7,9 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import { classifyName, verb, type Classification, type StageId } from './categories'
-import { extractLocation, type Location } from './locations'
+import { compareLocations, extractLocation, type Location } from './locations'
 import { locationFactor, relation, stageDistance, whereText, type Profiled, type RelationRule } from './sequence'
+import { patternIndex, patternNote, type FirmSequencing, type PatternLinkType, type SequencingPattern } from './firm-patterns'
 
 export type LogicActivity = Pick<Activity, 'id' | 'activityId' | 'name'> & Partial<Pick<Activity, 'wbs' | 'activityType' | 'status' | 'milestoneKind'>>
 export type LogicLink = Pick<Relationship, 'predecessorId' | 'successorId'> & Partial<Pick<Relationship, 'type' | 'lag'>>
@@ -24,8 +25,9 @@ export interface LogicSuggestion {
   action: 'add_link' | 'review_link' | 'remove_link'
   predecessor: ActivityRef
   successor: ActivityRef
-  type: 'FS'
-  lag: 0
+  /** FS with no lag, unless the firm's own past projects tie this kind of work another way (firm) */
+  type: PatternLinkType
+  lag: number
   /** 0..1 */
   confidence: number
   /** Plain English, about the kinds of work (no activity names): "Drywall usually follows MEP rough-in on Level 2." */
@@ -37,6 +39,8 @@ export interface LogicSuggestion {
   fixes: string[]
   /** Why the two activities were read as they were: matched terms per side */
   basis: { predecessor: string[]; successor: string[] }
+  /** The firm's own pattern behind this proposal (past projects that tie this kind of work this way) */
+  firm?: { projects: number; of: number; type: PatternLinkType; lag: number }
 }
 
 export interface ActivityProfile {
@@ -74,6 +78,8 @@ export interface SuggestOptions {
   suspicious?: boolean
   /** Redundant-link search is skipped above this many links (default 4000) */
   maxLinksForRedundancy?: number
+  /** The firm's sequencing patterns from its own past projects: favour them, use their link type and lag, and don't flag them as out of sequence */
+  firm?: FirmSequencing | null
 }
 
 const CLOSEOUT_STAGES = new Set<StageId>(['punch', 'inspection', 'cx', 'closeoutDocs', 'completion', 'final', 'paving', 'permit', 'start', 'precon'])
@@ -123,7 +129,7 @@ class Graph {
   }
 }
 
-interface Candidate { p: string; s: string; score: number; reason: string; rule: LogicSuggestion['rule'] }
+interface Candidate { p: string; s: string; score: number; reason: string; rule: LogicSuggestion['rule']; pattern?: SequencingPattern }
 
 /**
  * Suggest logic fixes for an uploaded schedule. Only task and milestone activities take part
@@ -132,6 +138,11 @@ interface Candidate { p: string; s: string; score: number; reason: string; rule:
 export function suggestLogic(activities: LogicActivity[], relationships: LogicLink[], opts: SuggestOptions = {}): LogicAssistResult {
   const minConf = opts.minConfidence ?? 0.3
   const suspicious = opts.suspicious ?? true
+  const firm = patternIndex(opts.firm)
+  const firmFor = (p: string, s: string): SequencingPattern | undefined => {
+    const a = prof.get(p)!.cls, b = prof.get(s)!.cls
+    return a.stage && b.stage && !a.modifier && !b.modifier ? firm.get(`${a.stage}>${b.stage}`) : undefined
+  }
   const acts = activities.filter(isWork)
   const byId = new Map(acts.map(a => [a.id, a]))
   const order = new Map(acts.map((a, i) => [a.id, i]))
@@ -169,9 +180,10 @@ export function suggestLogic(activities: LogicActivity[], relationships: LogicLi
   }).map(a => a.id) : [])
 
   /** Score one candidate link p → s (before safety checks). */
-  const score = (p: string, s: string): { score: number; reason: string; rule: RelationRule } | null => {
+  const score = (p: string, s: string): { score: number; reason: string; rule: RelationRule; pattern?: SequencingPattern } | null => {
     const P = prof.get(p)!, S = prof.get(s)!
-    const r = relation(P, S)
+    const pattern = firmFor(p, s)
+    const r = relation(P, S) ?? (pattern && P.loc.key === S.loc.key ? { strength: 0.5, reason: `${cap(S.cls.stageLabel)} follows ${P.cls.stageLabel} in your firm's schedules.`, rule: 'trade_sequence' as RelationRule, location: compareLocations(P.loc, S.loc) } : null)
     if (!r) return null
     const confs = Math.sqrt(Math.max(0.05, Math.min(P.cls.confidence, S.cls.confidence)))
     let v = r.strength * (r.rule === 'next_location' ? 1 : locationFactor(r.location)) * confs
@@ -179,7 +191,8 @@ export function suggestLogic(activities: LogicActivity[], relationships: LogicLi
     if (a.wbs && a.wbs === b.wbs) v += 0.05                       // same WBS group
     if (needSucc.has(p) && needPred.has(s)) v += 0.05              // closes two loose ends at once
     if ((order.get(p) ?? 0) < (order.get(s) ?? 0)) v += 0.03       // agrees with the file's activity order
-    return { score: Math.min(0.95, v), reason: r.reason, rule: r.rule }
+    if (pattern) v += 0.1 * pattern.share                          // how the firm itself ties this work
+    return { score: Math.min(0.95, v), reason: pattern ? `${r.reason} ${patternNote(pattern)}` : r.reason, rule: r.rule, pattern }
   }
   const proximity = (x: string, y: string) => Math.abs((order.get(x) ?? 0) - (order.get(y) ?? 0))
 
@@ -230,10 +243,13 @@ export function suggestLogic(activities: LogicActivity[], relationships: LogicLi
     const problem = need.kind === 'missing_predecessor' ? `${subj.code} ${subj.name} has no predecessor.`
       : need.kind === 'missing_successor' ? `${subj.code} ${subj.name} has no successor.`
         : `${subj.code} ${subj.name} leads only to the finish milestone.`
+    // The firm's link type and lag for this kind of work (SF is never proposed; lags stay modest).
+    const fp = c.pattern && c.pattern.type !== 'SF' && Math.abs(c.pattern.lag) <= 30 ? c.pattern : undefined
     accepted.push({
-      id: `${c.p}>${c.s}`, kind: need.kind, action: 'add_link', predecessor: ref(c.p), successor: ref(c.s), type: 'FS', lag: 0,
+      id: `${c.p}>${c.s}`, kind: need.kind, action: 'add_link', predecessor: ref(c.p), successor: ref(c.s), type: fp?.type ?? 'FS', lag: fp?.lag ?? 0,
       confidence: round2(c.score), reason: c.reason, problem, rule: c.rule, fixes,
       basis: { predecessor: prof.get(c.p)!.cls.terms, successor: prof.get(c.s)!.cls.terms },
+      ...(c.pattern ? { firm: { projects: c.pattern.projects, of: c.pattern.of, type: c.pattern.type, lag: c.pattern.lag } } : {}),
     })
   }
 
@@ -247,6 +263,8 @@ export function suggestLogic(activities: LogicActivity[], relationships: LogicLi
       const P = prof.get(l.predecessorId)!, S = prof.get(l.successorId)!
       if (P.cls.source !== 'name' || S.cls.source !== 'name' || P.cls.modifier || S.cls.modifier || !P.cls.stage || !S.cls.stage || P.cls.stage === S.cls.stage) continue
       if (P.cls.confidence < 0.6 || S.cls.confidence < 0.6) continue
+      // The firm's own habit is not "out of sequence".
+      if (firm.has(`${P.cls.stage}>${S.cls.stage}`)) continue
       const back = stageDistance(S.cls.stage, P.cls.stage)
       const loc = P.loc.key && S.loc.key && P.loc.key !== S.loc.key
       if (back === null || back > 3 || loc) continue

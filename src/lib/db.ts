@@ -636,7 +636,8 @@ export interface HistoryRow {
  * no third-party schedules), and none when the organization turned firm history off for its uploads.
  * Workspace walls apply too: a member never gets durations from a matter they are walled off from.
  */
-export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]>; selection: HistorySelection }> {
+/** The uploads firm history may learn from (see getOrgHistory), for the org and the caller's workspace walls. */
+async function orgHistorySelection(orgId: string, excludeScheduleId?: string): Promise<HistorySelection> {
   await initSchema()
   const ws = await workspaceScope('s.workspace_id', 3)
   const org = await query('SELECT settings FROM organizations WHERE id=$1', [orgId])
@@ -654,6 +655,11 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
     uploadOrigin: r.upload_origin === 'own' || r.upload_origin === 'third_party' ? r.upload_origin : null,
     workCount: Number(r.work_count), openCount: Number(r.open_count),
   })), { orgOptOut })
+  return selection
+}
+
+export async function getOrgHistory(orgId: string, excludeScheduleId?: string): Promise<{ rows: HistoryRow[]; calendars: Record<string, WorkCalendar[]>; selection: HistorySelection }> {
+  const selection = await orgHistorySelection(orgId, excludeScheduleId)
   if (!selection.included.length) return { rows: [], calendars: {}, selection }
   const res = await query(`
     SELECT a.schedule_id, s.project_type, s.region, s.gross_sqft, a.category, a.name, a.calendar_id, a.duration,
@@ -671,6 +677,26 @@ export async function getOrgHistory(orgId: string, excludeScheduleId?: string): 
     calendars: Object.fromEntries(cal.rows.map(r => [r.id, r.calendars as WorkCalendar[]])),
     selection,
   }
+}
+
+/**
+ * The logic of the firm's OWN past schedules (the same uploads firm history learns from, same org and
+ * workspace boundaries), for learning its sequencing style: activities (id, code, name, WBS, type) and
+ * relationships per schedule.
+ */
+export async function getOrgHistoryLogic(orgId: string, excludeScheduleId?: string): Promise<{ scheduleId: string; activities: Pick<Activity, 'id' | 'activityId' | 'name' | 'wbs' | 'activityType'>[]; links: Pick<Relationship, 'predecessorId' | 'successorId' | 'type' | 'lag'>[] }[]> {
+  const selection = await orgHistorySelection(orgId, excludeScheduleId)
+  if (!selection.included.length) return []
+  const [acts, rels] = await Promise.all([
+    query(`SELECT a.id, a.schedule_id, a.activity_id, a.name, a.wbs, a.activity_type FROM activities a JOIN schedules s ON s.id = a.schedule_id
+      WHERE s.org_id = $1 AND s.id = ANY($2::text[])`, [orgId, selection.included]),
+    query(`SELECT r.schedule_id, r.predecessor_id, r.successor_id, r.type, r.lag FROM relationships r JOIN schedules s ON s.id = r.schedule_id
+      WHERE s.org_id = $1 AND s.id = ANY($2::text[])`, [orgId, selection.included]),
+  ])
+  const out = new Map(selection.included.map(id => [id, { scheduleId: id, activities: [] as Pick<Activity, 'id' | 'activityId' | 'name' | 'wbs' | 'activityType'>[], links: [] as Pick<Relationship, 'predecessorId' | 'successorId' | 'type' | 'lag'>[] }]))
+  for (const r of acts.rows) out.get(r.schedule_id)?.activities.push({ id: r.id, activityId: r.activity_id, name: r.name, wbs: r.wbs ?? null, activityType: r.activity_type })
+  for (const r of rels.rows) out.get(r.schedule_id)?.links.push({ predecessorId: r.predecessor_id, successorId: r.successor_id, type: r.type ?? 'FS', lag: Number(r.lag) || 0 })
+  return [...out.values()]
 }
 
 /* ─── Chat ──────────────────────────────────────────── */
