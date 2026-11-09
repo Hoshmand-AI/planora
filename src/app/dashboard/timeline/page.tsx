@@ -144,7 +144,7 @@ export default function TimelinePage() {
           <button type="button" onClick={() => setZoom(ZOOMS[zi - 1])} disabled={zi <= 0} aria-label="Zoom out"
             className="pressable grid place-items-center w-9 h-9 rounded-l-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Minus size={15} aria-hidden /></button>
           <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} title="Fit the whole schedule"
-            className="px-2 h-9 text-[12.5px] font-semibold tabular-nums text-warm-700 hover:text-navy-950 disabled:hover:text-warm-700 border-x border-warm-200"><span className="sr-only">Fit the whole schedule, now zoomed </span>{zoom}×</button>
+            className="px-2 h-9 text-[12.5px] font-semibold tabular-nums text-warm-700 hover:text-navy-950 disabled:hover:text-warm-700 border-x border-warm-200">{zoom === 1 ? <><span className="sr-only">Whole schedule shown, zoom </span>1×</> : <><span className="sr-only">Zoomed {zoom}×. </span>Fit</>}</button>
           <button type="button" onClick={() => setZoom(ZOOMS[zi + 1])} disabled={zi >= ZOOMS.length - 1} aria-label="Zoom in"
             className="pressable grid place-items-center w-9 h-9 rounded-r-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Plus size={15} aria-hidden /></button>
         </div>
