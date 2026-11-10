@@ -30,7 +30,8 @@ export const POST = publicApi(async req => {
   if (!found) throw new ApiError(404, "Single sign-on isn't set up for that email domain. Sign in with your password, or ask your admin.", 'sso_not_configured')
   const org = await getOrganization(found.orgId)
   if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
-  const callback = `${new URL(req.url).origin}/api/auth/sso/callback`
+  // The public address (APP_URL) when set: behind a proxy the request's own origin can be an internal one.
+  const callback = `${appOrigin(req)}/api/auth/sso/callback`
   const { url, stateCookie } = await startSso(found.orgId, found.config, email, callback)
   const res = json({ url })
   res.cookies.set(SSO_COOKIE, stateCookie, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/api/auth/sso', maxAge: 600 })

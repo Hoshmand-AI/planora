@@ -236,3 +236,12 @@ describe('ordinary sentences are not misread', () => {
     expect(b.yesterday.completed.map(r => r.id)).toContain(one.id)
   })
 })
+
+describe('field reports that say work did not happen', () => {
+  it('are not read as work in the ground', () => {
+    const acts = [{ id: 'a', code: 'E4030', name: 'Set Generators and Fuel System', started: false, done: false }]
+    const ctx = { daysBehind: 0, delaysReported: [], openChangeItems: 0, staleDays: 1, projectType: null }
+    const w = projectWatch([{ documentId: 'd', title: 'Daily', docType: 'daily_report', citation: '', text: 'No work was started on the generators and fuel system today because of rain.\nThe generators and fuel system crew will start setting pads on Monday.' }], acts, ctx)
+    expect(w.field).toEqual([])
+  })
+})

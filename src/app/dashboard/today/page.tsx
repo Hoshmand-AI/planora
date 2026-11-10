@@ -268,12 +268,12 @@ export default function TodayPage() {
               <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[11px] font-bold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
               <q className="text-warm-700">{s.quote}</q>
               <span className="block text-[12px] text-warm-600 mt-1">{s.citation.includes(s.title) ? s.citation : `${s.title} ${s.citation}`}{s.activity ? ` · about ${s.activity.code} ${s.activity.name}` : ''}{s.days ? ` · ${s.days} work day${s.days === 1 ? '' : 's'}` : ''}</span>
-              {canWrite && s.kind !== 'commitment' && <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12.5px] font-medium text-accent-600 hover:underline" onClick={async () => {
+              {canWrite && s.kind !== 'commitment' && (items.some(it => it.sourceQuote === s.quote) ? <span className="mt-1.5 block text-[12.5px] text-warm-600">In the register</span> : <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12.5px] font-medium text-accent-600 hover:underline" onClick={async () => {
                 setBusy(`sig${i}`)
                 const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/register`, { kind: s.kind === 'change' ? 'pco' : s.kind === 'delay' ? 'issue' : 'risk', title: s.quote.slice(0, 180), impactDays: s.days, activityCodes: s.activity ? [s.activity.code] : [], sourceDocumentId: s.documentId, sourceQuote: s.quote })
                 setBusy('')
                 if (!r.ok) setErr(r.data.error || 'The item was not added.'); else await load()
-              }}>Add to the register</button>}
+              }}>Add to the register</button>)}
             </li>
           ))}</ul>
         )}

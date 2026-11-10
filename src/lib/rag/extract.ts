@@ -13,6 +13,8 @@ export const MAX_PAGES = 1500
 /** Below this many non-space characters per page a PDF is treated as scanned (no text layer). */
 export const MIN_CHARS_PER_PAGE = 40
 
+import { emailToText, transcriptToText } from './correspondence-files'
+
 export type DocFormat = 'pdf' | 'docx' | 'txt' | 'md'
 
 export class DocumentRejected extends Error {
@@ -32,9 +34,10 @@ export function formatOf(fileName: string, head: Buffer): DocFormat {
     return 'docx'
   }
   if (ext === 'doc') throw new DocumentRejected('Old Word .doc files are not supported. Save the document as .docx or PDF in Word, then upload it.', 'unsupported_format')
-  if (ext === 'txt' || ext === 'text') return 'txt'
+  // Saved emails and meeting transcripts are text: they are stored as text after their envelope is removed.
+  if (ext === 'txt' || ext === 'text' || ext === 'eml' || ext === 'vtt' || ext === 'srt') return 'txt'
   if (ext === 'md' || ext === 'markdown') return 'md'
-  throw new DocumentRejected(`Unsupported file type "${ext ? '.' + ext : fileName}". Upload a PDF, Word (.docx), text (.txt) or Markdown (.md) document.`, 'unsupported_format')
+  throw new DocumentRejected(`Unsupported file type "${ext ? '.' + ext : fileName}". Upload a PDF, Word (.docx), text (.txt), Markdown (.md), a saved email (.eml) or a meeting transcript (.vtt, .srt).`, 'unsupported_format')
 }
 
 /** UTF-8 text; refuses binary content that slipped in under a .txt name. */
@@ -86,7 +89,9 @@ export async function extractDocument(buf: Buffer, fileName: string, opts: { dra
     } else if (format === 'docx') {
       pages = [{ page: null, text: extractDocxText(buf) }]
     } else {
-      pages = [{ page: null, text: decodeText(buf) }]
+      const ext = fileName.toLowerCase().split('.').pop()
+      const text = decodeText(buf)
+      pages = [{ page: null, text: ext === 'eml' ? emailToText(text) : ext === 'vtt' || ext === 'srt' ? transcriptToText(text) : text }]
     }
   } catch (err) {
     if (err instanceof DocumentRejected) throw err
