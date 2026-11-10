@@ -453,7 +453,9 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     const pathOf = (b: CpmResult | null) => (b?.logicLongestPath?.length ? b.logicLongestPath : (b?.longestPath ?? []))
     const rawPath = pathOf(rawBase)
     const rawTarget = rawPath.find((id) => openIds.has(id))
-    const calIdOf = (id: string) => raw?.activities.find((a) => a.id === id)?.calendarId || s.defaultCalendarId || raw?.calendars[0]?.id
+    // Looked up once: the driving path of a large schedule can hold thousands of activities.
+    const rawById = new Map((raw?.activities ?? []).map((a) => [a.id, a]))
+    const calIdOf = (id: string) => rawById.get(id)?.calendarId || s.defaultCalendarId || raw?.calendars[0]?.id
     const pathCals = new Set((rawTarget ? rawPath.slice(rawPath.indexOf(rawTarget)) : rawPath).map(calIdOf).filter((x): x is string => !!x))
     const seasonalBase = new Map((raw?.calendars ?? []).filter((c) => c.seasonalBaseId && pathCals.has(c.id)).map((c) => [c.id, c.seasonalBaseId!]))
     const shutdownCals = new Set((raw?.calendars ?? []).filter((c) => pathCals.has(c.id) && shutdownDays(c).size > 0).map((c) => c.id))
@@ -473,12 +475,13 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     let base: CpmResult | null
     try { base = seasonal && inp ? runCpm(inp) : rawBase } catch { base = null }
     // Mandatory constraints (MSO/MFO) on the driving path hold dates by typing them in, not by logic.
+    const inpById = new Map((inp?.activities ?? []).map((x) => [x.id, x]))
     const mandatory = (id: string) => {
-      const a = inp?.activities.find((x) => x.id === id)
+      const a = inpById.get(id)
       return a && !a.actualFinish && (a.constraint?.type === 'MSO' || a.constraint?.type === 'MFO') ? a : null
     }
     const path = pathOf(base)
-    const pinnedOnPath = [...(base?.longestPathConstraint ? [base.longestPathConstraint.id] : []), ...path].filter((id, i, all) => all.indexOf(id) === i).map(mandatory).filter((a): a is CpmActivity => !!a)
+    const pinnedOnPath = [...new Set([...(base?.longestPathConstraint ? [base.longestPathConstraint.id] : []), ...path])].map(mandatory).filter((a): a is CpmActivity => !!a)
     const pinnedAny = pinnedOnPath.length ? pinnedOnPath : (base?.violations ?? []).map((v) => mandatory(v.id)).filter((a): a is CpmActivity => !!a)
     const pinText = (list: CpmActivity[]) => list.slice(0, 3).map((a) => `${a.code} (${a.constraint!.type === 'MSO' ? 'Mandatory Start' : 'Mandatory Finish'} ${fmtDate(a.constraint!.date)})`).join(', ')
     // The scheduled longest path starts at an activity a mandatory constraint sets (P6 stops there):

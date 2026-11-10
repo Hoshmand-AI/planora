@@ -16,7 +16,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
   const current = plan.generated
   plan.generated = undo.previous
   const impact = combinedImpact(current, undo.previous)
-  plan.audit.push({ at: new Date().toISOString(), by: ctx.name, action: 'override:undo', detail: `Undid: ${undo.summary} (made by ${undo.by} at ${undo.at})` })
+  plan.audit.push({ at: new Date().toISOString(), by: ctx.name, byId: ctx.userId, action: 'override:undo', detail: `Undid: ${undo.summary} (made by ${undo.by} at ${undo.at})` })
   const saved = await savePlan(plan)
   return NextResponse.json({ ...(await planView(saved, ctx.orgId)), impact, summary: `Undid: ${undo.summary}` })
 })

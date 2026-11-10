@@ -459,7 +459,9 @@ export async function getScheduleFileMeta(scheduleId: string, orgId: string): Pr
 
 export async function updateScheduleProfile(id: string, orgId: string, p: { projectType?: string | null; region?: string | null; grossSqft?: number | null }): Promise<void> {
   await initSchema()
-  await query('UPDATE schedules SET project_type=COALESCE($3,project_type), region=COALESCE($4,region), gross_sqft=COALESCE($5,gross_sqft) WHERE id=$1 AND org_id=$2', [id, orgId, p.projectType ?? null, p.region ?? null, p.grossSqft ?? null])
+  // A key that is present is written, null included (that clears the tag); a key that is absent is left alone.
+  await query('UPDATE schedules SET project_type=CASE WHEN $6 THEN $3 ELSE project_type END, region=CASE WHEN $7 THEN $4 ELSE region END, gross_sqft=CASE WHEN $8 THEN $5 ELSE gross_sqft END WHERE id=$1 AND org_id=$2',
+    [id, orgId, p.projectType ?? null, p.region ?? null, p.grossSqft ?? null, p.projectType !== undefined, p.region !== undefined, p.grossSqft !== undefined])
 }
 
 export async function deleteSchedule(id: string, orgId: string): Promise<boolean> {
@@ -740,7 +742,7 @@ export interface ExpertReview {
 
 export interface PlanDecision { decision: 'accept' | 'fix'; note: string; by: string; at: string }
 
-export interface AuditEntry { at: string; by: string; action: string; detail?: string }
+export interface AuditEntry { at: string; by: string; action: string; detail?: string; /** User id of who did it, on entries that change the schedule (for independent review) */ byId?: string }
 
 export interface Plan {
   id: string; orgId: string; userId: string; name: string

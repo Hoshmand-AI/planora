@@ -33,7 +33,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
   } else {
     return NextResponse.json({ error: 'This option is applied by answering the open questions.' }, { status: 400 })
   }
-  plan.audit.push({ at: now, by: ctx.name, action: 'recovery', detail: `${opt.title} → finish ${plan.generated.cpm?.projectFinish}` })
+  plan.audit.push({ at: now, by: ctx.name, byId: ctx.userId, action: 'recovery', detail: `${opt.title} → finish ${plan.generated.cpm?.projectFinish}` })
   const saved = await savePlan(plan)
   return NextResponse.json({ ...(await planView(saved, ctx.orgId)), applied: opt.title })
 })

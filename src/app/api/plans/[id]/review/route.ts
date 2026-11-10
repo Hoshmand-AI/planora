@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { api } from '@/lib/server/api'
 import { randomUUID as uuid } from 'crypto'
 import { savePlan, type ExpertReview } from '@/lib/db'
-import { scheduleFingerprint, type FingerprintedReview } from '@/lib/server/approval'
+import { scheduleFingerprint, type FingerprintedReview, scheduleAuthors } from '@/lib/server/approval'
 import { loadPlanContext, planView } from '../context'
 
 const VERDICTS: ExpertReview['verdict'][] = ['approve', 'approve_with_comments', 'reject']
@@ -14,8 +14,8 @@ export const POST = api<{ id: string }>({ permission: 'plan.review' }, async (re
   if (!plan.generated) return NextResponse.json({ error: 'Generate the schedule first.' }, { status: 400 })
   const body = await req.json().catch(() => ({}))
   if (!VERDICTS.includes(body.verdict)) return NextResponse.json({ error: 'verdict must be approve, approve_with_comments or reject' }, { status: 400 })
-  if (body.verdict !== 'reject' && ctx.settings.requireIndependentReview && plan.userId === ctx.userId) {
-    return NextResponse.json({ error: 'Your organization requires an independent review: the person who created this plan cannot approve it. Ask a reviewer or admin.', code: 'self_review' }, { status: 403 })
+  if (body.verdict !== 'reject' && ctx.settings.requireIndependentReview && scheduleAuthors(plan).has(ctx.userId)) {
+    return NextResponse.json({ error: 'Your organization requires an independent review: someone who created, generated or edited this plan cannot approve it. Ask a reviewer or admin who has not changed it.', code: 'self_review' }, { status: 403 })
   }
   const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 4000) : ''
   if (body.verdict !== 'approve' && !comment) return NextResponse.json({ error: 'Add a comment explaining what should change.' }, { status: 400 })

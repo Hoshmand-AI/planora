@@ -480,7 +480,12 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   }
   if ('projectType' in body || 'region' in body || 'grossSqft' in body) {
     const projectType = typeof body.projectType === 'string' && (PROJECT_TYPES as readonly string[]).includes(body.projectType) ? body.projectType : null
-    const profile = { projectType, region: typeof body.region === 'string' ? body.region.toUpperCase().slice(0, 12) : null, grossSqft: Number(body.grossSqft) || null }
+    // Only the tags named in the request change; a blank value clears that tag.
+    const profile = {
+      ...('projectType' in body ? { projectType } : {}),
+      ...('region' in body ? { region: typeof body.region === 'string' && body.region.trim() ? body.region.toUpperCase().slice(0, 12) : null } : {}),
+      ...('grossSqft' in body ? { grossSqft: Number(body.grossSqft) || null } : {}),
+    }
     await updateScheduleProfile(s.id, ctx.orgId, profile)
     await audit({ action: 'schedule.tag', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: { projectType: s.projectType, region: s.region, grossSqft: s.grossSqft }, after: profile } })
   }

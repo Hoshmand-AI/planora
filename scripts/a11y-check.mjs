@@ -77,6 +77,12 @@ for (const [name, url, prepare] of pages) {
   await page.goto(base + url, { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   if (prepare) await prepare()
+  // Measure the page as a reader sees it: let entrance animations (the landing page's 900 ms scroll-in
+  // fade, tab and drawer transitions) finish first, or contrast is read on half-transparent text.
+  await page.evaluate(() => Promise.race([
+    Promise.all(document.getAnimations().filter(a => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))),
+    new Promise(r => setTimeout(r, 3000)),
+  ]))
   await page.addScriptTag({ content: axeSource })
   const result = await page.evaluate(async () => {
     // eslint-disable-next-line no-undef

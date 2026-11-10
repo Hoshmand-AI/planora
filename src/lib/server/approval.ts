@@ -35,18 +35,29 @@ export interface ApprovalState {
 }
 
 /**
- * Whether the plan's current generated schedule carries an approving review by someone other than
- * its author, and the latest review of that exact content is not a rejection. Reviews recorded
+ * Whether the plan's current generated schedule carries an approving review by someone who did not
+ * create, generate or edit it, and the latest review of that exact content is not a rejection. Reviews recorded
  * before fingerprints existed (no scheduleFingerprint) never count: they cannot prove which content
  * was reviewed.
  */
-export function approvalOfCurrentVersion(plan: Pick<Plan, 'generated' | 'reviews' | 'userId'>): ApprovalState {
+/**
+ * Everyone who shaped the plan's schedule: its creator, and whoever generated it, edited it, undid an
+ * edit or applied a recovery option. None of them is an independent reviewer of it.
+ */
+export function scheduleAuthors(plan: Pick<Plan, 'userId'> & { audit?: Plan['audit'] }): Set<string> {
+  const out = new Set<string>([plan.userId])
+  for (const e of plan.audit ?? []) if (e.byId && /^(generate|recovery|override:)/.test(e.action)) out.add(e.byId)
+  return out
+}
+
+export function approvalOfCurrentVersion(plan: Pick<Plan, 'generated' | 'reviews' | 'userId'> & { audit?: Plan['audit'] }): ApprovalState {
   const fp = scheduleFingerprint(plan.generated)
   const reviews = plan.reviews as FingerprintedReview[]
   if (!fp) return { approved: false, rejected: false, staleApprovals: 0 }
   const current = reviews.filter(rv => rv.scheduleFingerprint === fp)
   const latest = current[current.length - 1]
-  const independent = (rv: FingerprintedReview) => rv.verdict !== 'reject' && !!rv.reviewerUserId && rv.reviewerUserId !== plan.userId
+  const authors = scheduleAuthors(plan)
+  const independent = (rv: FingerprintedReview) => rv.verdict !== 'reject' && !!rv.reviewerUserId && !authors.has(rv.reviewerUserId)
   const approved = current.some(independent)
   const rejected = latest?.verdict === 'reject'
   const staleApprovals = reviews.filter(rv => rv.scheduleFingerprint !== fp && independent(rv)).length
