@@ -844,6 +844,24 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS project_items_project_idx ON project_items(org_id, project_key, status, created_at);
     `,
   },
+  {
+    id: 24, name: 'daily_brief_subscriptions',
+    sql: `
+    -- Members who asked for a project's Daily Brief by email every working morning. One row per member
+    -- and project (the update series). last_sent_on makes each day's send happen once.
+    CREATE TABLE IF NOT EXISTS brief_subscriptions (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      project_key TEXT NOT NULL,
+      schedule_id TEXT NOT NULL,
+      audience TEXT NOT NULL DEFAULT 'pm' CHECK (audience IN ('pm','field','client')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_sent_on DATE,
+      UNIQUE (org_id, user_id, project_key)
+    );
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

@@ -7,6 +7,8 @@ import { applyScheduleEdits, validateEditChange, type ScheduleEdit } from '@/lib
 import { buildDailyBrief, missingScope, previousWorkday, type DailyBriefInput, type RegisterItem } from './daily-brief'
 import { extractSignals } from './correspondence'
 import { parseRegisterFields } from '@/lib/server/register'
+import { exportXerFromOriginal, xerEditsFrom } from '@/lib/export/xer'
+import { projectWatch } from './project-watch'
 
 const xer = fs.readFileSync(path.join(__dirname, '../parsers/__fixtures__/sample.xer'), 'latin1')
 const p = parseXER(xer, 's1')
@@ -134,5 +136,103 @@ describe('progress recorded in RunF9', () => {
     expect(r.activities.find(x => x.id === open.id)).toMatchObject({ status: 'in_progress' })
     expect(validateEditChange({ kind: 'progress', activityId: open.id, actualStart: '2999-01-01', actualFinish: null }, p.activities, p.relationships)).toHaveProperty('error')
     expect(validateEditChange({ kind: 'progress', activityId: open.id, actualStart: '2020-01-10', actualFinish: '2020-01-06' }, p.activities, p.relationships)).toHaveProperty('error')
+  })
+})
+
+describe('progress reaches the exported P6 file', () => {
+  it('writes the actual dates and the status into the original XER', () => {
+    const open = p.activities.find(a => a.activityType === 'task' && a.status === 'not_started')!
+    const applied = applyScheduleEdits(p.activities, p.relationships, [{ id: 'e1', change: { kind: 'progress', activityId: open.id, actualStart: '2026-03-17', actualFinish: '2026-03-24' }, reason: 'Reported on site', by: 'u1', byName: 'Ana', at: '2026-03-25T00:00:00.000Z' }]).applied
+    const out = exportXerFromOriginal(xer, new Map(), { edits: xerEditsFrom(p.activities, applied) })
+    const again = parseXER(out, 's2').activities.find(a => a.activityId === open.activityId)!
+    expect(again.status).toBe('complete')
+    expect(again.actualStart?.slice(0, 10)).toBe('2026-03-17')
+    expect(again.actualFinish?.slice(0, 10)).toBe('2026-03-24')
+    // Every other activity is written back as read.
+    expect(parseXER(out, 's2').activities.filter(a => a.status === 'complete').length).toBe(p.activities.filter(a => a.status === 'complete').length + 1)
+  })
+})
+
+describe('project documents read against the schedule', () => {
+  const acts = [
+    { id: 'a1', code: 'E4020', name: 'Set Medium-Voltage Switchgear', started: false, done: false },
+    { id: 'a2', code: 'D6010', name: 'Data Hall 1 Containment and Cable Tray', started: false, done: false },
+    { id: 'a3', code: 'M5030', name: 'Install CRAH Units', started: true, done: false },
+    ...Array.from({ length: 10 }, (_, i) => ({ id: `x${i}`, code: `X${i}`, name: 'Erect structural steel', started: false, done: false })),
+  ]
+  const doc = (docType: string, text: string) => ({ documentId: docType, title: `The ${docType}`, docType, citation: '§8', text })
+  const ctx = { daysBehind: 12, delaysReported: [{ title: 'OAC minutes', activity: 'E4020 Set Medium-Voltage Switchgear' }], openChangeItems: 0, staleDays: 40, projectType: 'data_center' }
+
+  it('contract watch: notice period, liquidated damages exposure and an overdue update', () => {
+    const w = projectWatch([doc('contract', 'The Contractor shall give written notice of any delay within seven (7) days of the event. The Contractor shall pay liquidated damages of $50,000 per day for each calendar day of delay. The Contractor shall submit an updated schedule monthly.')], acts, ctx)
+    const notice = w.contract.find(c => c.kind === 'notice')!, ld = w.contract.find(c => c.kind === 'damages')!, up = w.contract.find(c => c.kind === 'update')!
+    expect(notice).toMatchObject({ days: 7, active: true })
+    expect(notice.text).toContain('OAC minutes')
+    expect(ld).toMatchObject({ perDay: 50000, exposure: 600000, active: true })
+    expect(up.active).toBe(true)
+    expect(notice.quote).toContain('seven (7) days')
+  })
+
+  it('on time and nothing reported: the clauses are listed but not raised', () => {
+    const w = projectWatch([doc('contract', 'The Contractor shall give written notice of any delay within 10 days. Liquidated damages of $5,000 per day apply.')], acts, { ...ctx, daysBehind: 0, delaysReported: [], staleDays: 3 })
+    expect(w.contract.every(c => !c.active)).toBe(true)
+    expect(w.contract.find(c => c.kind === 'damages')!.exposure).toBeNull()
+  })
+
+  it('finds scope in the specifications that no activity covers, with the sentence', () => {
+    const w = projectWatch([doc('specification', 'Each data hall shall be protected by a double-interlock pre-action sprinkler system. Structural steel shall conform to ASTM A992.')], acts, ctx)
+    expect(w.notInSchedule.map(g => g.label)).toContain('Fire detection and suppression')
+    expect(w.notInSchedule.find(g => /Fire/.test(g.label))!.quote).toContain('pre-action')
+    expect(w.notInSchedule.map(g => g.label)).not.toContain('Structure')
+  })
+
+  it('compares the field report with the schedule', () => {
+    const w = projectWatch([doc('daily_report', 'The crew started Data Hall 1 containment and cable tray in row A. M5030 is completed in the hall. The switchgear will complete next week.')], acts, ctx)
+    expect(w.field.map(f => [f.activity.code, f.schedule])).toEqual([['D6010', 'not started'], ['M5030', 'in progress']])
+  })
+
+  it('reads only the right kinds of document', () => {
+    const w = projectWatch([doc('email', 'Liquidated damages of $50,000 per day. Written notice of delay within 7 days. The crew started Data Hall 1 containment and cable tray.')], acts, ctx)
+    expect(w).toMatchObject({ contract: [], field: [], notInSchedule: [] })
+  })
+})
+
+describe('ordinary sentences are not misread', () => {
+  const activities = [
+    { id: 'a1', code: 'P1030', name: 'Procure Medium-Voltage Switchgear', open: true },
+    { id: 'a2', code: 'E4030', name: 'Set Generators and Fuel System', open: true },
+  ]
+  const email = (text: string, docType = 'daily_report') => extractSignals([{ documentId: 'd', title: 'Report', docType, citation: '', text }], activities)
+
+  it('a sentence that says there is no delay is not a delay', () => {
+    for (const t of ['No delays were reported on site today, and the crew is working.', 'Lead time for the medium-voltage switchgear is 30 weeks, as planned in the schedule.',
+      'The crew stopped for lunch at noon and resumed the generator work.', 'The conduit behind the UPS room was inspected by the engineer.', 'Switchgear procurement is on schedule and the vendor confirmed it.'])
+      expect(email(t).filter(s => s.kind === 'delay'), t).toEqual([])
+  })
+
+  it('a real delay is still found, with its days', () => {
+    expect(email('The medium-voltage switchgear will be delayed by 3 weeks.')[0]).toMatchObject({ kind: 'delay', days: 15, activity: { code: 'P1030' } })
+    expect(email('Work stopped on the generators and fuel system for a failed pressure test.')[0]).toMatchObject({ kind: 'delay', activity: { code: 'E4030' } })
+  })
+
+  it('reads a line-formatted report one line at a time', () => {
+    const s = email('Weather: clear\nDelays: none\nGenerators and fuel system set on pads 1 to 4\nManpower: 212')
+    expect(s.filter(x => x.kind === 'delay')).toEqual([])
+  })
+
+  it('liquidated damages use the amount tied to "per day", not the contract value', () => {
+    const acts = Array.from({ length: 12 }, (_, i) => ({ id: `x${i}`, code: `X${i}`, name: 'Erect structural steel', started: false, done: false }))
+    const ctx = { daysBehind: 12, delaysReported: [], openChangeItems: 0, staleDays: 1, projectType: null }
+    const w = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'Under this $42,000,000 contract the Contractor shall pay liquidated damages of $10,000 per calendar day of delay.' }], acts, ctx)
+    expect(w.contract.find(c => c.kind === 'damages')).toMatchObject({ perDay: 10000, exposure: 120000 })
+    const pay = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'The Contractor shall submit each payment claim within 10 days of the end of the month.' }], acts, ctx)
+    expect(pay.contract.filter(c => c.kind === 'notice')).toEqual([])
+  })
+
+  it('an activity finished today shows as completed, not nowhere', () => {
+    const today = p.dataDate!.slice(0, 10)
+    const one = acts.find(a => a.activityType === 'task' && a.status !== 'complete')!
+    const b = buildDailyBrief(input({ today, activities: acts.map(a => (a.id === one.id ? { ...a, status: 'complete', actualStart: a.actualStart ?? today, actualFinish: today, percentComplete: 100 } : a)) }))
+    expect(b.yesterday.completed.map(r => r.id)).toContain(one.id)
   })
 })

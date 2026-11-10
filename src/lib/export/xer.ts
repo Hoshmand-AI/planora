@@ -232,12 +232,12 @@ export function xerUpdatesFrom(activities: { id: string; sourceId?: string | nul
 
 /** Edits made in RunF9, keyed by P6 task_id, to write into the original XER (durations in work days). */
 export interface XerEdits {
-  tasks: Map<string, { remainingDays?: number; originalDays?: number; constraint?: { type: ConstraintType; date: string } | null }>
+  tasks: Map<string, { remainingDays?: number; originalDays?: number; constraint?: { type: ConstraintType; date: string } | null; progress?: { actualStart: string; actualFinish: string | null } }>
   setLinks: { pred: string; succ: string; type: LinkType; lagDays: number }[]
   removeLinks: { pred: string; succ: string }[]
 }
 
-type EditLike = { status: 'applied' | 'skipped'; change: { kind: string; activityId?: string; remaining?: number; predecessorId?: string; successorId?: string; type?: LinkType; lag?: number; constraint?: { type: ConstraintType; date: string } | null } }
+type EditLike = { status: 'applied' | 'skipped'; change: { kind: string; activityId?: string; remaining?: number; actualStart?: string; actualFinish?: string | null; predecessorId?: string; successorId?: string; type?: LinkType; lag?: number; constraint?: { type: ConstraintType; date: string } | null } }
 
 /** Replay the applied edits of an uploaded schedule onto P6 task ids (the last edit of a field wins). */
 export function xerEditsFrom(activities: { id: string; sourceId?: string | null; status?: string }[], edits: EditLike[]): XerEdits {
@@ -249,11 +249,13 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
   for (const e of edits) {
     if (e.status !== 'applied') continue
     const c = e.change
-    if (c.kind === 'duration' || c.kind === 'constraint') {
+    if (c.kind === 'duration' || c.kind === 'constraint' || c.kind === 'progress') {
       const t = src(c.activityId)
       if (!t) continue
       const cur = tasks.get(t) || {}
-      if (c.kind === 'duration') {
+      // Progress reported in RunF9: the actual dates go into the file, so P6 opens with them.
+      if (c.kind === 'progress') { if (c.actualStart) cur.progress = { actualStart: c.actualStart, actualFinish: c.actualFinish ?? null } }
+      else if (c.kind === 'duration') {
         cur.remainingDays = c.remaining
         if (byId.get(c.activityId!)?.status !== 'in_progress') cur.originalDays = c.remaining
       } else cur.constraint = c.constraint ?? null
@@ -273,7 +275,7 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
  * Re-emit an uploaded XER with RunF9's recalculated early/late dates, float and driving-path flag on
  * open activities, and RunF9's forecast as the project's scheduled finish. Every other table, row
  * and field (including the file's own time of day on unchanged dates) is written back exactly as read.
- * With `opts.edits`, the edits made in RunF9 are written in too: durations (target/remaining hours),
+ * With `opts.edits`, the edits made in RunF9 are written in too: progress (actual dates and status), durations (target/remaining hours),
  * primary constraints, and TASKPRED rows changed, removed or added.
  */
 export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null; edits?: XerEdits | null; progressMode?: ProgressMode | null } = {}): string {
@@ -363,7 +365,16 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
       const c = cal.get(get('clndr_id').trim()) || cal.get(projCal.get(get('proj_id').trim()) || '') || cal.get(defaultCal || '')
       const finish = c?.finish || '17:00', hpd = c?.hoursPerDay || 8
       if (te) {
-        if (te.remainingDays !== undefined) set('remain_drtn_hr_cnt', hrs(te.remainingDays, hpd))
+        if (te.progress) {
+          const startTime = get('task_type').trim() === 'TT_FinMile' ? finish : c?.start || '08:00'
+          set('act_start_date', withDate(get('act_start_date'), te.progress.actualStart, startTime))
+          if (te.progress.actualFinish) {
+            set('act_end_date', withDate(get('act_end_date'), te.progress.actualFinish, finish))
+            set('status_code', 'TK_Complete'); set('remain_drtn_hr_cnt', '0')
+            if (idx.has('phys_complete_pct')) set('phys_complete_pct', '100')
+          } else if (get('status_code').trim() === 'TK_NotStart') set('status_code', 'TK_Active')
+        }
+        if (te.remainingDays !== undefined && !te.progress?.actualFinish) set('remain_drtn_hr_cnt', hrs(te.remainingDays, hpd))
         if (te.originalDays !== undefined) set('target_drtn_hr_cnt', hrs(te.originalDays, hpd))
         if (te.constraint !== undefined) {
           set('cstr_type', te.constraint ? CSTR[te.constraint.type] : '')

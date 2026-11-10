@@ -65,6 +65,19 @@ describe('publish approval is bound to the reviewed content (separation of dutie
     expect(approvalOfCurrentVersion(p).approved).toBe(false)
   })
 
+  it('someone who edited the schedule is not an independent reviewer of it', () => {
+    const p = plan() as ReturnType<typeof plan> & { audit: { at: string; by: string; action: string; byId?: string }[] }
+    p.audit = [{ at: '2026-01-01T00:00:00.000Z', by: 'Admin', byId: 'u-admin', action: 'override:duration' }]
+    p.reviews = [review(p, 'approve', 'u-admin')]
+    expect(approvalOfCurrentVersion(p).approved).toBe(false)
+    p.reviews = [review(p, 'approve', 'u-third')]
+    expect(approvalOfCurrentVersion(p).approved).toBe(true)
+    // Answering questions or leaving a note does not make someone an author of the schedule.
+    p.audit = [{ at: '2026-01-01T00:00:00.000Z', by: 'Admin', byId: 'u-admin', action: 'note' }]
+    p.reviews = [review(p, 'approve', 'u-admin')]
+    expect(approvalOfCurrentVersion(p).approved).toBe(true)
+  })
+
   it('self-approval, legacy reviews without a fingerprint, and a later rejection do not count', () => {
     const p = plan()
     p.reviews = [review(p, 'approve', AUTHOR)]

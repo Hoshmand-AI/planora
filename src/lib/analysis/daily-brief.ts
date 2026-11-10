@@ -157,8 +157,8 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   const staleDays = i.dataDate ? Math.max(0, diff(day(i.dataDate)!, today)) : null
 
   // Yesterday (since the previous working day, so a Monday brief covers the weekend).
-  const completed = acts.filter(a => { const f = day(a.actualFinish); return f && f >= yesterday && f < today }).map(a => row(a, day(a.actualFinish)))
-  const started = acts.filter(a => { const s = day(a.actualStart); return s && s >= yesterday && s < today && !completed.some(c => c.id === a.id) }).map(a => row(a, day(a.actualStart)))
+  const completed = acts.filter(a => { const f = day(a.actualFinish); return f && f >= yesterday && f <= today }).map(a => row(a, day(a.actualFinish)))
+  const started = acts.filter(a => { const s = day(a.actualStart); return s && s >= yesterday && s <= today && !completed.some(c => c.id === a.id) }).map(a => row(a, day(a.actualStart)))
 
   // Today, per the schedule.
   const finishing = open.filter(a => day(a.earlyFinish) === today).map(a => row(a, today)).sort(byFloat)
@@ -280,8 +280,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /* ─── Scope that a project of this type normally has ─────────────────────── */
 
-interface ScopeCheck { label: string; words: RegExp }
-const BUILDING_SCOPE: ScopeCheck[] = [
+export interface ScopeCheck { label: string; words: RegExp }
+export const BUILDING_SCOPE: ScopeCheck[] = [
   { label: 'Permits / approvals', words: /\bpermit|approval|\bAHJ\b|entitlement/i },
   { label: 'Submittals and procurement of long-lead items', words: /submittal|procure|fabricat|deliver|long[- ]lead|\bPO\b|purchase/i },
   { label: 'Foundations', words: /foundation|footing|pile|caisson|mat slab|\bSOG\b|slab on grade/i },
@@ -293,7 +293,7 @@ const BUILDING_SCOPE: ScopeCheck[] = [
   { label: 'Inspections / certificate of occupancy', words: /inspection|certificate of occupancy|\bTCO\b|\bCO\b|final inspection|fire marshal/i },
   { label: 'Punch list and closeout', words: /punch|close[- ]?out|turnover|as[- ]built|O&M/i },
 ]
-const DATA_CENTER_SCOPE: ScopeCheck[] = [
+export const DATA_CENTER_SCOPE: ScopeCheck[] = [
   { label: 'Utility interconnect / substation', words: /substation|interconnect|utility (power|service|feed)|grid|\bMV\b|medium voltage/i },
   { label: 'Generators', words: /generator|genset|\bgen\b/i },
   { label: 'UPS / batteries', words: /\bUPS\b|batter|uninterruptible/i },

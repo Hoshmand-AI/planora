@@ -6,19 +6,20 @@
 // from emails and meetings, missing scope and logic findings; with a version for the PM, the field
 // and the client. Everything is calculated from the schedule and the project's own records.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CalendarCheck, CalendarClock, CheckCircle2, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
+import { AlertTriangle, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { Disclosure } from '@/components/Disclosure'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
 import { Alert, postJson } from '@/components/ui'
 import { fmtDate, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
+import type { BriefAlert, ProjectWatch } from '@/lib/analysis/project-watch'
 import { useApp } from '../layout'
 
-interface BriefData { brief: DailyBrief; schedule: { id: string; name: string; version: string; editsApplied: number; sourceType: string }; activities: { id: string; code: string; name: string }[] }
 type Audience = 'pm' | 'field' | 'client'
+interface BriefData { brief: DailyBrief; watch: ProjectWatch; alerts: BriefAlert[]; email?: { available: boolean; everyMorning: Audience | null }; schedule: { id: string; name: string; version: string; editsApplied: number; sourceType: string }; activities: { id: string; code: string; name: string }[] }
 const AUDIENCES: { id: Audience; label: string; hint: string }[] = [
   { id: 'pm', label: 'Project manager', hint: 'Decisions, drivers and exposure' },
   { id: 'field', label: 'Field', hint: 'What to start, finish and protect today' },
@@ -42,26 +43,34 @@ export default function TodayPage() {
   const [whatIf, setWhatIf] = useState<{ activity: string; days: string }>({ activity: '', days: '5' })
   const [ranWhatIf, setRanWhatIf] = useState<{ activity: string; days: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [mailed, setMailed] = useState('')
   const [busy, setBusy] = useState('')
   const canWrite = can('schedule.write')
 
+  // Only the newest request may land: a slow answer for one project must never show under another.
+  const seq = useRef(0)
   const load = useCallback(async () => {
     if (!sid) return
+    const mine = ++seq.current
     setErr('')
     const q = new URLSearchParams({ asOf })
     if (ranWhatIf?.activity) { q.set('whatIfActivity', ranWhatIf.activity); q.set('whatIfDays', ranWhatIf.days) }
     try {
       const [b, r] = await Promise.all([fetch(`/api/schedules/${encodeURIComponent(sid)}/brief?${q}`), fetch(`/api/schedules/${encodeURIComponent(sid)}/register`)])
       const bd = await b.json().catch(() => ({}))
+      if (mine !== seq.current) return
       if (!b.ok) { setErr(bd.error || 'The brief could not be loaded.'); return }
       setData(bd)
       const rd = await r.json().catch(() => ({}))
+      if (mine !== seq.current) return
       setItems(r.ok ? rd.items : [])
       // What the recent changes moved (also marked on the Schedule tab).
-      fetch(`/api/schedules/${encodeURIComponent(sid)}/changes`).then(x => (x.ok ? x.json() : null)).then(setImpact).catch(() => {})
-    } catch { setErr('Network error. Check your connection and try again.') }
+      fetch(`/api/schedules/${encodeURIComponent(sid)}/changes`).then(x => (x.ok ? x.json() : null)).then(d => { if (mine === seq.current) setImpact(d) }).catch(() => {})
+    } catch { if (mine === seq.current) setErr('Network error. Check your connection and try again.') }
   }, [sid, asOf, ranWhatIf])
-  useEffect(() => { setData(null); load() }, [load])
+  // A new project starts clean; a new date or what-if keeps the page on screen while it recalculates.
+  useEffect(() => { setData(null); setItems([]); setImpact(null); setRanWhatIf(null); setWhatIf({ activity: '', days: '5' }); setMailed(''); setErr('') }, [sid])
+  useEffect(() => { load() }, [load])
 
   const progress = async (row: BriefRow, kind: 'start' | 'finish') => {
     if (!sid) return
@@ -88,7 +97,11 @@ export default function TodayPage() {
       <DataCenterSampleButton className="-mt-10 pb-12 text-center" />
     </>
   )
-  if (!data) return <div className="px-6 py-10 text-[14px] text-warm-600 flex items-center gap-2" role="status">{err || <><Loader2 size={14} className="animate-spin" aria-hidden /> Preparing today’s brief…</>}</div>
+  if (!data) return (
+    <div className="px-6 py-10 text-[14px] text-warm-600" role="status">
+      {err ? <><p className="mb-3 text-status-at-risk">{err}</p><button type="button" className={btn} onClick={load}>Try again</button></> : <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Preparing today’s brief…</span>}
+    </div>
+  )
 
   const b = data.brief
   const tone = b.headline.status === 'behind' ? 'text-status-at-risk' : b.headline.status === 'unknown' ? 'text-warm-700' : 'text-status-on-track'
@@ -122,14 +135,47 @@ export default function TodayPage() {
         </dl>
       </section>
 
+      {data.alerts.length > 0 && (
+        <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
+          <h2 id="alerts-h" className="text-[16px] font-semibold text-navy-950">Needs attention today ({data.alerts.filter(a => a.level === 'act').length} to act on, {data.alerts.filter(a => a.level === 'watch').length} to watch)</h2>
+          <ul className="mt-2 space-y-1.5">
+            {data.alerts.map((a, i) => (
+              <li key={i} className="flex gap-2 text-[13.5px] text-warm-700">
+                <span className={`mt-0.5 h-fit flex-shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
+                <span>{fmtDates(a.text)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* One brief, three readers. */}
       <section aria-labelledby="aud-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="aud-h" className="text-[16px] font-semibold text-navy-950">What you should know today</h2>
+          <div className="flex flex-wrap gap-2">
           <button type="button" className={btn} onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch { setErr('Copy is not available in this browser; select the text instead.') } }}>
             <ClipboardCopy size={13} className="inline mr-1 -mt-0.5" aria-hidden />{copied ? 'Copied' : 'Copy to send'}
           </button>
+          <button type="button" className={btn} disabled={busy === 'mail'} onClick={async () => {
+            setBusy('mail'); setMailed('')
+            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf })
+            setBusy(''); setMailed(r.ok ? 'Sent to your email.' : r.data.error || 'The email could not be sent.')
+          }}><Mail size={13} className="inline mr-1 -mt-0.5" aria-hidden />{busy === 'mail' ? 'Sending…' : 'Email it to me'}</button>
+          </div>
         </div>
+        {mailed && <p role="status" className="mt-2 text-[13px] text-warm-700">{mailed}</p>}
+        {data.email?.available && (
+          <label className="mt-2 flex items-start gap-2 text-[13px] text-warm-700">
+            <input type="checkbox" className="mt-0.5" checked={!!data.email.everyMorning} disabled={busy === 'sub'} onChange={async e => {
+              setBusy('sub'); setMailed('')
+              const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience }, e.target.checked ? 'PUT' : 'DELETE')
+              setBusy('')
+              if (!r.ok) setMailed(r.data.error || 'The setting was not saved.'); else await load()
+            }} />
+            <span>Email me this brief every working morning{data.email.everyMorning ? ` (${AUDIENCES.find(a => a.id === data.email!.everyMorning)!.label} version)` : ` (${AUDIENCES.find(a => a.id === audience)!.label} version)`}</span>
+          </label>
+        )}
         <div role="tablist" aria-label="Who the brief is for" className="mt-3 flex flex-wrap gap-1.5">
           {AUDIENCES.map(a => (
             <button key={a.id} role="tab" type="button" id={`aud-${a.id}`} aria-selected={audience === a.id} aria-controls="aud-panel" onClick={() => setAudience(a.id)}
@@ -232,6 +278,40 @@ export default function TodayPage() {
           ))}</ul>
         )}
       </Card>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <Card icon={<FileText size={15} />} title="Contract watch" sub="Notice periods, damages and update duties, read from the contract and what they mean today">
+          {data.watch.contract.length === 0 ? (
+            <p className="text-[13px] text-warm-600">{data.watch.read.contract ? 'No notice period, liquidated damages or update duty was found in the contract documents of this project.' : <>Add the contract and the scheduling specification under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link>. RunF9 will watch the notice periods, the liquidated damages and the update duties against the schedule every day.</>}</p>
+          ) : (
+            <ul className="space-y-2.5">{data.watch.contract.map((c, i) => (
+              <li key={i} className={`rounded-lg border p-3 text-[13px] ${c.active ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-warm-200'}`}>
+                <span className="font-medium text-navy-950">{fmtDates(c.text)}</span>
+                <q className="mt-1 block text-warm-700">{c.quote}</q>
+                <span className="mt-1 block text-[12px] text-warm-600">{c.citation.includes(c.title) ? c.citation : `${c.title} ${c.citation}`}</span>
+              </li>
+            ))}</ul>
+          )}
+        </Card>
+        <Card icon={<HardHat size={15} />} title="The field and the drawings against the schedule" sub="What the daily reports and the design documents say that the schedule does not">
+          <div>
+            <h3 className="text-[12.5px] font-semibold text-navy-950">In the ground, not in the schedule</h3>
+            {data.watch.field.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.field ? 'The daily reports agree with the schedule.' : 'Add daily field reports under Documents to compare the work on site with the schedule.'}</p> : (
+              <ul className="space-y-2">{data.watch.field.map((f, i) => (
+                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{f.text}</span><q className="block">{f.quote}</q><span className="block text-[12px] text-warm-600">{f.citation.includes(f.title) ? f.citation : `${f.title} ${f.citation}`}</span></li>
+              ))}</ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-[12.5px] font-semibold text-navy-950">In the drawings and specifications, not in the schedule</h3>
+            {data.watch.notInSchedule.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.design ? 'Every kind of work the design documents name has an activity.' : 'Add drawings and specifications under Documents to check that their scope is in the schedule.'}</p> : (
+              <ul className="space-y-2">{data.watch.notInSchedule.map((g, i) => (
+                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{g.label}: no activity covers it.</span><q className="block">{g.quote}</q><span className="block text-[12px] text-warm-600">{g.citation.includes(g.title) ? g.citation : `${g.title} ${g.citation}`}</span></li>
+              ))}</ul>
+            )}
+          </div>
+        </Card>
+      </div>
 
       <Register sid={sid!} items={items} openCount={openItems.length} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
 

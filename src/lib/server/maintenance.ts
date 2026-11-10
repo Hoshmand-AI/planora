@@ -52,6 +52,8 @@ export async function maybeRunMaintenance(): Promise<void> {
       RETURNING last_run_at`)
     if (!claim.rowCount) return
     const result = await runRetention()
+    // The day's Daily Brief emails, for installs without a scheduler (each subscription is sent once a day).
+    await (await import('./brief-digest')).sendDueBriefs()
     log('info', 'retention run', result as unknown as Record<string, unknown>)
   } catch (err) {
     log('error', 'retention run failed', errorFields(err))

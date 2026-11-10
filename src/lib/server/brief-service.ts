@@ -6,6 +6,7 @@ import { getScheduleSeries } from '@/lib/db'
 import { orderSeries } from '@/lib/analysis/compare'
 import { buildDailyBrief, missingScope, type BriefChange, type BriefWhatIf, type DailyBrief } from '@/lib/analysis/daily-brief'
 import { extractSignals, SIGNAL_DOC_TYPES } from '@/lib/analysis/correspondence'
+import { projectWatch, type BriefAlert, type ProjectWatch, type WatchChunk } from '@/lib/analysis/project-watch'
 import { contractTarget, loadScheduleData, networkOf } from '@/lib/planning/service'
 import { evaluateNetwork, uploadedRecoveryOptions } from '@/lib/planning/uploaded-recovery'
 import { remainingOf } from '@/lib/planning/uploaded-edits'
@@ -23,7 +24,7 @@ export const RECENT_CHANGE_DAYS = 7
 
 export interface BriefOptions { asOf?: string | null; whatIf?: { activity: string; days: number } | null }
 
-export async function loadDailyBrief(scheduleId: string, orgId: string, o: BriefOptions = {}): Promise<{ brief: DailyBrief; schedule: { id: string; name: string; version: string; editsApplied: number; sourceType: string }; activities: { id: string; code: string; name: string }[] } | null> {
+export async function loadDailyBrief(scheduleId: string, orgId: string, o: BriefOptions = {}): Promise<{ brief: DailyBrief; watch: ProjectWatch; alerts: BriefAlert[]; schedule: { id: string; name: string; version: string; editsApplied: number; sourceType: string }; activities: { id: string; code: string; name: string }[] } | null> {
   const data = await loadScheduleData(scheduleId, orgId, { basis: 'scenario' })
   if (!data) return null
   const s = data.schedule
@@ -32,15 +33,18 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   const base = data.cpm ? evaluateNetwork(net, []) : null
   const target = contractTarget(data.analysis)
   const byCode = new Map(data.activities.map(a => [a.activityId.toLowerCase(), a]))
+  const byId = new Map(data.activities.map(a => [a.id, a]))
   const openTask = (a: (typeof data.activities)[number] | undefined) => !!a && a.activityType === 'task' && a.status !== 'complete' && !a.actualFinish
 
   const register = await listRegister(orgId, registerKey(s)).catch(err => { log('warn', 'register unavailable', { error: (err as Error).message }); return [] })
 
   // Signals: unflagged passages of the project's correspondence (never passages that read like instructions).
   let signals: ReturnType<typeof extractSignals> = []
+  let docChunks: WatchChunk[] = []
   try {
-    const chunks = (await scopedChunks({ orgId, scheduleId: s.id, access: await currentWorkspaceAccess() }, { includeUnreviewed: true, limit: 3000 }))
-      .filter(c => !c.flagged && c.scope === 'project' && SIGNAL_DOC_TYPES.includes(c.docType))
+    const all = (await scopedChunks({ orgId, scheduleId: s.id, access: await currentWorkspaceAccess() }, { includeUnreviewed: true, limit: 3000 })).filter(c => !c.flagged && c.scope === 'project')
+    docChunks = all.map(c => ({ documentId: c.documentId, title: c.title, docType: c.docType, citation: c.citation, text: c.text }))
+    const chunks = all.filter(c => SIGNAL_DOC_TYPES.includes(c.docType))
     signals = extractSignals(chunks.map(c => ({ documentId: c.documentId, title: c.title, docType: c.docType, citation: c.citation, text: c.text })),
       data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, open: a.status !== 'complete' && !a.actualFinish })))
   } catch (err) { log('warn', 'correspondence signals unavailable', { error: (err as Error).message }) }
@@ -65,7 +69,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   }
   if (base) {
     const pathIds = data.analysis.drivingPath?.ids?.length ? data.analysis.drivingPath.ids : base.longestPath
-    const driver = pathIds.map(id => data.activities.find(a => a.id === id)).find(a => openTask(a) && remainingOf(a!) > 0)
+    const driver = pathIds.map(id => byId.get(id)).find(a => openTask(a) && remainingOf(a!) > 0)
     if (o.whatIf) {
       const a = byCode.get(o.whatIf.activity.trim().toLowerCase())
       const days = Math.max(1, Math.min(365, Math.round(o.whatIf.days)))
@@ -80,7 +84,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
       if (w) whatIfs.push(w)
     }
     for (const sg of signals.filter(x => x.activity && x.days && (x.kind === 'delay' || x.kind === 'change')).slice(0, 2)) {
-      const a = data.activities.find(x => x.id === sg.activity!.id)
+      const a = byId.get(sg.activity!.id)
       const w = openTask(a) ? slip(a!, Math.min(365, sg.days!), `Correspondence: ${sg.title.slice(0, 50)}`) : null
       if (w) whatIfs.push(w)
     }
@@ -112,12 +116,12 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
       const p = prev ? await loadScheduleData(prev.id, orgId) : null
       if (p) {
         const key = (r: { predecessorId: string; successorId: string; type: string; lag: number }, acts: typeof data.activities) => {
-          const c = (id: string) => acts.find(a => a.id === id)?.activityId ?? id
-          return `${c(r.predecessorId)}>${c(r.successorId)}:${r.type}:${r.lag}`
+          const code = new Map(acts.map(a => [a.id, a.activityId]))
+          return (x: typeof r) => `${code.get(x.predecessorId) ?? x.predecessorId}>${code.get(x.successorId) ?? x.successorId}:${x.type}:${x.lag}`
         }
         const before = new Map(p.activities.map(a => [a.activityId, a]))
         const after = new Map(data.activities.map(a => [a.activityId, a]))
-        const relB = new Set(p.relationships.map(r => key(r, p.activities))), relA = new Set(data.relationships.map(r => key(r, data.activities)))
+        const relB = new Set(p.relationships.map(key(p.relationships[0], p.activities))), relA = new Set(data.relationships.map(key(data.relationships[0], data.activities)))
         sinceLastUpdate = {
           version: `${p.schedule.name} (${p.schedule.version})`,
           finishMovedDays: p.analysis.forecastFinish && data.analysis.forecastFinish ? diff(p.analysis.forecastFinish, data.analysis.forecastFinish) : null,
@@ -138,8 +142,32 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     register, signals, changes, submittedFinish: data.editsApplied ? data.submittedForecastFinish : null,
     whatIfs, logic, missingScope: missingScope(data.activities, s.projectType), sinceLastUpdate,
   })
+  // The project's documents read against the schedule: contract clauses, drawings and specifications, field reports.
+  const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
+    daysBehind: brief.headline.daysBehind, staleDays: brief.staleDays, projectType: s.projectType,
+    delaysReported: signals.filter(x => x.kind === 'delay' || x.kind === 'change').map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
+    openChangeItems: brief.changeItems.length,
+  })
+
+  // What needs someone's attention today, most pressing first.
+  const alerts: BriefAlert[] = []
+  const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
+  if (brief.headline.status === 'behind') alerts.push({ level: 'act', section: 'deadline', text: `The forecast is ${n(brief.headline.daysBehind!, 'day')} behind the required date.` })
+  if (brief.overdue.finishCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.` })
+  if (brief.overdue.startCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.` })
+  for (const c of watch.contract.filter(x => x.active)) alerts.push({ level: 'act', section: 'contract', text: c.text })
+  for (const f of watch.field) alerts.push({ level: 'act', section: 'field', text: f.text })
+  const overdueItems = register.filter(r => r.status === 'open' && r.dueDate && r.dueDate < today)
+  if (overdueItems.length) alerts.push({ level: 'act', section: 'register', text: `${n(overdueItems.length, 'register item')} past due: ${overdueItems.slice(0, 2).map(r => r.title).join('; ')}.` })
+  const newDelays = signals.filter(x => x.kind === 'delay')
+  if (newDelays.length) alerts.push({ level: 'watch', section: 'signals', text: `${n(newDelays.length, 'delay')} reported in emails, minutes or field reports${newDelays[0].activity ? `, including ${newDelays[0].activity.code} ${newDelays[0].activity.name}` : ''}.` })
+  if (brief.today.starting.length || brief.today.finishing.length) alerts.push({ level: 'watch', section: 'today', text: `Today: ${n(brief.today.starting.length, 'start')} and ${n(brief.today.finishing.length, 'finish', 'finishes')} are scheduled${[...brief.today.starting, ...brief.today.finishing].some(r => r.critical) ? ', some on the critical path' : ''}.` })
+  if (brief.lookahead.becomingCritical.length) alerts.push({ level: 'watch', section: 'lookahead', text: `${n(brief.lookahead.becomingCritical.length, 'activity is', 'activities are')} within ${10} work days of becoming critical.` })
+  if (watch.notInSchedule.length) alerts.push({ level: 'watch', section: 'documents', text: `The project documents name ${n(watch.notInSchedule.length, 'kind')} of work that no activity covers: ${watch.notInSchedule.slice(0, 3).map(x => x.label).join('; ')}.` })
+  if (brief.staleDays != null && brief.staleDays > 10) alerts.push({ level: 'watch', section: 'deadline', text: `Progress is ${brief.staleDays} days old. Record progress or upload an update.` })
+
   return {
-    brief,
+    brief, watch, alerts,
     schedule: { id: s.id, name: s.name, version: s.version, editsApplied: data.editsApplied, sourceType: s.sourceType },
     activities: data.activities.filter(a => (a.activityType === 'task' || a.activityType === 'milestone') && a.status !== 'complete' && !a.actualFinish).map(a => ({ id: a.id, code: a.activityId, name: a.name })),
   }

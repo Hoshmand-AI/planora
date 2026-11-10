@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense } from 'react'
+import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense, Fragment } from 'react'
 import type { DataLocation } from '@/lib/server/data-location'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
 import Link from 'next/link'
@@ -221,6 +221,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [selectedSchedule])
 
+  // How many things on the open project need action today (the Today tab carries the count).
+  const [todayCount, setTodayCount] = useState(0)
+  const onToday = pathname.startsWith('/dashboard/today')
+  useEffect(() => {
+    setTodayCount(0)
+    if (!selectedSchedule || !user || mfaSetupRequired) return
+    let live = true
+    // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Today tab is entered or left.
+    const d = new Date(), asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}`).then(r => (r.ok ? r.json() : null))
+      .then(d => { if (live && d) setTodayCount((d.alerts as { level: string }[]).filter(a => a.level === 'act').length) }).catch(() => {})
+    return () => { live = false }
+  }, [selectedSchedule, user, mfaSetupRequired, onToday])
+
   // Removes the open upload (wrong file, or one that must not be here). The server audits it.
   const deleteUpload = async () => {
     const s = selectedSchedule
@@ -424,11 +438,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {PROJECT_TABS.map(t => {
                     const here = pathname.startsWith(t.href)
                     return (
-                      <Link key={t.href} href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
+                      <Fragment key={t.href}>
+                      <Link href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
                         className={`relative whitespace-nowrap px-3 py-3 text-[14px] transition-colors ${here ? 'text-navy-950 font-semibold' : 'text-warm-600 font-medium hover:text-navy-950'}`}>
                         {t.label}
                         <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
                       </Link>
+                      {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Today". */}
+                      {t.href === '/dashboard/today' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[11px] font-bold leading-[18px] text-white">{todayCount}</span>}
+                      </Fragment>
                     )
                   })}
                 </nav>

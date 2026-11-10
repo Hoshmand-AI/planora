@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { hasControlMarkings, mostRestrictive } from '@/lib/server/classification'
 import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { can } from '@/lib/server/permissions'
@@ -39,7 +40,8 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
 
   const cls = plan.answers['security.classification']
   const classification = cls?.status === 'withheld' ? 'classified' : typeof cls?.value === 'string' ? cls.value : null
-  const vision = visionAllowed({ canUseAi: can(auth.role, 'ai.use'), classification })
+  // Until the classification question is answered, nobody has said this material may leave: no page is sent to a model.
+  const vision = cls ? visionAllowed({ canUseAi: can(auth.role, 'ai.use'), classification }) : { ok: false, reason: 'the security classification question in the interview is not answered yet' }
   let pages
   try {
     pages = (await extractDocument(bytes, name, {
@@ -56,7 +58,9 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
   let note: string | null = null
   const missing = (Object.keys(PREFILL_QUESTIONS) as PrefillQuestion[]).filter(q => !proposals.some(p => p.questionId === q) && !plan.answers[q])
   const flagged = pages.some(p => detectInjection(p.text).length)
-  const gm = groundingMode(classification, [])
+  // A document that carries CUI or classification markings is handled as CUI even when the plan is not marked.
+  const marked = pages.some(p => hasControlMarkings(p.text))
+  const gm = groundingMode(marked ? mostRestrictive(classification, 'cui') : classification, [])
   if (!missing.length) note = null
   else if (flagged) note = 'The document contains text that reads like instructions to an AI, so it was not sent to a model; the answers below come from rules only.'
   else if (gm.mode !== 'model') note = gm.reason

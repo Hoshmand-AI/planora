@@ -328,7 +328,8 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     const isSummary = tagText(own, 'Summary') === '1'
     // Outline: a work task belongs to the nearest summary above it; its WBS is that summary's path
     // ("1.2 Foundations", like the P6 parser's WBS path) so the hierarchy can be rebuilt on export.
-    const level = parseInt(outlineLevel, 10)
+    // A real outline is a few levels deep; a huge number in a damaged file must not size the stack.
+    const level = Math.min(parseInt(outlineLevel, 10), 64)
     const ownWbs = tagText(own, 'WBS') || tagText(own, 'OutlineNumber')
     let parentWbs = ''
     if (level > 0) {

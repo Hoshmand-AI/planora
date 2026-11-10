@@ -69,6 +69,9 @@ jobs:
       # Test-only: webhooks may target the local receiver; emails are written to a folder the checks read.
       RUNF9_ALLOW_INSECURE_WEBHOOKS: '1'
       RUNF9_EMAIL_OUTBOX: /tmp/runf9-outbox
+      # Test-only: the secret the morning scheduler presents to /api/cron/daily-brief.
+      CRON_SECRET: ci-only-cron-secret
+      RUNF9_BRIEF_HOUR_UTC: '0'
       # Test-only: cloud storage connections may use the local S3 and Azure Blob emulators.
       RUNF9_STORAGE_CUSTOM_ENDPOINTS: 'true'
       # Test-only RunF9 cloud identities, pointed at scripts/mock-cloud.mjs (sign-in instead of keys).

@@ -21,7 +21,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.write', apiKey: true
   const history = await loadFirmHistory(ctx.orgId, plan.answers['project.type'].value as ProjectType)
   const generated = generateSchedule({ answers: plan.answers, history, previous: body.fresh ? null : plan.generated })
   plan.generated = generated
-  plan.audit.push({ at: generated.generatedAt, by: ctx.name, action: body.fresh ? 'generate_fresh' : 'generate', detail: `${generated.activities.length} activities, finish ${generated.cpm?.projectFinish}` })
+  plan.audit.push({ at: generated.generatedAt, by: ctx.name, byId: ctx.userId, action: body.fresh ? 'generate_fresh' : 'generate', detail: `${generated.activities.length} activities, finish ${generated.cpm?.projectFinish}` })
   const saved = await savePlan(plan)
   return NextResponse.json(await planView(saved, ctx.orgId))
 })

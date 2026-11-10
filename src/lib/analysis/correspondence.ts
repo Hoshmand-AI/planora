@@ -13,7 +13,9 @@ export interface SignalActivity { id: string; code: string; name: string; open: 
 export const SIGNAL_DOC_TYPES: readonly string[] = ['email', 'meeting', 'daily_report', 'rfi', 'change_order']
 export const MAX_SIGNALS = 20
 
-const DELAY = /\b(delay(?:ed|s|ing)?|late|slip(?:ped|s|ping)?|push(?:ed|ing)? (?:out|back)|behind schedule|behind|won'?t make|will not make|not ready|on hold|hold[- ]up|stopp?ed|suspend(?:ed)?|back[- ]?order(?:ed)?|lead time|re-?sequence|stand[- ]?by|shortage|rework|failed (?:inspection|test)|rejected|weather day|no access)\b/i
+const DELAY = /\b(delay(?:ed|s|ing)?|(?:is|are|was|were|be|running|arrive[sd]?|deliver(?:ed|y)?) late|slip(?:ped|s|ping)?|push(?:ed|ing)? (?:out|back)|behind schedule|won'?t make|will not make|not ready|on hold|hold[- ]up|work (?:has |was |is )?stopp?ed|stopp?ed work|suspend(?:ed)?|back[- ]?order(?:ed)?|lead time (?:has |is now |now )?(?:increased|extended|grown|slipped)|re-?sequence|stand[- ]?by|shortage|rework|failed (?:the |its |a )?(?:\w+ )?(?:inspection|test)|rejected|weather day|no access)\b/i
+/** Sentences that say there is no delay, or that things are as planned: never a delay. */
+const NO_DELAY = /\bno (?:new |further |schedule )?(?:delays?|impacts?|slippage|issues?)\b|\bdelays?\s*:\s*(?:none|nil|n\/?a|no)\b|\bwithout (?:any )?delay|\bnot (?:been )?delayed\b|\bno impact\b|\bas planned\b|\bon schedule\b|\bon track\b|\bahead of schedule\b/i
 const CHANGE = /\b(change order|\bPCO\b|\bCOR?\b #?\d|change request|directive|\bCCD\b|\bASI\b|bulletin|revised (?:drawing|design|scope)|added scope|additional scope|scope change|amendment|redesign)\b/i
 const RISK = /\b(risk|concern(?:ed)?|may not|might not|at risk|unlikely|uncertain|pending approval|awaiting|waiting on|not yet (?:approved|released|issued)|unresolved)\b/i
 const COMMIT = /\b(will (?:deliver|arrive|complete|finish|start|be (?:on site|ready|energized))|commit(?:ted|s)? to|confirmed (?:for|delivery)|expected (?:on|by)|scheduled for|ETA)\b/i
@@ -35,7 +37,8 @@ function daysIn(sentence: string): number | null {
 
 /** Split into sentences without breaking on abbreviations inside activity IDs or decimals. */
 function sentences(text: string): string[] {
-  return text.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])|\s*[\n•]\s*/).map(s => s.trim()).filter(s => s.length >= 20 && s.length <= 400)
+  // Lines first (field reports and minutes are often one fact per line, without full stops), then sentences.
+  return text.split(/[\r\n•]+/).flatMap(line => line.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/)).map(s => s.trim()).filter(s => s.length >= 20 && s.length <= 400)
 }
 
 /** The activity a sentence is about: an activity ID in it, else the open activity whose name shares the most (at least two) significant words. */
@@ -61,7 +64,7 @@ export function extractSignals(chunks: CorrespondenceChunk[], activities: Signal
   for (const c of chunks) {
     if (!SIGNAL_DOC_TYPES.includes(c.docType)) continue
     for (const s of sentences(c.text)) {
-      const kind: BriefSignal['kind'] | null = DELAY.test(s) ? 'delay' : CHANGE.test(s) ? 'change' : RISK.test(s) ? 'risk' : COMMIT.test(s) ? 'commitment' : null
+      const kind: BriefSignal['kind'] | null = DELAY.test(s) && !NO_DELAY.test(s) ? 'delay' : CHANGE.test(s) ? 'change' : RISK.test(s) ? 'risk' : COMMIT.test(s) ? 'commitment' : null
       if (!kind) continue
       const key = norm(s).slice(0, 120)
       if (seen.has(key)) continue

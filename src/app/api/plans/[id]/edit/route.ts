@@ -39,7 +39,7 @@ export const POST = api<{ id: string }>({ permission: 'plan.write' }, async (req
     // The approval was bound to the previous content; it no longer applies (publishing needs a fresh review).
     const approvalInvalidated = wasApproved && !approvalOfCurrentVersion(plan).approved
     const at = new Date().toISOString()
-    edits.forEach((edit, i) => plan.audit.push({ at, by: ctx.name, action: `override:${edit.kind}`, detail: `${summaries[i]}. Reason: ${String(edit.reason).trim().slice(0, 500)}${fromInstruction ? ' (plain-English edit)' : ''}${approvalInvalidated && i === edits.length - 1 ? '. Earlier approval no longer applies; a fresh review is required.' : ''}` }))
+    edits.forEach((edit, i) => plan.audit.push({ at, by: ctx.name, byId: ctx.userId, action: `override:${edit.kind}`, detail: `${summaries[i]}. Reason: ${String(edit.reason).trim().slice(0, 500)}${fromInstruction ? ' (plain-English edit)' : ''}${approvalInvalidated && i === edits.length - 1 ? '. Earlier approval no longer applies; a fresh review is required.' : ''}` }))
     const saved = await savePlan(plan)
     return NextResponse.json({ ...(await planView(saved, ctx.orgId)), impact, summary, approvalInvalidated })
   } catch (err) {
