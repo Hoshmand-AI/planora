@@ -11,7 +11,8 @@ import { sendDueBriefs } from '@/lib/server/brief-digest'
  */
 export const GET = publicApi(async req => {
   const secret = process.env.CRON_SECRET
-  if (!secret) return NextResponse.json({ error: 'Not configured' }, { status: 503 })
+  // No secret set: nothing runs from here (the hourly housekeeping sends the briefs). Not an error, so it is not logged as one.
+  if (!secret) return NextResponse.json({ configured: false, sent: 0, skipped: 0 })
   const given = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
   if (!given || !safeEqual(given, secret)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   return NextResponse.json(await sendDueBriefs(new Date(), (process.env.APP_URL || appOrigin(req)).replace(/\/+$/, '')))
