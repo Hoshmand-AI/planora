@@ -47,7 +47,6 @@ const ROWS: Row[] = [
   { code: 'M5020', name: 'Set Chillers and Cooling Towers', wbs: 'MECH', dur: 20, preds: [['M5010'], ['P1060']] },
   { code: 'M5030', name: 'Install CRAH Units - Data Hall 1', wbs: 'DH1', dur: 25, preds: [['M5020']] },
   { code: 'M5035', name: 'Chilled Water Flush and Fill', wbs: 'MECH', dur: 15, preds: [['M5020']] },
-  { code: 'M5040', name: 'Fire Protection and VESDA', wbs: 'MECH', dur: 40, preds: [['C3050']] },
   { code: 'M5050', name: 'BMS and EPMS Controls', wbs: 'MECH', dur: 50, preds: [['M5020'], ['E4040']] },
   { code: 'D6005', name: 'Data Hall 1 Grounding Grid', wbs: 'DH1', dur: 10, preds: [['E4040', 'SS', 54]] },
   { code: 'D6010', name: 'Data Hall 1 Containment and Cable Tray', wbs: 'DH1', dur: 35, preds: [['E4050']] },
@@ -88,7 +87,7 @@ export interface DataCenterSample {
   xer: string
   dataDate: string
   requiredDate: string
-  documents: { title: string; docType: 'meeting' | 'email' | 'daily_report'; text: string }[]
+  documents: { title: string; docType: 'meeting' | 'email' | 'daily_report' | 'contract' | 'specification'; text: string }[]
   register: { kind: 'risk' | 'issue' | 'pco' | 'change_order'; title: string; owner: string; dueInDays: number; impactDays: number | null; activityCodes: string[] }[]
 }
 
@@ -179,8 +178,20 @@ export function dataCenterSample(today: string): DataCenterSample {
       { title: `Daily field report ${us(last)}`, docType: 'daily_report', text: [
         `Daily field report, ${us(last)}. Weather clear. 212 workers on site.`,
         'Busway installation in Data Hall 1 continued on rows A through D. CRAH units 9 through 14 were set.',
+        'The crew started Data Hall 1 containment and cable tray in row A ahead of the busway.',
         'BMS controls pulling is behind schedule in the electrical rooms because the conduit was not released; the crew lost 2 days.',
         'No safety incidents.',
+      ].join('\n\n') },
+      { title: 'Contract excerpt: time and schedule', docType: 'contract', text: [
+        'ARTICLE 8. TIME.',
+        '8.2 The Contractor shall give the Owner written notice of any delay or change affecting the Contract Time within seven (7) days of the event giving rise to it. Failure to give notice waives the claim.',
+        '8.4 If Ready for Service of Data Hall 1 is not achieved by the required date, the Contractor shall pay liquidated damages of $50,000 per day for each calendar day of delay.',
+        '8.6 The Contractor shall submit an updated schedule monthly with each application for payment.',
+        '8.7 Float is not for the exclusive use of either party and belongs to the project.',
+      ].join('\n\n') },
+      { title: 'Specification 21 13 00 and 28 31 00 excerpt', docType: 'specification', text: [
+        'SECTION 21 13 00. Each data hall and electrical room shall be protected by a double-interlock pre-action sprinkler system.',
+        'SECTION 28 31 00. Provide aspirating smoke detection (VESDA) in each data hall, tied to the fire alarm system, and test it before the integrated systems test.',
       ].join('\n\n') },
     ],
     register: [

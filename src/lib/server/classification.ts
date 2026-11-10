@@ -49,6 +49,13 @@ const isClassification = (c: unknown): c is DataClassification => c === 'unclass
 export const isLessRestrictive = (next: string | null | undefined, stored: string | null | undefined): boolean =>
   (isClassification(stored) ? RANK[stored] : 0) > (isClassification(next) ? RANK[next] : 0)
 
+/**
+ * Banner and portion markings that say a document is controlled or classified (as printed: upper case).
+ * A hit means the text is handled as CUI at least, whatever the project's setting says.
+ */
+const MARKINGS = /\bCUI\b|CONTROLLED UNCLASSIFIED INFORMATION|\bFOUO\b|FOR OFFICIAL USE ONLY|\bNOFORN\b|\bTOP SECRET\b|\bSECRET\/\/|\bCONFIDENTIAL\/\/|\(U\/\/FOUO\)|\bITAR[- ]CONTROLLED\b|EXPORT CONTROLLED/
+export const hasControlMarkings = (text: string): boolean => MARKINGS.test(text)
+
 export function mostRestrictive(...cs: (string | null | undefined)[]): DataClassification | null {
   let out: DataClassification | null = null
   for (const c of cs) if (isClassification(c) && (out === null || RANK[c] > RANK[out])) out = c
