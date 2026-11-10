@@ -115,10 +115,10 @@ export function seriesBaselineFrom(
 }
 
 /** Loads the series' Baseline upload (firm-scoped) for an upload; null when there is none. */
-export async function loadSeriesBaseline(orgId: string, current: SeriesMember & { projectKey?: string | null }): Promise<ResolvedBaseline | null> {
+export async function loadSeriesBaseline(orgId: string, current: SeriesMember & { projectKey?: string | null; workspaceId?: string | null }): Promise<ResolvedBaseline | null> {
   if (!current.projectKey) return null
   const { getScheduleSeries, getActivities } = await import('@/lib/db')
-  const series = await getScheduleSeries(orgId, current.projectKey)
+  const series = await getScheduleSeries(orgId, current.projectKey, 'workspaceId' in current ? current.workspaceId ?? null : undefined)
   const base = pickSeriesBaseline(current, series)
   if (!base) return null
   const acts = await getActivities(base.id)
@@ -264,9 +264,9 @@ export const MAX_WINDOW_UPDATES = 36
  * and recalculated; capped at the latest MAX_WINDOW_UPDATES uploads. A schedule outside a series
  * returns just itself.
  */
-export async function loadSeriesUpdates(orgId: string, schedule: { id: string; projectKey?: string | null }, opts: { basis?: ScheduleBasis } = {}) {
+export async function loadSeriesUpdates(orgId: string, schedule: { id: string; projectKey?: string | null; workspaceId?: string | null }, opts: { basis?: ScheduleBasis } = {}) {
   const { getScheduleSeries, getScheduleById } = await import('@/lib/db')
-  const series = orderSeries(schedule.projectKey ? await getScheduleSeries(orgId, schedule.projectKey) : [await getScheduleById(schedule.id, orgId)].filter((s): s is Schedule => !!s))
+  const series = orderSeries(schedule.projectKey ? await getScheduleSeries(orgId, schedule.projectKey, 'workspaceId' in schedule ? schedule.workspaceId ?? null : undefined) : [await getScheduleById(schedule.id, orgId)].filter((s): s is Schedule => !!s))
   const truncated = series.length > MAX_WINDOW_UPDATES
   const picked = series.slice(-MAX_WINDOW_UPDATES)
   const loaded = []

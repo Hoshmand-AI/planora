@@ -43,7 +43,7 @@ const STOP = new Set(['the', 'a', 'an', 'of', 'for', 'and', 'to', 'activity', 't
 export function splitClauses(text: string): string[] {
   return text
     .replace(/\r/g, '')
-    .split(/\n+|;\s*|\.\s+(?=[A-Za-z])|\s+(?:and\s+)?then\s+/i)
+    .split(/\n+|;\s*|\.\s+(?=[A-Za-z])|\s+(?:and\s+)?then\s+|,?\s+and\s+(?=(?:also\s+)?(?:extend|lengthen|increase|shorten|reduce|compress|crash|decrease|trim|set|change|make|update|link|tie|connect|unlink|remove|delete|drop|add|rename|clear)\b)/i)
     .map(s => s.trim().replace(/^(?:and|also|please|then)\s+/i, '').replace(/[.!]+$/, '').trim())
     .filter(Boolean)
     .slice(0, MAX_CLAUSES)
@@ -86,11 +86,17 @@ export function resolveActivity(phrase: string, acts: RefActivity[]): RefActivit
   const p = phrase.trim().replace(/^(?:the|activity|task)\s+/i, '').replace(/^["“']|["”']$/g, '').trim()
   if (!p) return 'Name the activity (by its ID or name).'
   const lower = p.toLowerCase()
-  const tokens = new Set(lower.split(/[^a-z0-9._-]+/i).filter(Boolean))
-  const byCode = acts.filter(a => a.code && tokens.has(a.code.toLowerCase()))
-  if (byCode.length === 1) return byCode[0]
+  // The phrase is a code ("A1030", "12", "#12", "ID 12"), or is exactly a name.
+  const bare = lower.replace(/^(?:#|id\s+|no\.?\s+|number\s+)/, '')
+  const whole = acts.filter(a => a.code && a.code.toLowerCase() === bare)
+  if (whole.length === 1) return whole[0]
   const exact = acts.filter(a => norm(a.name) === norm(p))
   if (exact.length === 1) return exact[0]
+  // A code inside a longer phrase. A code that is only digits is not looked for there: "Level 2 Framing"
+  // and "March 15" are a name and a date, not activities 2 and 15.
+  const tokens = new Set(lower.split(/[^a-z0-9._-]+/i).filter(Boolean))
+  const byCode = acts.filter(a => a.code && !/^\d+$/.test(a.code) && tokens.has(a.code.toLowerCase()))
+  if (byCode.length === 1) return byCode[0]
   const words = sig(p).map(stem)
   if (!words.length) return `No activity matches "${p}".`
   const hits = acts.filter(a => { const n = new Set(sig(a.name).map(stem)); return words.every(w => n.has(w)) })
@@ -134,11 +140,17 @@ export function readClause(clause: string, acts: RefActivity[], opts: { allowStr
     const rest = c.replace(date.match, ' ').replace(/\s+/g, ' ').trim()
     if ((m = /^(.+?)\s+(?:must|should|has to|needs to|shall|will|can(?:not|'t)?|may not|is to|to)?\s*(?:not\s+)?(start|begin|finish|end|complete|be (?:done|complete|completed|finished))\b(.*)$/i.exec(rest))) {
       const verb = /^(start|begin)/i.test(m[2]) ? 'S' : 'F'
-      const q = rest.toLowerCase()
-      const neg = /\b(?:cannot|can't|can not|may not|must not|not)\b/.test(c.toLowerCase())
+      // Read the words after the activity's name only (a name may itself hold "after" or "before").
+      const said = rest.slice(m[1].length).toLowerCase()
+      const q = m[3].toLowerCase()
+      const neg = /\b(?:cannot|can't|can not|may not|must not|shall not|should not|not)\b/.test(said)
       let kind: 'NET' | 'NLT' | 'O' | null = null
-      if (/\bno earlier than\b|\bnot before\b|\bon or after\b|\bafter\b/.test(q) || (neg && /\bbefore\b/.test(q))) kind = 'NET'
-      else if (/\bno later than\b|\bby\b|\bon or before\b|\bbefore\b/.test(q) || (neg && /\bafter\b/.test(q))) kind = 'NLT'
+      if (/\bnot? earlier than\b|\bon or after\b/.test(q)) kind = 'NET'
+      else if (/\bnot? later than\b|\bon or before\b/.test(q)) kind = 'NLT'
+      // "cannot finish after" is no later than; "must not start before" is no earlier than.
+      else if (/\bafter\b/.test(q)) kind = neg ? 'NLT' : 'NET'
+      else if (/\bbefore\b/.test(q)) kind = neg ? 'NET' : 'NLT'
+      else if (/\bby\b/.test(q)) kind = 'NLT'
       else if (/\bon\b/.test(q)) kind = 'O'
       if (!kind) return { error: 'Say whether the date is "no earlier than", "by / no later than" or "on".' }
       const type = (kind === 'O' ? (verb === 'S' ? 'MSO' : 'MFO') : `${verb}${kind}`) as InstructionConstraint
@@ -148,11 +160,12 @@ export function readClause(clause: string, acts: RefActivity[], opts: { allowStr
   }
 
   // Durations: "extend A by 5 days", "add 2 weeks to A", "shorten A by 3 days", "A takes 10 days", "set A to 12 days".
-  if ((m = /^(?:extend|lengthen|increase|delay|push)\s+(.+?)\s+by\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null) { const d = parseDays(m[2])!; return one(m[1], a => ({ op: 'duration', activityId: a.id, delta: d })) }
+  if ((m = /^(?:extend|lengthen|increase)\s+(.+?)\s+by\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null) { const d = parseDays(m[2])!; return one(m[1], a => ({ op: 'duration', activityId: a.id, delta: d })) }
   if ((m = /^(?:add)\s+(.+?)\s+to\s+(?:the\s+)?(?:duration\s+of\s+)?(.+)$/i.exec(c)) && parseDays(m[1]) != null && !/^(?:an?\s+)?(?:new\s+)?activity\b/i.test(m[1])) { const d = parseDays(m[1])!; return one(m[2], a => ({ op: 'duration', activityId: a.id, delta: d })) }
+  if ((m = /^(?:remove|take|subtract|cut)\s+(.+?)\s+(?:from|off)\s+(?:the\s+)?(?:duration\s+of\s+)?(.+)$/i.exec(c)) && parseDays(m[1]) != null) { const d = parseDays(m[1])!; return one(m[2], a => ({ op: 'duration', activityId: a.id, delta: -d })) }
   if ((m = /^(?:shorten|reduce|cut|compress|crash|decrease|trim)\s+(.+?)\s+by\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null) { const d = parseDays(m[2])!; return one(m[1], a => ({ op: 'duration', activityId: a.id, delta: -d })) }
   if ((m = /^(?:shorten|reduce|cut|compress|crash|decrease|trim|extend|lengthen|increase|set|change|make|update)\s+(?:the\s+)?(?:remaining\s+)?(?:duration\s+(?:of|for)\s+)?(.+?)\s+to\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null) { const d = parseDays(m[2])!; return one(m[1].replace(/(?:'s)?\s+(?:remaining\s+)?duration$/i, ''), a => ({ op: 'duration', activityId: a.id, days: d })) }
-  if ((m = /^(.+?)\s+(?:takes|will take|should take|needs|lasts|is|=)\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null && !/\b(after|before)\b/i.test(m[2])) { const d = parseDays(m[2])!; return one(m[1].replace(/(?:'s)?\s+(?:remaining\s+)?duration$/i, ''), a => ({ op: 'duration', activityId: a.id, days: d })) }
+  if ((m = /^(.+?)\s+(?:takes|will take|should take|needs|lasts|is|=)\s+(.+)$/i.exec(c)) && parseDays(m[2]) != null && !/\b(after|before|late|later|behind|early|earlier|ahead|delayed|float)\b/i.test(m[2])) { const d = parseDays(m[2])!; return one(m[1].replace(/(?:'s)?\s+(?:remaining\s+)?duration$/i, ''), a => ({ op: 'duration', activityId: a.id, days: d })) }
 
   // Structural edits (RunF9 plans only): rename, add, remove an activity.
   if (opts.allowStructural) {
@@ -175,17 +188,24 @@ export function readClause(clause: string, acts: RefActivity[], opts: { allowStr
     return two(m[1], m[2], (a, b) => ({ op: 'link', from: a.id, to: b.id, type, lag: lag ?? 0 }))
   }
   if ((m = /^(.+?)\s*(?:→|->)\s*(.+)$/.exec(c))) return two(m[1], m[2], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FS', lag: 0 }))
-  if ((m = /^(?:start|begin)\s+(.+?)\s+(?:(.+?)\s+)?(?:after|once)\s+(.+?)\s+(starts|start|begins|begin|has started|is underway)$/i.exec(c)) || (m = /^(.+?)\s+(?:can|may|should|must|will)?\s*(?:start|begin)s?\s+(?:(.+?)\s+)?(?:after|once)\s+(.+?)\s+(starts|start|begins|begin|has started|is underway)$/i.exec(c))) {
+  if ((m = /^(?:start|begin)\s+(.+?)\s+(?:((?:\d+(?:\.\d+)?|[a-z]+)\s*(?:work(?:ing)?\s+|business\s+|calendar\s+)?(?:days?|d|wd|weeks?|wks?|w))\s+)?(?:after|once)\s+(.+?)\s+(starts|start|begins|begin|has started|is underway)$/i.exec(c)) || (m = /^(.+?)\s+(?:can|may|should|must|will)?\s*(?:start|begin)s?\s+(?:((?:\d+(?:\.\d+)?|[a-z]+)\s*(?:work(?:ing)?\s+|business\s+|calendar\s+)?(?:days?|d|wd|weeks?|wks?|w))\s+)?(?:after|once)\s+(.+?)\s+(starts|start|begins|begin|has started|is underway)$/i.exec(c))) {
     const lag = m[2] ? parseDays(m[2]) : 0
     if (m[2] && lag == null) return { error: `Could not read the lag "${m[2]}"; use days or weeks.` }
     return two(m[3], m[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'SS', lag: lag ?? 0 }))
   }
-  if ((m = /^(.+?)\s+(?:must|should|can|will)?\s*(?:finish|end|complete)(?:es|s)?\s+(?:(.+?)\s+)?(?:with|after|when)\s+(.+?)(?:\s+(?:finishes|ends|completes|is done))?$/i.exec(c)) && !/\b(?:starts?|begins?)\b/i.test(c)) {
+  // "A after B" where A is exactly an activity's name (a name may itself end in "Finishes" or "Starts").
+  if ((m = /^(.+?)\s+(?:after|once|following)\s+(.+)$/i.exec(c)) && acts.some(a => norm(a.name) === norm(m![1]))) return two(m[2], m[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FS', lag: 0 }))
+  if ((m = /^(.+?)\s+(?:must|should|can|will)?\s*(?:finish|end|complete)(?:es|s)?\s+(?:((?:\d+(?:\.\d+)?|[a-z]+)\s*(?:work(?:ing)?\s+|business\s+|calendar\s+)?(?:days?|d|wd|weeks?|wks?|w))\s+)?(?:with|after|when)\s+(.+?)(?:\s+(?:finishes|ends|completes|is done))?$/i.exec(c)) && !/\b(?:starts?|begins?)\b/i.test(c)) {
     const lag = m[2] ? parseDays(m[2]) : 0
     if (m[2] && lag == null) return { error: `Could not read the lag "${m[2]}"; use days or weeks.` }
-    return two(m[3], m[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FF', lag: lag ?? 0 }))
+    const ff = two(m[3], m[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FF', lag: lag ?? 0 }))
+    if (ff && 'step' in ff) return ff
+    // Otherwise "finish(es)" may be part of a name: fall through to the plain "A after B" reading.
+    const fs = /^(.+?)\s+(?:after|once|following)\s+(.+)$/i.exec(c)
+    const alt = fs ? two(fs[2], fs[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FS', lag: 0 })) : null
+    return alt && 'step' in alt ? alt : ff
   }
-  if ((m = /^(?:start|begin|do|schedule)?\s*(.+?)\s+(?:can|may|should|must|will|has to|needs to)?\s*(?:start|begin|starts|begins|go|goes|come|comes|happen|happens|follow|follows)?\s*(?:(.+?)\s+)?(?:after|once|following)\s+(.+?)(?:\s+(?:finishes|is (?:done|finished|complete|completed)|completes|ends))?$/i.exec(c))) {
+  if ((m = /^(?:start|begin|do|schedule)?\s*(.+?)\s+(?:can|may|should|must|will|has to|needs to)?\s*(?:start|begin|starts|begins|go|goes|come|comes|happen|happens|follow|follows)?\s*(?:((?:\d+(?:\.\d+)?|[a-z]+)\s*(?:work(?:ing)?\s+|business\s+|calendar\s+)?(?:days?|d|wd|weeks?|wks?|w))\s+)?(?:after|once|following)\s+(.+?)(?:\s+(?:finishes|is (?:done|finished|complete|completed)|completes|ends))?$/i.exec(c))) {
     const lag = m[2] ? parseDays(m[2]) : 0
     if (m[2] && lag == null) return null
     return two(m[3], m[1], (a, b) => ({ op: 'link', from: a.id, to: b.id, type: 'FS', lag: lag ?? 0 }))

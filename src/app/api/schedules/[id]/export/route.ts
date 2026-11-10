@@ -94,7 +94,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   // answers what could not be filled or was left out, as JSON, instead of the file.
   if (format === 'ipmdar') {
     if (marking) return NextResponse.json({ error: 'The IPMDAR dataset is not offered for a schedule marked CUI or classified: RunF9 does not decide the security marking that file must carry.', code: 'ipmdar_marking' }, { status: 409 })
-    const spd = buildIpmdarSpd(g, { projectName: schedule.name, securityMarking: 'UNCLASSIFIED', softwareVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7), metadata: { ContractorName: auth.orgName, ProgramName: schedule.name } })
+    const spd = buildIpmdarSpd(g, { projectName: schedule.name, ...(classification === 'unclassified' ? { securityMarking: 'UNCLASSIFIED' } : {}), softwareVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7), metadata: { ContractorName: auth.orgName, ProgramName: schedule.name } })
     if (req.nextUrl.searchParams.get('report') === '1') return NextResponse.json({ format, basis, files: Object.keys(spd.files), warnings: spd.warnings })
     const zip = zipIpmdarSpd(spd.files)
     const file = `${slug}-ipmdar-spd.zip`

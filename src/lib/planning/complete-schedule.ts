@@ -10,6 +10,17 @@ import { runCpm } from './cpm'
 import { defaultCalendar } from './calendar'
 import { fmtDate } from '@/lib/format'
 
+/**
+ * The finish used for work the file marks complete but gives no actual finish (a spreadsheet with only
+ * "100%"): the file's own finish when that is before the data date, else the day before the data date.
+ */
+export function assumedFinishOf(a: Pick<Activity, 'earlyFinish' | 'baselineFinish'>, dataDate: string | null | undefined): string | null {
+  const dd = dataDate ? dataDate.slice(0, 10) : null
+  const own = (a.earlyFinish ?? a.baselineFinish ?? null)?.slice(0, 10) ?? null
+  if (!dd) return own
+  return own && own < dd ? own : new Date(Date.parse(dd + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+}
+
 export interface CompletionResult {
   activities: Activity[]
   projectStart: string | null
@@ -99,13 +110,7 @@ export function completeSchedule(input: {
     : null
   // Work the file marks complete but gives no actual finish (a spreadsheet with only "100%") is done, not waiting:
   // it takes the file's own finish when that is before the data date, else the day before the data date.
-  const dayBefore = (iso: string) => new Date(Date.parse(iso.slice(0, 10) + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
-  const assumedFinish = (a: Activity): string | null => {
-    const dd = input.dataDate ? input.dataDate.slice(0, 10) : null
-    const own = (a.earlyFinish ?? a.baselineFinish ?? null)?.slice(0, 10) ?? null
-    if (!dd) return own
-    return own && own < dd ? own : dayBefore(dd)
-  }
+  const assumedFinish = (a: Activity): string | null => assumedFinishOf(a, input.dataDate)
   const cpmActs: CpmActivity[] = work.map(a => ({
     id: a.id, code: a.activityId, name: a.name,
     duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),

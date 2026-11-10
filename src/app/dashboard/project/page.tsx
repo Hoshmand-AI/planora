@@ -228,7 +228,7 @@ export default function ProjectPage() {
       </div>
 
       {selectedSchedule.sourceType !== 'generated' && (
-        <ScheduleTools scheduleId={selectedSchedule.id}
+        <ScheduleTools key={selectedSchedule.id} scheduleId={selectedSchedule.id}
           progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
           inHistory={selectedSchedule.inHistory ?? true}
           canEdit={can('schedule.write')} editsCount={editsCount}

@@ -40,12 +40,16 @@ const LD = /liquidated damages|\bLDs\b/i
 const MONEY = /\$\s?([\d,]+(?:\.\d+)?)\s*(k|thousand|million|m)?\b/i
 const PER_DAY = /\b(?:per|each|for each|for every|a)\s+(?:calendar\s+|working\s+|business\s+)?day\b/i
 /** The amount written right before "per day": a contract sentence often names the contract value first. */
-const AMOUNT_PER_DAY = /\$\s?([\d,]+(?:\.\d+)?)\s*(k|thousand|million|m)?\s*(?:\([^)]{0,60}\)\s*)?(?:per|each|for each|for every|a)\s+(?:calendar\s+|working\s+|business\s+)?day\b/i
+const AMOUNT_PER_DAY = /\$\s?([\d,]+(?:\.\d+)?)\s*(k|thousand|million|m)?\s*\)?\s*(?:\([^)]{0,60}\)\s*)?(?:per|each|for each|for every|a)\s+(?:calendar\s+|working\s+|business\s+)?day\b/i
+/** A ceiling on the damages ("not to exceed $500,000"): never the daily amount. */
+const CAP = /\b(?:not to exceed|up to|maximum(?: of)?|capped at|cap of|limit(?:ed to| of)|aggregate(?: of)?|in no event (?:more|greater) than)\s+(?:an?\s+)?(?:total\s+(?:of\s+)?|aggregate\s+(?:of\s+)?)?\$\s?[\d,]+(?:\.\d+)?\s*(?:k|thousand|million|m)?\b/gi
 const UPDATE = /\b(?:update|updated|updates|submit|submittal of)\b.{0,60}\bschedule\b|\bschedule\b.{0,60}\b(?:update|updated|updates)\b/i
 const PERIOD = /\b(monthly|each month|every month|weekly|each week|every week|bi-?weekly|every two weeks)\b/i
 const FLOAT = /\bfloat\b.{0,80}\b(belongs?|owned|ownership|exclusive|shared|jointly|project)\b/i
 const WORKING = /\b(continued|continu(?:es|ing)|started|began|commenced|underway|under way|in progress|installing|pouring|pulling|setting|erecting|placing|crew (?:is|was) on)\b/i
 const FINISHED = /\b(completed?|finished|wrapped up|signed off|100\s?%)\b/i
+/** Part done: a percentage under 100, or "nearly", "partially". */
+const PARTIAL = /\b\d{1,2}(?:\.\d+)?\s?%|\b(?:partial(?:ly)?|nearly|almost|mostly|about half|halfway)\b/i
 const NOT_DONE = /\b(not (?:yet )?(?:complete|completed|finished|started)|will (?:complete|finish|start)|to (?:be )?complet|remaining|behind)\b/i
 /** Sentences that say work did not happen: never evidence that it did. */
 const NO_WORK = /\bno (?:work|progress|activity|crew)\b|\b(?:did|could|was|were) not\b|\bnot (?:yet )?(?:started|begun|commenced)\b|\bunable to\b|\bcancell?ed\b|\brained out\b|\bwill (?:start|begin|commence)\b|\bscheduled to (?:start|begin)\b/i
@@ -107,14 +111,15 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
     }
     if (LD.test(s)) {
       // The daily amount is the figure tied to "per day"; failing that, the first figure after the words "liquidated damages".
-      const perDay = amount(s, AMOUNT_PER_DAY) ?? (PER_DAY.test(s) ? amount(s.slice(LD.exec(s)!.index)) : null)
+      const rate = s.replace(CAP, ' ')
+      const perDay = amount(rate, AMOUNT_PER_DAY) ?? (PER_DAY.test(rate) ? amount(rate.slice(LD.exec(rate)?.index ?? 0)) ?? amount(rate) : null)
       const behind = Math.max(0, ctx.daysBehind ?? 0)
       const exposure = perDay && behind ? perDay * behind : null
       push(`ld:${perDay ?? 'x'}`, { ...src(c, s), kind: 'damages', perDay, exposure, active: behind > 0,
         text: perDay ? (behind ? `Liquidated damages are ${money(perDay)} per day. At ${behind} day${behind === 1 ? '' : 's'} behind, the exposure is about ${money(exposure!)}.` : `Liquidated damages are ${money(perDay)} per day. The forecast meets the required date today, so there is no exposure.`)
           : `The contract carries liquidated damages${behind ? `; the forecast is ${behind} day${behind === 1 ? '' : 's'} behind the required date` : ''}. The daily amount could not be read from this sentence.` })
     }
-    if (UPDATE.test(s) && PERIOD.test(s)) {
+    if (UPDATE.test(s) && PERIOD.test(s) && !/look[- ]?ahead/i.test(s)) {
       const weekly = /week/i.test(PERIOD.exec(s)![1]) && !/bi-?weekly|two weeks/i.test(s)
       const limit = weekly ? 7 : /bi-?weekly|two weeks/i.test(s) ? 14 : 31
       const late = ctx.staleDays != null && ctx.staleDays > limit
@@ -151,8 +156,9 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
   const seen = new Set<string>()
   for (const c of fieldChunks) for (const s of sentences(c.text)) {
     if (NO_WORK.test(s)) continue
-    const finished = FINISHED.test(s) && !NOT_DONE.test(s)
-    const working = WORKING.test(s)
+    const partial = PARTIAL.test(s) && !/\b100\s?%/.test(s)
+    const finished = FINISHED.test(s) && !NOT_DONE.test(s) && !partial
+    const working = WORKING.test(s) || partial
     if (!finished && !working) continue
     let a: WatchActivity | null = null
     for (const t of s.split(/[^A-Za-z0-9._-]+/)) { const x = codes.get(t.toLowerCase()); if (x && /\d/.test(t)) { a = x; break } }

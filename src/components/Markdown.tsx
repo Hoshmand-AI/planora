@@ -9,7 +9,7 @@ import { fmtDates } from '@/lib/format'
 function inline(text: string, keyBase: string): ReactNode[] {
   const out: ReactNode[] = []
   // **bold**, `code`, _italic_ or *italic* (single-word boundaries so snake_case and 5*3 stay as they are)
-  const re = /\*\*([^*]+?)\*\*|`([^`]+?)`|(?<![\w*])_([^_\n]+?)_(?![\w])|(?<![\w*])\*([^*\n]+?)\*(?![\w*])/g
+  const re = /\*\*([^*]+?)\*\*|`([^`]+?)`|(?<![\w*])_([^_\n]+?)_(?![\w])|(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])/g
   let last = 0
   let m: RegExpExecArray | null
   let i = 0
@@ -82,10 +82,12 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       const ordered = numbered.test(line) && !bullet.test(line)
       const re = ordered ? numbered : bullet
       const items: string[] = []
+      // A numbered list keeps its own numbers: a blank line or a nested bullet between items starts a new <ol>, which must not restart at 1.
+      const first = ordered ? Number(/^\s*(\d+)/.exec(line)![1]) : 1
       while (i < lines.length && re.test(lines[i])) { items.push(re.exec(lines[i])![1]); i++ }
       const k = `l${blocks.length}`
       const lis = items.map((it, j) => <li key={j}>{inline(it, `${k}-${j}`)}</li>)
-      blocks.push(ordered ? <ol key={k} className="list-decimal ml-5 space-y-1">{lis}</ol> : <ul key={k} className="list-disc ml-5 space-y-1">{lis}</ul>)
+      blocks.push(ordered ? <ol key={k} start={first} className="list-decimal ml-5 space-y-1">{lis}</ol> : <ul key={k} className="list-disc ml-5 space-y-1">{lis}</ul>)
       continue
     }
     para.push(line)

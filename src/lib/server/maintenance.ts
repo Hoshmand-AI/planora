@@ -6,6 +6,8 @@
 import { initSchema, query } from '@/lib/db'
 import { normalizeSettings } from './settings'
 import { log, errorFields } from './log'
+import { runWithRequest } from './context'
+import { randomUUID } from 'crypto'
 
 let lastLocalRun = 0
 
@@ -51,10 +53,21 @@ export async function maybeRunMaintenance(): Promise<void> {
       ON CONFLICT (name) DO UPDATE SET last_run_at = NOW() WHERE maintenance_runs.last_run_at < NOW() - INTERVAL '1 hour'
       RETURNING last_run_at`)
     if (!claim.rowCount) return
-    const result = await runRetention()
-    // The day's Daily Brief emails, for installs without a scheduler (each subscription is sent once a day).
-    await (await import('./brief-digest')).sendDueBriefs()
-    log('info', 'retention run', result as unknown as Record<string, unknown>)
+    // The work runs as the system, after the response: the member whose request claimed the slot does not
+    // wait for it (up to a few hundred emails), and its audit events do not carry their IP or request id.
+    const work = () => runWithRequest({ requestId: randomUUID(), method: 'JOB', path: '/jobs/maintenance', ip: null, userAgent: null }, async () => {
+      try {
+        const result = await runRetention()
+        // The day's Daily Brief emails, for installs without a scheduler (each subscription is sent once a day).
+        await (await import('./brief-digest')).sendDueBriefs()
+        log('info', 'retention run', result as unknown as Record<string, unknown>)
+      } catch (err) {
+        log('error', 'retention run failed', errorFields(err))
+      }
+    })
+    let deferred = false
+    try { (await import('next/server')).after(work); deferred = true } catch { /* not inside a request (a job, a test): run now */ }
+    if (!deferred) await work()
   } catch (err) {
     log('error', 'retention run failed', errorFields(err))
   }

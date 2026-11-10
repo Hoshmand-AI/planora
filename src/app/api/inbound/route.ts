@@ -4,7 +4,8 @@ import { audit } from '@/lib/server/audit'
 import { can } from '@/lib/server/permissions'
 import { hit } from '@/lib/server/rate-limit'
 import { clientIp, runWithRequest } from '@/lib/server/context'
-import { isRestrictedClassification } from '@/lib/server/classification'
+import { hasControlMarkings, isRestrictedClassification } from '@/lib/server/classification'
+import { detectInjection } from '@/lib/rag/injection'
 import { resolveWorkspaceAccess } from '@/lib/server/workspaces'
 import { INBOX_LIMITS, MAX_INBOUND_BYTES, markInboxUsed, resolveInboxToken } from '@/lib/server/project-inbox'
 import { getScheduleById, getScheduleSeries, query } from '@/lib/db'
@@ -14,6 +15,7 @@ import { ingestDocument } from '@/lib/rag/store'
 import { DocumentRejected } from '@/lib/rag/extract'
 import { emailSubject } from '@/lib/rag/correspondence-files'
 import { fmtDate } from '@/lib/format'
+import { parseRegisterKey } from '@/lib/server/register'
 import type { DocType } from '@/lib/rag/types'
 
 /**
@@ -83,13 +85,18 @@ export const POST = publicApi(async req => {
   } else if (!ctype.startsWith('text/plain')) {
     throw new ApiError(415, 'Send message/rfc822 (a raw email), text/vtt, application/x-subrip, text/plain or application/json.', 'unsupported_media_type')
   }
+  // A message that carries CUI or classification markings is not taken through an inbox (as for a marked project).
+  if (hasControlMarkings(content.toString('utf8')) || hasControlMarkings(title)) throw new ApiError(409, 'This message carries CUI or classification markings. Add it by hand on the Documents tab of a project marked for it.', 'classification')
+  // The title is written into what a model reads; a subject that reads like instructions to an AI is not kept.
+  if (title && detectInjection(title).length) title = ''
   title = title || `${LABEL[docType]} received ${fmtDate(new Date().toISOString().slice(0, 10))}`
 
   const access = await resolveWorkspaceAccess({ userId: u.id, orgId: inbox.orgId, role: u.role })
   const info = { requestId: randomUUID(), method: 'POST', path: '/api/inbound', ip, userAgent: req.headers.get('user-agent'), userId: String(u.id), email: String(u.email), name: String(u.name), orgId: inbox.orgId, role: String(u.role), workspaceAccess: async () => access }
   return runWithRequest(info, async () => {
     // The project's latest upload the member can still see (workspace access applies).
-    const series = orderSeries(await getScheduleSeries(inbox.orgId, inbox.projectKey))
+    const at = parseRegisterKey(inbox.projectKey)
+    const series = at.projectKey ? orderSeries(await getScheduleSeries(inbox.orgId, at.projectKey, at.workspaceId)) : []
     const schedule = series[series.length - 1] ?? await getScheduleById(inbox.scheduleId, inbox.orgId)
     if (!schedule) throw new ApiError(410, 'The project this inbox belongs to is no longer available.', 'gone')
     const classification = await projectClassification(schedule.id, inbox.orgId)

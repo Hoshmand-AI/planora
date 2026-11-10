@@ -5,7 +5,7 @@
 // (three-point ranges and discrete risk events). Writing needs schedule.write; others see read-only.
 
 import { askText } from '@/components/AskText'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { postJson } from './ui'
 import { PlainEnglishEdit, type EditPreview } from './PlainEnglishEdit'
@@ -74,6 +74,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
 
   const submit = async () => {
     setErr('')
+    if (kind === 'duration' && num.trim() === '') { setErr('Enter the remaining duration in work days.'); return }
     const change: Change = kind === 'duration' ? { kind, activityId: a, remaining: Number(num) }
       : kind === 'link_set' ? { kind, predecessorId: a, successorId: b, type, lag: Number(num || 0) }
         : kind === 'link_remove' ? { kind, predecessorId: a, successorId: b }
@@ -87,7 +88,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     onChanged()
   }
   const revert = async (e: EditRow) => {
-    const why = await askText({ title: `Revert "${e.label}" (${e.before} → ${e.after})`, label: 'Reason (kept in the audit log)', required: true, confirmLabel: 'Revert' })
+    const why = await askText({ title: fmtDates(`Revert "${e.label}" (${e.before} → ${e.after})`), label: 'Reason (kept in the audit log)', required: true, confirmLabel: 'Revert' })
     if (!why) return
     setBusy(true)
     const r = await fetch(`/api/schedules/${scheduleId}/edits?${new URLSearchParams({ editId: e.id, reason: why })}`, { method: 'DELETE' })
@@ -170,7 +171,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           <label className="block text-[12px] text-warm-600">Reason (required, kept with the edit)
             <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Steel erector confirmed a second crew from 11/02" className={`${input} block mt-0.5 w-full`} />
           </label>
-          <button type="submit" disabled={busy || reason.trim().length < 5 || !a.trim()} className={primary}>{busy ? 'Recalculating…' : 'Save edit and recalculate'}</button>
+          <button type="submit" disabled={busy || reason.trim().length < 5 || !a.trim() || (kind === 'duration' && num.trim() === '')} className={primary}>{busy ? 'Recalculating…' : 'Save edit and recalculate'}</button>
         </form>
       ) : !data.editable ? <p className="text-warm-600">This schedule was published from a RunF9 plan; edit the plan instead.</p>
         : <p className="text-warm-600">Your role can view edits but not make them.</p>}
@@ -184,10 +185,14 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState('')
   const [reasons, setReasons] = useState<Record<string, string>>({})
+  const shown = useRef('')
 
   useEffect(() => {
     let live = true
-    setData(null); setMsg('')
+    // The "Applied…" line survives the reload that follows an applied option; a new schedule or basis clears it.
+    const sameView = shown.current === `${scheduleId}|${basis}`
+    shown.current = `${scheduleId}|${basis}`
+    setData(null); if (!sameView) setMsg('')
     fetch(`/api/schedules/${scheduleId}/recovery${basis === 'scenario' ? '?basis=scenario' : ''}`).then(async r => {
       const d = await r.json().catch(() => ({}))
       if (!live) return

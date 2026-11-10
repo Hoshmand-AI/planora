@@ -5,7 +5,7 @@ import { appOrigin, emailConfigured, sendEmail } from '@/lib/server/email'
 import { hit } from '@/lib/server/rate-limit'
 import { isRestrictedClassification, scheduleClassification } from '@/lib/server/classification'
 import { getScheduleById } from '@/lib/db'
-import { seriesKey } from '@/lib/server/register'
+import { registerKey } from '@/lib/server/register'
 import { BRIEF_AUDIENCES, briefEmailSubject, briefEmailText, getSubscription, subscribe, unsubscribe } from '@/lib/server/brief-digest'
 import { loadDailyBrief } from '@/lib/server/brief-service'
 
@@ -22,7 +22,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const act = (sp.get('whatIfActivity') || '').slice(0, 80), days = Number(sp.get('whatIfDays'))
   const out = await loadDailyBrief(params.id, auth.orgId, { asOf: sp.get('asOf'), whatIf: act && Number.isFinite(days) && days > 0 ? { activity: act, days } : null })
   if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const sub = auth.userId ? await getSubscription(auth.orgId, auth.userId, seriesKey((await getScheduleById(params.id, auth.orgId))!)) : null
+  const sub = auth.userId ? await getSubscription(auth.orgId, auth.userId, registerKey((await getScheduleById(params.id, auth.orgId))!)) : null
   return NextResponse.json({ ...out, email: { available: emailConfigured(), everyMorning: sub?.audience ?? null } })
 })
 
@@ -57,7 +57,7 @@ export const PUT = api<{ id: string }>({ permission: 'read' }, async (req, { par
   const audience = BRIEF_AUDIENCES.find(a => a === b.audience) ?? 'pm'
   if (!emailConfigured()) return NextResponse.json({ error: 'Email is not set up on this installation.', code: 'email_unavailable' }, { status: 400 })
   if (isRestrictedClassification(await scheduleClassification(schedule.id, auth.orgId))) return NextResponse.json({ error: 'This project is marked CUI or classified, so its brief is not sent by email.', code: 'restricted' }, { status: 409 })
-  await subscribe(auth.orgId, auth.userId, seriesKey(schedule), schedule.id, audience)
+  await subscribe(auth.orgId, auth.userId, registerKey(schedule), schedule.id, audience)
   await audit({ action: 'brief.subscribed', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name, audience } })
   return NextResponse.json({ everyMorning: audience })
 })
@@ -65,6 +65,6 @@ export const PUT = api<{ id: string }>({ permission: 'read' }, async (req, { par
 export const DELETE = api<{ id: string }>({ permission: 'read' }, async (_req, { params, auth }) => {
   const schedule = await getScheduleById(params.id, auth.orgId)
   if (!schedule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (await unsubscribe(auth.orgId, auth.userId, seriesKey(schedule))) await audit({ action: 'brief.unsubscribed', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name } })
+  if (await unsubscribe(auth.orgId, auth.userId, registerKey(schedule))) await audit({ action: 'brief.unsubscribed', targetType: 'schedule', targetId: schedule.id, detail: { schedule: schedule.name } })
   return NextResponse.json({ everyMorning: null })
 })

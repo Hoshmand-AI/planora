@@ -137,7 +137,17 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     if (t['status_code'] === 'TK_Complete') status = 'complete'
     else if (t['status_code'] === 'TK_Active') status = 'in_progress'
 
-    let pct = parseFloat(t['phys_complete_pct'] || t['complete_pct'] || '0') || 0
+    // P6 keeps physical % only for the Physical type; for Duration (its default) and Units the percent is
+    // derived, and phys_complete_pct stays 0 unless someone typed it.
+    const numOf = (k: string) => { const n = parseFloat(t[k] ?? ''); return Number.isFinite(n) ? n : null }
+    let pct: number
+    if (t['complete_pct_type'] === 'CP_Drtn') {
+      const od = numOf('target_drtn_hr_cnt') ?? 0, rd = numOf('remain_drtn_hr_cnt') ?? od
+      pct = od > 0 ? Math.round((100 * (od - rd)) / od * 100) / 100 : numOf('phys_complete_pct') ?? 0
+    } else if (t['complete_pct_type'] === 'CP_Units') {
+      const act = (numOf('act_work_qty') ?? 0) + (numOf('act_equip_qty') ?? 0), rem = (numOf('remain_work_qty') ?? 0) + (numOf('remain_equip_qty') ?? 0)
+      pct = act + rem > 0 ? Math.round((100 * act) / (act + rem) * 100) / 100 : numOf('phys_complete_pct') ?? 0
+    } else pct = parseFloat(t['phys_complete_pct'] || t['complete_pct'] || '0') || 0
     if (pct < 0 || pct > 100) {
       warnings.push(`Activity ${t['task_code'] || t['task_id']}: percent complete ${pct} is outside 0–100; set to ${pct < 0 ? 0 : 100}`)
       ex.add({ severity: 'warning', entity: 'activity', field: 'TASK.phys_complete_pct', disposition: 'converted', example: code, message: 'Percent complete outside 0–100 was clamped' })

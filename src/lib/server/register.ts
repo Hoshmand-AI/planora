@@ -14,6 +14,12 @@ export const MAX_REGISTER_ITEMS = 500
  */
 export const registerKey = (s: { id: string; projectKey?: string | null; workspaceId?: string | null }) =>
   s.projectKey ? (s.workspaceId ? `ws:${s.workspaceId}|${s.projectKey}` : s.projectKey) : `schedule:${s.id}`
+/** The workspace and series a register key names (the reverse of registerKey); no series for a single schedule. */
+export function parseRegisterKey(key: string): { workspaceId: string | null; projectKey: string | null } {
+  const m = /^ws:([^|]+)\|(.+)$/.exec(key)
+  if (m) return { workspaceId: m[1], projectKey: m[2] }
+  return { workspaceId: null, projectKey: key.startsWith('schedule:') ? null : key }
+}
 /** The update series a subscription follows (the raw series key, used to find the latest upload). */
 export const seriesKey = (s: { id: string; projectKey?: string | null }) => s.projectKey || `schedule:${s.id}`
 

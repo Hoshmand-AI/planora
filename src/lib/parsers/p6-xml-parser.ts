@@ -289,7 +289,13 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     const st = childText(t, 'Status').toLowerCase().replace(/\s+/g, '')
     const status: Activity['status'] = st === 'completed' ? 'complete' : st === 'inprogress' ? 'in_progress' : 'not_started'
 
-    const rawPct = childText(t, 'PhysicalPercentComplete') || childText(t, 'PercentComplete') || '0'
+    // Physical % is the activity's percent only for the Physical type; for Duration (P6's default) and Units,
+    // P6 writes the derived percent in PercentComplete / DurationPercentComplete / UnitsPercentComplete.
+    const pctKind = childText(t, 'PercentCompleteType').toLowerCase()
+    const positive = (...tags: string[]) => tags.map(x => childText(t, x)).find(v => parseFloat(v) > 0)
+    const rawPct = (pctKind === 'duration' ? positive('PercentComplete', 'DurationPercentComplete')
+      : pctKind === 'units' ? positive('PercentComplete', 'UnitsPercentComplete') : undefined)
+      ?? (childText(t, 'PhysicalPercentComplete') || childText(t, 'PercentComplete') || '0')
     let pct = round2((parseFloat(rawPct) || 0) * pctScale)
     if (pctScale === 100 && parseFloat(rawPct) > 0) ex.add({ severity: 'info', entity: 'activity', field: 'Activity.PhysicalPercentComplete', disposition: 'converted', example: code, message: 'P6 XML percent (a fraction, 0–1) converted to 0–100' })
     if (pct < 0 || pct > 100) {

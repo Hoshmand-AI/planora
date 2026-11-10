@@ -128,7 +128,7 @@ export async function loadScheduleEvm(orgId: string, id: string, opts: { basis?:
   const s = data.schedule
   if (s.projectKey && s.dataDate) {
     const { getScheduleSeries } = await import('@/lib/db')
-    const series = orderSeries(await getScheduleSeries(orgId, s.projectKey))
+    const series = orderSeries(await getScheduleSeries(orgId, s.projectKey, s.workspaceId ?? null))
     const prev = [...series].reverse().find(x => x.id !== s.id && x.dataDate && x.dataDate < s.dataDate!)
     const p = prev ? await loadScheduleData(prev.id, orgId, opts) : null
     if (p) {

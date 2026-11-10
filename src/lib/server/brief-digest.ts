@@ -8,6 +8,7 @@ import { getScheduleSeries, initSchema, query } from '@/lib/db'
 import { orderSeries } from '@/lib/analysis/compare'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { audit } from './audit'
+import { parseRegisterKey } from './register'
 import { isRestrictedClassification, scheduleClassification } from './classification'
 import { runWithRequest } from './context'
 import { emailConfigured, sendEmail } from './email'
@@ -77,7 +78,8 @@ export async function sendDueBriefs(now = new Date(), origin = (process.env.APP_
           const access = await resolveWorkspaceAccess({ userId: s.user_id, orgId, role: s.role })
           // Run as the subscriber, so every read below applies their workspace access.
           const sent = await runWithRequest({ requestId: randomUUID(), method: 'JOB', path: '/jobs/daily-brief', ip: null, userAgent: null, userId: s.user_id, email: s.email, name: s.name, orgId, role: s.role, workspaceAccess: async () => access }, async () => {
-            const series = orderSeries(await getScheduleSeries(orgId, s.project_key))
+            const at = parseRegisterKey(String(s.project_key))
+            const series = at.projectKey ? orderSeries(await getScheduleSeries(orgId, at.projectKey, at.workspaceId)) : []
             const latest = series[series.length - 1]
             const scheduleId = latest?.id ?? s.schedule_id
             if (isRestrictedClassification(await scheduleClassification(scheduleId, orgId))) return false

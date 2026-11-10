@@ -197,12 +197,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const data = await res.json().catch(() => ({}))
     const list: Schedule[] = data.schedules || []
     setSchedules(list)
-    if (!selectedSchedule && list.length > 0) {
+    setSelectedSchedule(cur => {
+      if (cur) {
+        // Keep the open project, with what was just saved on it (classification, progress mode, label…).
+        // The same object is kept when nothing changed, so effects keyed on it do not run again.
+        const fresh = list.find(s => s.id === cur.id)
+        return fresh && JSON.stringify(fresh) !== JSON.stringify(cur) ? fresh : cur
+      }
+      if (!list.length) return cur
       // Honor a deep link on first load instead of flashing the newest schedule.
       const wanted = typeof window === 'undefined' ? null : deepLinkedScheduleId(window.location.pathname, new URLSearchParams(window.location.search))
-      setSelectedSchedule(list.find(s => s.id === wanted) ?? list[0])
-    }
-  }, [selectedSchedule])
+      return list.find(s => s.id === wanted) ?? list[0]
+    })
+  }, [])
 
   // Only the latest selection's metrics may land (a slower earlier request must not overwrite them).
   const metricsFor = useRef<string | null>(null)

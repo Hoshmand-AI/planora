@@ -15,7 +15,15 @@ export const MAX_SIGNALS = 20
 
 const DELAY = /\b(delay(?:ed|s|ing)?|(?:is|are|was|were|be|running|arrive[sd]?|deliver(?:ed|y)?) late|slip(?:ped|s|ping)?|push(?:ed|ing)? (?:out|back)|behind schedule|won'?t make|will not make|not ready|on hold|hold[- ]up|work (?:has |was |is )?stopp?ed|stopp?ed work|suspend(?:ed)?|back[- ]?order(?:ed)?|lead time (?:has |is now |now )?(?:increased|extended|grown|slipped)|re-?sequence|stand[- ]?by|shortage|rework|failed (?:the |its |a )?(?:\w+ )?(?:inspection|test)|rejected|weather day|no access)\b/i
 /** Sentences that say there is no delay, or that things are as planned: never a delay. */
-const NO_DELAY = /\bno (?:new |further |schedule )?(?:delays?|impacts?|slippage|issues?)\b|\bdelays?\s*:\s*(?:none|nil|n\/?a|no)\b|\bwithout (?:any )?delay|\bnot (?:been )?delayed\b|\bno impact\b|\bas planned\b|\bon schedule\b|\bon track\b|\bahead of schedule\b/i
+const NO_DELAY = /\bno (?:new |further |schedule )?(?:delays?|impacts?|slippage|issues?)\b|\bdelays?\s*:\s*(?:none|nil|n\/?a|no)\b|\bwithout (?:any )?delay|\bnot (?:been )?delayed\b|\bno impact\b/i
+/** "On schedule", "as planned": no delay, unless the sentence denies it ("will not finish on schedule") or states a delay with its length. */
+const AS_PLANNED = /\bas planned\b|\bon schedule\b|\bon track\b|\bahead of schedule\b/i
+const DENIED = /\b(?:not|won'?t|cannot|can'?t|unlikely to|no longer|fail(?:s|ed)? to|unable to)\b[^.;]{0,50}\b(?:as planned|on schedule|on track)\b/i
+const STATED_DELAY = /\bdelay(?:ed|s)?\b[^.;]{0,30}\b\d{1,3}\s*(?:work(?:ing)?\s*|calendar\s*|business\s*)?(?:day|week|month)s?\b|\b\d{1,3}\s*(?:work(?:ing)?\s*|calendar\s*|business\s*)?(?:day|week|month)s?\b[^.;]{0,20}\b(?:delay|late|behind)\b/i
+const noDelay = (s: string) => NO_DELAY.test(s) || (AS_PLANNED.test(s) && !DENIED.test(s) && !STATED_DELAY.test(s))
+/** A lead time is how long delivery takes, not how far the work slips; only "by N weeks" is a change. */
+const LEAD_TIME = /\blead[- ]times?\b/i
+const BY_DAYS = /\bby\s+(?:an?\s+additional\s+|another\s+)?(\d{1,3})\s*(?:work(?:ing)?\s*|calendar\s*|business\s*)?(day|week|month)s?\b/i
 const CHANGE = /\b(change order|\bPCO\b|\bCOR?\b #?\d|change request|directive|\bCCD\b|\bASI\b|bulletin|revised (?:drawing|design|scope)|added scope|additional scope|scope change|amendment|redesign)\b/i
 const RISK = /\b(risk|concern(?:ed)?|may not|might not|at risk|unlikely|uncertain|pending approval|awaiting|waiting on|not yet (?:approved|released|issued)|unresolved)\b/i
 const COMMIT = /\b(will (?:deliver|arrive|complete|finish|start|be (?:on site|ready|energized))|commit(?:ted|s)? to|confirmed (?:for|delivery)|expected (?:on|by)|scheduled for|ETA)\b/i
@@ -64,13 +72,13 @@ export function extractSignals(chunks: CorrespondenceChunk[], activities: Signal
   for (const c of chunks) {
     if (!SIGNAL_DOC_TYPES.includes(c.docType)) continue
     for (const s of sentences(c.text)) {
-      const kind: BriefSignal['kind'] | null = DELAY.test(s) && !NO_DELAY.test(s) ? 'delay' : CHANGE.test(s) ? 'change' : RISK.test(s) ? 'risk' : COMMIT.test(s) ? 'commitment' : null
+      const kind: BriefSignal['kind'] | null = DELAY.test(s) && !noDelay(s) ? 'delay' : CHANGE.test(s) ? 'change' : RISK.test(s) ? 'risk' : COMMIT.test(s) ? 'commitment' : null
       if (!kind) continue
       const key = norm(s).slice(0, 120)
       if (seen.has(key)) continue
       seen.add(key)
       const activity = matchActivity(s, acts, codes)
-      const days = kind === 'commitment' ? null : daysIn(s)
+      const days = kind === 'commitment' ? null : LEAD_TIME.test(s) ? daysIn(BY_DAYS.exec(s)?.[0] ?? '') : daysIn(s)
       // Sentences with neither an activity nor a number of days are noise unless they announce a change.
       if (!activity && days == null && kind !== 'change' && kind !== 'delay') continue
       const score = (activity ? 4 : 0) + (days != null ? 3 : 0) + (kind === 'delay' ? 2 : kind === 'change' ? 2 : kind === 'risk' ? 1 : 0) + (activity?.open ? 1 : 0)
