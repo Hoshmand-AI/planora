@@ -862,6 +862,29 @@ export const MIGRATIONS: Migration[] = [
     );
     `,
   },
+  {
+    id: 25, name: 'project_inboxes',
+    sql: `
+    -- A project's inbox: an address that mail rules and meeting tools post emails, transcripts and
+    -- daily reports to. Only a SHA-256 of its token is stored (shown once at creation). The inbox
+    -- follows the project (its update series) and acts as the member who created it.
+    CREATE TABLE IF NOT EXISTS project_inboxes (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      schedule_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      received_count INTEGER NOT NULL DEFAULT 0,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS project_inboxes_project_idx ON project_inboxes(org_id, project_key);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

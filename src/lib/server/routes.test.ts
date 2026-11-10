@@ -10,8 +10,10 @@ const PUBLIC = new Set([
   'auth/route.ts', 'health/route.ts', 'auth/sso/route.ts', 'auth/sso/callback/route.ts', 'auth/verify/route.ts',
   // SAML 2.0: SP metadata (fetched by IdPs), SP-initiated login, and the assertion consumer service.
   'auth/saml/[connection]/metadata/route.ts', 'auth/saml/[connection]/login/route.ts', 'auth/saml/[connection]/acs/route.ts',
-  // The morning scheduler: no session; it must present the scheduler's secret (CRON_SECRET).
+  // The morning scheduler: no session; it presents the scheduler's secret (CRON_SECRET) when one is set.
   'cron/daily-brief/route.ts',
+  // Project inbox: no session; the caller presents the inbox token (src/lib/server/project-inbox.ts).
+  'inbound/route.ts',
 ])
 /** Routes that may turn off the cross-site write check (the SAML ACS receives a cross-site HTTP-POST from the IdP). */
 const CSRF_EXEMPT = new Set([

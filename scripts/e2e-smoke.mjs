@@ -365,6 +365,31 @@ async function main() {
       r = await A.get(`/api/schedules/${sid}/brief`)
       ok(r.data.brief.signals.some(x => x.activity?.code === 'D120' && x.kind === 'delay' && x.days === 4) && r.data.brief.signals.some(x => x.activity?.code === 'D130' && /Owner Rep/.test(x.quote)), 'Signals from the email (D120 on hold 4 days) and the transcript (D130 at risk, with the speaker)', r.data.brief.signals)
     }
+    {
+      // Project inbox: the mailbox and the meeting recorder send on their own; the brief reads it.
+      r = await A.post(`/api/schedules/${sid}/inbox`, { name: 'Project mailbox' })
+      const tok = r.data.token, inboxId = r.data.inbox?.id
+      ok(r.status === 200 && /^inbox_/.test(tok || '') && r.data.address.endsWith('/api/inbound'), 'Project inbox created; its token is shown once', r.data)
+      r = await A.get(`/api/schedules/${sid}/inbox`)
+      ok(r.status === 200 && r.data.inboxes.length === 1 && !JSON.stringify(r.data).includes(tok), 'The inbox list never shows the token again', r.data)
+      const send = (token, type, body, extra = {}) => fetch(`${BASE}/api/inbound`, { method: 'POST', headers: { 'content-type': type, ...(token ? { authorization: `Bearer ${token}` } : {}), ...extra }, body })
+      ok((await send('', 'text/plain', 'hello')).status === 401 && (await send('inbox_' + 'x'.repeat(43), 'text/plain', 'hello')).status === 401, 'The inbox address refuses a caller without a valid token')
+      const eml = 'From: Site Super <super@gc.example>\r\nTo: pm@gc.example\r\nSubject: D140 switchgear\r\nDate: Tue, 10 Nov 2026 09:00:00 +0000\r\nContent-Type: text/plain\r\n\r\nActivity D140 is delayed 6 days because the switchgear shipment slipped.\r\n'
+      let res = await send(tok, 'message/rfc822', eml), d = await res.json()
+      ok(res.status === 200 && d.received && d.title === 'D140 switchgear' && d.docType === 'email', 'An email sent to the inbox becomes a project document titled by its subject', d)
+      res = await send(tok, 'message/rfc822', eml); d = await res.json()
+      ok(res.status === 200 && d.duplicate === true, 'The same email sent twice is stored once', d)
+      res = await send(tok, 'application/json', JSON.stringify({ type: 'meeting', title: 'OAC call (recorder)', text: 'Owner Rep: Activity D150 is at risk because the fire marshal has not scheduled the inspection.' })); d = await res.json()
+      ok(res.status === 200 && d.docType === 'meeting', 'A transcript posted as JSON by a meeting recorder is stored as a meeting', d)
+      ok((await send(tok, 'application/pdf', 'x')).status === 415, 'The inbox refuses a content type it does not read')
+      r = await A.get(`/api/schedules/${sid}/brief`)
+      ok(r.data.brief.signals.some(x => x.activity?.code === 'D140' && x.kind === 'delay' && x.days === 6), 'The brief picks up the delay from the email the inbox received (D140, 6 days)', r.data.brief.signals.map(x => [x.activity?.code, x.kind, x.days]))
+      r = await A.get(`/api/schedules/${sid}/inbox`)
+      ok(r.data.inboxes[0].received === 2, 'The inbox counts what it received', r.data.inboxes)
+      ok((await B.req('GET', `/api/schedules/${sid}/inbox`)).status === 404 && (await B.req('DELETE', `/api/schedules/${sid}/inbox?inboxId=${inboxId}`)).status === 404, "Firm B cannot see or turn off Firm A's inbox")
+      r = await A.req('DELETE', `/api/schedules/${sid}/inbox?inboxId=${inboxId}`)
+      ok(r.status === 200 && (await send(tok, 'text/plain', 'Daily report: no work today.')).status === 401, 'A turned-off inbox refuses its token at once', r.data)
+    }
     // Contract, specification and field report read against the schedule.
     const add = async (name, docType, text) => { const f = new FormData(); f.append('file', new Blob([text]), `${name}.txt`); f.append('title', name); f.append('docType', docType); return A.req('POST', `/api/schedules/${sid}/documents`, f) }
     ok((await add('Contract Article 8', 'contract', 'ARTICLE 8. The Contractor shall give written notice of any delay within seven (7) days of the event. The Contractor shall pay liquidated damages of $10,000 per day for each calendar day of delay.')).status === 200, 'Contract excerpt added')
