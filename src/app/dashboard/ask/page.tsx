@@ -90,7 +90,7 @@ export default function AskPage() {
   if (!selectedSchedule) {
     return (
       <EmptyState title="Upload a schedule to ask questions" action={{ label: can('schedule.write') ? 'Upload a schedule' : 'Build a schedule', onClick: openUpload }}>
-        AI-powered Q&amp;A works with your actual schedule data.
+        Answers come from your own schedule data, with the numbers RunF9 calculated.
       </EmptyState>
     )
   }

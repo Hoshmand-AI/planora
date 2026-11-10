@@ -37,11 +37,13 @@ export function criticalPathStatus(input: {
   const noPred = work.filter(a => !hasPred.has(a.id))
   const noSucc = work.filter(a => !hasSucc.has(a.id))
   // The project's own start and finish are allowed one open end each (DCMA #1 counts the rest).
-  const startOk = noPred.some(a => a.activityType === 'milestone') ? 1 : noPred.length ? 1 : 0
-  const finishOk = noSucc.some(a => a.activityType === 'milestone') ? 1 : noSucc.length ? 1 : 0
-  const missing = new Set([...noPred, ...noSucc].map(a => a.id)).size
-  const openEnds = links.length ? Math.max(0, missing - startOk - finishOk) : work.length
+  const startAct = noPred.find(a => a.activityType === 'milestone') ?? noPred[0]
+  const finishAct = noSucc.find(a => a.activityType === 'milestone') ?? noSucc[noSucc.length - 1]
   const open = work.filter(a => a.status !== 'complete' && !a.actualFinish)
+  // Counted over open work, as the Quality and Standards tabs count it: finished work cannot hold float.
+  const openEnds = links.length
+    ? open.filter(a => (!hasPred.has(a.id) && a !== startAct) || (!hasSucc.has(a.id) && a !== finishAct)).length
+    : open.length
   const count = open.filter(a => a.isCritical).length
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -60,7 +62,7 @@ export function criticalPathStatus(input: {
     }
   }
   const endsNote = openEnds > 0 && openEnds >= Math.max(2, Math.round(work.length * 0.05))
-    ? ` ${plural(openEnds, 'activity is', 'activities are')} missing a predecessor or successor (open ends), so float elsewhere may be overstated.`
+    ? ` ${plural(openEnds, 'open activity is', 'open activities are')} missing a predecessor or successor (open ends), so float elsewhere may be overstated.`
     : ''
   if (count === 0) {
     const why = input.mustFinishBy && input.minFloat != null && input.minFloat > 0

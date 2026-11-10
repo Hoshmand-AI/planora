@@ -51,19 +51,19 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <Link href="/" aria-label="RunF9 home" className="flex items-center">
             <Logo variant="dark" size="text-[26px]" />
           </Link>
-          <div className="hidden md:flex items-center gap-9">
+          <div className="hidden lg:flex items-center gap-7 xl:gap-9 whitespace-nowrap">
             {nav.map(([href, label]) => <a key={href} href={href} className="text-[14px] text-warm-700 hover:text-navy-950 transition-colors">{label}</a>)}
           </div>
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
             <Link href="/auth" className={`${secondaryBtn} px-4 py-2 text-[14px]`}>Sign in</Link>
             <Cta href={primaryHref} className={`${primaryBtn} px-5 py-2 text-[14px]`}>{primaryLabel}</Cta>
           </div>
-          <button className="md:hidden text-navy-950 p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
+          <button className="lg:hidden text-navy-950 p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
         {menuOpen && (
-          <div className="md:hidden px-6 pb-6 pt-2">
+          <div className="lg:hidden px-6 pb-6 pt-2">
             {nav.map(([href, label]) => <a key={href} href={href} className="block py-3 text-[17px] text-navy-950 border-b border-warm-200" onClick={() => setMenuOpen(false)}>{label}</a>)}
             <Link href="/auth" className="block py-3 text-[17px] text-navy-950 border-b border-warm-200">Sign in</Link>
             <Cta href={primaryHref} className={`${primaryBtn} w-full mt-5 py-3 text-[16px]`}>{primaryLabel}</Cta>

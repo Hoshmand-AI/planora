@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
 import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { askText } from '@/components/AskText'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
 import { fmtDate, fmtDates } from '@/lib/format'
@@ -59,7 +60,12 @@ export default function QualityPage() {
   useEffect(() => { load() }, [load])
 
   const respond = async (q: QuestionRow, response: string) => {
-    const note = response === 'intentional' ? prompt('Optional note (e.g. "weekend pour approved by owner"):') ?? '' : ''
+    let note = ''
+    if (response === 'intentional') {
+      const answer = await askText({ title: 'Marked as intentional', label: 'Note (optional)', placeholder: 'e.g. weekend pour approved by owner' })
+      if (answer === null) return
+      note = answer
+    }
     const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: q.id, response, note }) })
     if (res.ok) setData(d => d && ({ ...d, dataQuestions: d.dataQuestions.map(x => x.id === q.id ? { ...x, response: { response, note } } : x) }))
     else setError((await res.json().catch(() => ({}))).error || 'Your answer was not saved.')

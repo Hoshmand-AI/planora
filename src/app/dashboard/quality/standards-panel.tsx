@@ -24,6 +24,29 @@ const RESULT_UI: Record<RuleResultStatus, { label: string; cls: string; Icon: ty
   fail: { label: 'Fail', cls: 'text-status-at-risk', Icon: XCircle },
   not_assessable: { label: 'Not assessable', cls: 'text-warm-600', Icon: CircleSlash },
 }
+const METRIC_LABEL: Record<string, string> = {
+  'logic.open_ends_pct': 'Activities missing a predecessor or successor',
+  'logic.lags_share_pct': 'Relationships with a lag',
+  'logic.leads_count': 'Relationships with a lead (negative lag)',
+  'logic.fs_share_pct': 'Finish-to-start relationships',
+  'float.high_share_pct': 'Activities with high float',
+  'float.high_days': 'High-float limit',
+  'float.negative_count': 'Activities with negative float',
+  'duration.long_share_pct': 'Activities with a long duration',
+  'duration.long_days': 'Long-duration limit',
+  'constraints.hard_share_pct': 'Activities with a hard constraint',
+  'resources.loaded_pct': 'Activities with resources or cost',
+  'wbs.coverage_pct': 'Activities assigned to the WBS',
+  'trace.unlinked_to_finish_pct': 'Activities with no path to the finish',
+  'status.invalid_dates_count': 'Invalid actual or forecast dates',
+  'index.cpli': 'Critical Path Length Index (CPLI)',
+  'index.bei': 'Baseline Execution Index (BEI)',
+  'execution.missed_share_pct': 'Baseline tasks missed',
+  'baseline.coverage_pct': 'Activities with a baseline',
+}
+/** A plain name for a threshold's metric (never the internal key). */
+const metricLabel = (key: string) => METRIC_LABEL[key] ?? (key.split('.').pop() ?? key).replace(/_(pct|count)$/, '').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+
 const SOURCE_LABEL = { published: 'published value', runf9_default: 'RunF9 screening default', org_configured: 'set by your organization' } as const
 
 /** Standards view: pick framework(s), see results by characteristic with evidence and sources, record a run. */
@@ -188,7 +211,7 @@ function FrameworkView({ f }: { f: FrameworkResult }) {
           <ul className="space-y-1.5 text-[12.5px] text-warm-700">
             {f.conflicts.map(c => (
               <li key={c.metricKey}>
-                <span className="font-mono text-[11.5px] text-warm-600">{c.metricKey}</span> — {c.sides.map(s => `${s.ruleId} ${s.threshold.display} (${SOURCE_LABEL[s.threshold.source]}): ${RESULT_UI[s.result].label.toLowerCase()}`).join('; ')}
+                <span className="font-semibold text-navy-950">{metricLabel(c.metricKey)}</span> — {c.sides.map(s => `${s.ruleId} ${s.threshold.display} (${SOURCE_LABEL[s.threshold.source]}): ${RESULT_UI[s.result].label.toLowerCase()}`).join('; ')}
               </li>
             ))}
           </ul>
@@ -222,7 +245,7 @@ function RuleRow({ r }: { r: RuleResult }) {
         <div className="px-3 pb-3 pt-1 space-y-1.5 text-[12.5px] text-warm-700">
           <p>{r.message}</p>
           {r.reason && <p><span className="font-semibold text-navy-950">{r.result === 'not_assessable' ? 'Why not assessable: ' : 'Detail: '}</span>{r.reason}</p>}
-          {r.threshold && <p><span className="font-semibold text-navy-950">Threshold: </span>{r.threshold.display} ({SOURCE_LABEL[r.threshold.source]}){r.parameters.map(p => `; ${p.metricKey.split('.').pop()?.replace(/_/g, ' ')} ${p.display} (${SOURCE_LABEL[p.source]})`).join('')}</p>}
+          {r.threshold && <p><span className="font-semibold text-navy-950">Threshold: </span>{r.threshold.display} ({SOURCE_LABEL[r.threshold.source]}){r.parameters.map(p => `; ${metricLabel(p.metricKey).toLowerCase()} ${p.display} (${SOURCE_LABEL[p.source]})`).join('')}</p>}
           {r.evidence.length > 0 && <p><span className="font-semibold text-navy-950">Evidence: </span><span className="font-mono text-[11.5px]">{r.evidence.slice(0, 25).join(', ')}</span>{r.evidenceTotal > 25 ? ` and ${r.evidenceTotal - 25} more` : ''}</p>}
           {r.recommendation && r.result !== 'pass' && <p><span className="font-semibold text-navy-950">Recommendation: </span>{r.recommendation}</p>}
           <p className="text-[11.5px] text-warm-600">Source: {r.sourceReference} · {RULE_KIND_LABELS[r.kind]} · {FRAMEWORK_LABELS[r.framework]} · rule v{r.version} · {r.calculation}</p>

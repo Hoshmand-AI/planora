@@ -4,6 +4,7 @@
 // what-if / recovery options modeled on the file's own network, and the scheduler's Monte Carlo inputs
 // (three-point ranges and discrete risk events). Writing needs schedule.write; others see read-only.
 
+import { askText } from '@/components/AskText'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { postJson } from './ui'
@@ -86,7 +87,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     onChanged()
   }
   const revert = async (e: EditRow) => {
-    const why = window.prompt(`Reason for reverting "${e.label}" (${e.before} → ${e.after}):`)
+    const why = await askText({ title: `Revert "${e.label}" (${e.before} → ${e.after})`, label: 'Reason (kept in the audit log)', required: true, confirmLabel: 'Revert' })
     if (!why) return
     setBusy(true)
     const r = await fetch(`/api/schedules/${scheduleId}/edits?${new URLSearchParams({ editId: e.id, reason: why })}`, { method: 'DELETE' })

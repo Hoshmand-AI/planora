@@ -9,13 +9,14 @@ import { fmtDate, fmtDates } from '@/lib/format'
 import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
 import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
+import { EmptyState } from '@/components/EmptyState'
 import { ScheduleTools } from '@/components/ScheduleTools'
 import { EarnedValue } from '@/components/EarnedValue'
 import { useEffect, useState } from 'react'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can } = useApp()
+  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
   useEffect(() => {
@@ -39,10 +40,11 @@ export default function ProjectPage() {
 
   if (!selectedSchedule) {
     return (
-      <div className="px-5 md:px-6 py-10 text-center">
-        <p className="text-[15px] font-semibold text-navy-950">No project open</p>
-        <Link href="/dashboard" className="inline-block mt-2 text-[14px] font-medium text-accent-600 hover:underline">Choose one from your projects</Link>
-      </div>
+      <EmptyState title="No project open"
+        action={can('schedule.write') ? { label: 'Upload a schedule', onClick: openUpload } : { label: 'Go to your projects', href: '/dashboard' }}
+        secondary={can('schedule.write') ? { label: 'Or choose one from your projects', href: '/dashboard' } : undefined}>
+        Open a project to see its finish date, critical path and what needs attention.
+      </EmptyState>
     )
   }
 
