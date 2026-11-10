@@ -49,8 +49,13 @@ export interface ParsedSchedule {
 /* ─── helpers shared by the parsers (not part of the public contract) ─── */
 
 /** Build an Activity with sensible defaults. */
+/** No real activity runs longer than this many work days (about 140 years); a larger number in a file is a typing error. */
+export const MAX_DURATION_DAYS = 36500
+/** A duration as the engine can use it: a finite number of work days from 0 to MAX_DURATION_DAYS. */
+export const saneDuration = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? Math.min(MAX_DURATION_DAYS, Math.max(0, n)) : 0 }
+
 export function makeActivity(scheduleId: string, fields: Partial<Activity>): Activity {
-  return {
+  const a: Activity = {
     id: uuid(),
     scheduleId,
     activityId: '',
@@ -78,6 +83,10 @@ export function makeActivity(scheduleId: string, fields: Partial<Activity>): Act
     sourceId: null,
     ...fields,
   }
+  // Whatever the file said, the schedule is calculated on usable numbers (not NaN, negative or absurdly large).
+  a.duration = saneDuration(a.duration)
+  a.remainingDuration = saneDuration(a.remainingDuration)
+  return a
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')

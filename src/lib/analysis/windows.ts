@@ -39,7 +39,7 @@
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import type { ProgressMode, WorkCalendar } from '@/lib/planning/types'
-import { completeSchedule, type CompletionResult } from '@/lib/planning/complete-schedule'
+import { completeSchedule, scheduledRemaining, type CompletionResult } from '@/lib/planning/complete-schedule'
 import { defaultCalendar, workDaysBetween } from '@/lib/planning/calendar'
 import { baselineExecution, roundIndex } from '@/lib/analysis/dcma'
 import { fmtDate } from '@/lib/format'
@@ -338,7 +338,10 @@ function hybrid(P: Pair, o: Mix, basis: Basis) {
     return {
       ...d, id: `c:${code}`, scheduleId: 'windows',
       actualStart: p.actualStart, actualFinish: p.actualFinish, status: p.status, percentComplete: p.percentComplete,
-      remainingDuration: p.status === 'in_progress' ? p.remainingDuration : d.duration,
+      // Work not started carries its own remaining duration with the duration side: a planner who re-estimates
+      // unstarted work in P6 changes the remaining duration and leaves the original (the main engine schedules on it too).
+      // (Only when the duration side itself had not started: once started, its remaining is progress, not an estimate.)
+      remainingDuration: p.status === 'in_progress' ? p.remainingDuration : d.status === 'not_started' && !d.actualStart ? d.remainingDuration : d.duration,
       constraintType, constraintDate: k.constraintDate ?? null,
       calendarId: calRef(c, cs),
       earlyStart: null, earlyFinish: null, lateStart: null, lateFinish: null, totalFloat: 0, freeFloat: 0, isCritical: false,
@@ -390,6 +393,9 @@ function relsInto(u: WindowUpdate, codeOf: Map<string, string>, code: string): M
   return m
 }
 
+/** Work days an unstarted activity is scheduled on (its remaining duration when that differs from the original). */
+const effectiveDuration = (a: Activity) => scheduledRemaining(a) ?? Math.round(a.duration)
+
 /** What changed on one driving-path activity between the two updates. */
 function driverChanges(P: Pair, code: string, e0: Map<string, Activity>): DriverChange[] {
   const { E, L } = P
@@ -398,8 +404,10 @@ function driverChanges(P: Pair, code: string, e0: Map<string, Activity>): Driver
   if (!e) return [{ kind: 'added', detail: 'added in the later update' }]
   const out: DriverChange[] = []
   const notStarted = !l.actualStart && l.status !== 'in_progress' && l.status !== 'complete'
-  if (notStarted && Math.round(e.duration) !== Math.round(l.duration)) {
-    out.push({ kind: 'duration', delta: Math.round(l.duration - e.duration), detail: `original duration ${e.duration} → ${l.duration} wd` })
+  // The duration the work is scheduled on: the remaining duration where it differs from the original.
+  const ed = effectiveDuration({ ...e, status: 'not_started' }), ld = effectiveDuration(l)
+  if (notStarted && ed !== ld) {
+    out.push({ kind: 'duration', delta: ld - ed, detail: Math.round(e.duration) !== Math.round(l.duration) ? `original duration ${e.duration} → ${l.duration} wd` : `remaining duration ${ed} → ${ld} wd (original ${l.duration} wd unchanged)` })
   }
   if (l.status === 'in_progress' && e.status === 'in_progress' && Math.round(e.remainingDuration) !== Math.round(l.remainingDuration)) {
     out.push({ kind: 'remaining', delta: Math.round(l.remainingDuration - e.remainingDuration), detail: `remaining duration ${e.remainingDuration} → ${l.remainingDuration} wd` })
@@ -536,7 +544,7 @@ export function analyzeWindow(E: WindowUpdate, L: WindowUpdate, index = 1, finis
   for (const [c, l] of P.lBy) {
     const e = P.eBy.get(c)
     if (!e) continue
-    if (l.status === 'not_started' && Math.round(e.duration) !== Math.round(l.duration)) durationsChanged++
+    if (l.status === 'not_started' && effectiveDuration({ ...e, status: 'not_started' }) !== effectiveDuration(l)) durationsChanged++
     if ((e.constraintType ?? null) !== (l.constraintType ?? null) || (e.constraintDate ?? null) !== (l.constraintDate ?? null)) constraintsChanged++
     if (calName(E, e) !== calName(L, l)) calendarsChanged++
   }

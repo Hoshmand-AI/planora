@@ -5,7 +5,7 @@ import { entitlementsFor } from '@/lib/server/entitlements'
 import { can } from '@/lib/server/permissions'
 import { hit } from '@/lib/server/rate-limit'
 import { currentRequest } from '@/lib/server/context'
-import { appOrigin } from '@/lib/server/email'
+import { samlOrigin, SAML_NEEDS_APP_URL } from '@/lib/server/email'
 
 /**
  * SP-initiated SAML sign-in: redirects the browser to the identity provider with an AuthnRequest
@@ -21,7 +21,8 @@ export const GET = publicApi<{ connection: string }>(async (req, { params, auth 
   if (test && !(auth && auth.orgId === found.orgId && can(auth.role, 'org.manage'))) throw new ApiError(403, 'Only an admin of this organization can test its SAML connection.')
   if (!test && !found.config.enabled) throw new ApiError(404, 'SAML single sign-on is not turned on for this organization.', 'sso_not_configured')
   if (!entitlementsFor(found.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
-  const origin = appOrigin(req)
+  const origin = samlOrigin(req)
+  if (!origin) throw new ApiError(500, SAML_NEEDS_APP_URL, 'app_url_required')
   const { url, stateCookie } = await startSaml(found.orgId, found.config, origin, { test })
   const res = NextResponse.redirect(url, 303)
   res.cookies.set(SAML_COOKIE, stateCookie, samlCookieOptions(origin, 600))

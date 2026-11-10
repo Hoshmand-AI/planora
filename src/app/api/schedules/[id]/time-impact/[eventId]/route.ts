@@ -15,7 +15,8 @@ import { DELAY_EVENT_STATUSES, parseDelayEventFields, TIA_DISCLAIMER, type Delay
  *   DELETE → removes a delay event that was never run (an analysed event is a record: reject it instead).
  */
 export const GET = api<{ id: string; eventId: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth }) => {
-  const event = await getDelayEvent(params.eventId, params.id, auth.orgId)
+  // The schedule lookup applies the caller's workspace access (ethical walls); the event lookup alone is organization-wide.
+  const event = (await getScheduleById(params.id, auth.orgId)) ? await getDelayEvent(params.eventId, params.id, auth.orgId) : undefined
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const runs = await listTiaRuns(event.id, auth.orgId)
   return NextResponse.json({ event, runs, disclaimer: TIA_DISCLAIMER })
@@ -57,7 +58,8 @@ export const PATCH = api<{ id: string; eventId: string }>({ permission: 'schedul
 })
 
 export const DELETE = api<{ id: string; eventId: string }>({ permission: 'schedule.write' }, async (_req, { params, auth }) => {
-  const event = await getDelayEvent(params.eventId, params.id, auth.orgId)
+  // The schedule lookup applies the caller's workspace access (ethical walls); the event lookup alone is organization-wide.
+  const event = (await getScheduleById(params.id, auth.orgId)) ? await getDelayEvent(params.eventId, params.id, auth.orgId) : undefined
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!(await deleteDelayEvent(event.id, params.id, auth.orgId))) {
     return NextResponse.json({ error: 'This delay event has been analysed, so it is kept as a record. Reject it instead.', code: 'has_runs' }, { status: 409 })

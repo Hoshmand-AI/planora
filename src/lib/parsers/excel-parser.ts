@@ -218,6 +218,8 @@ interface PredRef { ref: string; type: Relationship['type']; lag: number }
 export function predCandidates(token: string): PredRef[] {
   const t = token.trim()
   if (!t) return []
+  // A predecessor reference is short; a huge cell is taken as written (and never run through the patterns below).
+  if (t.length > 120) return [{ ref: t, type: 'FS', lag: 0 }]
   const out: PredRef[] = []
   const T = (s: string) => s.toUpperCase() as Relationship['type']
   const lagOf = (num: string, unit: string) => parseDurationDays(`${num.replace(/\s/g, '')}${unit.toLowerCase()}`) ?? 0
@@ -497,7 +499,8 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const code = txt(row, 'code')
     const name = txt(row, 'name')
     if (!code && !name) return
-    if (headerTexts.has(normHeader(code || name)) && matchHeader(code || name)) return // repeated header row
+    // A repeated header row repeats several column titles; one cell that happens to read "Finish" or "Start" is an activity.
+    if (headerTexts.has(normHeader(code || name)) && matchHeader(code || name) && row.filter(c => { const t = cellText(c); return !!t && headerTexts.has(normHeader(t)) }).length >= 2) return
     // The other row of a two-row P6 header (field names above titles, or titles below field names)
     if (matchHeader(code) === 'code' && (!name || matchHeader(name) === 'name')) return
     // P6 import: rows marked "Delete This Row" are deleted, not imported
@@ -566,7 +569,8 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
       name: name || code,
       wbs: txt(row, 'wbs') || group,
       duration: duration ?? 0,
-      remainingDuration: rd ?? (status === 'complete' ? 0 : duration ?? 0),
+      // No Remaining column: work in progress has the share of its duration that its percent complete leaves.
+      remainingDuration: rd ?? (status === 'complete' ? 0 : status === 'in_progress' && pct > 0 && pct < 100 ? Math.max(1, round2(((duration ?? 0) * (100 - pct)) / 100)) : duration ?? 0),
       percentComplete: pct,
       earlyStart: start,
       earlyFinish: finish,
@@ -606,9 +610,15 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   /* resolve logic */
   const byCode = new Map<string, Activity>()
   const byCodeLower = new Map<string, Activity>()
+  const duplicateIds = new Set<string>()
   for (const a of activities) {
+    if (byCode.has(a.activityId)) duplicateIds.add(a.activityId)
     if (!byCode.has(a.activityId)) byCode.set(a.activityId, a)
     if (!byCodeLower.has(a.activityId.toLowerCase())) byCodeLower.set(a.activityId.toLowerCase(), a)
+  }
+  if (duplicateIds.size) {
+    warnings.push(`${duplicateIds.size} activity ID${duplicateIds.size === 1 ? ' is' : 's are'} used on more than one row (${[...duplicateIds].slice(0, 5).join(', ')}); logic points at the first row with that ID, and comparisons between updates may match the wrong one`)
+    ex.add({ severity: 'warning', entity: 'activity', field: 'Activity ID', disposition: 'defaulted', count: duplicateIds.size, example: [...duplicateIds][0], message: 'The same activity ID is used on more than one row' })
   }
   const resolve = (ref: string): Activity | undefined => {
     const r = ref.trim()
@@ -623,7 +633,9 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const addLinks = (self: Activity, list: string, dir: 'pred' | 'succ', row: number) => {
     for (const token of splitList(list)) {
       let done = false
-      for (const cand of predCandidates(token)) {
+      // An activity ID that matches as written wins: "A1000-1" is that activity, not A1000 with a one-day lead.
+      const exact = resolve(token) ? [{ ref: token.trim(), type: 'FS' as const, lag: 0 }] : null
+      for (const cand of exact ?? predCandidates(token)) {
         const other = resolve(cand.ref)
         if (!other) continue
         done = true

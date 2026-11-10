@@ -79,6 +79,18 @@ export async function sendEmail(m: Email): Promise<{ sent: boolean; provider: st
   }
 }
 
+/**
+ * The address SAML assertions must be issued for. In production it has to be the configured public
+ * address: taking it from the request would let whoever sends the request choose the audience and
+ * recipient the assertion is checked against. Test environments (RUNF9_ALLOW_INSECURE_OIDC) use the request's own.
+ */
+export function samlOrigin(req: Request): string | null {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '')
+  if (process.env.NODE_ENV === 'production' && !/^(1|true)$/i.test(process.env.RUNF9_ALLOW_INSECURE_OIDC || '')) return null
+  return new URL(req.url).origin
+}
+export const SAML_NEEDS_APP_URL = 'SAML single sign-on needs the public address of this installation: set APP_URL (for example https://runf9.example.com) and restart.'
+
 /** Public origin for links in emails: APP_URL if set, else the request's own origin. */
 export function appOrigin(req: Request): string {
   return (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '')

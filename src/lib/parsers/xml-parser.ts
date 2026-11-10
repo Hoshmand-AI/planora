@@ -55,6 +55,11 @@ function tagText(xml: string, tag: string): string {
 /* ─── durations ─────────────────────────────────────────── */
 
 /** MSPDI duration "PT8H30M0S" / "P2DT4H0M0S" / "-PT8H0M0S" → hours (a "D" component counts as one work day). */
+/** MS Project duration and lag format codes that mean elapsed (wall-clock) time. */
+const ELAPSED_FORMATS = new Set(['4', '6', '8', '10', '12', '36', '38', '40', '42', '44'])
+/** A link between two large summaries becomes one link per pair of work tasks: beyond this it is not applied. */
+const MAX_SUMMARY_LINKS = 2500
+
 export function mspDurationHours(dur: string, hoursPerDay: number): number {
   if (!dur) return 0
   const m = dur.trim().match(/^(-)?P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/)
@@ -272,6 +277,12 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   const ex = new ExceptionCollector('import', 'ms_xml')
   const xml = content.replace(/^﻿/, '')
 
+  // A collection opened more often than it is closed is a damaged file; reading on would retry from every
+  // opener (minutes on a large file), so it is refused here with a plain message.
+  for (const t of ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports', 'Task', 'PredecessorLink', 'Calendar']) {
+    if (xml.split(`<${t}>`).length !== xml.split(`</${t}>`).length) throw new Error(`This MS Project XML file is damaged: a <${t}> section is not closed. Export it again from MS Project (File → Save As → XML).`)
+  }
+
   // Project-level fields only (exclude nested collections that also contain <Name>, <Start>, …)
   const header = stripBlocks(xml, ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports'])
   const title = tagText(header, 'Title')
@@ -313,6 +324,11 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   const hpdByUid = new Map<string, number>()
   let projectSummaryName = ''
   const outlineStack: string[] = []
+  // The summary tasks above the current row (UIDs), and the work tasks under each summary: a link drawn
+  // to or from a summary in MS Project applies to the work under it.
+  const summaryUidStack: string[] = []
+  const workUnder = new Map<string, string[]>()
+  let idKeyed = 0, inactive = 0
   const pendingLinks: { succUid: string; block: string }[] = []
   const deadlines: { a: Activity; date: string }[] = []
 
@@ -325,6 +341,9 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     if (uid === '0' || outlineLevel === '0') { projectSummaryName = name; continue } // project summary task
     if (!name) { ex.add({ severity: 'loss', entity: 'activity', field: 'Task.Name', disposition: 'dropped', example: `UID ${uid}`, message: 'Task without a name was skipped' }); continue }
 
+    // An inactive task stays in the MS Project file for the record but is not part of the schedule.
+    if (tagText(own, 'Active') === '0') { inactive++; ex.add({ severity: 'warning', entity: 'activity', field: 'Task.Active', disposition: 'dropped', example: name, message: 'Inactive task left out (MS Project does not schedule it)' }); continue }
+
     const isSummary = tagText(own, 'Summary') === '1'
     // Outline: a work task belongs to the nearest summary above it; its WBS is that summary's path
     // ("1.2 Foundations", like the P6 parser's WBS path) so the hierarchy can be rebuilt on export.
@@ -334,10 +353,16 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     let parentWbs = ''
     if (level > 0) {
       outlineStack.length = Math.min(outlineStack.length, level - 1)
+      summaryUidStack.length = Math.min(summaryUidStack.length, level - 1)
       for (let k = outlineStack.length - 1; k >= 0 && !parentWbs; k--) parentWbs = outlineStack[k] || ''
       if (isSummary) {
         while (outlineStack.length < level - 1) outlineStack.push('')
         outlineStack.push(ownWbs ? `${ownWbs} ${name}` : '')
+        while (summaryUidStack.length < level - 1) summaryUidStack.push('')
+        summaryUidStack.push(uid)
+        if (!workUnder.has(uid)) workUnder.set(uid, [])
+      } else {
+        for (const s of summaryUidStack) if (s) workUnder.get(s)?.push(uid)
       }
     }
     const calUidRaw = tagText(own, 'CalendarUID')
@@ -357,7 +382,14 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     // Slack values are integers in tenths of minutes
     const slack = (v: string) => (v === '' ? null : round2(parseFloat(v) / (600 * hpd)))
 
-    const duration = days(tagText(own, 'Duration'), 'Task.Duration')
+    // Elapsed durations ("30 edays": a cure, a lead time) are wall-clock time, not working time.
+    const elapsedDuration = ELAPSED_FORMATS.has(tagText(own, 'DurationFormat'))
+    let duration = days(tagText(own, 'Duration'), 'Task.Duration')
+    if (elapsedDuration && duration > 0) {
+      const calendarDays = mspDurationHours(tagText(own, 'Duration'), 24) / 24
+      duration = Math.max(1, Math.round((calendarDays * 5) / 7))
+      ex.add({ severity: 'warning', entity: 'activity', field: 'Task.DurationFormat (elapsed)', disposition: 'converted', example: name, message: 'Elapsed duration converted to work days (five per seven calendar days)' })
+    }
     const remTxt = tagText(own, 'RemainingDuration')
     const pct = parseFloat(tagText(own, 'PercentComplete') || '0') || 0
     const actualStart = isoDatePrefix(tagText(own, 'ActualStart'))
@@ -435,6 +467,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     // MS Project Deadline: a target finish. Kept as the activity's finish constraint (or the project's
     // required finish on an end activity) once the links are known.
     const deadline = isoDatePrefix(tagText(own, 'Deadline'))
+    if (!code) idKeyed++
     const a = makeActivity(scheduleId, {
       activityId: code || `A${idTxt}`,
       name,
@@ -468,7 +501,12 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
     for (const link of allBlocks(block, 'PredecessorLink')) pendingLinks.push({ succUid: uid, block: link })
   }
 
+  // Without an activity code of their own, tasks are known by their MS Project row ID, which renumbers when rows are
+  // inserted or deleted. Say so: comparing two updates then matches by row, not by task.
+  if (idKeyed > 0) ex.add({ severity: 'warning', entity: 'activity', field: 'Task.ID', disposition: 'defaulted', count: idKeyed, message: 'Tasks are identified by their row ID. If rows were inserted or deleted since the previous update, comparisons between updates match different tasks; give tasks a unique ID or WBS code in MS Project to make them stable' })
+  if (inactive > 0) warnings.push(`${inactive} inactive task${inactive === 1 ? ' was' : 's were'} left out (MS Project does not schedule inactive tasks)`)
   const relationships: Relationship[] = []
+  let summaryLinks = 0
   for (const { succUid, block } of pendingLinks) {
     const predUid = tagText(block, 'PredecessorUID')
     const pred = byUid.get(predUid)
@@ -487,7 +525,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
       // percentage lag: LinkLag is percent × 10 of the predecessor duration
       lag = round2((lagRaw / 1000) * pred.duration)
       ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink.LagFormat (percent)', disposition: 'converted', example: `${pred.activityId} -> ${succ.activityId}`, message: 'Percentage lag converted to work days of the predecessor duration' })
-    } else if (['4', '6', '8', '10', '12', '36', '38', '40', '42', '44'].includes(fmt)) {
+    } else if (ELAPSED_FORMATS.has(fmt)) {
       // elapsed units: LinkLag is in tenths of minutes of wall-clock time
       lag = round2(lagRaw / 600 / 24)
       warnings.push(`Link ${pred.activityId} → ${succ.activityId}: elapsed lag converted to ${lag} calendar days`)
@@ -497,8 +535,21 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
       lag = round2(exact)
       if (wasRounded(exact, lag)) ex.add({ severity: 'info', entity: 'relationship', field: 'PredecessorLink.LinkLag', disposition: 'converted', example: `${pred.activityId} -> ${succ.activityId}`, message: 'Lag converted to work days and rounded to 0.01 day' })
     }
-    relationships.push({ id: uuid(), scheduleId, predecessorId: pred.id, successorId: succ.id, type, lag })
+    // A link on a summary task applies to the work under it (summaries themselves are not scheduled).
+    const leaves = (uid: string, a: Activity) => (a.activityType === 'summary' ? (workUnder.get(uid) ?? []).map(u => byUid.get(u)).filter((x): x is Activity => !!x && x.activityType !== 'summary') : [a])
+    const preds = leaves(predUid, pred), succs = leaves(succUid, succ)
+    if (pred.activityType === 'summary' || succ.activityType === 'summary') {
+      if (!preds.length || !succs.length || preds.length * succs.length > MAX_SUMMARY_LINKS) {
+        warnings.push(`Link ${pred.activityId} → ${succ.activityId} is on a summary task and could not be applied to the work under it; skipped`)
+        ex.add({ severity: 'loss', entity: 'relationship', field: 'PredecessorLink (summary task)', disposition: 'dropped', example: `${pred.activityId} -> ${succ.activityId}`, message: 'Link on a summary task could not be applied to its work tasks' })
+        continue
+      }
+      summaryLinks++
+      ex.add({ severity: 'warning', entity: 'relationship', field: 'PredecessorLink (summary task)', disposition: 'converted', example: `${pred.activityId} -> ${succ.activityId}`, message: 'Link on a summary task applied to each work task under it' })
+    }
+    for (const p of preds) for (const q of succs) if (p !== q) relationships.push({ id: uuid(), scheduleId, predecessorId: p.id, successorId: q.id, type, lag })
   }
+  if (summaryLinks > 0) warnings.push(`${summaryLinks} link${summaryLinks === 1 ? '' : 's'} on summary tasks ${summaryLinks === 1 ? 'was' : 'were'} applied to the work tasks under them`)
 
   // Deadlines: an end activity's (nothing follows it) is the project's required finish (RunF9's own
   // export writes the required finish there, as P6 Must Finish By); any other activity's becomes its
