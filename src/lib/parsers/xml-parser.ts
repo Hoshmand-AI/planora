@@ -277,6 +277,12 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
   const ex = new ExceptionCollector('import', 'ms_xml')
   const xml = content.replace(/^﻿/, '')
 
+  // A collection opened more often than it is closed is a damaged file; reading on would retry from every
+  // opener (minutes on a large file), so it is refused here with a plain message.
+  for (const t of ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports', 'Task', 'PredecessorLink', 'Calendar']) {
+    if (xml.split(`<${t}>`).length !== xml.split(`</${t}>`).length) throw new Error(`This MS Project XML file is damaged: a <${t}> section is not closed. Export it again from MS Project (File → Save As → XML).`)
+  }
+
   // Project-level fields only (exclude nested collections that also contain <Name>, <Start>, …)
   const header = stripBlocks(xml, ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports'])
   const title = tagText(header, 'Title')

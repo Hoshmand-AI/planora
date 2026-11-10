@@ -12,7 +12,7 @@ import { entitlementsFor } from '@/lib/server/entitlements'
 import { audit, auditQuietly } from '@/lib/server/audit'
 import { currentRequest } from '@/lib/server/context'
 import { randomToken } from '@/lib/server/crypto'
-import { appOrigin } from '@/lib/server/email'
+import { samlOrigin, SAML_NEEDS_APP_URL } from '@/lib/server/email'
 import { log } from '@/lib/server/log'
 import { assertBetaAccess } from '@/lib/server/beta'
 
@@ -36,7 +36,8 @@ async function readForm(req: NextRequest): Promise<{ SAMLResponse: string; Relay
  * the response must answer the one-time AuthnRequest issued for that browser.
  */
 export const POST = publicApi<{ connection: string }>(async (req, { params }) => {
-  const origin = appOrigin(req)
+  const origin = samlOrigin(req)
+  if (!origin) throw new ApiError(500, SAML_NEEDS_APP_URL, 'app_url_required')
   const clearState = (res: NextResponse) => { res.cookies.set(SAML_COOKIE, '', { path: SAML_COOKIE_PATH, maxAge: 0 }); return res }
   let test = false
   let orgId: string | undefined

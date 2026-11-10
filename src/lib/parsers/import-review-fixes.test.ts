@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseMSProjectXML } from './xml-parser'
 import { parseSpreadsheet, predCandidates } from './excel-parser'
+import { makeActivity, MAX_DURATION_DAYS } from './types'
 
 const task = (uid: number, id: number, name: string, level: number, extra = '', links = '') =>
   `<Task><UID>${uid}</UID><ID>${id}</ID><Name>${name}</Name><OutlineLevel>${level}</OutlineLevel><Start>2026-03-02T08:00:00</Start><Finish>2026-03-06T17:00:00</Finish>${extra.includes('<Duration>') ? '' : '<Duration>PT40H0M0S</Duration>'}${extra}${links}</Task>`
@@ -60,5 +61,32 @@ describe('spreadsheet import', () => {
     const start = Date.now()
     expect(predCandidates(t)).toEqual([{ ref: t, type: 'FS', lag: 0 }])
     expect(Date.now() - start).toBeLessThan(200)
+  })
+})
+
+describe('import guards', () => {
+  const csv = (rows: string[]) => parseSpreadsheet(Buffer.from(rows.join('\n')), 't.csv', 's')
+
+  it('work in progress without a Remaining column keeps the share its percent complete leaves', async () => {
+    const p = await csv(['Act ID,Activity Name,OD,Actual Start,% Complete', 'A1,Pour,20,2026-03-02,90', 'A2,Strip,10,,0'])
+    expect(p.activities[0]).toMatchObject({ status: 'in_progress', remainingDuration: 2 })
+    expect(p.activities[1].remainingDuration).toBe(10)
+  })
+
+  it('a repeated activity ID is reported', async () => {
+    const p = await csv(['Act ID,Activity Name,OD', 'A1,Dig,5', 'A1,Dig again,5'])
+    expect(p.warnings.join(' ')).toMatch(/used on more than one row/)
+  })
+
+  it('a damaged MS Project file is refused at once with a plain message', () => {
+    const bad = `<Project><Tasks></Tasks>${'<Views>'.repeat(20000)}</Project>`
+    const start = Date.now()
+    expect(() => parseMSProjectXML(bad, 's')).toThrow(/damaged/)
+    expect(Date.now() - start).toBeLessThan(500)
+  })
+
+  it('durations are always usable numbers', () => {
+    expect(makeActivity('s', { duration: NaN, remainingDuration: -4 })).toMatchObject({ duration: 0, remainingDuration: 0 })
+    expect(makeActivity('s', { duration: 9_999_999_999 }).duration).toBe(MAX_DURATION_DAYS)
   })
 })

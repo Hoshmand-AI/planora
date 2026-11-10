@@ -569,7 +569,8 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
       name: name || code,
       wbs: txt(row, 'wbs') || group,
       duration: duration ?? 0,
-      remainingDuration: rd ?? (status === 'complete' ? 0 : duration ?? 0),
+      // No Remaining column: work in progress has the share of its duration that its percent complete leaves.
+      remainingDuration: rd ?? (status === 'complete' ? 0 : status === 'in_progress' && pct > 0 && pct < 100 ? Math.max(1, round2(((duration ?? 0) * (100 - pct)) / 100)) : duration ?? 0),
       percentComplete: pct,
       earlyStart: start,
       earlyFinish: finish,
@@ -609,9 +610,15 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   /* resolve logic */
   const byCode = new Map<string, Activity>()
   const byCodeLower = new Map<string, Activity>()
+  const duplicateIds = new Set<string>()
   for (const a of activities) {
+    if (byCode.has(a.activityId)) duplicateIds.add(a.activityId)
     if (!byCode.has(a.activityId)) byCode.set(a.activityId, a)
     if (!byCodeLower.has(a.activityId.toLowerCase())) byCodeLower.set(a.activityId.toLowerCase(), a)
+  }
+  if (duplicateIds.size) {
+    warnings.push(`${duplicateIds.size} activity ID${duplicateIds.size === 1 ? ' is' : 's are'} used on more than one row (${[...duplicateIds].slice(0, 5).join(', ')}); logic points at the first row with that ID, and comparisons between updates may match the wrong one`)
+    ex.add({ severity: 'warning', entity: 'activity', field: 'Activity ID', disposition: 'defaulted', count: duplicateIds.size, example: [...duplicateIds][0], message: 'The same activity ID is used on more than one row' })
   }
   const resolve = (ref: string): Activity | undefined => {
     const r = ref.trim()

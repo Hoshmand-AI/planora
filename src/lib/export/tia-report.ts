@@ -73,15 +73,19 @@ export function tiaMarkdown(input: TiaReportInput): string {
   const { event: e, run } = input
   const r = run.result
   const out: string[] = []
-  out.push(`# Time Impact Analysis — ${e.title}`, '')
+  out.push(`# Time Impact Analysis — ${run.result.event?.title ?? e.title}`, '')
   out.push(`**${r.update.name} (${r.update.version})** · data date ${d(r.update.dataDate)} · basis: ${r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} RunF9 edits (a what-if scenario)` : 'as submitted'} · run ${fmtDate(run.createdAt)}${run.createdByName ? ` by ${run.createdByName}` : ''}`, '')
   for (const n of input.notes ?? []) out.push(`**Note:** ${n}`, '')
   out.push('## Calculation, not conclusion', '', `> ${TIA_DISCLAIMER}`, '')
+  // The event as it was when this run was calculated (the event can be edited afterwards; the run cannot).
+  const ev = r.event ?? { title: e.title, responsibility: e.responsibility, responsibilityLabel: RESPONSIBILITY_LABELS[e.responsibility] ?? e.responsibility, eventStart: e.eventStart, eventEnd: e.eventEnd }
+  const editedSince = ev.title !== e.title || ev.responsibility !== e.responsibility || (ev.eventStart ?? null) !== (e.eventStart ?? null) || (ev.eventEnd ?? null) !== (e.eventEnd ?? null)
+  if (editedSince) out.push('**Note:** The delay event was edited after this run. The title, responsibility label and event dates below are the ones this run was calculated with.', '')
   out.push('## Delay event', '', table(['Item', 'Value'], [
-    ['Title', e.title],
+    ['Title', ev.title],
     ['Description', e.description ?? '—'],
-    ['Responsibility (label entered by the user, not a determination)', RESPONSIBILITY_LABELS[e.responsibility] ?? e.responsibility],
-    ['Event start / end', `${d(e.eventStart)} / ${d(e.eventEnd)}`],
+    ['Responsibility (label entered by the user, not a determination)', ev.responsibilityLabel || (RESPONSIBILITY_LABELS[ev.responsibility] ?? ev.responsibility)],
+    ['Event start / end', `${d(ev.eventStart)} / ${d(ev.eventEnd)}`],
     ['Notice date', d(e.notifiedOn)],
     ['Status', `${STATUS_LABELS[e.status]}${e.statusNote ? ` — ${e.statusNote}` : ''}`],
   ]), '')
@@ -135,9 +139,9 @@ export async function exportTiaXlsx(input: TiaReportInput, prov: Provenance, mar
   addProvenance(wb, prov, `Time Impact Analysis — ${e.title}`)
   sheet(wb, 'Summary', ['Item', 'Value'], [
     ['Disclaimer', TIA_DISCLAIMER],
-    ['Delay event', e.title], ['Description', e.description ?? ''],
-    ['Responsibility (label entered by the user, not a determination)', RESPONSIBILITY_LABELS[e.responsibility] ?? e.responsibility],
-    ['Event start', d(e.eventStart)], ['Event end', d(e.eventEnd)], ['Notice date', d(e.notifiedOn)], ['Status', STATUS_LABELS[e.status]],
+    ['Delay event', r.event?.title ?? e.title], ['Description', e.description ?? ''],
+    ['Responsibility (label entered by the user, not a determination)', r.event?.responsibilityLabel || (RESPONSIBILITY_LABELS[r.event?.responsibility ?? e.responsibility] ?? e.responsibility)],
+    ['Event start', d(r.event ? r.event.eventStart : e.eventStart)], ['Event end', d(r.event ? r.event.eventEnd : e.eventEnd)], ['Notice date', d(e.notifiedOn)], ['Status', STATUS_LABELS[e.status]],
     ['Update', `${r.update.name} (${r.update.version})`], ['Data date', d(r.update.dataDate)], ['Basis', r.update.basis === 'scenario' && r.update.editsApplied ? `with ${r.update.editsApplied} RunF9 edits` : 'as submitted'],
     ...r.findings.map((f, i) => [`Finding ${i + 1}`, f]),
     ...r.validation.errors.map(x => ['Validation error', x]),
