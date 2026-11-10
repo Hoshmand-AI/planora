@@ -10,6 +10,7 @@ import { basisFrom, loadScheduleData } from '@/lib/planning/service'
 import { uploadedToGenerated } from '@/lib/planning/uploaded'
 import { exportXer, exportXerFromOriginal, xerEditsFrom, xerUpdatesFrom } from '@/lib/export/xer'
 import { decodeXer, encodeXer } from '@/lib/parsers/xer-codec'
+import { buildIpmdarSpd, zipIpmdarSpd } from '@/lib/export/ipmdar-spd'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
@@ -27,6 +28,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  * Download an uploaded schedule, recalculated by RunF9, with its own activity IDs, WBS, progress
  * and required finish:
  *   ?format=xer | xml | csv | xlsx-p6 | xlsx-import
+ *   ?format=ipmdar   IPMDAR Schedule Performance Dataset v1.0 (ZIP of JSON tables); ?report=1 lists its warnings
  *   ?format=lookahead-xlsx  3-week look-ahead: activities in progress or starting within 21 days of
  *                           the data date, with remaining duration, float and predecessors
  * XLSX downloads carry provenance (source file, SHA-256, release, progress mode, settings, data date).
@@ -68,7 +70,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
     await audit({ action: 'schedule.download_original', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, file: f.fileName, sha256: f.sha256 } })
     return new NextResponse(f.content as unknown as BodyInit, { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${f.fileName.replace(/"/g, '')}"`, 'X-Content-SHA256': f.sha256 } })
   }
-  if (!['xer', 'xml', 'csv', 'xlsx-p6', 'xlsx-import', 'lookahead-xlsx'].includes(format)) return NextResponse.json({ error: 'Unknown format. Use xer, xml, csv, xlsx-p6, xlsx-import, lookahead-xlsx or original.' }, { status: 400 })
+  if (!['xer', 'xml', 'csv', 'xlsx-p6', 'xlsx-import', 'lookahead-xlsx', 'ipmdar'].includes(format)) return NextResponse.json({ error: 'Unknown format. Use xer, xml, csv, xlsx-p6, xlsx-import, lookahead-xlsx, ipmdar or original.' }, { status: 400 })
   requireFeature(auth.plan, entitlementsFor(auth.plan).exports.includes(format), `${format.toUpperCase()} export`)
   // CUI / classified uploads (or schedules built from such a plan) carry markings on every export.
   const classification = await scheduleClassification(schedule.id, auth.orgId).catch(() => 'classified' as const)
@@ -88,6 +90,17 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   // (CSV and Excel do not write them; their export exception report says so.)
   const resources = await loadScheduleResources(schedule, auth.orgId, data.activities).catch(() => null)
   const g = uploadedToGenerated(schedule, data.activities, data.relationships, data.cpm, data.analysis, scenarioEdits, { resources })
+  // IPMDAR Schedule Performance Dataset (src/lib/export/ipmdar-spd.ts): a ZIP of JSON tables. ?report=1
+  // answers what could not be filled or was left out, as JSON, instead of the file.
+  if (format === 'ipmdar') {
+    if (marking) return NextResponse.json({ error: 'The IPMDAR dataset is not offered for a schedule marked CUI or classified: RunF9 does not decide the security marking that file must carry.', code: 'ipmdar_marking' }, { status: 409 })
+    const spd = buildIpmdarSpd(g, { projectName: schedule.name, securityMarking: 'UNCLASSIFIED', softwareVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7), metadata: { ContractorName: auth.orgName, ProgramName: schedule.name } })
+    if (req.nextUrl.searchParams.get('report') === '1') return NextResponse.json({ format, basis, files: Object.keys(spd.files), warnings: spd.warnings })
+    const zip = zipIpmdarSpd(spd.files)
+    const file = `${slug}-ipmdar-spd.zip`
+    await audit({ action: 'schedule.export', targetType: 'schedule', targetId: schedule.id, detail: { name: schedule.name, version: schedule.version, format, file, basis, editsInRunF9: editsApplied, activities: g.activities.length, warnings: spd.warnings.length, sha256: createHash('sha256').update(zip).digest('hex') } })
+    return new NextResponse(zip as unknown as BodyInit, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${file}"`, 'X-RunF9-Export-Warnings': String(spd.warnings.length) } })
+  }
   // P6's progress option: written into the export when the scheduler changed it from the file's own.
   const mode = data.analysis.progressMode
   const fileMode = data.analysis.fileProgressMode ?? null
