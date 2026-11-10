@@ -390,6 +390,15 @@ async function main() {
       r = await A.req('DELETE', `/api/schedules/${sid}/inbox?inboxId=${inboxId}`)
       ok(r.status === 200 && (await send(tok, 'text/plain', 'Daily report: no work today.')).status === 401, 'A turned-off inbox refuses its token at once', r.data)
     }
+    {
+      // IPMDAR Schedule Performance Dataset: a ZIP of JSON tables, with a report of what could not be filled.
+      const res = await fetch(`${BASE}/api/schedules/${sid}/export?format=ipmdar`, { headers: { cookie: A.cookie } })
+      const zip = Buffer.from(await res.arrayBuffer())
+      ok(res.status === 200 && res.headers.get('content-type') === 'application/zip' && zip.subarray(0, 2).toString() === 'PK' && zip.includes('IPMDAR_SCHEDULE_PERFORMANCE_DATASET/1.0') === false && zip.includes('FileType.txt'), 'IPMDAR dataset downloads as a ZIP with FileType.txt', res.status)
+      r = await A.get(`/api/schedules/${sid}/export?format=ipmdar&report=1`)
+      ok(r.status === 200 && ['FileType.txt', 'DatasetMetadata.json', 'ProjectScheduleData.json', 'Tasks.json', 'TaskScheduleData.json', 'TaskRelationships.json', 'Calendars.json'].every(f => r.data.files.includes(f)) && Array.isArray(r.data.warnings), `IPMDAR dataset has its tables (${r.data.files?.length} files, ${r.data.warnings?.length} notes on what could not be filled)`, r.data)
+      ok((await B.req('GET', `/api/schedules/${sid}/export?format=ipmdar`)).status === 404, "Firm B cannot export Firm A's schedule as IPMDAR")
+    }
     // Contract, specification and field report read against the schedule.
     const add = async (name, docType, text) => { const f = new FormData(); f.append('file', new Blob([text]), `${name}.txt`); f.append('title', name); f.append('docType', docType); return A.req('POST', `/api/schedules/${sid}/documents`, f) }
     ok((await add('Contract Article 8', 'contract', 'ARTICLE 8. The Contractor shall give written notice of any delay within seven (7) days of the event. The Contractor shall pay liquidated damages of $10,000 per day for each calendar day of delay.')).status === 200, 'Contract excerpt added')

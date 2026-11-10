@@ -183,11 +183,12 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
       <Disclosure title="Export and original file">
         <div className="flex flex-wrap gap-2 text-[13px]">
-          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
+          {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV'], ['ipmdar', 'IPMDAR schedule dataset (.zip)']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>
         <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
+        {!restricted && <p className="text-[12px] text-warm-600 mt-1">The IPMDAR dataset follows the DoD Schedule Performance Dataset format, version 1.0, and is marked UNCLASSIFIED. Run it through the government&apos;s validator and add your contract details before you submit it.</p>}
         {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 
