@@ -166,3 +166,20 @@ describe('windows analysis: scope, drivers, hidden delay and reissues', () => {
     expect(all.windows[1].notes.join(' ')).toMatch(/reissue \(a revision of the same period\)/)
   })
 })
+
+describe('windows analysis: remaining duration re-estimated on work not started', () => {
+  // The usual way a planner re-estimates unstarted work in P6: the original duration stays, the remaining grows.
+  const a = update('R1', 'Update 1', '2026-03-02', '10', [{ activityId: 'A100', duration: 10 }, { activityId: 'B200', duration: 10 }, FIN], [['A100', 'B200'], ['B200', 'F900']])
+  const b = update('R2', 'Update 2', '2026-03-02', '10', [{ activityId: 'A100', duration: 10 }, { activityId: 'B200', duration: 10, remainingDuration: 30 }, FIN], [['A100', 'B200'], ['B200', 'F900']])
+  const w = analyzeWindow(a, b)
+
+  it('moves the finish by the same amount as the schedule itself, and books it to durations', () => {
+    expect(w.before.finish).toBe('2026-03-27')
+    expect(w.after.finish).toBe('2026-04-24')
+    expect(w.after.finish).toBe(b.analysis.forecastFinish?.slice(0, 10))
+    expect(w.movement).toBe(28)
+    expect(w.attribution!.revisions.durations).toBe(28)
+    expect(w.attribution!.progress + w.attribution!.addedDeleted + w.attribution!.revisions.total).toBe(28)
+    expect(w.counts.durationsChanged).toBe(1)
+  })
+})

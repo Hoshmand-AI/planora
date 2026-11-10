@@ -218,6 +218,8 @@ interface PredRef { ref: string; type: Relationship['type']; lag: number }
 export function predCandidates(token: string): PredRef[] {
   const t = token.trim()
   if (!t) return []
+  // A predecessor reference is short; a huge cell is taken as written (and never run through the patterns below).
+  if (t.length > 120) return [{ ref: t, type: 'FS', lag: 0 }]
   const out: PredRef[] = []
   const T = (s: string) => s.toUpperCase() as Relationship['type']
   const lagOf = (num: string, unit: string) => parseDurationDays(`${num.replace(/\s/g, '')}${unit.toLowerCase()}`) ?? 0
@@ -497,7 +499,8 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     const code = txt(row, 'code')
     const name = txt(row, 'name')
     if (!code && !name) return
-    if (headerTexts.has(normHeader(code || name)) && matchHeader(code || name)) return // repeated header row
+    // A repeated header row repeats several column titles; one cell that happens to read "Finish" or "Start" is an activity.
+    if (headerTexts.has(normHeader(code || name)) && matchHeader(code || name) && row.filter(c => { const t = cellText(c); return !!t && headerTexts.has(normHeader(t)) }).length >= 2) return
     // The other row of a two-row P6 header (field names above titles, or titles below field names)
     if (matchHeader(code) === 'code' && (!name || matchHeader(name) === 'name')) return
     // P6 import: rows marked "Delete This Row" are deleted, not imported
@@ -623,7 +626,9 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
   const addLinks = (self: Activity, list: string, dir: 'pred' | 'succ', row: number) => {
     for (const token of splitList(list)) {
       let done = false
-      for (const cand of predCandidates(token)) {
+      // An activity ID that matches as written wins: "A1000-1" is that activity, not A1000 with a one-day lead.
+      const exact = resolve(token) ? [{ ref: token.trim(), type: 'FS' as const, lag: 0 }] : null
+      for (const cand of exact ?? predCandidates(token)) {
         const other = resolve(cand.ref)
         if (!other) continue
         done = true

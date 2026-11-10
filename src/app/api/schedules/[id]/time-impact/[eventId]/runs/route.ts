@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { randomUUID as uuid } from 'crypto'
 import { api, body as readBody } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
+import { getScheduleById } from '@/lib/db'
 import { addTiaRun, getDelayEvent, listTiaRuns, updateDelayEvent } from '@/lib/tia-db'
 import { basisFrom } from '@/lib/planning/service'
 import { runTia, tiaInputs, TIA_DISCLAIMER } from '@/lib/analysis/tia'
@@ -15,7 +16,8 @@ import { loadTiaContext } from '@/lib/server/tia-service'
  *        that does not validate returns 400 with the errors and stores nothing. Needs schedule.write; audited.
  */
 export const GET = api<{ id: string; eventId: string }>({ permission: 'read', apiKey: true }, async (_req, { params, auth }) => {
-  const event = await getDelayEvent(params.eventId, params.id, auth.orgId)
+  // The schedule lookup applies the caller's workspace access (ethical walls); the event lookup alone is organization-wide.
+  const event = (await getScheduleById(params.id, auth.orgId)) ? await getDelayEvent(params.eventId, params.id, auth.orgId) : undefined
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ runs: await listTiaRuns(event.id, auth.orgId), disclaimer: TIA_DISCLAIMER })
 })
