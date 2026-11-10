@@ -6,6 +6,7 @@
 // Every finding carries the sentence it rests on and where that sentence is. Pure.
 
 import { BUILDING_SCOPE, DATA_CENTER_SCOPE } from './daily-brief'
+import { CIVIL_PROJECT_TYPES } from '@/lib/planning/types'
 
 export interface WatchChunk { documentId: string; title: string; docType: string; citation: string; text: string }
 export interface WatchActivity { id: string; code: string; name: string; wbs?: string | null; started: boolean; done: boolean }
@@ -46,6 +47,8 @@ const FLOAT = /\bfloat\b.{0,80}\b(belongs?|owned|ownership|exclusive|shared|join
 const WORKING = /\b(continued|continu(?:es|ing)|started|began|commenced|underway|under way|in progress|installing|pouring|pulling|setting|erecting|placing|crew (?:is|was) on)\b/i
 const FINISHED = /\b(completed?|finished|wrapped up|signed off|100\s?%)\b/i
 const NOT_DONE = /\b(not (?:yet )?(?:complete|completed|finished|started)|will (?:complete|finish|start)|to (?:be )?complet|remaining|behind)\b/i
+/** Sentences that say work did not happen: never evidence that it did. */
+const NO_WORK = /\bno (?:work|progress|activity|crew)\b|\b(?:did|could|was|were) not\b|\bnot (?:yet )?(?:started|begun|commenced)\b|\bunable to\b|\bcancell?ed\b|\brained out\b|\bwill (?:start|begin|commence)\b|\bscheduled to (?:start|begin)\b/i
 const STOP = new Set(['the', 'and', 'for', 'with', 'level', 'area', 'install', 'installation', 'work', 'phase', 'building', 'complete', 'start', 'finish', 'new', 'all', 'set', 'data', 'hall', 'system', 'systems', 'units'])
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -98,9 +101,9 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
       const hit = ctx.delaysReported[0]
       const active = ctx.delaysReported.length > 0 || ctx.openChangeItems > 0
       push(`notice:${n}`, { ...src(c, s), kind: 'notice', days: n, active,
-        text: hit ? `Written notice is due within ${n} days of a delay or change. A delay is reported in ${hit.title}${hit.activity ? ` (about ${hit.activity})` : ''}: confirm the notice has gone out.`
+        text: hit ? `Written notice is due within ${n} days of a delay or change. A delay is reported in ${hit.title}${hit.activity ? ` (about ${hit.activity})` : ''}: confirm the notice has gone out, then add it to the register to clear this reminder.`
           : ctx.openChangeItems > 0 ? `Written notice is due within ${n} days of a delay or change. ${ctx.openChangeItems} change item${ctx.openChangeItems === 1 ? ' is' : 's are'} open in the register: confirm notice was given for each.`
-          : `Written notice is due within ${n} days of a delay or change. Nothing on the project triggers it today.` })
+          : `Written notice is due within ${n} days of a delay or change. Nothing new on the project triggers it today.` })
     }
     if (LD.test(s)) {
       // The daily amount is the figure tied to "per day"; failing that, the first figure after the words "liquidated damages".
@@ -129,7 +132,8 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
   const notInSchedule: ScopeGap[] = []
   if (work.length >= 10 && designChunks.length) {
     const dc = ctx.projectType === 'data_center' || /data ?(center|hall)|\bUPS\b|CRAH|\bIST\b/i.test(scheduleText)
-    for (const check of [...BUILDING_SCOPE, ...(dc ? DATA_CENTER_SCOPE : [])]) {
+    const civil = (CIVIL_PROJECT_TYPES as readonly string[]).includes(ctx.projectType ?? '')
+    for (const check of [...(civil ? [] : BUILDING_SCOPE), ...(dc ? DATA_CENTER_SCOPE : [])]) {
       if (check.words.test(scheduleText)) continue
       let found: ScopeGap | null = null
       for (const c of designChunks) {
@@ -146,6 +150,7 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
   const field: FieldMismatch[] = []
   const seen = new Set<string>()
   for (const c of fieldChunks) for (const s of sentences(c.text)) {
+    if (NO_WORK.test(s)) continue
     const finished = FINISHED.test(s) && !NOT_DONE.test(s)
     const working = WORKING.test(s)
     if (!finished && !working) continue

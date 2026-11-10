@@ -208,10 +208,10 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
         </form>
       </Section>
     )}
-    <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
+    <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, a saved email (.eml) or a meeting transcript from Teams, Zoom or Meet (.vtt, .srt), up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
       <form key={formKey} onSubmit={submit} className="grid md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
-          <FileSourcePicker accept=".pdf,.docx,.txt,.md" canManage={canOrg} keepValue="none" keepLabel="Not kept (RunF9 keeps only the extracted text)" inputClassName={inputClass} />
+          <FileSourcePicker accept=".pdf,.docx,.txt,.md,.eml,.vtt,.srt" canManage={canOrg} keepValue="none" keepLabel="Not kept (RunF9 keeps only the extracted text)" inputClassName={inputClass} />
         </div>
         <Field label="Title" hint="Defaults to the file name.">{p => <input {...p} value={title} maxLength={160} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. Section 01 32 16 Construction Progress Schedule" />}</Field>
         <Field label="Document type">{p => (

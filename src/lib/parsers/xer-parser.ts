@@ -127,6 +127,7 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
     const hrs = (v: string | undefined, field?: string) => {
       if (v === undefined || v === '') return null
       const exact = parseFloat(v) / hpd
+      if (!Number.isFinite(exact)) return null // not a number in the file: treated as not given
       const r = round2(exact)
       if (field && wasRounded(exact, r)) ex.add({ severity: 'info', entity: 'activity', field, disposition: 'converted', example: code, message: 'Hours converted to work days on the activity calendar and rounded to 0.01 day' })
       return r

@@ -354,6 +354,17 @@ async function main() {
     r = await A.get(`/api/schedules/${sid}/brief`)
     const sig = r.data.brief.signals.find(x => x.kind === 'delay')
     ok(sig && sig.days === 10 && sig.activity?.code === 'D110' && r.data.brief.whatIfs.some(w => w.title.startsWith('Correspondence:')), `Signal from the minutes: delay of ${sig?.days} work days on ${sig?.activity?.code}, with its what-if run`, r.data.brief.signals)
+    // A saved email (.eml) and a Teams/Zoom transcript (.vtt) are read like any other document.
+    {
+      const eml = ['From: Sub PM <pm@sub.example>', 'To: super@gc.example', 'Subject: Feeder pull', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: quoted-printable', '', 'We are unable to release the crew: pull feeders is on hold for 4 days pending the=', ' megger test results.', ''].join('\r\n')
+      const f = new FormData(); f.append('file', new Blob([eml]), 'feeder-pull.eml'); f.append('docType', 'email')
+      r = await A.req('POST', `/api/schedules/${sid}/documents`, f)
+      ok(r.status === 200 && r.data.document.format === 'txt', 'Saved email (.eml) added as a project document', r.data)
+      const v = new FormData(); v.append('file', new Blob(['WEBVTT\n\n1\n00:00:01.000 --> 00:00:05.000\n<v Owner Rep>Activity D130 is at risk because the utility has not confirmed the outage window.\n']), 'oac-call.vtt'); v.append('docType', 'meeting')
+      ok((await A.req('POST', `/api/schedules/${sid}/documents`, v)).status === 200, 'Meeting transcript (.vtt) added as a project document')
+      r = await A.get(`/api/schedules/${sid}/brief`)
+      ok(r.data.brief.signals.some(x => x.activity?.code === 'D120' && x.kind === 'delay' && x.days === 4) && r.data.brief.signals.some(x => x.activity?.code === 'D130' && /Owner Rep/.test(x.quote)), 'Signals from the email (D120 on hold 4 days) and the transcript (D130 at risk, with the speaker)', r.data.brief.signals)
+    }
     // Contract, specification and field report read against the schedule.
     const add = async (name, docType, text) => { const f = new FormData(); f.append('file', new Blob([text]), `${name}.txt`); f.append('title', name); f.append('docType', docType); return A.req('POST', `/api/schedules/${sid}/documents`, f) }
     ok((await add('Contract Article 8', 'contract', 'ARTICLE 8. The Contractor shall give written notice of any delay within seven (7) days of the event. The Contractor shall pay liquidated damages of $10,000 per day for each calendar day of delay.')).status === 200, 'Contract excerpt added')

@@ -145,8 +145,9 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   // The project's documents read against the schedule: contract clauses, drawings and specifications, field reports.
   const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
     daysBehind: brief.headline.daysBehind, staleDays: brief.staleDays, projectType: s.projectType,
-    delaysReported: signals.filter(x => x.kind === 'delay' || x.kind === 'change').map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
-    openChangeItems: brief.changeItems.length,
+    // A delay that has been put in the register has been dealt with as far as the reminder goes.
+    delaysReported: signals.filter(x => (x.kind === 'delay' || x.kind === 'change') && !register.some(r => r.sourceQuote === x.quote)).map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
+    openChangeItems: brief.changeItems.filter(c => !register.find(r => r.id === c.id)?.sourceQuote).length,
   })
 
   // What needs someone's attention today, most pressing first.

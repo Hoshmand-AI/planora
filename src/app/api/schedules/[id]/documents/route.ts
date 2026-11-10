@@ -28,7 +28,7 @@ export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { pa
     project: { scheduleId: schedule.id, name: schedule.name, projectKey: schedule.projectKey ?? null },
     documents,
     docTypes: DOC_TYPES.map(id => ({ id, label: DOC_TYPE_LABELS[id] })),
-    limits: { maxBytes: effectiveUploadLimit(MAX_DOCUMENT_BYTES), formats: ['pdf', 'docx', 'txt', 'md'] },
+    limits: { maxBytes: effectiveUploadLimit(MAX_DOCUMENT_BYTES), formats: ['pdf', 'docx', 'txt', 'md', 'eml', 'vtt', 'srt'] },
     classification: await projectClassification(schedule.id, auth.orgId),
     ...(deploymentKind() === 'commercial_cloud' ? { cuiWarning: CUI_CLOUD_WARNING } : {}),
   })

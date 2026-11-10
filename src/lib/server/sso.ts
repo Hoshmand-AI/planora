@@ -157,10 +157,14 @@ export interface SsoIdentity { orgId: string; email: string; name: string; subje
 
 /** Completes the flow: checks state, exchanges the code, verifies the ID token. */
 export async function finishSso(params: URLSearchParams, stateCookie: string | undefined): Promise<SsoIdentity> {
-  if (params.get('error')) throw new ApiError(401, `The identity provider declined the sign-in (${params.get('error_description') || params.get('error')}).`)
   let st: { orgId: string; state: string; nonce: string; verifier: string; callbackUrl: string }
   try { st = jwt.verify(stateCookie || '', cookieSecret()) as typeof st } catch { throw new ApiError(401, 'Your sign-in expired or was started in another browser. Start again.') }
   if (!params.get('state') || params.get('state') !== st.state) throw new ApiError(401, 'Sign-in state mismatch. Start again.')
+  // Only after the state matches (so the text comes from the flow this browser started), and only plain words from it.
+  if (params.get('error')) {
+    const why = (params.get('error_description') || params.get('error') || '').replace(/[^\w .,:;'()-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+    throw new ApiError(401, `The identity provider declined the sign-in${why ? ` (${why})` : ''}.`)
+  }
   const code = params.get('code')
   if (!code) throw new ApiError(400, 'Missing authorization code.')
   const config = await ssoConfigFor(st.orgId)
