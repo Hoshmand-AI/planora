@@ -386,7 +386,7 @@ async function main() {
     ok(r.status === 200 && r.data.changed.length === 0, 'No recent changes before any edit')
     const acts = (await A.get(`/api/schedules?id=${sid}`)).data.activities
     const d110 = acts.find(a => a.activityId === 'D110'), d120 = acts.find(a => a.activityId === 'D120')
-    r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'progress', activityId: d110.id, actualStart: at(-20), actualFinish: at(1) }, reason: 'Future finish must be refused' })
+    r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'progress', activityId: d110.id, actualStart: at(-20), actualFinish: at(3) }, reason: 'Future finish must be refused' })
     ok(r.status === 400, 'Progress with a future finish date is refused')
     r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'progress', activityId: d110.id, actualStart: at(-20), actualFinish: at(0) }, reason: 'Reported finished on the daily brief' })
     ok(r.status === 200, 'Progress recorded: D110 finished today', r.data)

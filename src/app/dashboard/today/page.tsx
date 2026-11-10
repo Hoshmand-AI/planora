@@ -6,7 +6,7 @@
 // from emails and meetings, missing scope and logic findings; with a version for the PM, the field
 // and the client. Everything is calculated from the schedule and the project's own records.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
@@ -47,23 +47,30 @@ export default function TodayPage() {
   const [busy, setBusy] = useState('')
   const canWrite = can('schedule.write')
 
+  // Only the newest request may land: a slow answer for one project must never show under another.
+  const seq = useRef(0)
   const load = useCallback(async () => {
     if (!sid) return
+    const mine = ++seq.current
     setErr('')
     const q = new URLSearchParams({ asOf })
     if (ranWhatIf?.activity) { q.set('whatIfActivity', ranWhatIf.activity); q.set('whatIfDays', ranWhatIf.days) }
     try {
       const [b, r] = await Promise.all([fetch(`/api/schedules/${encodeURIComponent(sid)}/brief?${q}`), fetch(`/api/schedules/${encodeURIComponent(sid)}/register`)])
       const bd = await b.json().catch(() => ({}))
+      if (mine !== seq.current) return
       if (!b.ok) { setErr(bd.error || 'The brief could not be loaded.'); return }
       setData(bd)
       const rd = await r.json().catch(() => ({}))
+      if (mine !== seq.current) return
       setItems(r.ok ? rd.items : [])
       // What the recent changes moved (also marked on the Schedule tab).
-      fetch(`/api/schedules/${encodeURIComponent(sid)}/changes`).then(x => (x.ok ? x.json() : null)).then(setImpact).catch(() => {})
-    } catch { setErr('Network error. Check your connection and try again.') }
+      fetch(`/api/schedules/${encodeURIComponent(sid)}/changes`).then(x => (x.ok ? x.json() : null)).then(d => { if (mine === seq.current) setImpact(d) }).catch(() => {})
+    } catch { if (mine === seq.current) setErr('Network error. Check your connection and try again.') }
   }, [sid, asOf, ranWhatIf])
-  useEffect(() => { setData(null); load() }, [load])
+  // A new project starts clean; a new date or what-if keeps the page on screen while it recalculates.
+  useEffect(() => { setData(null); setItems([]); setImpact(null); setRanWhatIf(null); setWhatIf({ activity: '', days: '5' }); setMailed(''); setErr('') }, [sid])
+  useEffect(() => { load() }, [load])
 
   const progress = async (row: BriefRow, kind: 'start' | 'finish') => {
     if (!sid) return
@@ -90,7 +97,11 @@ export default function TodayPage() {
       <DataCenterSampleButton className="-mt-10 pb-12 text-center" />
     </>
   )
-  if (!data) return <div className="px-6 py-10 text-[14px] text-warm-600 flex items-center gap-2" role="status">{err || <><Loader2 size={14} className="animate-spin" aria-hidden /> Preparing today’s brief…</>}</div>
+  if (!data) return (
+    <div className="px-6 py-10 text-[14px] text-warm-600" role="status">
+      {err ? <><p className="mb-3 text-status-at-risk">{err}</p><button type="button" className={btn} onClick={load}>Try again</button></> : <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Preparing today’s brief…</span>}
+    </div>
+  )
 
   const b = data.brief
   const tone = b.headline.status === 'behind' ? 'text-status-at-risk' : b.headline.status === 'unknown' ? 'text-warm-700' : 'text-status-on-track'

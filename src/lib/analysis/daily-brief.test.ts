@@ -196,3 +196,43 @@ describe('project documents read against the schedule', () => {
     expect(w).toMatchObject({ contract: [], field: [], notInSchedule: [] })
   })
 })
+
+describe('ordinary sentences are not misread', () => {
+  const activities = [
+    { id: 'a1', code: 'P1030', name: 'Procure Medium-Voltage Switchgear', open: true },
+    { id: 'a2', code: 'E4030', name: 'Set Generators and Fuel System', open: true },
+  ]
+  const email = (text: string, docType = 'daily_report') => extractSignals([{ documentId: 'd', title: 'Report', docType, citation: '', text }], activities)
+
+  it('a sentence that says there is no delay is not a delay', () => {
+    for (const t of ['No delays were reported on site today, and the crew is working.', 'Lead time for the medium-voltage switchgear is 30 weeks, as planned in the schedule.',
+      'The crew stopped for lunch at noon and resumed the generator work.', 'The conduit behind the UPS room was inspected by the engineer.', 'Switchgear procurement is on schedule and the vendor confirmed it.'])
+      expect(email(t).filter(s => s.kind === 'delay'), t).toEqual([])
+  })
+
+  it('a real delay is still found, with its days', () => {
+    expect(email('The medium-voltage switchgear will be delayed by 3 weeks.')[0]).toMatchObject({ kind: 'delay', days: 15, activity: { code: 'P1030' } })
+    expect(email('Work stopped on the generators and fuel system for a failed pressure test.')[0]).toMatchObject({ kind: 'delay', activity: { code: 'E4030' } })
+  })
+
+  it('reads a line-formatted report one line at a time', () => {
+    const s = email('Weather: clear\nDelays: none\nGenerators and fuel system set on pads 1 to 4\nManpower: 212')
+    expect(s.filter(x => x.kind === 'delay')).toEqual([])
+  })
+
+  it('liquidated damages use the amount tied to "per day", not the contract value', () => {
+    const acts = Array.from({ length: 12 }, (_, i) => ({ id: `x${i}`, code: `X${i}`, name: 'Erect structural steel', started: false, done: false }))
+    const ctx = { daysBehind: 12, delaysReported: [], openChangeItems: 0, staleDays: 1, projectType: null }
+    const w = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'Under this $42,000,000 contract the Contractor shall pay liquidated damages of $10,000 per calendar day of delay.' }], acts, ctx)
+    expect(w.contract.find(c => c.kind === 'damages')).toMatchObject({ perDay: 10000, exposure: 120000 })
+    const pay = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'The Contractor shall submit each payment claim within 10 days of the end of the month.' }], acts, ctx)
+    expect(pay.contract.filter(c => c.kind === 'notice')).toEqual([])
+  })
+
+  it('an activity finished today shows as completed, not nowhere', () => {
+    const today = p.dataDate!.slice(0, 10)
+    const one = acts.find(a => a.activityType === 'task' && a.status !== 'complete')!
+    const b = buildDailyBrief(input({ today, activities: acts.map(a => (a.id === one.id ? { ...a, status: 'complete', actualStart: a.actualStart ?? today, actualFinish: today, percentComplete: 100 } : a)) }))
+    expect(b.yesterday.completed.map(r => r.id)).toContain(one.id)
+  })
+})

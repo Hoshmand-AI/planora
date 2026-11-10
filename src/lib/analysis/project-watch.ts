@@ -34,10 +34,12 @@ const MAX = 8
 const NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, ten: 10, fourteen: 14, fifteen: 15, twenty: 20, 'twenty-one': 21, thirty: 30, sixty: 60 }
 const WITHIN = /\b(?:within|no later than|not later than)\s+(?:\(?(\d{1,3})\)?|([a-z-]+)(?:\s*\((\d{1,3})\))?)\s+(?:calendar\s+|working\s+|business\s+|work\s+)?days?\b/i
 const NOTICE = /\b(notice|notif(?:y|ication)|claim)\b/i
-const DELAY_WORD = /\b(delay|time extension|extension of time|impact|change|claim|differing)\b/i
+const DELAY_WORD = /\b(delay|time extension|extension of time|impact|change|differing)\b/i
 const LD = /liquidated damages|\bLDs\b/i
 const MONEY = /\$\s?([\d,]+(?:\.\d+)?)\s*(k|thousand|million|m)?\b/i
-const PER_DAY = /\b(?:per|each|for each|for every|a)\s+(?:calendar\s+)?day\b/i
+const PER_DAY = /\b(?:per|each|for each|for every|a)\s+(?:calendar\s+|working\s+|business\s+)?day\b/i
+/** The amount written right before "per day": a contract sentence often names the contract value first. */
+const AMOUNT_PER_DAY = /\$\s?([\d,]+(?:\.\d+)?)\s*(k|thousand|million|m)?\s*(?:\([^)]{0,60}\)\s*)?(?:per|each|for each|for every|a)\s+(?:calendar\s+|working\s+|business\s+)?day\b/i
 const UPDATE = /\b(?:update|updated|updates|submit|submittal of)\b.{0,60}\bschedule\b|\bschedule\b.{0,60}\b(?:update|updated|updates)\b/i
 const PERIOD = /\b(monthly|each month|every month|weekly|each week|every week|bi-?weekly|every two weeks)\b/i
 const FLOAT = /\bfloat\b.{0,80}\b(belongs?|owned|ownership|exclusive|shared|jointly|project)\b/i
@@ -49,7 +51,8 @@ const STOP = new Set(['the', 'and', 'for', 'with', 'level', 'area', 'install', '
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 const stem = (w: string) => w.replace(/(ing|es|s)$/, '')
 const words = (s: string) => norm(s).split(' ').filter(w => w.length > 2 && !STOP.has(w)).map(stem)
-const sentences = (text: string) => text.replace(/\s+/g, ' ').split(/(?<=[.!?;])\s+(?=[A-Z0-9"“(])|\s*[\n•]\s*/).map(s => s.trim()).filter(s => s.length >= 20 && s.length <= 500)
+// Lines first (reports are often one fact per line), then sentences.
+const sentences = (text: string) => text.split(/[\r\n•]+/).flatMap(line => line.replace(/\s+/g, ' ').split(/(?<=[.!?;])\s+(?=[A-Z0-9"“(])/)).map(s => s.trim()).filter(s => s.length >= 20 && s.length <= 500)
 const src = (c: WatchChunk, quote: string): Source => ({ quote: quote.slice(0, 320), title: c.title, citation: c.citation, documentId: c.documentId })
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
 
@@ -59,8 +62,8 @@ function daysWithin(s: string): number | null {
   const n = m[1] ? Number(m[1]) : m[3] ? Number(m[3]) : NUM[m[2]?.toLowerCase() ?? '']
   return n && n <= 365 ? n : null
 }
-function amount(s: string): number | null {
-  const m = MONEY.exec(s)
+function amount(s: string, re: RegExp = MONEY): number | null {
+  const m = re.exec(s)
   if (!m) return null
   const n = Number(m[1].replace(/,/g, ''))
   if (!Number.isFinite(n) || n <= 0) return null
@@ -100,7 +103,8 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
           : `Written notice is due within ${n} days of a delay or change. Nothing on the project triggers it today.` })
     }
     if (LD.test(s)) {
-      const perDay = PER_DAY.test(s) ? amount(s) : null
+      // The daily amount is the figure tied to "per day"; failing that, the first figure after the words "liquidated damages".
+      const perDay = amount(s, AMOUNT_PER_DAY) ?? (PER_DAY.test(s) ? amount(s.slice(LD.exec(s)!.index)) : null)
       const behind = Math.max(0, ctx.daysBehind ?? 0)
       const exposure = perDay && behind ? perDay * behind : null
       push(`ld:${perDay ?? 'x'}`, { ...src(c, s), kind: 'damages', perDay, exposure, active: behind > 0,

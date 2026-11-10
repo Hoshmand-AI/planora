@@ -208,7 +208,8 @@ export function validateEditChange(raw: unknown, activities: Activity[], relatio
       const a = work(b.activityId, 'activity')
       if (typeof a === 'string') return { error: a }
       if (a.status === 'complete' || a.actualFinish) return { error: `${a.activityId} is already complete.` }
-      const today = new Date().toISOString().slice(0, 10)
+      // "Today" for the person reporting can be a day ahead of the server's UTC date (east of UTC).
+      const today = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
       const start = a.actualStart ? a.actualStart.slice(0, 10) : b.actualStart
       const finish = b.actualFinish == null || b.actualFinish === '' ? null : b.actualFinish
       if (!isoDay(start)) return { error: 'Give the actual start date (YYYY-MM-DD).' }

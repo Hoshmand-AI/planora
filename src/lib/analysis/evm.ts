@@ -377,7 +377,7 @@ export function computeEvm(input: EvmInput): EvmAnalysis {
     const spiT = ratio(es, at)
     const ieacT = spiT ? round(pd / spiT, 1) : null
     earnedSchedule = {
-      baselineStart: fromDayNumber(tp.s0), baselineFinish: fromDayNumber(tp.f0), pd, es: round(es, 2), at, esDate: fromDayNumber(tp.s0 + Math.floor(es)),
+      baselineStart: fromDayNumber(tp.s0), baselineFinish: fromDayNumber(tp.f0), pd, es: round(es, 2), at, esDate: fromDayNumber(tp.s0 + Math.max(0, Math.ceil(es) - 1)),
       spiT, svT: round(es - at, 1), ieacT, forecastFinish: ieacT != null ? fromDayNumber(tp.s0 + Math.ceil(ieacT) - 1) : null,
     }
   }

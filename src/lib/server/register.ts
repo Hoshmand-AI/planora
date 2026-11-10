@@ -7,8 +7,15 @@ import { initSchema, query } from '@/lib/db'
 import { REGISTER_KINDS, type RegisterItem, type RegisterKind } from '@/lib/analysis/daily-brief'
 
 export const MAX_REGISTER_ITEMS = 500
-/** The key a project's register is filed under: the update series, else the schedule itself. */
-export const registerKey = (s: { id: string; projectKey?: string | null }) => s.projectKey || `schedule:${s.id}`
+/**
+ * The key a project's register is filed under: the update series inside its workspace, else the schedule
+ * itself. The workspace is part of the key so two walled workspaces that hold a project with the same P6
+ * name never share a register.
+ */
+export const registerKey = (s: { id: string; projectKey?: string | null; workspaceId?: string | null }) =>
+  s.projectKey ? (s.workspaceId ? `ws:${s.workspaceId}|${s.projectKey}` : s.projectKey) : `schedule:${s.id}`
+/** The update series a subscription follows (the raw series key, used to find the latest upload). */
+export const seriesKey = (s: { id: string; projectKey?: string | null }) => s.projectKey || `schedule:${s.id}`
 
 const iso = (v: unknown) => (v ? new Date(String(v)).toISOString() : '')
 function rowToItem(r: Record<string, unknown>): RegisterItem & { closedAt: string | null; updatedAt: string } {

@@ -223,14 +223,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // How many things on the open project need action today (the Today tab carries the count).
   const [todayCount, setTodayCount] = useState(0)
+  const onToday = pathname.startsWith('/dashboard/today')
   useEffect(() => {
     setTodayCount(0)
     if (!selectedSchedule || !user || mfaSetupRequired) return
     let live = true
-    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief`).then(r => (r.ok ? r.json() : null))
+    // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Today tab is entered or left.
+    const d = new Date(), asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}`).then(r => (r.ok ? r.json() : null))
       .then(d => { if (live && d) setTodayCount((d.alerts as { level: string }[]).filter(a => a.level === 'act').length) }).catch(() => {})
     return () => { live = false }
-  }, [selectedSchedule, user, mfaSetupRequired, pathname])
+  }, [selectedSchedule, user, mfaSetupRequired, onToday])
 
   // Removes the open upload (wrong file, or one that must not be here). The server audits it.
   const deleteUpload = async () => {

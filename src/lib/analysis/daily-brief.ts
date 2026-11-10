@@ -157,8 +157,8 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   const staleDays = i.dataDate ? Math.max(0, diff(day(i.dataDate)!, today)) : null
 
   // Yesterday (since the previous working day, so a Monday brief covers the weekend).
-  const completed = acts.filter(a => { const f = day(a.actualFinish); return f && f >= yesterday && f < today }).map(a => row(a, day(a.actualFinish)))
-  const started = acts.filter(a => { const s = day(a.actualStart); return s && s >= yesterday && s < today && !completed.some(c => c.id === a.id) }).map(a => row(a, day(a.actualStart)))
+  const completed = acts.filter(a => { const f = day(a.actualFinish); return f && f >= yesterday && f <= today }).map(a => row(a, day(a.actualFinish)))
+  const started = acts.filter(a => { const s = day(a.actualStart); return s && s >= yesterday && s <= today && !completed.some(c => c.id === a.id) }).map(a => row(a, day(a.actualStart)))
 
   // Today, per the schedule.
   const finishing = open.filter(a => day(a.earlyFinish) === today).map(a => row(a, today)).sort(byFloat)

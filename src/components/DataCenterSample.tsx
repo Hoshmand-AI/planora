@@ -32,15 +32,18 @@ export function DataCenterSampleButton({ className = '' }: { className?: string 
       const id: string | undefined = data.schedule?.id
       if (!up.ok || !id) { setErr(data.error || 'The sample could not be opened.'); setBusy(''); return }
       const base = `/api/schedules/${encodeURIComponent(id)}`
+      // Opened before today (the same file): open it as it is, without adding its documents and register again.
+      const reg = data.duplicate ? { items: [] } : await fetch(`${base}/register`).then(r => (r.ok ? r.json() : { items: [] })).catch(() => ({ items: [] }))
+      const have = new Set<string>((reg.items as { title: string }[]).map(i => i.title))
       setBusy('Adding minutes, emails and the register…')
       // The extras are best effort: the schedule alone already gives a full brief.
-      for (const doc of s.documents) {
+      for (const doc of data.duplicate ? [] : s.documents) {
         const f = new FormData()
         f.set('file', new File([doc.text], `${doc.title.replace(/[^\w .-]+/g, ' ')}.txt`, { type: 'text/plain' }))
         f.set('title', doc.title); f.set('docType', doc.docType)
         await fetch(`${base}/documents`, { method: 'POST', body: f }).catch(() => null)
       }
-      for (const r of s.register) {
+      for (const r of data.duplicate ? [] : s.register.filter(x => !have.has(x.title))) {
         const due = new Date(d); due.setDate(due.getDate() + r.dueInDays)
         await postJson(`${base}/register`, { kind: r.kind, title: r.title, owner: r.owner, impactDays: r.impactDays, activityCodes: r.activityCodes, dueDate: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}` })
       }

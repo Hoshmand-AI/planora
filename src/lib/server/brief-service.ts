@@ -33,6 +33,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   const base = data.cpm ? evaluateNetwork(net, []) : null
   const target = contractTarget(data.analysis)
   const byCode = new Map(data.activities.map(a => [a.activityId.toLowerCase(), a]))
+  const byId = new Map(data.activities.map(a => [a.id, a]))
   const openTask = (a: (typeof data.activities)[number] | undefined) => !!a && a.activityType === 'task' && a.status !== 'complete' && !a.actualFinish
 
   const register = await listRegister(orgId, registerKey(s)).catch(err => { log('warn', 'register unavailable', { error: (err as Error).message }); return [] })
@@ -68,7 +69,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   }
   if (base) {
     const pathIds = data.analysis.drivingPath?.ids?.length ? data.analysis.drivingPath.ids : base.longestPath
-    const driver = pathIds.map(id => data.activities.find(a => a.id === id)).find(a => openTask(a) && remainingOf(a!) > 0)
+    const driver = pathIds.map(id => byId.get(id)).find(a => openTask(a) && remainingOf(a!) > 0)
     if (o.whatIf) {
       const a = byCode.get(o.whatIf.activity.trim().toLowerCase())
       const days = Math.max(1, Math.min(365, Math.round(o.whatIf.days)))
@@ -83,7 +84,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
       if (w) whatIfs.push(w)
     }
     for (const sg of signals.filter(x => x.activity && x.days && (x.kind === 'delay' || x.kind === 'change')).slice(0, 2)) {
-      const a = data.activities.find(x => x.id === sg.activity!.id)
+      const a = byId.get(sg.activity!.id)
       const w = openTask(a) ? slip(a!, Math.min(365, sg.days!), `Correspondence: ${sg.title.slice(0, 50)}`) : null
       if (w) whatIfs.push(w)
     }
@@ -115,12 +116,12 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
       const p = prev ? await loadScheduleData(prev.id, orgId) : null
       if (p) {
         const key = (r: { predecessorId: string; successorId: string; type: string; lag: number }, acts: typeof data.activities) => {
-          const c = (id: string) => acts.find(a => a.id === id)?.activityId ?? id
-          return `${c(r.predecessorId)}>${c(r.successorId)}:${r.type}:${r.lag}`
+          const code = new Map(acts.map(a => [a.id, a.activityId]))
+          return (x: typeof r) => `${code.get(x.predecessorId) ?? x.predecessorId}>${code.get(x.successorId) ?? x.successorId}:${x.type}:${x.lag}`
         }
         const before = new Map(p.activities.map(a => [a.activityId, a]))
         const after = new Map(data.activities.map(a => [a.activityId, a]))
-        const relB = new Set(p.relationships.map(r => key(r, p.activities))), relA = new Set(data.relationships.map(r => key(r, data.activities)))
+        const relB = new Set(p.relationships.map(key(p.relationships[0], p.activities))), relA = new Set(data.relationships.map(key(data.relationships[0], data.activities)))
         sinceLastUpdate = {
           version: `${p.schedule.name} (${p.schedule.version})`,
           finishMovedDays: p.analysis.forecastFinish && data.analysis.forecastFinish ? diff(p.analysis.forecastFinish, data.analysis.forecastFinish) : null,
