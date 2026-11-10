@@ -5,6 +5,7 @@
 // over-allocations with the activities contributing, and leveling / smoothing with a staffing what-if.
 // Works for an uploaded schedule (/api/schedules/{id}/resources) and a plan (/api/plans/{id}/resources).
 
+import { askText } from '@/components/AskText'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { fmtDate } from '@/lib/format'
 import { Alert, Button, inputClass, postJson } from './ui'
@@ -317,7 +318,7 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
     onSaved()
   }
   const remove = async () => {
-    const why = window.prompt('Reason for removing the leveled scenario (kept in the audit log):')
+    const why = await askText({ title: 'Remove the leveled scenario', label: 'Reason (kept in the audit log)', required: true, confirmLabel: 'Remove' })
     if (!why) return
     const res = await fetch(`${base}/level?reason=${encodeURIComponent(why)}`, { method: 'DELETE' })
     const d = await res.json().catch(() => ({}))

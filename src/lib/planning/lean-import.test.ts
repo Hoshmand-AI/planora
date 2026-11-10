@@ -173,7 +173,13 @@ describe('criticalPathStatus', () => {
     const s = criticalPathStatus({ activities: acts, links, calculated: true })
     expect(s.openEnds).toBe(3)
     expect(s.count).toBe(2)
-    expect(s.detail).toMatch(/3 activities are missing a predecessor or successor \(open ends\)/)
+    expect(s.detail).toMatch(/3 open activities are missing a predecessor or successor \(open ends\)/)
+  })
+  it('does not count the open ends of finished work', () => {
+    const acts = [a('s', { activityType: 'milestone', status: 'complete' }), a('1', { status: 'complete' }), a('2'), a('3'), a('f', { activityType: 'milestone' })]
+    // 1 is finished with no successor; 3 is open with no successor
+    const links = [{ from: 's', to: '1' }, { from: 's', to: '2' }, { from: '2', to: 'f' }, { from: 's', to: '3' }]
+    expect(criticalPathStatus({ activities: acts, links, calculated: true }).openEnds).toBe(1)
   })
   it('a completed schedule has no critical path to show and says so', () => {
     const s = criticalPathStatus({ activities: [a('1', { status: 'complete' })], links: [], calculated: false })

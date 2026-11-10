@@ -32,7 +32,7 @@ export function Robot({ mood = 'working', size = 64, label, className = '', stil
       {mood === 'working' ? (
         <circle cx="24" cy="24" r="20" fill="none" stroke={c} strokeWidth="4" strokeLinecap="round" strokeDasharray="34 92" className={still ? '' : 'status-sweep'} />
       ) : (
-        <circle cx="24" cy="24" r="20" fill="none" stroke={c} strokeWidth="4" strokeDasharray={mood === 'idle' ? '2 8' : undefined} />
+        mood !== 'idle' && <circle cx="24" cy="24" r="20" fill="none" stroke={c} strokeWidth="4" />
       )}
       {mood === 'done' && <path d="M16 24.5 l5.5 5.5 L32.5 18.5" fill="none" stroke={c} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />}
       {(mood === 'waiting' || mood === 'worried') && <>

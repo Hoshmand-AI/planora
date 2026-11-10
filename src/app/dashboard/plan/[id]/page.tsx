@@ -1,5 +1,6 @@
 'use client'
 
+import { askText } from '@/components/AskText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -682,7 +683,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
 
 function LinkRow({ l, other, dir, onEdit, busy }: { l: PlanLink; other?: PlanActivity; dir: 'after' | 'before'; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null }) {
   const remove = async () => {
-    const reason = prompt('Why remove this relationship? (kept in the audit trail)')
+    const reason = await askText({ title: 'Remove this relationship', label: 'Reason (kept in the audit trail)', required: true, confirmLabel: 'Remove' })
     if (reason && reason.trim()) await onEdit({ kind: 'remove_link', linkId: l.id, reason })
   }
   return (

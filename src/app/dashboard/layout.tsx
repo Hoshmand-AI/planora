@@ -1,5 +1,6 @@
 'use client'
 
+import { AskTextHost } from '@/components/AskText'
 import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense, Fragment } from 'react'
 import type { DataLocation } from '@/lib/server/data-location'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
@@ -473,6 +474,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
             <div key={pathname} className="max-w-6xl mx-auto md:px-3 page-enter">
               {children}
+              <AskTextHost />
             </div>
           </main>
         </div>
