@@ -31,3 +31,20 @@ describe('recovery options: the driving path to the contract milestone', () => {
     expect(plan!.options.filter(o => o.daysSaved > 0).every(o => !/N1 Install site fence/.test(o.title))).toBe(true)
   })
 })
+
+describe('finish when a mandatory constraint holds work later than logic', () => {
+  it('is the last date on screen, in the what-if evaluation as on the dashboard', async () => {
+    const { evaluateNetwork } = await import('./uploaded-recovery')
+    const cal = defaultCalendar()
+    const acts = [
+      makeActivity('s', { activityId: 'A', name: 'A', duration: 5, remainingDuration: 5, calendarId: cal.id }),
+      makeActivity('s', { activityId: 'B', name: 'B', duration: 5, remainingDuration: 5, calendarId: cal.id, constraintType: 'MFO', constraintDate: '2026-03-20' }),
+      makeActivity('s', { activityId: 'C', name: 'C', duration: 5, remainingDuration: 5, calendarId: cal.id }),
+    ]
+    const id = (c: string) => acts.find(a => a.activityId === c)!.id
+    const rel = (p: string, q: string): Relationship => ({ id: `${p}${q}`, scheduleId: 's', predecessorId: id(p), successorId: id(q), type: 'FS', lag: 0 })
+    const r = evaluateNetwork({ activities: acts, relationships: [rel('A', 'B'), rel('B', 'C')], calendars: [cal], defaultCalendarId: cal.id, projectStart: '2026-03-02', dataDate: '2026-03-02', mustFinishBy: null, progressMode: 'retained' } as NetworkInput, [])
+    expect(r.finish).toBe('2026-03-27')
+    expect(r.measured).toBe('2026-03-27')
+  })
+})

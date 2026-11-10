@@ -145,5 +145,7 @@ export function completeSchedule(input: {
     ? `RunF9 recalculated all ${filled} activities from their durations, logic, calendars and constraints (${mode}) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.`
     : `The file did not include calculated dates or float, so RunF9 scheduled ${filled} activities from their durations, logic and calendars (${mode}; critical path and float are RunF9's calculation).`
       + (undated ? ` It has no project start, data date or activity dates either, so the network was scheduled from ${fmtDate(projectStart)}, the day it was first calculated: the durations, logic and float are the file's, the calendar dates are not.` : '')
-  return { activities, projectStart, projectFinish: res.logicFinish, hasLogic, cpm: res, fileValues, note }
+  // The later of what logic gives and what the dates show: a mandatory constraint can hold work later than logic,
+  // and the finish is never earlier than the last activity on screen.
+  return { activities, projectStart, projectFinish: res.logicFinish > res.projectFinish ? res.logicFinish : res.projectFinish, hasLogic, cpm: res, fileValues, note }
 }

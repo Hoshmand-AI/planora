@@ -292,6 +292,9 @@ export default function TodayPage() {
               </li>
             ))}</ul>
           )}
+          {data.watch.read.contract > 0 && (
+            <p className="text-[12.5px] text-warm-600">These are the clauses that state a number of days, an amount or a frequency. For obligations worded less directly, <Link href={`/dashboard/ask?schedule=${encodeURIComponent(sid!)}&docs=1&unreviewed=1&q=${encodeURIComponent('List every obligation in the contract documents that carries a deadline, a notice requirement, a submittal or a penalty, with the clause each comes from, and say which ones the current schedule status triggers.')}`} className="font-medium text-accent-600 hover:underline">ask AI to read the contract</Link>; its answer cites each clause.</p>
+          )}
         </Card>
         <Card icon={<HardHat size={15} />} title="The field and the drawings against the schedule" sub="What the daily reports and the design documents say that the schedule does not">
           <div>

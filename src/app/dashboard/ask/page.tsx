@@ -28,6 +28,14 @@ export default function AskPage() {
   const docsId = useId()
   const unrevId = useId()
   const bottomRef = useRef<HTMLDivElement>(null)
+  // A question handed over from another page (the Daily Brief's "Ask AI" links): shown ready to send, never sent for the user.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const q = sp.get('q')
+    if (q) setInput(q.slice(0, 600))
+    if (sp.get('docs') === '1') setUseDocs(true)
+    if (sp.get('unreviewed') === '1') setWithUnreviewed(true)
+  }, [])
   // Without an AI model, answers are a readout of the schedule facts: say so before anyone asks.
   const [aiOff, setAiOff] = useState(false)
   useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])

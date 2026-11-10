@@ -113,8 +113,10 @@ export function overlapSplit(projectType?: string | null): { by: string; unit: s
 function finishOf(done: ReturnType<typeof completeSchedule>, id: string): string | null {
   const a = done.activities.find(x => x.id === id)
   if (a?.actualFinish) return a.actualFinish.slice(0, 10)
-  const v = done.cpm?.violations.find(x => x.id === id)
-  return v?.logicDate ?? done.cpm?.times[id]?.earlyFinish ?? null
+  // The later of the date shown and the date logic gives (a mandatory constraint upstream can overrule logic), as the dashboard measures it.
+  const early = done.cpm?.times[id]?.earlyFinish ?? null
+  const logic = done.cpm?.logicTimes?.[id]?.earlyFinish ?? done.cpm?.violations.find(x => x.id === id)?.logicDate ?? null
+  return logic && early ? (logic > early ? logic : early) : logic ?? early
 }
 
 /** Recalculate the network with these changes applied (nothing is stored); `measureId` = the contract milestone. */
@@ -129,8 +131,9 @@ export function evaluateNetwork(net: NetworkInput, changes: ScheduleEditChange[]
   if (!done.cpm) return { finish: done.projectFinish, measured: done.projectFinish, minFloat: null, longestPath: [], earlyFinish: {} }
   const open = done.activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe' && a.status !== 'complete' && !a.actualFinish && done.cpm!.times[a.id])
   const minFloat = open.length ? Math.min(...open.map(a => done.cpm!.times[a.id].totalFloat)) : null
-  const measured = measureId ? finishOf(done, measureId) ?? done.cpm.logicFinish : done.cpm.logicFinish
-  return { finish: done.cpm.logicFinish, measured, minFloat, longestPath: done.cpm.longestPath, earlyFinish: Object.fromEntries(Object.entries(done.cpm.times).map(([id, t]) => [id, t.earlyFinish])) }
+  const finish = done.projectFinish ?? done.cpm.logicFinish
+  const measured = measureId ? finishOf(done, measureId) ?? finish : finish
+  return { finish, measured, minFloat, longestPath: done.cpm.longestPath, earlyFinish: Object.fromEntries(Object.entries(done.cpm.times).map(([id, t]) => [id, t.earlyFinish])) }
 }
 
 /** Walk back from `to` through the logic: at each step the open predecessor that finishes latest. */
