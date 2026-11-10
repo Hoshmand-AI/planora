@@ -6,6 +6,7 @@
 
 import type { Activity, Relationship } from '@/lib/db'
 import { CIVIL_PROJECT_TYPES } from '@/lib/planning/types'
+import { schedulePercentComplete } from '@/lib/analysis/progress'
 
 export const BRIEF_LIST_LIMIT = 12
 /** Open work with total float at or under this many work days is "about to become critical". */
@@ -251,8 +252,9 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   if (tomorrow.length) field.push(`Coming in the next 3 days: ${tomorrow.slice(0, 5).map(r => `${label(r)} (${us(r.date)})`).join('; ')}${tomorrow.length > 5 ? `; and ${tomorrow.length - 5} more` : ''}. Confirm crews, materials and access.`)
 
   const client: string[] = [daysBehind == null ? (fc ? `The current forecast finish is ${us(fc)}.` : 'The forecast finish is not yet calculated.') : daysBehind > 0 ? `${cap(target)} is currently forecast ${us(fc)}, ${plural(daysBehind, 'calendar day')} later than the required ${us(req!.date)}.` : `${cap(target)} is forecast ${us(fc)}, ${daysBehind === 0 ? 'on' : `${plural(-daysBehind, 'calendar day')} ahead of`} the required ${us(req!.date)}.`]
-  const pct = acts.length ? Math.round((acts.filter(done).length / acts.length) * 100) : 0
-  client.push(`${pct}% of activities are complete (${acts.filter(done).length} of ${acts.length}).`)
+  // The same measure as the Projects card and the Overview tile (weighted by duration), with the plain count beside it.
+  const pct = schedulePercentComplete(i.activities)
+  client.push(`The work is ${pct}% complete by duration (${acts.filter(done).length} of ${acts.length} activities finished).`)
   const nextMs = milestones.filter(m => (m.date ?? '') >= today).slice(0, 4)
   if (nextMs.length) client.push(`Milestones in the next 30 days: ${nextMs.map(m => `${m.name} (${us(m.date)})`).join('; ')}.`)
   if (changeItems.length) client.push(`${plural(changeItems.length, 'change item')} ${changeItems.length === 1 ? 'is' : 'are'} open${changeImpactDays ? `, with up to ${plural(changeImpactDays, 'work day')} of possible schedule impact under review` : ''}.`)

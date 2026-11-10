@@ -63,6 +63,16 @@ const ROWS: Row[] = [
   { code: 'T8040', name: 'Substantial Completion', wbs: 'TURN', dur: 0, preds: [['T8030']], ms: 'finish' },
 ]
 
+/** One crew per part of the job: its size (people working at once) and how many are available. */
+const CREWS: Record<string, { name: string; size: number; max: number }> = {
+  PRE: { name: 'Procurement and Expediting', size: 2, max: 6 }, SITE: { name: 'Civil Crew', size: 14, max: 30 }, SUB: { name: 'Utility and Substation Crew', size: 10, max: 20 },
+  SHELL: { name: 'Structure and Envelope Crew', size: 24, max: 60 }, ELEC: { name: 'Electricians', size: 18, max: 40 }, MECH: { name: 'Mechanical and Controls Crew', size: 16, max: 40 },
+  DH1: { name: 'Data Hall Fit-Out Crew', size: 20, max: 30 }, DH2: { name: 'Data Hall Fit-Out Crew', size: 20, max: 30 }, CX: { name: 'Commissioning Agents', size: 8, max: 16 }, TURN: { name: 'Closeout Crew', size: 6, max: 12 },
+}
+/** Equipment bought on the long-lead activities (US dollars), on top of the labor on each activity. */
+const EQUIPMENT_COST: Record<string, number> = { P1020: 9_400_000, P1030: 6_200_000, P1040: 14_500_000, P1050: 8_300_000, P1060: 7_100_000, P1070: 3_900_000 }
+const LABOR_RATE = 96 // dollars an hour, loaded
+
 /** Work days from the start to the data date, and the work the vendors and crews still owe on that day. */
 const DATA_DATE_INDEX = 300
 const REMAINING_AT_DATA_DATE: Record<string, number> = {
@@ -155,6 +165,24 @@ export function dataCenterSample(today: string): DataCenterSample {
   let n = 0
   table('TASKPRED', ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt'],
     ROWS.flatMap(r => r.preds.map(([c, type = 'FS', lag = 0]) => [++n, taskId(r.code), taskId(c), 1, 1, `PR_${type}`, lag * 8])))
+  // Resources and costs: one crew per activity, with budget, actual and remaining cost, so resource loading and earned value have data.
+  const crewIds = [...new Set(Object.values(CREWS).map(c => c.name))]
+  const rid = (w: string) => 900 + crewIds.indexOf(CREWS[w].name)
+  table('CURRTYPE', ['curr_id', 'decimal_digit_cnt', 'curr_symbol', 'decimal_symbol', 'curr_type', 'curr_short_name', 'base_exch_rate'], [[1, 2, '$', '.', 'US Dollar', 'USD', 1]])
+  table('RSRC', ['rsrc_id', 'rsrc_short_name', 'rsrc_name', 'rsrc_type'], crewIds.map((nm, i) => [900 + i, nm.split(' ')[0].toUpperCase(), nm, 'RT_Labor']))
+  table('RSRCRATE', ['rsrc_rate_id', 'rsrc_id', 'max_qty_per_hr', 'cost_per_qty', 'start_date'], crewIds.map((nm, i) => [950 + i, 900 + i, Math.max(...Object.values(CREWS).filter(c => c.name === nm).map(c => c.max)), LABOR_RATE, `${iso(start)} 00:00`]))
+  let ar = 0
+  table('TASKRSRC', ['taskrsrc_id', 'task_id', 'proj_id', 'rsrc_id', 'target_qty', 'target_qty_per_hr', 'remain_qty', 'remain_qty_per_hr', 'act_reg_qty', 'act_ot_qty', 'target_cost', 'act_reg_cost', 'act_ot_cost', 'remain_cost'],
+    ROWS.filter(r => !r.ms).map(r => {
+      const c = cur.get(r.code)!, crew = CREWS[r.wbs]
+      const hours = r.dur * 8 * crew.size, remHours = c.rem * 8 * crew.size
+      const done = c.status === 'TK_Complete' ? 1 : c.status === 'TK_Active' ? Math.max(0, 1 - c.rem / Math.max(r.dur, c.rem)) : 0
+      const budget = hours * LABOR_RATE + (EQUIPMENT_COST[r.code] ?? 0)
+      // Work that ran late cost more than planned: the overrun shows in the actual and the remaining cost.
+      const late = REMAINING_AT_DATA_DATE[r.code] != null ? 1.09 : 1.02
+      const actual = Math.round(budget * done * late), remain = Math.round(budget * (1 - done) * late)
+      return [++ar, taskId(r.code), 1, rid(r.wbs), hours, crew.size, remHours, c.status === 'TK_Complete' ? 0 : crew.size, Math.round(hours * done), 0, Math.round(budget), actual, 0, remain]
+    }))
   L.push('%E')
 
   const us = (d: string) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`

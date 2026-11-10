@@ -45,7 +45,7 @@ export function basisWarning(basis: ScheduleBasis, editsApplied: number, who = '
   const n = `${editsApplied} RunF9 edit${editsApplied === 1 ? '' : 's'}`
   return basis === 'scenario'
     ? `Basis: ${who} with ${n} applied (a what-if scenario). These figures are not the schedule as submitted.`
-    : `Basis: ${who} as submitted. ${n} ${editsApplied === 1 ? 'is' : 'are'} not applied; choose "With RunF9 edits" (basis=scenario) to see the scenario.`
+    : `Basis: ${who} as submitted. ${n} ${editsApplied === 1 ? 'is' : 'are'} not applied; choose "With RunF9 edits" to see the scenario.`
 }
 
 /**

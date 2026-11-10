@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
-import { fmtDay } from '@/lib/format'
+import { fmtDate, fmtDay } from '@/lib/format'
 import { formatMb, tooLargeMessage } from '@/lib/upload-limit'
 
 interface Doc {
@@ -176,7 +176,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   const submitPaste = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setBusy(true)
-    const name = (pasteTitle.trim() || `${pasteTypes.find(t => t.id === pasteType)?.label ?? 'Note'} ${new Date().toISOString().slice(0, 10)}`).slice(0, 150)
+    const name = (pasteTitle.trim() || `${pasteTypes.find(t => t.id === pasteType)?.label ?? 'Note'} ${fmtDate(new Date().toISOString().slice(0, 10))}`).slice(0, 150)
     const fd = new FormData()
     fd.set('file', new File([pasted], `${name.replace(/[^\w .-]+/g, ' ').trim() || 'note'}.txt`, { type: 'text/plain' }))
     fd.set('title', name)

@@ -6,6 +6,7 @@ import { PROJECT_TYPE_LABELS, isCivilType, type ProjectType, type CanonicalCateg
 import { phaseOf } from '@/lib/semantic/taxonomy'
 import { phaseLabelsFor } from '@/lib/export/wbs'
 import { fmtDate } from '@/lib/format'
+import { schedulePercentComplete } from '@/lib/analysis/progress'
 import { FINISH_LABELS } from '@/lib/analysis/schedule-analysis'
 
 export interface ProjectBrief {
@@ -49,7 +50,8 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
   const dataDate = s.dataDate
   const work = activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe')
   const done = work.filter(a => a.status === 'complete').length
-  const pct = work.length ? Math.round((100 * done) / work.length) : 0
+  // The same measure as the Projects card and the Overview tile (weighted by duration), with the plain count beside it.
+  const pct = schedulePercentComplete(activities)
 
   // Scope by work phase (from semantic normalization, so it works for every file format), in schedule order.
   // Civil projects use civil phase names (no "MEP Systems" or "Interiors" for a bridge or a transit line).
@@ -94,7 +96,7 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
       : [finish && { label: 'Forecast finish', value: fmtDate(finish) }]),
     start && finish && { label: 'Duration', value: durationText(start, finish) },
     dataDate && { label: 'Data date', value: fmtDate(dataDate) },
-    { label: 'Progress', value: `${pct}% of ${work.length} activities complete` },
+    { label: 'Progress', value: `${pct}% complete by duration (${done} of ${work.length} activities finished)` },
   ].filter(Boolean) as { label: string; value: string }[]
 
   const sentences = [
@@ -103,7 +105,7 @@ export function projectBrief(s: Schedule, activities: Activity[], extra: { city?
     finishMs && !dateOf(finishMs) ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name}; its date cannot be forecast because the file has no dates or logic to calculate it from.` : '',
     finishMs && dateOf(finishMs) ? `The goal is ${finishMs.name.toLowerCase().startsWith('substantial') ? '' : 'reaching '}${finishMs.name} by ${fmtDate(dateOf(finishMs))}${logic[finishMs.id] ? ` (logic-driven; ${fmtDate(finishMs.earlyFinish || finishMs.earlyStart)} as scheduled, held by a mandatory constraint)` : ''}${nextMilestones[0] && nextMilestones[0].name !== finishMs.name ? `; the next milestone is ${nextMilestones[0].name} on ${nextMilestones[0].date}${nextMilestones[0].basis === 'logic' ? ' (logic-driven)' : ''}` : ''}.` : '',
     twoFinishes ? `${FINISH_LABELS.scheduled}: ${fmtDate(an!.scheduledFinish)}; ${FINISH_LABELS.logic.charAt(0).toLowerCase() + FINISH_LABELS.logic.slice(1)}: ${fmtDate(an!.logicFinish)}.` : '',
-    `${pct}% of activities are complete${dataDate ? ` as of ${fmtDate(dataDate)}` : ''}.`,
+    `The work is ${pct}% complete by duration (${done} of ${work.length} activities finished)${dataDate ? ` as of ${fmtDate(dataDate)}` : ''}.`,
   ].filter(Boolean)
   const summary = sentences.join(' ')
   const text = [
