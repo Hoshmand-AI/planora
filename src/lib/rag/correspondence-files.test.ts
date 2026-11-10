@@ -30,6 +30,12 @@ describe('saved emails and meeting transcripts', () => {
     expect(t).not.toContain('x()')
   })
 
+  it('HTML is reduced to text: nested tags cannot rebuild one, and entities are decoded once', () => {
+    const t = emailToText('Content-Type: text/html\r\n\r\n<p>Hold <scr<script>x</script>ipt>alert(1)</scr</script >ipt> A &amp;lt; B &lt; C</p><SCRIPT type="x">steal()</SCRIPT foo>')
+    expect(t).not.toMatch(/<script|<\/script|steal\(\)/i)
+    expect(t).toContain('A &lt; B < C')
+  })
+
   it('reads a Teams or Zoom transcript as speaker lines', () => {
     const vtt = 'WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n<v Dana PM>The switchgear will be delayed\n\n2\n00:00:04.000 --> 00:00:06.000\n<v Dana PM>by 3 weeks.\n\n3\n00:00:07.000 --> 00:00:09.000\n<v Sam Field>Understood.\n'
     expect(transcriptToText(vtt)).toBe('Dana PM: The switchgear will be delayed by 3 weeks.\nSam Field: Understood.')

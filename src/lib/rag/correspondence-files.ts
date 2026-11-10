@@ -6,8 +6,19 @@ const decodeB64 = (s: string) => Buffer.from(s.replace(/\s+/g, ''), 'base64').to
 const decodeBody = (body: string, encoding: string) => (/quoted-printable/i.test(encoding) ? decodeQp(body) : /base64/i.test(encoding) ? decodeB64(body) : body)
 /** RFC 2047 encoded words in headers: =?utf-8?B?...?= and =?utf-8?Q?...?= */
 const decodeWords = (s: string) => s.replace(/=\?[^?]+\?([BbQq])\?([^?]*)\?=/g, (_, kind: string, data: string) => (kind.toUpperCase() === 'B' ? decodeB64(data) : decodeQp(data.replace(/_/g, ' '))))
-const stripHtml = (s: string) => s.replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<br\s*\/?>|<\/(p|div|tr|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, ' ')
-  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+/**
+ * The words of an HTML message as plain text. The result is stored and shown as text (never as markup);
+ * tags are still removed until none is left, so text such as "<scr<script>ipt>" cannot rebuild one, and
+ * "&amp;" is decoded last, so "&amp;lt;" stays the literal "&lt;" the sender wrote.
+ */
+function stripHtml(html: string): string {
+  let s = html
+  for (let prev = ''; prev !== s;) {
+    prev = s
+    s = s.replace(/<(style|script)\b[^>]*>[\s\S]*?<\/\1\b[^>]*>/gi, ' ').replace(/<br\s*\/?>|<\/(?:p|div|tr|li|h\d)\b[^>]*>/gi, '\n').replace(/<[^>]*>/g, ' ')
+  }
+  return s.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+}
 
 function splitHeaders(raw: string): { headers: Map<string, string>; body: string } {
   const at = raw.search(/\r?\n\r?\n/)
@@ -54,7 +65,10 @@ export function transcriptToText(raw: string): string {
     const t = line.trim()
     if (!t || /^WEBVTT/i.test(t) || /^NOTE\b/.test(t) || /^\d+$/.test(t) || /-->/.test(t) || /^[0-9a-f-]{8,}(\/\d+-\d+)?$/i.test(t)) continue
     const voice = /^<v\s+([^>]+)>/.exec(t)?.[1]
-    const said = t.replace(/<[^>]+>/g, '').trim()
+    // Cue tags (<v Name>, <c>, <i>) are dropped until none is left; a transcript is stored and shown as text.
+    let said = t
+    for (let prev = ''; prev !== said;) { prev = said; said = said.replace(/<[^>]*>/g, '') }
+    said = said.trim()
     if (!said) continue
     const entry = voice ? `${voice}: ${said}` : said
     // The same speaker carrying on: one line, so a sentence split across cues reads as a sentence.
