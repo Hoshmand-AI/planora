@@ -140,7 +140,7 @@ function chainTo(net: NetworkInput, to: string, earlyFinish: Record<string, stri
   const chain: string[] = []
   const seen = new Set<string>()
   let cur: string | undefined = to
-  while (cur && !seen.has(cur) && chain.length < 500) {
+  while (cur && !seen.has(cur) && chain.length < 20000) {
     seen.add(cur); chain.unshift(cur)
     const ps: string[] = (preds.get(cur) || []).filter(id => earlyFinish[id] && byId.get(id) && byId.get(id)!.status !== 'complete')
     cur = ps.sort((a, b) => (earlyFinish[b] || '').localeCompare(earlyFinish[a] || ''))[0]
@@ -162,8 +162,13 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
   // longest path. The longest path stops at a date-pinned activity (e.g. a finish milestone held by a
   // Finish On constraint); then follow the logic back from that activity.
   let path: Activity[]
-  if (target) path = chainTo(net, target.id, base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
-  else {
+  // The engine's own longest path up to the milestone when the milestone is on it (it accounts for relationship
+  // types and lags); otherwise walk back from the milestone.
+  const at = target ? base.longestPath.indexOf(target.id) : -1
+  if (target) {
+    path = at >= 0 ? base.longestPath.slice(0, at + 1).map(id => byId.get(id)).filter(openTask) : []
+    if (!path.length) path = chainTo(net, target.id, base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
+  } else {
     path = base.longestPath.map(id => byId.get(id)).filter(openTask)
     if (!path.length) path = chainTo(net, base.longestPath[base.longestPath.length - 1], base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
   }

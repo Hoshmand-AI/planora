@@ -176,7 +176,9 @@ export function runCpm(input: CpmInput): CpmResult {
       continue
     }
     idx.set(a.id, nodes.length)
-    const isMs = a.type === 'milestone'
+    // A task with no duration, no remaining and no progress occupies no time, like a milestone (P6 schedules it so):
+    // counted as a one-day task it pushed its successors, and the finish, a day late.
+    const isMs = a.type === 'milestone' || (!(Number(a.duration) > 0) && !(Number(a.remaining) > 0) && !a.actualStart && !a.actualFinish)
     const af = dateNum(a.actualFinish), as = dateNum(a.actualStart)
     if (a.actualFinish && Number.isNaN(af)) warnings.push(`Activity ${a.code}: invalid actual finish '${a.actualFinish}' ignored.`)
     if (a.actualStart && Number.isNaN(as)) warnings.push(`Activity ${a.code}: invalid actual start '${a.actualStart}' ignored.`)
@@ -346,7 +348,8 @@ export function runCpm(input: CpmInput): CpmResult {
         // Retained logic: the remaining work waits for FS/SS predecessors (sLB already holds them).
         const resume = retained ? Math.max(dataDay, as, sLB) : Math.max(dataDay, as)
         if (rem > 0) f = c.add(c.next(resume), rem - 1)
-        else f = Math.max(as, c.prev(dataDay - 1))
+        // No work left: it finishes when its retained-logic predecessors allow, not before them (the backward pass holds it there too).
+        else f = Math.max(as, c.prev((retained ? Math.max(dataDay, sLB) : dataDay) - 1))
         if (fLB > f + 1) f = c.next(fLB - 1)
         if (hasK && (k!.type === 'FNET' || k!.type === 'FO') && kd > f) f = c.next(kd)
         return { ef: f + 1, resume: rem > 0 ? c.next(resume) : as }
@@ -462,7 +465,8 @@ export function runCpm(input: CpmInput): CpmResult {
       if (q.state === 'complete') continue
       if (q.state === 'progress' && !retained && (ed.type === 'FS' || ed.type === 'SS')) continue
       switch (ed.type) {
-        case 'FS': finishUB = Math.min(finishUB, shift(q.ls, -ed.lag, c)); break
+        // A started successor with no work left has only its finish still to come: that is what its predecessor must meet.
+        case 'FS': finishUB = Math.min(finishUB, shift(q.state === 'progress' && remainingOf(q) === 0 ? q.lf : q.ls, -ed.lag, c)); break
         case 'SS': startUB = Math.min(startUB, shift(q.ls, -ed.lag, c)); break
         case 'FF': finishUB = Math.min(finishUB, shift(q.lf, -ed.lag, c)); break
         case 'SF': startUB = Math.min(startUB, shift(q.lf, -ed.lag, c)); break

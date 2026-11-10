@@ -481,3 +481,20 @@ describe('runCpm: round-3 mandatory-constraint handling', () => {
     expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'C'], constraints: [{ id: 'B', type: 'MSO', date: '2026-03-16', effect: 'later' }] })
   })
 })
+
+describe('runCpm: review fixes', () => {
+  it('a task with no duration takes no time (its successor is not pushed a day)', () => {
+    const r = runCpm(input([act('A', 5), act('Z', 0, { type: 'task' }), act('B', 5)], [fs('A', 'Z'), fs('Z', 'B')]))
+    expect(r.times.B).toMatchObject({ earlyStart: '2026-03-09', earlyFinish: '2026-03-13' })
+    expect(r.projectFinish).toBe('2026-03-13')
+  })
+
+  it('started work with nothing remaining waits for its unfinished predecessor, and gives that predecessor no negative float', () => {
+    // Data date 03/09. P (10d) is open; S started out of sequence and has 0 remaining; T follows S.
+    const r = runCpm(input([
+      act('P', 10), act('S', 5, { actualStart: '2026-03-02', remaining: 0 }), act('T', 5),
+    ], [fs('P', 'S'), fs('S', 'T')], { dataDate: '2026-03-09', progressMode: 'retained' }))
+    expect(r.times.P.totalFloat).toBeGreaterThanOrEqual(0)
+    expect(r.times.T.earlyStart > r.times.P.earlyFinish).toBe(true)
+  })
+})

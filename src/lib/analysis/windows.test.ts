@@ -183,3 +183,14 @@ describe('windows analysis: remaining duration re-estimated on work not started'
     expect(w.counts.durationsChanged).toBe(1)
   })
 })
+
+describe('work marked complete without an actual finish', () => {
+  it('is treated as done: its successor starts at the data date, not after the full duration again', () => {
+    const u = update('C1', 'Update 1', '2026-03-30', '10', [
+      { activityId: 'A100', duration: 20, status: 'complete', percentComplete: 100 }, { activityId: 'B200', duration: 5 }, FIN,
+    ], [['A100', 'B200'], ['B200', 'F900']])
+    const b = u.activities.find(a => a.activityId === 'B200')!
+    expect(b.earlyStart?.slice(0, 10)).toBe('2026-03-30')
+    expect(u.analysis.forecastFinish?.slice(0, 10)).toBe('2026-04-03')
+  })
+})
