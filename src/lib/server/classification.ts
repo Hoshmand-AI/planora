@@ -45,6 +45,10 @@ const RANK: Record<DataClassification, number> = { unclassified: 0, cui: 1, clas
 const isClassification = (c: unknown): c is DataClassification => c === 'unclassified' || c === 'cui' || c === 'classified'
 
 /** The most restrictive of several classifications (null when none is set). */
+/** True when `next` is a lower marking than the stored one (CUI → unclassified, classified → CUI). Unmarked counts as the lowest. */
+export const isLessRestrictive = (next: string | null | undefined, stored: string | null | undefined): boolean =>
+  (isClassification(stored) ? RANK[stored] : 0) > (isClassification(next) ? RANK[next] : 0)
+
 export function mostRestrictive(...cs: (string | null | undefined)[]): DataClassification | null {
   let out: DataClassification | null = null
   for (const c of cs) if (isClassification(c) && (out === null || RANK[c] > RANK[out])) out = c

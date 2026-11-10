@@ -900,6 +900,15 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
 }
 
 /** Everything the organization has stored in RunF9, as one JSON document (data portability). */
+/** The organization row for an export file, without the stored sign-in secret (even encrypted, it does not belong in a file). */
+function exportableOrg<T>(org: T): T {
+  const o = org as unknown as { sso?: Record<string, unknown> | null } | null | undefined
+  if (!o?.sso || typeof o.sso !== 'object') return org
+  const { clientSecretEnc: _omit, ...sso } = o.sso
+  void _omit
+  return { ...(o as object), sso } as unknown as T
+}
+
 export async function exportOrganization(orgId: string) {
   await initSchema()
   const org = await getOrganization(orgId)
@@ -922,7 +931,9 @@ export async function exportOrganization(orgId: string) {
   const { exportDocuments } = await import('@/lib/rag/store')
   const projectDocuments = await exportDocuments(orgId)
   const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
-  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: org, members, plans, schedules: scheduleData, standardsRuns, projectDocuments, retrievalLog, auditEvents: audit }
+  // The project register (risks, issues, change items).
+  const projectRegister = (await query('SELECT * FROM project_items WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -942,6 +953,7 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     await q('DELETE FROM document_chunks WHERE org_id=$1', [orgId])
     await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])
+    await q('DELETE FROM project_items WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
     await q('DELETE FROM plans WHERE org_id=$1', [orgId])
@@ -986,6 +998,7 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE delay_events SET created_by=$2 WHERE created_by=$1', [userId, heir])
     await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
     await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
+    await q("UPDATE project_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE retrieval_log SET user_id=NULL WHERE user_id=$1 AND org_id=$2', [userId, orgId])

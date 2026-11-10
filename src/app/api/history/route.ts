@@ -13,7 +13,8 @@ export const GET = api({ permission: 'read' }, async (_req, { auth: ctx }) => {
   const uploaded = schedules.filter(s => s.sourceType !== 'generated')
   const bt = backtest(uploaded.map(s => ({ scheduleId: s.id, name: `${s.name} (${s.version})`, projectType: s.projectType as ProjectType | null, state: s.region, grossSqft: s.grossSqft })), rows, calendars)
   return NextResponse.json({
-    organization: org,
+    // Only what the page shows: settings and sign-in configuration stay behind org.manage (/api/org).
+    organization: org ? { id: org.id, name: org.name } : null,
     privacy: 'Only schedules uploaded by your organization are used. Nothing is shared with or learned from other firms.',
     // Which uploads calibrate history and why the others do not (as-built only, one per project, ...).
     schedules: uploaded.map(s => {

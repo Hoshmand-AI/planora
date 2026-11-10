@@ -168,7 +168,46 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
     setBusy(false)
   }
 
+  // Emails, meeting notes and field reports are usually pasted, not saved as files: send the text as a .txt.
+  const [pasted, setPasted] = useState('')
+  const [pasteTitle, setPasteTitle] = useState('')
+  const [pasteType, setPasteType] = useState('email')
+  const pasteTypes = data.docTypes.filter(t => ['email', 'meeting', 'daily_report'].includes(t.id))
+  const submitPaste = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setBusy(true)
+    const name = (pasteTitle.trim() || `${pasteTypes.find(t => t.id === pasteType)?.label ?? 'Note'} ${new Date().toISOString().slice(0, 10)}`).slice(0, 150)
+    const fd = new FormData()
+    fd.set('file', new File([pasted], `${name.replace(/[^\w .-]+/g, ' ').trim() || 'note'}.txt`, { type: 'text/plain' }))
+    fd.set('title', name)
+    fd.set('docType', pasteType)
+    try {
+      const res = await fetch(base, { method: 'POST', body: fd })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) onDone({ tone: 'error', text: d.error || 'The text was not added.' })
+      else { onDone({ tone: d.warning ? 'warning' : 'success', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). Anything in it that affects the schedule shows on the Today tab, quoted with its source.${d.warning ? ` ${d.warning}` : ''}` }); setPasted(''); setPasteTitle('') }
+    } catch { onDone({ tone: 'error', text: 'Network error. Check your connection and try again.' }) }
+    setBusy(false)
+  }
+
   return (
+    <>
+    {pasteTypes.length > 0 && (
+      <Section title="Paste an email, meeting notes or a field report" description="RunF9 reads it for delays, changes, risks and commitments, ties them to activities, and shows them on the Today tab with the sentence quoted. Nothing is sent to an AI model for this.">
+        <form onSubmit={submitPaste} className="grid md:grid-cols-2 gap-3">
+          <Field label="Title" hint="Defaults to the type and today’s date.">{p => <input {...p} value={pasteTitle} maxLength={150} onChange={e => setPasteTitle(e.target.value)} className={inputClass} placeholder="e.g. OAC meeting 11/10 minutes" />}</Field>
+          <Field label="What it is">{p => (
+            <select {...p} value={pasteType} onChange={e => setPasteType(e.target.value)} className={inputClass}>
+              {pasteTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          )}</Field>
+          <div className="md:col-span-2">
+            <Field label="Text">{p => <textarea {...p} value={pasted} onChange={e => setPasted(e.target.value)} rows={6} className={inputClass} placeholder="Paste the email thread, the minutes or transcript, or the daily report here." />}</Field>
+          </div>
+          <div className="md:col-span-2"><Button type="submit" disabled={busy || pasted.trim().length < 20}>{busy ? 'Reading…' : 'Add to this project'}</Button></div>
+        </form>
+      </Section>
+    )}
     <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
       <form key={formKey} onSubmit={submit} className="grid md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
@@ -193,6 +232,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
         </div>
       </form>
     </Section>
+    </>
   )
 }
 

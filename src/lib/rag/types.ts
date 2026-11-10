@@ -1,6 +1,6 @@
 // Shared types for retrieval-augmented grounding over customer project documents.
 
-export const DOC_TYPES = ['contract', 'scheduling_spec', 'owner_requirement', 'specification', 'change_order', 'rfi', 'drawing', 'other'] as const
+export const DOC_TYPES = ['contract', 'scheduling_spec', 'owner_requirement', 'specification', 'change_order', 'rfi', 'drawing', 'email', 'meeting', 'daily_report', 'other'] as const
 export type DocType = typeof DOC_TYPES[number]
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
   contract: 'Contract',
@@ -10,6 +10,9 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   change_order: 'Change order / directive',
   rfi: 'RFI',
   drawing: 'Drawing',
+  email: 'Email / letter',
+  meeting: 'Meeting minutes / transcript',
+  daily_report: 'Daily field report',
   other: 'Other',
 }
 export const isDocType = (v: unknown): v is DocType => typeof v === 'string' && (DOC_TYPES as readonly string[]).includes(v)

@@ -60,7 +60,7 @@ for (const name of DEVICES) {
   await fits('Overview')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-overview.png` })
   // Every project tab
-  for (const tab of ['Schedule', 'Quality', 'Delays', 'Resources', 'Documents', 'Reports', 'Ask AI', 'Overview']) {
+  for (const tab of ['Today', 'Schedule', 'Quality', 'Delays', 'Resources', 'Documents', 'Reports', 'Ask AI', 'Overview']) {
     const link = page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: tab, exact: true })
     await link.scrollIntoViewIfNeeded(); await tap(link)
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
@@ -73,7 +73,7 @@ for (const name of DEVICES) {
       if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-schedule.png` })
     }
   }
-  console.log('   ✓ all 8 project tabs open by tap and fit the screen')
+  console.log('   ✓ all 9 project tabs open by tap and fit the screen')
   // Sidebar collapse on tablets and desktops
   if (desc.viewport.width >= 768) {
     const w = () => page.evaluate(() => Math.round(document.querySelector('aside').getBoundingClientRect().width))

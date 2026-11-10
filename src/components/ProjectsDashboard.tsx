@@ -15,6 +15,7 @@ import { useApp } from '@/app/dashboard/layout'
 import { fmtDate, fmtDay } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
 import { EmptyState } from '@/components/EmptyState'
+import { DataCenterSampleButton } from '@/components/DataCenterSample'
 import type { DataLocation } from '@/lib/server/data-location'
 
 type Filter = 'all' | 'at_risk' | 'attention' | 'stale' | 'on_track'
@@ -173,10 +174,16 @@ export function ProjectsDashboard() {
   if (!rows.length) return (
     <div className="px-5 md:px-6 py-6 md:py-8 space-y-6">
       {header}
+<>
       <EmptyState heading="h2" title="Add your first project" action={{ label: 'Build with the interview', href: '/dashboard/plan' }}
         secondary={can('schedule.write') ? { label: 'Or upload a P6 or MS Project schedule', onClick: openUpload } : undefined}>
         Every project you upload or build shows up here, with its status and forecast finish.
       </EmptyState>
+      {can('schedule.write') && <div className="-mt-10 pb-12 text-center">
+        <p className="text-[13px] text-warm-600 mb-2">Or see a live project first: a data center in construction, with late switchgear, meeting minutes and a risk register.</p>
+        <DataCenterSampleButton />
+      </div>}
+      </>
       {/* First run (design package step 7): how RunF9 works, in three steps that match the real flow. */}
       <section aria-labelledby="first-run-h" className="max-w-4xl mx-auto">
         <h2 id="first-run-h" className="text-[17px] font-semibold text-navy-950 text-center">Better schedules start with better questions</h2>

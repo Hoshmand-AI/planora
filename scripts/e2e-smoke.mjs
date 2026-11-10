@@ -317,6 +317,60 @@ async function main() {
   r = await A.get('/api/history')
   ok(!r.data.schedules.some(s => s.id === pubId), 'Generated schedules never pollute firm history')
 
+  /* ── Daily Brief: the living schedule, its register, its correspondence and recent changes ── */
+  {
+    const iso = d => d.toISOString().slice(0, 10)
+    const at = n => { const d = new Date(); d.setUTCDate(d.getUTCDate() + n); return iso(d) }
+    const live = ['Act ID,Activity Name,OD,Start,Finish,Actual Start,Actual Finish,Preds',
+      `D100,NTP,0,${at(-30)},${at(-30)},${at(-30)},${at(-30)},`, `D110,Set main switchgear,20,${at(-20)},${at(8)},${at(-20)},,D100`,
+      `D120,Pull feeders,15,${at(9)},${at(30)},,,D110`, `D130,Level 3 startup,10,${at(31)},${at(45)},,,D120`, `D140,Ready for service,0,${at(46)},${at(46)},,,D130`].join('\n')
+    r = await upload(A, 'daily-brief.csv', live, { projectType: 'data_center' })
+    ok(r.status === 200, 'Live schedule uploaded for the daily brief', r.data)
+    const sid = r.data.schedule.id
+    r = await A.get(`/api/schedules/${sid}/brief`)
+    ok(r.status === 200 && r.data.brief.driving.today && r.data.brief.audiences.pm.length > 0 && r.data.brief.audiences.field.length > 0 && r.data.brief.audiences.client.length > 0 && r.data.brief.whatIfs.length > 0,
+      `Daily brief: driving today ${r.data.brief?.driving?.today?.code}, ${r.data.brief?.whatIfs?.length} what-if runs, PM / field / client versions`, r.data)
+    const finish0 = r.data.brief.headline.forecast
+    r = await A.get(`/api/schedules/${sid}/brief?whatIfActivity=D120&whatIfDays=10`)
+    ok(r.status === 200 && r.data.brief.whatIfs[0].title.startsWith('Your what-if') && r.data.brief.whatIfs[0].days > 0, `Custom what-if: D120 +10 work days moves the finish ${r.data.brief?.whatIfs?.[0]?.days} days`, r.data.brief?.whatIfs)
+    // Register: add, appears in the brief, close, gone from the brief, delete.
+    r = await A.post(`/api/schedules/${sid}/register`, { kind: 'pco', title: 'PCO-7 added feeder set', impactDays: 6, activityCodes: ['D120'], dueDate: at(5) })
+    ok(r.status === 200 && r.data.item.kind === 'pco', 'Register item added (PCO)', r.data)
+    const itemId = r.data.item.id
+    ok((await A.post(`/api/schedules/${sid}/register`, { kind: 'nope', title: 'x' })).status === 400, 'Register refuses an unknown kind')
+    r = await A.get(`/api/schedules/${sid}/brief`)
+    ok(r.data.brief.changeItems.length === 1 && r.data.brief.changeImpactDays === 6 && r.data.brief.whatIfs.some(w => w.title.startsWith('Register:')), 'Open change item reaches the brief and its own what-if run', r.data.brief)
+    r = await A.req('PATCH', `/api/schedules/${sid}/register?itemId=${itemId}`, { status: 'closed' })
+    ok(r.status === 200 && r.data.item.status === 'closed', 'Register item closed')
+    ok((await A.get(`/api/schedules/${sid}/brief`)).data.brief.changeItems.length === 0, 'Closed item leaves the brief')
+    ok((await B.get(`/api/schedules/${sid}/brief`)).status === 404 && (await B.get(`/api/schedules/${sid}/register`)).status === 404 && (await B.get(`/api/schedules/${sid}/changes`)).status === 404, "Firm B cannot read Firm A's brief, register or changes")
+    ok((await A.req('DELETE', `/api/schedules/${sid}/register?itemId=${itemId}`)).status === 200, 'Register item deleted')
+    // Correspondence: a pasted meeting note becomes a signal tied to the activity.
+    const fd = new FormData()
+    fd.append('file', new Blob(['OAC meeting. The vendor reported the main switchgear will be delayed by 2 weeks. Next meeting Tuesday.']), 'oac.txt')
+    fd.append('title', 'OAC minutes'); fd.append('docType', 'meeting')
+    r = await A.req('POST', `/api/schedules/${sid}/documents`, fd)
+    ok(r.status === 200, 'Meeting minutes added as a project document', r.data)
+    r = await A.get(`/api/schedules/${sid}/brief`)
+    const sig = r.data.brief.signals.find(x => x.kind === 'delay')
+    ok(sig && sig.days === 10 && sig.activity?.code === 'D110' && r.data.brief.whatIfs.some(w => w.title.startsWith('Correspondence:')), `Signal from the minutes: delay of ${sig?.days} work days on ${sig?.activity?.code}, with its what-if run`, r.data.brief.signals)
+    // Progress recorded in RunF9, then highlighted as a recent change with what it moved.
+    r = await A.get(`/api/schedules/${sid}/changes`)
+    ok(r.status === 200 && r.data.changed.length === 0, 'No recent changes before any edit')
+    const acts = (await A.get(`/api/schedules?id=${sid}`)).data.activities
+    const d110 = acts.find(a => a.activityId === 'D110'), d120 = acts.find(a => a.activityId === 'D120')
+    r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'progress', activityId: d110.id, actualStart: at(-20), actualFinish: at(1) }, reason: 'Future finish must be refused' })
+    ok(r.status === 400, 'Progress with a future finish date is refused')
+    r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'progress', activityId: d110.id, actualStart: at(-20), actualFinish: at(0) }, reason: 'Reported finished on the daily brief' })
+    ok(r.status === 200, 'Progress recorded: D110 finished today', r.data)
+    r = await A.post(`/api/schedules/${sid}/edits`, { change: { kind: 'duration', activityId: d120.id, remaining: 25 }, reason: 'Feeder pull re-estimated by the foreman' })
+    ok(r.status === 200, 'Duration changed on D120')
+    r = await A.get(`/api/schedules/${sid}/changes`)
+    ok(r.status === 200 && r.data.changed.length === 2 && r.data.moved.some(m => m.code === 'D130') && r.data.finishMovedDays !== null, `Recent changes: ${r.data.changed?.length} changed, ${r.data.movedCount} moved, finish ${r.data.finishMovedDays} days`, r.data)
+    r = await A.get(`/api/schedules/${sid}/brief`)
+    ok(r.data.brief.changed.edits.length === 2 && r.data.brief.headline.forecast !== finish0 && !r.data.activities.some(a => a.code === 'D110'), 'Brief runs on the living schedule: D110 is done, the changes are listed, the forecast moved', r.data.brief.changed)
+  }
+
   console.log(`\nAll ${passed} checks passed.`)
 }
 

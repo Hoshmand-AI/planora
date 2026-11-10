@@ -278,6 +278,10 @@ async function main() {
   if (r.status !== 200 || r.data.reverted?.length !== 1 || !r.data.edits.some(e => e.id === EA)) fatal('A undoes the plain-English edit (other edits stay)', r.data)
   r = await A.put(`/api/schedules/${SA2}/risk`, { ranges: [{ activityId: ACT, optimistic: 5, mostLikely: 8, pessimistic: 14 }], events: [{ name: `Alpha risk ${AMARK}`, probability: 0.3, impactDays: 10, activityId: ACT }] })
   if (r.status !== 200) fatal('A saves risk inputs', r.data)
+  // The project register (risks, issues, change items) behind the Daily Brief
+  r = await A.post(`/api/schedules/${SA2}/register`, { kind: 'risk', title: `Alpha risk ${AMARK}`, impactDays: 5, activityCodes: [open[1].activityId] })
+  if (r.status !== 200) fatal('A adds a register item', r.data)
+  const RA = r.data.item.id
   r = await A.get(`/api/schedules/${SA2}/quality`)
   const questionId = r.data.dataQuestions?.[0]?.id ?? `dcma:${r.data.dcma?.checks.find(c => c.result === 'fail' || c.result === 'warn')?.id ?? 5}`
   r = await A.post(`/api/schedules/${SA2}/quality`, { questionId, response: 'intentional', note: `Alpha answer ${AMARK}` })
@@ -306,7 +310,7 @@ async function main() {
   if (!SESSA) fatal('A lists its sessions', r.data)
   const aPlanVersion = (await A.get(`/api/plans/${PA}`)).data.plan.version
 
-  IDS = { PA, PS, SA, SA2, ACT, EA, WSA, IA, KEYA, HOOKA, SESSA, UA }
+  IDS = { PA, PS, SA, SA2, ACT, EA, RA, WSA, IA, KEYA, HOOKA, SESSA, UA }
   FAKE = fakeIds(IDS)
   A_IDS = Object.values(IDS).filter(v => typeof v === 'string' && v.length >= 12)
 
@@ -335,6 +339,7 @@ async function main() {
     ['published schedule', `/api/schedules?id=${PS}`], ['upload', `/api/schedules?id=${SA2}`], ['quality', `/api/schedules/${SA2}/quality`],
     ['edits', `/api/schedules/${SA2}/edits`], ['risk', `/api/schedules/${SA2}/risk`], ['recovery', `/api/schedules/${SA2}/recovery`],
     ['review', `/api/schedules/${SA2}/review`], ['original file', `/api/schedules/${SA2}/export?format=original`], ['compare', `/api/schedules/compare?id=${SA2}&base=${SA}`],
+    ['daily brief', `/api/schedules/${SA2}/brief`], ['register', `/api/schedules/${SA2}/register`], ['recent changes', `/api/schedules/${SA2}/changes`],
     ['windows', `/api/schedules/windows?id=${SA2}`], ['Ask AI history', `/api/ask?scheduleId=${SA2}`],
   ]) {
     await control('control', `A reads its own ${name}`, async () => { const x = await A.get(url); return { ok: x.status === 200, note: `${x.status} ${String(x.data?.error ?? '').slice(0, 120)}` } })
@@ -372,6 +377,14 @@ async function main() {
   await b('quality scenario', i => ['GET', `/api/schedules/${i.SA2}/quality?basis=scenario`])
   await b('logic suggestions', i => ['GET', `/api/schedules/${i.SA2}/logic-suggestions`])
   await b('answer data question', i => ['POST', `/api/schedules/${i.SA2}/quality`, { questionId, response: 'will_fix', note: 'cross-tenant' }])
+  await b('daily brief', i => ['GET', `/api/schedules/${i.SA2}/brief`])
+  await b('daily brief what-if', i => ['GET', `/api/schedules/${i.SA2}/brief?whatIfActivity=${encodeURIComponent(i.ACT)}&whatIfDays=5`])
+  await b('recent changes', i => ['GET', `/api/schedules/${i.SA2}/changes`])
+  await b('read register', i => ['GET', `/api/schedules/${i.SA2}/register`])
+  await b('add register item', i => ['POST', `/api/schedules/${i.SA2}/register`, { kind: 'risk', title: 'cross-tenant risk' }])
+  await b('close register item', i => ['PATCH', `/api/schedules/${i.SA2}/register?itemId=${i.RA}`, { status: 'closed' }])
+  await b('delete register item', i => ['DELETE', `/api/schedules/${i.SA2}/register?itemId=${i.RA}`])
+  await b('record progress', i => ['POST', `/api/schedules/${i.SA2}/edits`, { change: { kind: 'progress', activityId: i.ACT, actualStart: '2020-01-06', actualFinish: null }, reason: 'cross-tenant progress attempt' }])
   await b('read scenario edits', i => ['GET', `/api/schedules/${i.SA2}/edits`])
   await b('add scenario edit', i => ['POST', `/api/schedules/${i.SA2}/edits`, { change: { kind: 'duration', activityId: i.ACT, remaining: 1 }, reason: 'cross-tenant edit attempt' }])
   await b('preview plain-English edit', i => ['POST', `/api/schedules/${i.SA2}/edits/interpret`, { instruction: `extend ${i.ACT} by 2 days` }])
