@@ -51,6 +51,9 @@ const pool = new Pool({
   ssl: tls.ssl,
   max: Number(process.env.PG_POOL_MAX) || 10,
   connectionTimeoutMillis: 10_000,
+  // No statement waits for ever on a connection that went quiet (a suspended database, a half-open socket):
+  // the request fails after two minutes instead of holding the function until the platform kills it.
+  query_timeout: 120_000,
   idleTimeoutMillis: 30_000,
   keepAlive: true,
 })
@@ -79,39 +82,66 @@ export function initSchema(): Promise<void> {
   return schemaReady
 }
 
-const MIGRATION_LOCK = 727_001
+// A new key: an instance running the previous code may still hold the old session-level lock on a pooled connection.
+const MIGRATION_LOCK = 727_002
 
-/** Applies pending migrations in order, each in its own transaction, under a cluster-wide advisory lock. */
+/**
+ * Applies pending migrations in order, each in its own transaction.
+ *
+ * A start with nothing to apply (every start except the first after a release that adds a migration) takes no
+ * lock: it reads the applied ids and returns. A pending migration runs under a transaction-scoped advisory lock,
+ * which is released at COMMIT or ROLLBACK and so also works through a transaction pooler (PgBouncer, Neon's
+ * pooled endpoint). A session-level lock does not: the pooler can hand the unlock to a different server
+ * connection, leaving the lock held and every later start waiting on it.
+ */
 async function createSchema() {
+  const applied = async (): Promise<Map<number, string> | null> => {
+    try { return new Map<number, string>((await pool.query('SELECT id, checksum FROM schema_migrations')).rows.map(r => [Number(r.id), String(r.checksum)])) }
+    catch (err) { if ((err as { code?: string }).code === '42P01') return null; throw err } // the table does not exist yet
+  }
+  let done = await applied()
+  if (done) {
+    for (const m of MIGRATIONS) if (done.has(m.id) && done.get(m.id) !== checksum(m)) console.warn(JSON.stringify({ level: 'warn', msg: 'migration checksum drift', migration: m.id, name: m.name }))
+    if (MIGRATIONS.every(m => done!.has(m.id))) return
+  }
   const client = await pool.connect()
+  let broken: Error | undefined
   try {
-    await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK])
-    try {
-      await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
-        id INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
-      const done = new Map<number, string>((await client.query('SELECT id, checksum FROM schema_migrations')).rows.map(r => [Number(r.id), String(r.checksum)]))
-      for (const m of MIGRATIONS) {
-        const sum = checksum(m)
-        if (done.has(m.id)) {
-          if (done.get(m.id) !== sum) console.warn(JSON.stringify({ level: 'warn', msg: 'migration checksum drift', migration: m.id, name: m.name }))
-          continue
-        }
-        await client.query('BEGIN')
-        try {
-          await client.query(m.sql)
-          await client.query('INSERT INTO schema_migrations (id, name, checksum) VALUES ($1,$2,$3)', [m.id, m.name, sum])
-          await client.query('COMMIT')
-          console.log(JSON.stringify({ level: 'info', msg: 'migration applied', migration: m.id, name: m.name }))
-        } catch (err) {
-          await client.query('ROLLBACK')
-          throw new Error(`Migration ${m.id} (${m.name}) failed: ${(err as Error).message}`)
-        }
+    const inLock = async <T>(fn: () => Promise<T>): Promise<T> => {
+      await client.query('BEGIN')
+      try {
+        await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK])
+        const out = await fn()
+        await client.query('COMMIT')
+        return out
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw err
       }
-    } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK])
     }
+    await inLock(() => client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      id INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`))
+    done = (await applied()) ?? new Map()
+    for (const m of MIGRATIONS) {
+      if (done.has(m.id)) continue
+      try {
+        await inLock(async () => {
+          // Another instance may have applied it while this one waited for the lock.
+          if ((await client.query('SELECT 1 FROM schema_migrations WHERE id=$1', [m.id])).rowCount) return
+          await client.query(m.sql)
+          await client.query('INSERT INTO schema_migrations (id, name, checksum) VALUES ($1,$2,$3)', [m.id, m.name, checksum(m)])
+          console.log(JSON.stringify({ level: 'info', msg: 'migration applied', migration: m.id, name: m.name }))
+        })
+      } catch (err) {
+        throw new Error(`Migration ${m.id} (${m.name}) failed: ${(err as Error).message}`)
+      }
+    }
+  } catch (err) {
+    broken = err as Error
+    throw err
   } finally {
-    client.release()
+    // After a failure the connection may be mid-transaction: discard it instead of returning it to the pool.
+    client.release(broken)
   }
 }
 
