@@ -41,7 +41,10 @@ export function DataCenterSampleButton({ className = '' }: { className?: string 
         const f = new FormData()
         f.set('file', new File([doc.text], `${doc.title.replace(/[^\w .-]+/g, ' ')}.txt`, { type: 'text/plain' }))
         f.set('title', doc.title); f.set('docType', doc.docType)
-        await fetch(`${base}/documents`, { method: 'POST', body: f }).catch(() => null)
+        const up = await fetch(`${base}/documents`, { method: 'POST', body: f }).catch(() => null)
+        // The sample's own documents are approved at once, so search and Ask AI can use them without an extra step.
+        const docId = up?.ok ? (await up.json().catch(() => ({}))).document?.id : null
+        if (docId) await postJson(`${base}/documents/${encodeURIComponent(docId)}`, { trust: 'approved' }, 'PATCH')
       }
       for (const r of data.duplicate ? [] : s.register.filter(x => !have.has(x.title))) {
         const due = new Date(d); due.setDate(due.getDate() + r.dueInDays)

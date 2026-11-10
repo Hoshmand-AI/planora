@@ -194,7 +194,7 @@ function offlineAnswer(stats: Record<string, string | number>, critical: Activit
     ...critical.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: ${a.earlyStart} → ${a.earlyFinish}, float ${a.totalFloat}d`),
     '',
     '**Next up:**',
-    ...nearTerm.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: starts ${a.earlyStart}${a.isCritical ? ' (critical)' : ''}`),
+    ...nearTerm.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: ${a.actualStart || a.status === 'in_progress' ? `under way, forecast finish ${a.earlyFinish}` : `starts ${a.earlyStart}`}${a.isCritical ? ' (critical)' : ''}`),
   ]
   if (extra) lines.push('', '```', extra.trim(), '```')
   return lines.join('\n')

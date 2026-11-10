@@ -32,7 +32,7 @@ const btnPrimary = 'px-3 py-1.5 rounded-full bg-navy-950 text-white text-[13px] 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 export default function TodayPage() {
-  const { selectedSchedule, can, openUpload } = useApp()
+  const { selectedSchedule, can, openUpload, refreshMetrics, refreshSchedules } = useApp()
   const sid = selectedSchedule?.id
   const [data, setData] = useState<BriefData | null>(null)
   const [items, setItems] = useState<RegisterItem[]>([])
@@ -79,7 +79,8 @@ export default function TodayPage() {
     const r = await postJson(`/api/schedules/${encodeURIComponent(sid)}/edits`, { change: { kind: 'progress', activityId: row.id, actualStart: day, actualFinish: kind === 'finish' ? day : null }, reason: `Progress reported on the Daily Brief (${kind === 'finish' ? 'finished' : 'started'} ${fmtDate(day)})` })
     setBusy('')
     if (!r.ok) { setErr(r.data.error || 'Progress was not recorded.'); return }
-    await load()
+    // The other tabs read the project's numbers and its list of edits from the shared state: bring them up to date too.
+    await Promise.all([load(), refreshMetrics().catch(() => {}), refreshSchedules().catch(() => {})])
   }
 
   const text = useMemo(() => {

@@ -6,6 +6,7 @@
 // Titles, messages and recommendations are RunF9's own paraphrases; sourceReference is a citation.
 // An automated scan is not a GAO compliance determination (see GAO_DISCLAIMER).
 
+import { fmtDate } from '@/lib/format'
 import { isValidDate, toDayNumber } from '@/lib/planning/calendar'
 import type { AnalyzableActivity } from '@/lib/planning/types'
 import { DEFAULT_GAO_THRESHOLDS, type GaoThresholds } from './config'
@@ -500,7 +501,7 @@ export const GAO_RULES: RuleDef[] = [
       if (net.input.subject.kind === 'plan') return notAssessable('A generated plan has not been statused yet; the data date is its start.')
       const dd = net.input.schedule.dataDate
       return isValidDate(dd)
-        ? { result: 'pass', metric: `data date ${dd}`, evidence: [], recommendation: 'No action needed.' }
+        ? { result: 'pass', metric: `data date ${fmtDate(dd)}`, evidence: [], recommendation: 'No action needed.' }
         : { result: 'fail', metric: 'no data date', evidence: [], recommendation: 'Set the data date (status date) in the scheduling tool and re-export.' }
     },
   }),

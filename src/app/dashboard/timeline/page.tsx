@@ -249,7 +249,7 @@ export default function TimelinePage() {
                   </div>
                 )
               })}
-              {groups.length === 0 && <p className="px-4 py-10 text-center text-[14px] text-warm-600">{filtering ? 'No activities match.' : 'No activities with dates in this schedule.'}</p>}
+              {groups.length === 0 && <p className="sticky left-0 w-screen max-w-full px-4 py-10 text-center text-[14px] text-warm-600">{filtering ? 'No activities match.' : 'No activities with dates in this schedule.'}</p>}
               </div>
             </div>
           </div>

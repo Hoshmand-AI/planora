@@ -4,6 +4,9 @@ import { completeSchedule } from './complete-schedule'
 import { dataCenterSample } from './sample-datacenter'
 import { extractSignals } from '@/lib/analysis/correspondence'
 import { missingScope } from '@/lib/analysis/daily-brief'
+import { xerCostData } from '@/lib/parsers/costs'
+import { readXerTables } from '@/lib/parsers/xer-parser'
+import { xerResourceData } from '@/lib/parsers/resources'
 
 describe('data center sample', () => {
   const s = dataCenterSample('2026-11-10')
@@ -38,5 +41,14 @@ describe('data center sample', () => {
   it('is the same for the same day and moves with the day', () => {
     expect(dataCenterSample('2026-11-10').xer).toBe(s.xer)
     expect(dataCenterSample('2026-11-14').dataDate).toBe('2026-11-13') // Saturday → the Friday before
+  })
+
+  it('carries crews and costs, so resource loading and earned value have data', () => {
+    const costs = xerCostData(s.xer)
+    expect(costs).not.toBeNull()
+    expect(JSON.stringify(costs)).toMatch(/USD|\$/)
+    const res = xerResourceData(readXerTables(s.xer), new Map(p.activities.map(a => [a.sourceId!, a])), p.dataDate)
+    expect(res).not.toBeNull()
+    expect(JSON.stringify(res)).toContain('Electricians')
   })
 })
