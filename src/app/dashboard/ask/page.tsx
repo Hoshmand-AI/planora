@@ -18,6 +18,7 @@ const SUGGESTED = [
 
 export default function AskPage() {
   const { selectedSchedule, openUpload, can } = useApp()
+  const canAsk = can('ai.use')
   const [messages, setMessages] = useState<Message[]>([])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
@@ -33,9 +34,13 @@ export default function AskPage() {
 
   useEffect(() => {
     if (!selectedSchedule) return
+    let live = true
+    setMessages([])
     fetch(`/api/ask?scheduleId=${selectedSchedule.id}`)
       .then(r => r.json())
-      .then(data => setMessages(data.messages || []))
+      .then(data => { if (live) setMessages(data.messages || []) })
+      .catch(() => {})
+    return () => { live = false }
   }, [selectedSchedule])
 
   useEffect(() => {
@@ -44,7 +49,7 @@ export default function AskPage() {
 
   const handleSend = async (question?: string) => {
     const q = question || input.trim()
-    if (!q || !selectedSchedule) return
+    if (!q || !selectedSchedule || !canAsk) return
     setInput('')
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: q, createdAt: new Date().toISOString() }
@@ -57,10 +62,10 @@ export default function AskPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(), role: 'assistant',
-        content: data.answer || 'Unable to generate response.',
+        content: data.answer || (res.ok ? 'No answer came back. Try asking again.' : data.error || 'The question could not be answered. Try again in a moment.'),
         createdAt: new Date().toISOString(),
       }
       setMessages(prev => [...prev, aiMsg])
@@ -153,10 +158,10 @@ export default function AskPage() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Ask about your schedule…"
+          placeholder={canAsk ? 'Ask about your schedule…' : 'Your role cannot use Ask AI. Ask an admin for access.'}
           aria-label="Ask about your schedule"
           className="flex-1 bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
-          disabled={loading}
+          disabled={loading || !canAsk}
         />
         <button
           onClick={() => handleSend()}

@@ -26,6 +26,8 @@ export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
   for (const e of edits) {
     if (e.status !== 'applied') continue
     const c = e.change
+    // Progress is a status report, not an override of the plan.
+    if (c.kind === 'progress') continue
     const target = c.kind === 'duration' || c.kind === 'constraint' ? c.activityId : c.successorId
     const field: Override['field'] = c.kind === 'duration' ? 'duration' : c.kind === 'constraint' ? 'constraint' : c.kind === 'link_remove' ? 'remove_link' : e.before === 'no relationship' ? 'add_link' : 'type'
     const reason = c.kind === 'link_set' || c.kind === 'link_remove' ? `${e.label}: ${e.reason}` : e.reason

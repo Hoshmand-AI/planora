@@ -63,6 +63,7 @@ export default function PlanPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [publishedId, setPublishedId] = useState('')
   const [dateAlerts, setDateAlerts] = useState<string[]>([])
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
   const [conflict, setConflict] = useState(false)
@@ -94,7 +95,7 @@ export default function PlanPage() {
     setSraState('idle')
     if (hasCpm) runSra()
   }, [planVersion, hasCpm, runSra])
-  const { can } = useApp()
+  const { can, refreshSchedules, setSelectedSchedule } = useApp()
   const stickyRef = useRef<HTMLDivElement>(null)
   const [stickyTop, setStickyTop] = useState(0)
   useEffect(() => {
@@ -204,7 +205,12 @@ export default function PlanPage() {
       if (!confirm(`Publish this plan as a baseline anyway?\n\n${warnings}`)) return
       data = await call('publish', `/api/plans/${id}/publish`, { method: 'POST', body: JSON.stringify({ confirm: true }) })
     }
-    if (data) setNotice('Published. Overview, Quality, Timeline and Ask AI now work on this schedule; it is also the baseline for progress updates.')
+    if (data) {
+      // Make the published schedule the open project, so Today, Overview and the other tabs work at once.
+      await refreshSchedules().catch(() => {})
+      if (data.schedule) { setSelectedSchedule(data.schedule as never); setPublishedId(String((data.schedule as { id: string }).id)) }
+      setNotice('Published. Today, Overview, Quality, Schedule and Ask AI now work on this schedule; it is also the baseline for progress updates.')
+    }
   }
   const suggest = async () => {
     const data = await call('suggest', `/api/plans/${id}/suggest`, { method: 'POST', body: '{}' })
@@ -330,7 +336,7 @@ export default function PlanPage() {
           You have read-only access to plans{can('plan.review') ? ' (you can record expert reviews on the Evaluation tab)' : ''}. Ask an admin of your organization if you need to make changes.
         </Banner>
       )}
-      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}</Banner>}
+      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}{publishedId && notice.startsWith('Published') ? <> <Link href={`/dashboard/today?schedule=${publishedId}`} className="font-semibold underline">Open today’s brief</Link></> : null}</Banner>}
       {error && <Banner kind="error" onClose={() => setError('')}>{error}</Banner>}
       {dateAlerts.length > 0 && (
         <Banner kind="warn" onClose={() => setDateAlerts([])}>

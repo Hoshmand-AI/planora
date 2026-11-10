@@ -35,7 +35,8 @@ const workCounts = (acts: { activityType: string; actualFinish: string | null }[
   return { workCount: work.length, openCount: work.filter(a => !a.actualFinish).length }
 }
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
-import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE } from '@/lib/server/classification'
+import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, isLessRestrictive } from '@/lib/server/classification'
+import { can } from '@/lib/server/permissions'
 import { deploymentKind } from '@/lib/llm/provider'
 import { workspaceForNewItem } from '@/lib/server/workspaces'
 
@@ -381,6 +382,11 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
   const typeErr = projectTypeError(body.projectType)
   if (typeErr) return NextResponse.json({ error: typeErr, code: 'invalid_project_type', validTypes: PROJECT_TYPES }, { status: 400 })
   if ('classification' in body && !isClassification(body.classification)) return NextResponse.json({ error: `classification must be one of ${CLASSIFICATIONS.join(', ')}.` }, { status: 400 })
+  // Lowering a marking re-opens cloud AI and unmarked exports, so it takes an administrator, not the scheduler alone.
+  if ('classification' in body && isLessRestrictive(body.classification, s.classification) && !can(ctx.role, 'org.manage')) {
+    await audit({ action: 'schedule.classification_refused', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.classification ?? null, requested: body.classification, reason: 'downgrade_needs_admin' } })
+    return NextResponse.json({ error: 'Only an organization admin can lower a security marking (for example CUI to unclassified). Ask an admin to make this change.', code: 'downgrade_needs_admin' }, { status: 403 })
+  }
   const classifiedRefusal = 'classification' in body ? classifiedCloudRefusal(body.classification, deploymentKind()) : null
   if (classifiedRefusal) {
     await audit({ action: 'schedule.classification_refused', targetType: 'schedule', targetId: s.id, detail: { name: s.name, requested: 'classified', reason: CLASSIFIED_CLOUD_CODE, deployment: deploymentKind() } })

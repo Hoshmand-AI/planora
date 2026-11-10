@@ -808,6 +808,42 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS read_by TEXT NOT NULL DEFAULT 'text';
     `,
   },
+  {
+    id: 23, name: 'project_register_and_correspondence',
+    sql: `
+    -- Project correspondence kept with the project documents: emails, meeting minutes / transcripts
+    -- and daily field reports (the Daily Brief reads them for schedule signals). Widening the allowed
+    -- values only: every existing row stays valid, and older code shows the new types as "Other".
+    ALTER TABLE project_documents DROP CONSTRAINT IF EXISTS project_documents_doc_type_check;
+    ALTER TABLE project_documents ADD CONSTRAINT project_documents_doc_type_check
+      CHECK (doc_type IN ('contract', 'scheduling_spec', 'owner_requirement', 'specification', 'other', 'change_order', 'rfi', 'drawing', 'email', 'meeting', 'daily_report'));
+    -- The project register: risks, issues, PCOs, change requests, change orders and contract
+    -- amendments, each optionally tied to activities and to the document it came from. Keyed by the
+    -- project (update series) so it carries across updates. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS project_items (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      project_key TEXT NOT NULL,
+      schedule_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('risk', 'issue', 'pco', 'change_request', 'change_order', 'amendment')),
+      title TEXT NOT NULL,
+      detail TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+      owner TEXT,
+      due_date TEXT,
+      impact_days INTEGER,
+      activity_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      source_document_id TEXT,
+      source_quote TEXT,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      closed_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS project_items_project_idx ON project_items(org_id, project_key, status, created_at);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

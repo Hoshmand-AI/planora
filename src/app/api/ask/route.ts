@@ -7,9 +7,12 @@ import { randomUUID as uuid } from 'crypto'
 import { groundedAsk } from '@/lib/rag/answer'
 import { projectClassification, projectScope } from '@/lib/rag/scope'
 
+const MAX_QUESTION = 4000
+
 export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
-  const { question, scheduleId, useDocuments, includeUnreviewed } = await req.json()
-  if (!question || !scheduleId) return NextResponse.json({ error: 'Question and scheduleId required' }, { status: 400 })
+  const { question, scheduleId, useDocuments, includeUnreviewed } = await req.json().catch(() => ({}))
+  if (typeof question !== 'string' || !question.trim() || typeof scheduleId !== 'string' || !scheduleId) return NextResponse.json({ error: 'Question and scheduleId required' }, { status: 400 })
+  if (question.length > MAX_QUESTION) return NextResponse.json({ error: `Questions are limited to ${MAX_QUESTION.toLocaleString()} characters. Shorten it and ask again.` }, { status: 400 })
 
   const data = await loadScheduleData(scheduleId, auth.orgId)
   if (!data) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })

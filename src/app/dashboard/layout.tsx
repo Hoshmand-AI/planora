@@ -67,6 +67,7 @@ const NAV = [
 ]
 /** Tabs inside one uploaded project, in the order a scheduler works. */
 export const PROJECT_TABS = [
+  { href: '/dashboard/today',       label: 'Today' },
   { href: '/dashboard/project',     label: 'Overview' },
   { href: '/dashboard/timeline',    label: 'Schedule' },
   { href: '/dashboard/quality',     label: 'Quality' },
@@ -192,7 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   /* ── Data ── */
   const refreshSchedules = useCallback(async () => {
     const res  = await fetch('/api/schedules')
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
     const list: Schedule[] = data.schedules || []
     setSchedules(list)
     if (!selectedSchedule && list.length > 0) {
@@ -208,11 +209,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     metricsFor.current = selectedSchedule?.id ?? null
     if (!selectedSchedule) { setMetrics(null); return }
     const id = selectedSchedule.id
-    const res  = await fetch(`/api/schedules?id=${id}`)
-    const data = await res.json()
-    if (metricsFor.current !== id) return
-    setMetrics(data.metrics ? { ...data.metrics, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
+    // Never show one project's numbers under another project's name while the new ones load.
+    setMetrics(m => (m && m.scheduleId === id ? m : null))
+    try {
+      const res  = await fetch(`/api/schedules?id=${id}`)
+      const data = await res.json()
+      if (metricsFor.current !== id) return
+      setMetrics(data.metrics ? { ...data.metrics, scheduleId: id, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
+    } catch {
+      if (metricsFor.current === id) setMetrics(null)
+    }
   }, [selectedSchedule])
+
+  // Removes the open upload (wrong file, or one that must not be here). The server audits it.
+  const deleteUpload = async () => {
+    const s = selectedSchedule
+    if (!s || !confirm(`Delete "${s.name} (${s.version})"?\n\nThis removes the upload, its activities, the edits made in RunF9 and its analysis for everyone in your organization. It cannot be undone.`)) return
+    const res = await fetch(`/api/schedules?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) { const d = res ? await res.json().catch(() => ({})) : {}; alert(d.error || 'The upload was not deleted. Try again.'); return }
+    setSelectedSchedule(null); setMetrics(null)
+    await refreshSchedules()
+    router.push('/dashboard')
+  }
 
   useEffect(() => { if (user && !mfaSetupRequired) refreshSchedules() }, [user, mfaSetupRequired, refreshSchedules])
   useEffect(() => { if (user && !mfaSetupRequired) fetch('/api/system').then(r => r.json()).then(d => setLlm(d.llm || null)).catch(() => {}) }, [user])
@@ -388,9 +406,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </p>
                     </div>
                     {can('schedule.write') && selectedSchedule.sourceType !== 'generated' && (
-                      <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 py-2 text-[13.5px] font-semibold hover:bg-warm-100">
-                        <Upload size={14} aria-hidden="true" /> Upload update
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 py-2 text-[13.5px] font-semibold hover:bg-warm-100">
+                          <Upload size={14} aria-hidden="true" /> Upload update
+                        </button>
+                        <button type="button" onClick={deleteUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-warm-700 px-3.5 py-2 text-[13px] font-medium hover:bg-warm-100">
+                          Delete this upload
+                        </button>
+                      </div>
                     )}
                   </div>
                 ) : (

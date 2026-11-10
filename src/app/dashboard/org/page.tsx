@@ -73,6 +73,7 @@ export default function OrgPage() {
   const [events, setEvents] = useState<AuditEvent[] | null>(null)
   const [actionFilter, setActionFilter] = useState('')
   const [verify, setVerify] = useState<{ ok: boolean; count: number; brokenAt?: { seq: number; reason: string } } | null>(null)
+  const [verifyErr, setVerifyErr] = useState('')
   const [owner, setOwner] = useState({ userId: '', password: '', code: '', confirm: '' })
   const [sso, setSso] = useState({ enabled: false, issuer: '', clientId: '', clientSecret: '', domains: '', defaultRole: 'viewer', enforce: false })
   const [ssoHelp, setSsoHelp] = useState<{ value: string; hosts: string[] } | null>(null)
@@ -317,10 +318,16 @@ export default function OrgPage() {
               </select>
             )}</Field>
             <Button variant="secondary" disabled={busy === 'verify'} onClick={async () => {
-              setBusy('verify'); const r = await fetch('/api/audit?verify=1'); setVerify(await r.json()); setBusy(null)
+              setBusy('verify'); setVerify(null); setVerifyErr('')
+              try {
+                const r = await fetch('/api/audit?verify=1'); const d = await r.json().catch(() => ({}))
+                if (!r.ok || typeof d.ok !== 'boolean') setVerifyErr(d.error || 'The check could not run. Try again in a moment; this says nothing about the records.')
+                else setVerify(d)
+              } catch { setVerifyErr('The check could not run (network error). This says nothing about the records.') } finally { setBusy(null) }
             }}>{busy === 'verify' ? 'Verifying…' : 'Verify integrity'}</Button>
             <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
           </div>
+          {verifyErr && <div className="mb-3"><Alert tone="warning">{verifyErr}</Alert></div>}
           {verify && (
             <div className="mb-3">{verify.ok
               ? <Alert tone="success"><CheckCircle2 size={14} className="inline mr-1" aria-hidden="true" />Intact: all {verify.count.toLocaleString()} records match their hash chain.</Alert>

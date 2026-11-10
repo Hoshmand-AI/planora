@@ -10,6 +10,7 @@
 //   link_set     — add a relationship, or change the type/lag of an existing one (same pred/succ)
 //   link_remove  — delete a relationship
 //   constraint   — set or clear an activity's primary constraint
+//   progress     — actual start (and actual finish) reported in RunF9 between uploads
 // Pure: no database access, so it is unit tested with the CPM.
 
 import type { Activity, Relationship } from '@/lib/db'
@@ -21,9 +22,11 @@ export type ScheduleEditChange =
   | { kind: 'link_set'; predecessorId: string; successorId: string; type: LinkType; lag: number }
   | { kind: 'link_remove'; predecessorId: string; successorId: string }
   | { kind: 'constraint'; activityId: string; constraint: { type: ConstraintType; date: string } | null }
+  /** Progress reported in RunF9 between uploads: the activity started, or started and finished */
+  | { kind: 'progress'; activityId: string; actualStart: string; actualFinish: string | null }
 
 export type ScheduleEditKind = ScheduleEditChange['kind']
-export const EDIT_KINDS: readonly ScheduleEditKind[] = ['duration', 'link_set', 'link_remove', 'constraint']
+export const EDIT_KINDS: readonly ScheduleEditKind[] = ['duration', 'link_set', 'link_remove', 'constraint', 'progress']
 
 export interface ScheduleEdit {
   id: string
@@ -110,6 +113,17 @@ export function applyScheduleEdits(activities: Activity[], relationships: Relati
       a.constraintDate = c.constraint?.date ?? null
       edited.add(a.id)
       applied.push({ ...e, label, before, after: cstrText(a.constraintType, a.constraintDate), status: 'applied' })
+    } else if (c.kind === 'progress') {
+      const a = byId.get(c.activityId)
+      const label = `${name(c.activityId)}: progress`
+      if (!a || !isWork(a)) { skip(label, 'The activity is no longer in this schedule.'); continue }
+      if (a.status === 'complete' || a.actualFinish) { skip(label, 'The activity is already complete in the uploaded schedule.'); continue }
+      const before = a.actualStart ? `started ${a.actualStart.slice(0, 10)}` : 'not started'
+      a.actualStart = a.actualStart ?? c.actualStart
+      if (c.actualFinish) { a.actualFinish = c.actualFinish; a.status = 'complete'; a.remainingDuration = 0; a.percentComplete = 100 }
+      else a.status = 'in_progress'
+      edited.add(a.id)
+      applied.push({ ...e, label, before, after: c.actualFinish ? `finished ${c.actualFinish}` : `started ${c.actualStart}`, status: 'applied' })
     }
   }
   return { activities: acts, relationships: rels, applied, editedActivityIds: [...edited] }
@@ -190,7 +204,21 @@ export function validateEditChange(raw: unknown, activities: Activity[], relatio
       if (!isoDay(c.date)) return { error: 'Constraint date must be a date (YYYY-MM-DD).' }
       return { change: { kind: 'constraint', activityId: a.id, constraint: { type: type as ConstraintType, date: String(c.date) } } }
     }
-    default: return { error: 'Edit kind must be duration, link_set, link_remove or constraint.' }
+    case 'progress': {
+      const a = work(b.activityId, 'activity')
+      if (typeof a === 'string') return { error: a }
+      if (a.status === 'complete' || a.actualFinish) return { error: `${a.activityId} is already complete.` }
+      const today = new Date().toISOString().slice(0, 10)
+      const start = a.actualStart ? a.actualStart.slice(0, 10) : b.actualStart
+      const finish = b.actualFinish == null || b.actualFinish === '' ? null : b.actualFinish
+      if (!isoDay(start)) return { error: 'Give the actual start date (YYYY-MM-DD).' }
+      if (finish !== null && !isoDay(finish)) return { error: 'The actual finish must be a date (YYYY-MM-DD).' }
+      if (String(start) > today || (finish && String(finish) > today)) return { error: 'Actual dates cannot be in the future.' }
+      if (finish && String(finish) < String(start)) return { error: 'The actual finish cannot be before the actual start.' }
+      if (a.actualStart && !finish) return { error: `${a.activityId} has already started; give its actual finish to complete it.` }
+      return { change: { kind: 'progress', activityId: a.id, actualStart: String(start), actualFinish: finish ? String(finish) : null } }
+    }
+    default: return { error: 'Edit kind must be duration, link_set, link_remove, constraint or progress.' }
   }
 }
 

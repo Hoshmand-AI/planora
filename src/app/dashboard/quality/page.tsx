@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
 import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useApp } from '../layout'
@@ -41,14 +41,20 @@ export default function QualityPage() {
   const [tab, setTab] = useState<QualityTab>('checks')
   const [selected, setSelected] = useState<number | null>(null)
 
+  const loadingFor = useRef<string | null>(null)
   const load = useCallback(async () => {
     if (!selectedSchedule) return
     setLoading(true); setError('')
-    const res = await fetch(`/api/schedules/${selectedSchedule.id}/quality`)
-    const d = await res.json()
-    setLoading(false)
-    if (!res.ok) { setError(d.error || 'Could not analyze schedule.'); return }
-    setData(d)
+    const id = selectedSchedule.id
+    loadingFor.current = id
+    try {
+      const res = await fetch(`/api/schedules/${id}/quality`)
+      const d = await res.json().catch(() => ({}))
+      if (loadingFor.current !== id) return
+      setLoading(false)
+      if (!res.ok) { setError(d.error || 'Could not analyze schedule.'); return }
+      setData(d)
+    } catch { if (loadingFor.current === id) { setLoading(false); setError('Network error. Check your connection and try again.') } }
   }, [selectedSchedule])
   useEffect(() => { load() }, [load])
 
@@ -56,11 +62,13 @@ export default function QualityPage() {
     const note = response === 'intentional' ? prompt('Optional note (e.g. "weekend pour approved by owner"):') ?? '' : ''
     const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: q.id, response, note }) })
     if (res.ok) setData(d => d && ({ ...d, dataQuestions: d.dataQuestions.map(x => x.id === q.id ? { ...x, response: { response, note } } : x) }))
+    else setError((await res.json().catch(() => ({}))).error || 'Your answer was not saved.')
   }
 
   const decide = async (id: number, response: 'intentional' | 'will_fix', note: string) => {
     const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: `dcma:${id}`, response, note }) })
     if (res.ok) setData(d => d && ({ ...d, guidance: d.guidance.map(g => g.id === id ? { ...g, decision: { response, note } } : g) }))
+    else setError((await res.json().catch(() => ({}))).error || 'Your decision was not saved.')
   }
   // Reviewer dispositions (reviewer / admin / owner): per finding or question, and for the submission.
   const postReview = async (body: Record<string, unknown>): Promise<string | null> => {
@@ -120,6 +128,7 @@ export default function QualityPage() {
   return (
     <div id="quality-panel-checks" className="px-4 md:px-6 pb-8">
       <div className="pt-4"><QualityTabs tab={tab} onChange={setTab} /></div>
+      {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
 
       <div className="max-w-5xl space-y-6 mt-5">
         {/* The score, then the few things to fix first */}

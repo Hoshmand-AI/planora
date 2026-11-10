@@ -4,8 +4,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
 import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
-import { fmtDate } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
 import { axisTicks } from '@/lib/timeline-axis'
+
+interface Impact { windowDays: number; changed: { id: string; code: string; name: string; what: string; before: string; after: string }[]; moved: { id: string; finishDays: number; startDays: number }[]; movedCount: number; finishMovedDays: number | null }
 
 interface ActivityData {
   id: string; name: string; activityId: string; duration: number; remainingDuration: number
@@ -65,6 +67,23 @@ export default function TimelinePage() {
     return () => { live = false }
   }, [selectedSchedule])
 
+  // Recent changes made in RunF9 and what they moved: highlighted for 7 days so they are easy to follow.
+  const [impact, setImpact] = useState<Impact | null>(null)
+  const [onlyChanged, setOnlyChanged] = useState(false)
+  useEffect(() => {
+    setImpact(null); setOnlyChanged(false)
+    if (!selectedSchedule) return
+    let live = true
+    fetch(`/api/schedules/${selectedSchedule.id}/changes`).then(r => (r.ok ? r.json() : null)).then(d => { if (live) setImpact(d) }).catch(() => {})
+    return () => { live = false }
+  }, [selectedSchedule])
+  const marks = useMemo(() => {
+    const m = new Map<string, { changed?: boolean; days?: number }>()
+    for (const c of impact?.changed ?? []) m.set(c.id, { changed: true })
+    for (const x of impact?.moved ?? []) m.set(x.id, { ...m.get(x.id), days: x.finishDays || x.startDays })
+    return m
+  }, [impact])
+
   const work = useMemo(() => (activities ?? []).filter(a => a.activityType === 'task' || a.activityType === 'milestone'), [activities])
 
   // Timeline span across every dated activity, so filtering doesn't rescale the bars.
@@ -84,6 +103,7 @@ export default function TimelinePage() {
     const byWbs = new Map<string, ActivityData[]>()
     for (const a of work) {
       if (!test(a)) continue
+      if (onlyChanged && !marks.has(a.id)) continue
       if (q && !a.name.toLowerCase().includes(q) && !a.activityId.toLowerCase().includes(q)) continue
       const k = a.wbs?.trim() || 'General activities'
       if (!byWbs.has(k)) byWbs.set(k, [])
@@ -102,7 +122,7 @@ export default function TimelinePage() {
         critical: acts.filter(a => a.isCritical && progressOf(a) !== 'complete').length,
       }
     }).sort((x, y) => (x.start || '9').localeCompare(y.start || '9'))
-  }, [work, filter, query])
+  }, [work, filter, query, onlyChanged, marks])
 
   if (!selectedSchedule) {
     return (
@@ -112,7 +132,7 @@ export default function TimelinePage() {
     )
   }
 
-  const filtering = filter !== 'all' || !!query.trim()
+  const filtering = filter !== 'all' || !!query.trim() || onlyChanged
   // Phases start open when filtering (to show the matches) or when the schedule is small; large ones start as a phase summary.
   const isOpen = (name: string) => open[name] ?? (filtering || work.length <= PAGE)
   const pos = (iso: string) => span ? ((t(iso) - span.lo) / span.range) * 100 : 0
@@ -131,6 +151,16 @@ export default function TimelinePage() {
 
   return (
     <div className="px-4 md:px-6 py-5 md:py-6">
+      {impact && impact.changed.length > 0 && (
+        <div role="status" className="mb-4 rounded-[14px] border border-accent-500 bg-accent-100 px-4 py-3 text-[13.5px] text-warm-700">
+          <p><strong className="text-navy-950">{impact.changed.length} {impact.changed.length === 1 ? 'activity was' : 'activities were'} changed in RunF9 in the last {impact.windowDays} days.</strong>{' '}
+            {impact.movedCount > 0 ? `${impact.movedCount} open ${impact.movedCount === 1 ? 'activity moves' : 'activities move'} because of it` : 'No other activity moves because of it'}
+            {impact.finishMovedDays ? `, and the finish is ${Math.abs(impact.finishMovedDays)} day${Math.abs(impact.finishMovedDays) === 1 ? '' : 's'} ${impact.finishMovedDays > 0 ? 'later' : 'earlier'}` : impact.finishMovedDays === 0 ? ', and the finish does not move' : ''}.
+            {' '}They are marked below until the changes are {impact.windowDays} days old. The bars show the schedule as submitted; a mark such as +5d is the move with the edits.</p>
+          <ul className="mt-1.5 space-y-0.5 text-[12.5px]">{impact.changed.slice(0, 4).map(c => <li key={c.id}>{fmtDates(c.what)}: {fmtDates(c.before)} → {fmtDates(c.after)}</li>)}</ul>
+          <button type="button" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(v => !v)} className="mt-2 pressable rounded-full border border-navy-900 bg-white px-3 py-1 text-[12.5px] font-semibold text-navy-950">{onlyChanged ? 'Show all activities' : 'Show only changed and moved'}</button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
           {FILTERS.map(f => (
@@ -208,7 +238,7 @@ export default function TimelinePage() {
                     </button>
                     {expanded && (
                       <div className="rise-in">
-                        {rows.map(a => <ActivityRow key={a.id} a={a} pos={pos} span={span} active={selected === a.id} onSelect={() => setSelected(selected === a.id ? null : a.id)} />)}
+                        {rows.map(a => <ActivityRow key={a.id} a={a} mark={marks.get(a.id)} pos={pos} span={span} active={selected === a.id} onSelect={() => setSelected(selected === a.id ? null : a.id)} />)}
                         {g.acts.length > rows.length && (
                           <button type="button" onClick={() => setFull(f => ({ ...f, [g.name]: true }))} className="w-full px-4 py-2 text-left text-[13px] font-semibold text-accent-600 hover:underline">
                             Show all {g.acts.length}
@@ -239,8 +269,8 @@ export default function TimelinePage() {
   )
 }
 
-function ActivityRow({ a, pos, span, active, onSelect }: {
-  a: ActivityData; pos: (iso: string) => number; span: { range: number } | null; active: boolean; onSelect: () => void
+function ActivityRow({ a, mark, pos, span, active, onSelect }: {
+  a: ActivityData; mark?: { changed?: boolean; days?: number }; pos: (iso: string) => number; span: { range: number } | null; active: boolean; onSelect: () => void
 }) {
   const s = startOf(a), f = finishOf(a)
   const prog = progressOf(a)
@@ -252,7 +282,7 @@ function ActivityRow({ a, pos, span, active, onSelect }: {
     <button type="button" onClick={onSelect} aria-pressed={active}
       className={`group w-full flex items-center h-[42px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
       <div className={`sticky left-0 z-10 self-stretch flex flex-col justify-center transition-colors w-[200px] md:w-[260px] flex-shrink-0 pl-10 pr-3 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
-        <span className="block truncate text-[13px] text-navy-950">{a.name}</span>
+        <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[10px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
         <span className="block text-[11px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? ` · float ${a.totalFloat}d` : ''}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>

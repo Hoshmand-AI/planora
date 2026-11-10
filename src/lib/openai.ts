@@ -1,5 +1,5 @@
 import { Activity, Relationship, Schedule } from '@/lib/db'
-import { chat, llmStatus, AiRefusalError } from '@/lib/llm/provider'
+import { chat, llmStatus, AiRefusalError, AiQuotaError, RestrictedDataError } from '@/lib/llm/provider'
 import { log } from '@/lib/server/log'
 import { runDcma, type DcmaRules } from '@/lib/analysis/dcma'
 import { analyzableFromDb } from '@/lib/planning/service'
@@ -145,7 +145,8 @@ export async function askScheduleQuestion(
   } catch (error: unknown) {
     const err = error as Error
     // A refusal is not an answer: say so plainly and give the schedule facts instead.
-    if (error instanceof AiRefusalError) return `${err.message}\n\n` + prompt.offline()
+    // So is a deliberate block (CUI / classified content is never sent to a cloud model) or a used-up daily limit: not an outage.
+    if (error instanceof AiRefusalError || error instanceof RestrictedDataError || error instanceof AiQuotaError) return `${err.message}\n\n` + prompt.offline()
     log('warn', 'model call failed', { purpose: 'ask_ai', error: err.message })
     return `AI analysis temporarily unavailable (${err.message}). Schedule facts:\n\n` + prompt.offline()
   }
