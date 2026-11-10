@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { emailToText, transcriptToText } from './correspondence-files'
+import { emailSubject, emailToText, transcriptToText } from './correspondence-files'
 import { extractDocument } from './extract'
 import { extractSignals } from '@/lib/analysis/correspondence'
 
@@ -47,5 +47,13 @@ describe('saved emails and meeting transcripts', () => {
     expect(format).toBe('txt')
     const s = extractSignals([{ documentId: 'd', title: 'Email', docType: 'email', citation: '', text: pages[0].text }], [{ id: 'a', code: 'P1030', name: 'Procure Medium-Voltage Switchgear', open: true }])
     expect(s[0]).toMatchObject({ kind: 'delay', days: 15, activity: { code: 'P1030' } })
+  })
+})
+
+describe('emailSubject', () => {
+  it('reads and decodes the subject, folded lines included', () => {
+    expect(emailSubject('From: a@b.c\r\nSubject: =?UTF-8?B?RDE0MCBzd2l0Y2hnZWFy?=\r\n\r\nBody')).toBe('D140 switchgear')
+    expect(emailSubject('Subject: Level 3\r\n startup delay\r\nFrom: a@b.c\r\n\r\nBody')).toBe('Level 3 startup delay')
+    expect(emailSubject('From: a@b.c\r\n\r\nSubject: not a header')).toBe('')
   })
 })

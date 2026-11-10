@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
+import { askText } from '@/components/AskText'
 import { fmtDate, fmtDay } from '@/lib/format'
 import { formatMb, tooLargeMessage } from '@/lib/upload-limit'
 
@@ -89,6 +90,7 @@ export default function DocumentsPage() {
       <div aria-live="polite">{notice && <Alert tone={notice.tone}>{notice.text}</Alert>}</div>
 
       {can('schedule.write') && data && <UploadForm base={base} data={data} canOrg={can('org.manage')} onDone={(n) => { setNotice(n); load() }} />}
+      {can('schedule.write') && data && <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />}
 
       <Section title="Documents" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
@@ -323,6 +325,84 @@ function Requirements({ base, items, canDecide, onChange, onError }: { base: str
           </li>
         ))}
       </ul>
+    </Section>
+  )
+}
+
+interface Inbox { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; received: number; revokedAt: string | null }
+
+/** The project's inbox: where a mail rule or a meeting recorder sends emails and transcripts on its own. */
+function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => void }) {
+  const [data, setData] = useState<{ inboxes: Inbox[]; address: string; available: boolean } | null>(null)
+  const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState('')
+  const load = useCallback(async () => {
+    const r = await fetch(`${base}/inbox`)
+    if (r.ok) setData(await r.json())
+  }, [base])
+  useEffect(() => { setData(null); setFresh(null); setError(''); load() }, [load])
+
+  const create = async () => {
+    const name = await askText({ title: 'New project inbox', label: 'What will send to it?', placeholder: 'e.g. Project mailbox, Weekly OAC meeting recorder', required: true, confirmLabel: 'Create' })
+    if (!name) return
+    setBusy(true); setError('')
+    const r = await postJson(`${base}/inbox`, { name })
+    setBusy(false)
+    if (!r.ok) { setError(r.data.error || 'The inbox was not created.'); return }
+    setFresh({ name, token: String(r.data.token) })
+    load()
+  }
+  const turnOff = async (i: Inbox) => {
+    if (!window.confirm(`Turn off "${i.name}"? Whatever sends to it will be refused from now on.`)) return
+    const r = await fetch(`${base}/inbox?${new URLSearchParams({ inboxId: i.id })}`, { method: 'DELETE' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) setError(d.error || 'The inbox was not turned off.')
+    else { setData(x => x && { ...x, inboxes: d.inboxes }); if (fresh?.name === i.name) setFresh(null) }
+  }
+  const copy = async (what: string, text: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(what); setTimeout(() => setCopied(''), 2000) } catch { setError('Copy is not available in this browser. Select the text and copy it.') }
+  }
+  if (!data) return null
+  const active = data.inboxes.filter(i => !i.revokedAt)
+  const example = fresh ? `curl -X POST ${data.address} \\
+  -H "Authorization: Bearer ${fresh.token}" \\
+  -H "Content-Type: message/rfc822" \\
+  --data-binary @message.eml` : ''
+  return (
+    <Section title="Project inbox" description="Connect the project mailbox and the meeting recorder once. Each email, transcript or daily report they send lands here as a project document, and the Today tab reads it for delays, changes, risks and commitments the same morning.">
+      {!data.available ? <p className="text-[13px] text-warm-700">CUI and classified projects have no inbox. Add their documents by hand.</p> : (
+        <div className="space-y-3">
+          {error && <Alert tone="error">{error}</Alert>}
+          {fresh && (
+            <div className="border border-accent-600/40 bg-white rounded-md p-3 space-y-2" role="status">
+              <p className="text-[13px] font-semibold text-navy-950">“{fresh.name}” is ready. Copy the token now: it is shown only once.</p>
+              <div className="grid gap-2 text-[12.5px]">
+                <div><span className="text-warm-700">Send to (POST): </span><code className="font-mono text-navy-950 break-all">{data.address}</code> <button type="button" onClick={() => copy('address', data.address)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'address' ? 'Copied' : 'Copy'}</button></div>
+                <div><span className="text-warm-700">Token (Authorization: Bearer): </span><code className="font-mono text-navy-950 break-all">{fresh.token}</code> <button type="button" onClick={() => copy('token', fresh.token)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'token' ? 'Copied' : 'Copy'}</button></div>
+              </div>
+              <pre className="bg-warm-100 rounded p-2 text-[11.5px] text-navy-950 overflow-x-auto"><code>{example}</code></pre>
+              <p className="text-[12px] text-warm-700">In Microsoft Power Automate, Zapier or n8n: on a new email in the project mailbox (or a finished meeting transcript), add an HTTP step that posts to the address with this token. Accepted: a raw email (message/rfc822), a transcript (text/vtt), plain text, or JSON with type, title and text.</p>
+              <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-[12.5px] font-medium text-accent-600 hover:underline">I have copied it</button>
+            </div>
+          )}
+          {active.length > 0 && (
+            <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md bg-white">
+              {active.map(i => (
+                <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
+                  <div>
+                    <span className="font-medium text-navy-950">{i.name}</span>
+                    <span className="text-warm-600"> · token {i.prefix}… · {i.received} received{i.lastUsedAt ? `, last ${fmtDay(i.lastUsedAt)}` : ''} · created {fmtDate(i.createdAt)}</span>
+                  </div>
+                  <button type="button" onClick={() => turnOff(i)} className="text-[12.5px] font-medium text-status-at-risk hover:underline">Turn off</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button type="button" onClick={create} disabled={busy}>{busy ? 'Creating…' : active.length ? 'Add another inbox' : 'Create the project inbox'}</Button>
+        </div>
+      )}
     </Section>
   )
 }

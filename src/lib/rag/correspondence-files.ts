@@ -57,6 +57,12 @@ export function emailToText(raw: string): string {
   return [...top, '', text].join('\n')
 }
 
+/** The Subject line of a saved email, decoded; '' when it has none. */
+export function emailSubject(raw: string): string {
+  const { headers } = splitHeaders(raw)
+  return decodeWords(headers.get('subject') || '').replace(/\s+/g, ' ').trim()
+}
+
 /** A WebVTT or SubRip transcript as "Speaker: what they said" lines, without cue numbers and timestamps. */
 export function transcriptToText(raw: string): string {
   const out: string[] = []

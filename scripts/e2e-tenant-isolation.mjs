@@ -384,6 +384,8 @@ async function main() {
   await b('unsubscribe from the daily brief', i => ['DELETE', `/api/schedules/${i.SA2}/brief`])
   await b('recent changes', i => ['GET', `/api/schedules/${i.SA2}/changes`])
   await b('read register', i => ['GET', `/api/schedules/${i.SA2}/register`])
+  await b('read project inboxes', i => ['GET', `/api/schedules/${i.SA2}/inbox`])
+  await b('create project inbox', i => ['POST', `/api/schedules/${i.SA2}/inbox`, { name: 'cross-tenant inbox' }])
   await b('add register item', i => ['POST', `/api/schedules/${i.SA2}/register`, { kind: 'risk', title: 'cross-tenant risk' }])
   await b('close register item', i => ['PATCH', `/api/schedules/${i.SA2}/register?itemId=${i.RA}`, { status: 'closed' }])
   await b('delete register item', i => ['DELETE', `/api/schedules/${i.SA2}/register?itemId=${i.RA}`])
