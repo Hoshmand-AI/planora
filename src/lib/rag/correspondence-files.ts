@@ -63,7 +63,7 @@ export function transcriptToText(raw: string): string {
   let last = ''
   for (const line of raw.replace(/\r/g, '').split('\n')) {
     const t = line.trim()
-    if (!t || /^WEBVTT/i.test(t) || /^NOTE\b/.test(t) || /^\d+$/.test(t) || /-->/.test(t) || /^[0-9a-f-]{8,}(\/\d+-\d+)?$/i.test(t)) continue
+    if (!t || /^WEBVTT/i.test(t) || /^NOTE\b/.test(t) || /^\d+$/.test(t) || t.includes('-->') /* a cue's timing line */ || /^[0-9a-f-]{8,}(\/\d+-\d+)?$/i.test(t)) continue
     const voice = /^<v\s+([^>]+)>/.exec(t)?.[1]
     // Cue tags (<v Name>, <c>, <i>) are dropped until none is left; a transcript is stored and shown as text.
     let said = t
