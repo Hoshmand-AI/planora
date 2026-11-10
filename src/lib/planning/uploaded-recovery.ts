@@ -113,8 +113,10 @@ export function overlapSplit(projectType?: string | null): { by: string; unit: s
 function finishOf(done: ReturnType<typeof completeSchedule>, id: string): string | null {
   const a = done.activities.find(x => x.id === id)
   if (a?.actualFinish) return a.actualFinish.slice(0, 10)
-  const v = done.cpm?.violations.find(x => x.id === id)
-  return v?.logicDate ?? done.cpm?.times[id]?.earlyFinish ?? null
+  // The later of the date shown and the date logic gives (a mandatory constraint upstream can overrule logic), as the dashboard measures it.
+  const early = done.cpm?.times[id]?.earlyFinish ?? null
+  const logic = done.cpm?.logicTimes?.[id]?.earlyFinish ?? done.cpm?.violations.find(x => x.id === id)?.logicDate ?? null
+  return logic && early ? (logic > early ? logic : early) : logic ?? early
 }
 
 /** Recalculate the network with these changes applied (nothing is stored); `measureId` = the contract milestone. */
@@ -129,8 +131,9 @@ export function evaluateNetwork(net: NetworkInput, changes: ScheduleEditChange[]
   if (!done.cpm) return { finish: done.projectFinish, measured: done.projectFinish, minFloat: null, longestPath: [], earlyFinish: {} }
   const open = done.activities.filter(a => a.activityType !== 'summary' && a.activityType !== 'loe' && a.status !== 'complete' && !a.actualFinish && done.cpm!.times[a.id])
   const minFloat = open.length ? Math.min(...open.map(a => done.cpm!.times[a.id].totalFloat)) : null
-  const measured = measureId ? finishOf(done, measureId) ?? done.cpm.logicFinish : done.cpm.logicFinish
-  return { finish: done.cpm.logicFinish, measured, minFloat, longestPath: done.cpm.longestPath, earlyFinish: Object.fromEntries(Object.entries(done.cpm.times).map(([id, t]) => [id, t.earlyFinish])) }
+  const finish = done.projectFinish ?? done.cpm.logicFinish
+  const measured = measureId ? finishOf(done, measureId) ?? finish : finish
+  return { finish, measured, minFloat, longestPath: done.cpm.longestPath, earlyFinish: Object.fromEntries(Object.entries(done.cpm.times).map(([id, t]) => [id, t.earlyFinish])) }
 }
 
 /** Walk back from `to` through the logic: at each step the open predecessor that finishes latest. */
@@ -140,7 +143,7 @@ function chainTo(net: NetworkInput, to: string, earlyFinish: Record<string, stri
   const chain: string[] = []
   const seen = new Set<string>()
   let cur: string | undefined = to
-  while (cur && !seen.has(cur) && chain.length < 500) {
+  while (cur && !seen.has(cur) && chain.length < 20000) {
     seen.add(cur); chain.unshift(cur)
     const ps: string[] = (preds.get(cur) || []).filter(id => earlyFinish[id] && byId.get(id) && byId.get(id)!.status !== 'complete')
     cur = ps.sort((a, b) => (earlyFinish[b] || '').localeCompare(earlyFinish[a] || ''))[0]
@@ -162,8 +165,13 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
   // longest path. The longest path stops at a date-pinned activity (e.g. a finish milestone held by a
   // Finish On constraint); then follow the logic back from that activity.
   let path: Activity[]
-  if (target) path = chainTo(net, target.id, base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
-  else {
+  // The engine's own longest path up to the milestone when the milestone is on it (it accounts for relationship
+  // types and lags); otherwise walk back from the milestone.
+  const at = target ? base.longestPath.indexOf(target.id) : -1
+  if (target) {
+    path = at >= 0 ? base.longestPath.slice(0, at + 1).map(id => byId.get(id)).filter(openTask) : []
+    if (!path.length) path = chainTo(net, target.id, base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
+  } else {
     path = base.longestPath.map(id => byId.get(id)).filter(openTask)
     if (!path.length) path = chainTo(net, base.longestPath[base.longestPath.length - 1], base.earlyFinish, byId).map(id => byId.get(id)).filter(openTask)
   }

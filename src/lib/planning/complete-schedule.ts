@@ -97,6 +97,15 @@ export function completeSchedule(input: {
   const fileValues = fileHadResults
     ? new Map<string, FileValues>(work.map(a => [a.id, { earlyStart: a.earlyStart, earlyFinish: a.earlyFinish, lateStart: a.lateStart, lateFinish: a.lateFinish, totalFloat: Number.isFinite(a.totalFloat) ? a.totalFloat : null }]))
     : null
+  // Work the file marks complete but gives no actual finish (a spreadsheet with only "100%") is done, not waiting:
+  // it takes the file's own finish when that is before the data date, else the day before the data date.
+  const dayBefore = (iso: string) => new Date(Date.parse(iso.slice(0, 10) + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+  const assumedFinish = (a: Activity): string | null => {
+    const dd = input.dataDate ? input.dataDate.slice(0, 10) : null
+    const own = (a.earlyFinish ?? a.baselineFinish ?? null)?.slice(0, 10) ?? null
+    if (!dd) return own
+    return own && own < dd ? own : dayBefore(dd)
+  }
   const cpmActs: CpmActivity[] = work.map(a => ({
     id: a.id, code: a.activityId, name: a.name,
     duration: a.activityType === 'milestone' ? 0 : Math.max(0, Math.round(a.duration)),
@@ -105,7 +114,7 @@ export function completeSchedule(input: {
     milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
     calendarId: a.calendarId || input.defaultCalendarId || cals[0].id,
     constraint: a.constraintType && CSTR.has(a.constraintType) && a.constraintDate ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : undefined,
-    actualStart: a.actualStart, actualFinish: a.actualFinish,
+    actualStart: a.actualStart ?? (a.status === 'complete' && !a.actualFinish ? assumedFinish(a) : a.actualStart), actualFinish: a.actualFinish ?? (a.status === 'complete' ? assumedFinish(a) : a.actualFinish),
   }))
   let res: CpmResult
   try {
@@ -136,5 +145,7 @@ export function completeSchedule(input: {
     ? `RunF9 recalculated all ${filled} activities from their durations, logic, calendars and constraints (${mode}) instead of using the dates and float stored in the file; differences from the file are listed in the analysis.`
     : `The file did not include calculated dates or float, so RunF9 scheduled ${filled} activities from their durations, logic and calendars (${mode}; critical path and float are RunF9's calculation).`
       + (undated ? ` It has no project start, data date or activity dates either, so the network was scheduled from ${fmtDate(projectStart)}, the day it was first calculated: the durations, logic and float are the file's, the calendar dates are not.` : '')
-  return { activities, projectStart, projectFinish: res.logicFinish, hasLogic, cpm: res, fileValues, note }
+  // The later of what logic gives and what the dates show: a mandatory constraint can hold work later than logic,
+  // and the finish is never earlier than the last activity on screen.
+  return { activities, projectStart, projectFinish: res.logicFinish > res.projectFinish ? res.logicFinish : res.projectFinish, hasLogic, cpm: res, fileValues, note }
 }

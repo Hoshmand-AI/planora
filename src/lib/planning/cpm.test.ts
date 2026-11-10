@@ -481,3 +481,57 @@ describe('runCpm: round-3 mandatory-constraint handling', () => {
     expect(r.drivingTrace).toEqual({ basis: 'scheduled', path: ['A', 'B', 'C'], constraints: [{ id: 'B', type: 'MSO', date: '2026-03-16', effect: 'later' }] })
   })
 })
+
+describe('runCpm: review fixes', () => {
+  it('a task with no duration takes no time (its successor is not pushed a day)', () => {
+    const r = runCpm(input([act('A', 5), act('Z', 0, { type: 'task' }), act('B', 5)], [fs('A', 'Z'), fs('Z', 'B')]))
+    expect(r.times.B).toMatchObject({ earlyStart: '2026-03-09', earlyFinish: '2026-03-13' })
+    expect(r.projectFinish).toBe('2026-03-13')
+  })
+
+  it('started work with nothing remaining waits for its unfinished predecessor, and gives that predecessor no negative float', () => {
+    // Data date 03/09. P (10d) is open; S started out of sequence and has 0 remaining; T follows S.
+    const r = runCpm(input([
+      act('P', 10), act('S', 5, { actualStart: '2026-03-02', remaining: 0 }), act('T', 5),
+    ], [fs('P', 'S'), fs('S', 'T')], { dataDate: '2026-03-09', progressMode: 'retained' }))
+    expect(r.times.P.totalFloat).toBeGreaterThanOrEqual(0)
+    expect(r.times.T.earlyStart > r.times.P.earlyFinish).toBe(true)
+  })
+})
+
+describe('runCpm: a finish milestone driven from the start of a day', () => {
+  const ms = (id: string, kind: 'start' | 'finish', extra: Partial<CpmActivity> = {}): CpmActivity => ({ id, code: id, name: id, duration: 0, type: 'milestone', milestoneKind: kind, ...extra })
+
+  it('shows the day its start milestone falls on, mid-week as on a Monday, and its late date agrees', () => {
+    for (const day of ['2026-03-04', '2026-03-09']) { // a Wednesday and a Monday
+      const r = runCpm(input([ms('NTP', 'start', { constraint: { type: 'SNET', date: day } }), ms('M', 'finish')], [fs('NTP', 'M')]))
+      expect(r.times.M, day).toMatchObject({ earlyStart: day, earlyFinish: day, lateFinish: day, totalFloat: 0 })
+      expect(r.projectFinish, day).toBe(day)
+    }
+  })
+
+  it('shows the day a task starts when tied to it start-to-start', () => {
+    const r = runCpm(input([act('P', 5, { constraint: { type: 'SNET', date: '2026-03-04' } }), ms('M', 'finish')], [{ from: 'P', to: 'M', type: 'SS', lag: 0 }]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-04')
+    expect(r.times.M.lateFinish >= r.times.M.earlyFinish).toBe(true)
+    expect(r.times.M.lateFinish <= r.projectFinish).toBe(true)
+  })
+
+  it('a finish milestone after a task still shows the task\'s last day', () => {
+    const r = runCpm(input([act('A', 5), ms('M', 'finish'), act('B', 3)], [fs('A', 'M'), fs('M', 'B')]))
+    expect(r.times.M.earlyFinish).toBe('2026-03-06')
+    expect(r.times.B.earlyStart).toBe('2026-03-09')
+  })
+})
+
+describe('runCpm: start-to-finish across a weekend', () => {
+  const sf = (from: string, to: string, lag = 0): CpmLink => ({ from, to, type: 'SF', lag })
+  it('the successor finishes on the Friday when its predecessor starts on the Monday', () => {
+    const r = runCpm(input([act('P', 5, { constraint: { type: 'SNET', date: '2026-03-09' } }), act('S', 3)], [sf('P', 'S')]))
+    expect(r.times.S.earlyFinish).toBe('2026-03-06')
+  })
+  it('mid-week it finishes the day before, as it did', () => {
+    const r = runCpm(input([act('P', 5, { constraint: { type: 'SNET', date: '2026-03-11' } }), act('S', 3)], [sf('P', 'S')]))
+    expect(r.times.S.earlyFinish).toBe('2026-03-10')
+  })
+})
