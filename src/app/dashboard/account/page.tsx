@@ -47,6 +47,7 @@ function AccountPage() {
   const [data, setData] = useState<AccountData | null>(null)
   const [msg, setMsg] = useState<{ tone: 'error' | 'success'; text: string; section: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   const [name, setName] = useState('')
   const [pw, setPw] = useState({ current: '', next: '', code: '' })
@@ -57,9 +58,12 @@ function AccountPage() {
   const [del, setDel] = useState({ password: '', code: '', confirm: '' })
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/account')
-    if (res.status === 401) { router.push('/auth'); return }
-    const d = await res.json()
+    const res = await fetch('/api/account').catch(() => null)
+    if (res?.status === 401) { router.push('/auth'); return }
+    // An error response is not account data: keep what is on screen, or say the page could not load.
+    const d = res?.ok ? await res.json().catch(() => null) : null
+    if (!d?.user || !d.mfa) { setLoadError(true); return }
+    setLoadError(false)
     setData(d); setName(d.user?.name ?? '')
   }, [router])
   useEffect(() => { load() }, [load])
@@ -74,6 +78,12 @@ function AccountPage() {
   }
   const note = (section: string) => msg?.section === section ? <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div> : null
 
+  if (!data && loadError) return (
+    <div className="px-4 md:px-6 py-12 max-w-3xl">
+      <Alert tone="error">Your account could not be loaded. Check your connection and try again.</Alert>
+      <div className="mt-3"><Button variant="secondary" onClick={() => { setLoadError(false); load() }}>Try again</Button></div>
+    </div>
+  )
   if (!data) return <div className="flex items-center justify-center py-24 text-warm-400"><Loader2 className="animate-spin" size={20} aria-label="Loading" /></div>
 
   const mfaNeeded = data.mfa.required && !data.mfa.enabled

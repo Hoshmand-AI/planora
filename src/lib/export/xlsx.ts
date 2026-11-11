@@ -8,7 +8,7 @@ import ExcelJS from 'exceljs'
 import type { ConstraintType, GeneratedSchedule } from '@/lib/planning/types'
 import { buildWbs, type WbsRow } from './wbs'
 import { fmtDate } from '@/lib/format'
-import { markingRows, type ExportMarking } from './markings'
+import { markFilledSheet, markingRows, type ExportMarking } from './markings'
 
 /**
  * CUI marking: the banner and designation as the first rows of a sheet (call before adding content)
@@ -146,7 +146,7 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
   ;[3, 8].forEach(r => { readme.getRow(readmeOff + r).font = { bold: true } })
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 4, visibility: 'visible' }]
   // Provenance last, so the import sheets keep their positions.
-  if (prov) addProvenance(wb, prov, `${projectName} — import workbook`)
+  if (prov) markFilledSheet(addProvenance(wb, prov, `${projectName} — import workbook`), mk)
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
@@ -298,7 +298,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
     const src = prov.sources[0]
     ws.getCell(off + 3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src ? sourceSha(src) : 'not recorded'} · RunF9 ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} · Basis: ${src ? sourceBasis(src) : 'as submitted'} — see the Provenance sheet`
     ws.getCell(off + 3, 1).font = { size: 9, color: { argb: 'FF6B6359' } }
-    addProvenance(wb, prov, `${projectName} — P6 layout`)
+    markFilledSheet(addProvenance(wb, prov, `${projectName} — P6 layout`), opts.marking)
   }
 
   return Buffer.from(await wb.xlsx.writeBuffer())

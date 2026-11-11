@@ -39,9 +39,8 @@ const FORMAT_LABEL: Record<ExportExceptionFormat, string> = {
 
 /** The working periods the P6 XER export writes for a calendar (see clndrData in ./xer). */
 function xerWorkTimes(c: WorkCalendar): string {
-  const h = c.hoursPerDay
-  const hhmm = (x: number) => `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x - Math.floor(x)) * 60)).padStart(2, '0')}`
-  return h > 6 ? `08:00-12:00,13:00-${hhmm(9 + h)}` : `08:00-${hhmm(8 + h)}`
+  const hhmm = (x: number) => (x >= 24 ? '00:00' : `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x - Math.floor(x)) * 60)).padStart(2, '0')}`)
+  return xerWorkPeriods(c.hoursPerDay).map(([from, to]) => `${hhmm(from)}-${hhmm(to)}`).join(',')
 }
 
 const isRunF9Rationale = (a: PlanActivity) => !!a.rationale?.summary && !a.rationale.summary.startsWith('From the uploaded file')

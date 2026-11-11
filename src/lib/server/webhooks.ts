@@ -13,6 +13,10 @@
 
 import { createHmac, randomUUID } from 'crypto'
 import { lookup } from 'dns/promises'
+import { lookup as dnsLookup } from 'dns'
+import { request as httpRequest } from 'http'
+import { request as httpsRequest } from 'https'
+import type { LookupFunction } from 'net'
 import { isIP } from 'net'
 import { after } from 'next/server'
 import { initSchema, query } from '@/lib/db'
@@ -128,11 +132,50 @@ export function sign(secret: string, body: string, t = Math.floor(Date.now() / 1
   return `t=${t},v1=${createHmac('sha256', secret).update(`${t}.${body}`).digest('hex')}`
 }
 
+/**
+ * The DNS lookup for the delivery connection itself: an answer that is a private or internal address
+ * is refused at connect time. urlProblem() resolves the host first, but a host name whose answer
+ * changes between that check and the connection would otherwise still be reached.
+ */
+export const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, options, (err, address, family) => {
+    if (!err) {
+      const list = Array.isArray(address) ? address.map(a => a.address) : [address]
+      if (!list.length || list.some(isPrivateAddress)) {
+        callback(Object.assign(new Error('The host resolves to a private or internal address.'), { code: 'EPRIVATE' }), address as never, family)
+        return
+      }
+    }
+    callback(err, address as never, family)
+  })
+}
+
+/** One POST with the given DNS lookup. Redirects are not followed; only the status is read. */
+export function postWithLookup(url: string, body: string, headers: Record<string, string>, lookupFn: LookupFunction, timeoutMs = TIMEOUT_MS): Promise<{ ok: boolean; status: string }> {
+  return new Promise(resolve => {
+    let done = false
+    const finish = (r: { ok: boolean; status: string }) => { if (!done) { done = true; clearTimeout(timer); resolve(r) } }
+    let u: URL
+    try { u = new URL(url) } catch { resolve({ ok: false, status: 'network error' }); return }
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method: 'POST', lookup: lookupFn, headers: { ...headers, 'content-length': String(Buffer.byteLength(body)) } }, res => {
+      const code = res.statusCode ?? 0
+      res.destroy()
+      finish({ ok: code >= 200 && code < 300, status: String(code) })
+    })
+    const timer = setTimeout(() => { finish({ ok: false, status: 'timeout' }); req.destroy() }, timeoutMs)
+    req.on('error', () => finish({ ok: false, status: 'network error' }))
+    req.end(body)
+  })
+}
+
 async function post(url: string, body: string, headers: Record<string, string>): Promise<{ ok: boolean; status: string }> {
   const problem = await urlProblem(url)
   if (problem) return { ok: false, status: `blocked: ${problem}` }
+  const all = { 'content-type': 'application/json', 'user-agent': 'RunF9-Webhooks/1', ...headers }
+  // Public destinations (not an air-gapped install, not a test receiver): the connection re-checks the address it resolves.
+  if (!airgapped() && !allowInsecure()) return postWithLookup(url, body, all, publicOnlyLookup)
   try {
-    const res = await fetch(url, { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': 'RunF9-Webhooks/1', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) })
+    const res = await fetch(url, { method: 'POST', body, headers: all, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) })
     return { ok: res.status >= 200 && res.status < 300, status: String(res.status) }
   } catch (err) {
     return { ok: false, status: (err as Error).name === 'TimeoutError' ? 'timeout' : 'network error' }

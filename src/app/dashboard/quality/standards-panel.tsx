@@ -57,6 +57,7 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
   const [runs, setRuns] = useState<StoredRunSummary[]>([])
   const [viewing, setViewing] = useState<StoredRun | null>(null)
   const [loading, setLoading] = useState(false)
+  const [recording, setRecording] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const fromDefaults = useRef(false)
@@ -66,9 +67,10 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
   const load = useCallback(async (fws: Framework[] | null) => {
     setLoading(true); setError('')
     const q = fws ? `?frameworks=${encodeURIComponent(fws.join(','))}` : ''
-    const res = await fetch(`${endpoint}${q}`)
-    const d = await res.json().catch(() => ({}))
+    const res = await fetch(`${endpoint}${q}`).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
     setLoading(false)
+    if (!res) { setError('Network error. Check your connection and try again.'); return }
     if (!res.ok) { setError(d.error || 'Could not run the standards check.'); return }
     setResult(d.result); setRuns(d.runs || [])
     if (!fws && Array.isArray(d.defaults)) {
@@ -90,10 +92,12 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
   }, [key, load])
 
   const record = async () => {
-    if (!frameworks?.length) return
-    setStatus(''); setError('')
-    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frameworks }) })
-    const d = await res.json().catch(() => ({}))
+    if (!frameworks?.length || recording) return
+    setStatus(''); setError(''); setRecording(true)
+    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frameworks }) }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    setRecording(false)
+    if (!res) { setError('Network error. The assessment was not recorded.'); return }
     if (!res.ok) { setError(d.error || 'Could not record the assessment.'); return }
     setResult(d.result); setRuns(r => [d.saved, ...r]); setStatus(`Assessment recorded (rules version ${d.saved.rulesVersion}).`)
   }
@@ -136,7 +140,7 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
           </fieldset>
         )}
         <div className="flex flex-wrap items-center gap-3 mt-4">
-          {canRecord && <button type="button" onClick={record} disabled={loading || !frameworks?.length} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Record this assessment</button>}
+          {canRecord && <button type="button" onClick={record} disabled={loading || recording || !frameworks?.length} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Record this assessment</button>}
           <span className="text-[12px] text-warm-600">Recording keeps the results, rules version and thresholds so this assessment can be reproduced later.</span>
         </div>
         <div aria-live="polite" className="text-[12.5px] mt-2">

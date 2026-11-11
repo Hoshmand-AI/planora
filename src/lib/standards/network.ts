@@ -71,7 +71,9 @@ export function buildNetwork(input: StandardsInput): Network {
   const start = noPred.length ? noPred.reduce((m, a) => (esOf(a) < esOf(m) ? a : m)) : null
   const designated = s.finishMilestoneId ? all.find(a => a.id === s.finishMilestoneId || a.code === s.finishMilestoneId) : undefined
   const finishPool = noSucc.some(a => a.type === 'milestone') ? noSucc.filter(a => a.type === 'milestone') : noSucc
-  const finish = designated ?? (finishPool.length ? finishPool.reduce((m, a) => (efOf(a) >= efOf(m) ? a : m)) : null)
+  // A designated milestone with work after it (Substantial Completion, then punch list and Final
+  // Completion) is not where the network ends: open ends and paths to the finish use the last one.
+  const finish = (designated && !succs.has(designated.id) ? designated : null) ?? (finishPool.length ? finishPool.reduce((m, a) => (efOf(a) >= efOf(m) ? a : m)) : null)
 
   return {
     input, every, byId, all, open, openIds, links, rawLinks: s.links, preds, succs,

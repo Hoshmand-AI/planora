@@ -1,7 +1,10 @@
 // Display formatting. Data is stored and exchanged as ISO yyyy-mm-dd; people see MM/DD/YYYY by
 // default, or DD/MM/YYYY where a caller passes that preference (e.g. a project outside the US).
 
-const ISO = /\b(\d{4})-(\d{2})-(\d{2})(?:T[\d:.]+Z?)?\b/g
+// A calendar date (years 1900 to 2099) that stands on its own: not part of a longer code such as an
+// activity ID "1010-20-30", "A-2026-10-31" or "2026-10-31-05". No lookbehind (older Safari).
+const ISO = /(^|[^\w-])((?:19|20)\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?(?![\w-])/g
+const realDate = (y: string, m: string, d: string) => new Date(Date.UTC(+y, +m - 1, +d)).getUTCDate() === +d
 
 /** Display order for dates: MM/DD/YYYY (default) or DD/MM/YYYY. */
 export type DateOrder = 'MDY' | 'DMY'
@@ -20,7 +23,7 @@ export function fmtDate(v: string | null | undefined, order: DateOrder = DEFAULT
 
 /** Rewrites every ISO date inside free text (rationales, findings, questions) to MM/DD/YYYY (or DD/MM/YYYY). */
 export function fmtDates(text: string | null | undefined, order: DateOrder = DEFAULT_DATE_ORDER): string {
-  return text ? text.replace(ISO, (_, y, m, d) => dmy(y, m, d, order)) : ''
+  return text ? text.replace(ISO, (all, pre, y, m, d) => (realDate(y, m, d) ? pre + dmy(y, m, d, order) : all)) : ''
 }
 
 /** Timestamp → "10/31/2026 2:05 PM" (or "31/10/2026 14:05") in the viewer's time zone. */

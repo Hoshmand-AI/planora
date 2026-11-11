@@ -99,7 +99,18 @@ export function rulesPrefill(pages: PageText[]): Proposal[] {
       const val = /\b(?:contract\s+(?:sum|price|amount)|construction\s+(?:cost|budget|value)|estimated\s+(?:construction\s+)?cost|project\s+(?:budget|value))\b[^.$]{0,40}\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(million|M\b)?/i.exec(s)
       if (val) { const raw = Number(val[1].replace(/,/g, '')); const musd = val[2] ? raw : raw / 1_000_000; if (musd >= 0.05 && musd <= 100_000) put('project.value_musd', Math.round(musd * 100) / 100, `$${(Math.round(musd * 100) / 100).toLocaleString('en-US')}M`, s, p.page) }
       const pct = /\b(\d{2,3})\s*%\s*(?:complete\s+)?(?:construction\s+documents?|CDs?|design\s+development|DD|schematic\s+design|SD|design)\b/i.exec(s)
-      if (pct) { const n = Number(pct[1]); if (n >= 10 && n <= 100) { put('design.percent', n, `${n}%`, s, p.page); put('design.drawings', true, 'Yes', s, p.page) } }
+      if (pct) {
+        const raw = Number(pct[1])
+        if (raw >= 10 && raw <= 100) {
+          // A stage percentage is not the whole design: schematic design ends at 30% overall and design
+          // development at 60% (the interview's own thresholds), so "100% SD" is 30%, not 100%.
+          const stage = pct[0].replace(/^\d+\s*%\s*(?:complete\s+)?/i, '')
+          const sd = /^(?:schematic|SD)/i.test(stage), dd = /^(?:design\s+development|DD)/i.test(stage)
+          const n = sd ? Math.round(raw * 0.3) : dd ? Math.round(30 + raw * 0.3) : raw
+          put('design.percent', n, sd || dd ? `${n}% overall (${raw}% ${sd ? 'schematic design' : 'design development'})` : `${n}%`, s, p.page)
+          put('design.drawings', true, 'Yes', s, p.page)
+        }
+      }
       else if (/\b(?:issued\s+for\s+construction|IFC\s+(?:set|drawings))\b/i.test(s)) { put('design.percent', 100, '100%', s, p.page); put('design.drawings', true, 'Yes', s, p.page) }
       else if (/\b(?:drawings?\s+(?:list|index)|sheet\s+index|list\s+of\s+drawings)\b/i.test(s)) put('design.drawings', true, 'Yes', s, p.page)
       for (const [t, re] of TYPE_RULES) if (re.test(s)) { const h = typeHits.get(t) ?? { n: 0, quote: s, page: p.page }; h.n++; typeHits.set(t, h) }

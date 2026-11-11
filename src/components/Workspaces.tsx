@@ -23,9 +23,13 @@ export function Workspaces({ members }: { members: Member[] }) {
   const [draft, setDraft] = useState({ name: '', walled: true })
   const [adding, setAdding] = useState<Record<string, string>>({})
 
+  const [loadErr, setLoadErr] = useState(false)
   const load = useCallback(async () => {
-    const res = await fetch(URL_)
-    if (res.ok) setData(await res.json())
+    try {
+      const res = await fetch(URL_)
+      if (!res.ok) throw new Error('load')
+      setData(await res.json()); setLoadErr(false)
+    } catch { setLoadErr(true) }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -39,7 +43,11 @@ export function Workspaces({ members }: { members: Member[] }) {
     return r.data
   }
 
-  if (!data) return null
+  if (!data) return loadErr ? (
+    <Section title="Workspaces (ethical walls)">
+      <div className="space-y-2"><Alert tone="error">Could not load workspaces. Check your connection and try again.</Alert><Button variant="secondary" onClick={load}>Try again</Button></div>
+    </Section>
+  ) : null
   const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Former member'
   const restricted = new Set(data.restrictedMemberIds)
   const selectClass = 'bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px] text-warm-700'

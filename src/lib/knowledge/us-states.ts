@@ -11,3 +11,11 @@ export const US_STATES: { code: string; name: string }[] = [
   ['TN', 'Tennessee'], ['TX', 'Texas'], ['UT', 'Utah'], ['VT', 'Vermont'], ['VA', 'Virginia'], ['WA', 'Washington'],
   ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming'],
 ].map(([code, name]) => ({ code, name }))
+
+/**
+ * US territories. They are not in the state picker; a location typed with one of these names is
+ * inside the US (generic US permitting, federal questions and US federal holidays apply).
+ */
+export const US_TERRITORIES: { code: string; name: string }[] = [
+  ['PR', 'Puerto Rico'], ['GU', 'Guam'], ['VI', 'Virgin Islands'], ['AS', 'American Samoa'], ['MP', 'Northern Mariana Islands'],
+].map(([code, name]) => ({ code, name }))

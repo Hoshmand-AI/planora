@@ -185,6 +185,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             )}
             <ul className="list-disc pl-5 text-warm-600 space-y-0.5">{sra.assumptions.slice(0, 4).map((x, i) => <li key={i}>{x}</li>)}</ul>
             {sra.inputs && <RiskInputsPanel key={sra.inputs.updatedAt ?? 'none'} scheduleId={scheduleId} inputs={sra.inputs} canEdit={canEdit} onSaved={runRisk} />}
+            {sraErr && <p role="alert" className="text-status-at-risk">{sraErr} The figures above are from the last run that worked.</p>}
           </div>
         )}
       </Disclosure>

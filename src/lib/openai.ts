@@ -53,6 +53,24 @@ export function screenScheduleText<T extends Pick<ScheduleContext, 'schedule' | 
   }
 }
 
+/**
+ * The activity a question names after the word "activity" or "task" ("float of activity A1000"), or
+ * undefined. Only a whole activity ID counts (never part of one), and an ordinary word after "activity"
+ * ("which activity has...") is not an ID unless it is written exactly as the ID is.
+ */
+export function namedActivity<T extends { activityId: string }>(question: string, activities: readonly T[]): T | undefined {
+  for (const m of question.matchAll(/\b(?:task|activity)\s+(?:id\s+)?#?([A-Za-z0-9\-_.]+)/gi)) {
+    for (const word of new Set([m[1], m[1].replace(/[.\-_]+$/, '')])) {
+      if (!word) continue
+      const found = /\d/.test(word)
+        ? activities.find(a => a.activityId.toLowerCase() === word.toLowerCase())
+        : activities.find(a => a.activityId === word)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
 export function buildAskPrompt(question: string, rawContext: ScheduleContext): { system: string; offline: () => string } {
   const context = screenScheduleText(rawContext)
   // Build smart context — don't send all activities, just relevant ones
@@ -120,15 +138,9 @@ ${nearTermActivities.map(a => `- ${a.activityId}: ${a.name} | Duration: ${a.dura
 `
 
   // Check for specific activity queries
-  const activityMatch = question.match(/(?:task|activity)\s+([A-Za-z0-9\-_.]+)/i)
   let extraContext = ''
-  
-  if (activityMatch) {
-    const searchId = activityMatch[1]
-    const found = activities.find(a => 
-      a.activityId.toLowerCase() === searchId.toLowerCase() ||
-      a.activityId.toLowerCase().includes(searchId.toLowerCase())
-    )
+  {
+    const found = namedActivity(question, activities)
     if (found) {
       const preds = relationships.filter(r => r.successorId === found.id || r.successorId === found.activityId)
       const succs = relationships.filter(r => r.predecessorId === found.id || r.predecessorId === found.activityId)

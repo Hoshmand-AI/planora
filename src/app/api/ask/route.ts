@@ -6,11 +6,12 @@ import { askScheduleQuestion } from '@/lib/openai'
 import { randomUUID as uuid } from 'crypto'
 import { groundedAsk } from '@/lib/rag/answer'
 import { projectClassification, projectScope } from '@/lib/rag/scope'
+import { jsonObject } from '../json-body'
 
 const MAX_QUESTION = 4000
 
 export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
-  const { question, scheduleId, useDocuments, includeUnreviewed } = await req.json().catch(() => ({}))
+  const { question, scheduleId, useDocuments, includeUnreviewed } = await jsonObject(req)
   if (typeof question !== 'string' || !question.trim() || typeof scheduleId !== 'string' || !scheduleId) return NextResponse.json({ error: 'Question and scheduleId required' }, { status: 400 })
   if (question.length > MAX_QUESTION) return NextResponse.json({ error: `Questions are limited to ${MAX_QUESTION.toLocaleString()} characters. Shorten it and ask again.` }, { status: 400 })
 

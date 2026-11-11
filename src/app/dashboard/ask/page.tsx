@@ -27,7 +27,9 @@ export default function AskPage() {
   const [withUnreviewed, setWithUnreviewed] = useState(false)
   const docsId = useId()
   const unrevId = useId()
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  // The project the conversation on screen belongs to: a reply for a project the user has left is dropped.
+  const openId = useRef<string | null>(null)
   // A question handed over from another page (the Daily Brief's "Ask AI" links): shown ready to send, never sent for the user.
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
@@ -40,24 +42,30 @@ export default function AskPage() {
   const [aiOff, setAiOff] = useState(false)
   useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
 
+  const scheduleId = selectedSchedule?.id ?? null
   useEffect(() => {
-    if (!selectedSchedule) return
+    openId.current = scheduleId
+    if (!scheduleId) return
     let live = true
     setMessages([])
-    fetch(`/api/ask?scheduleId=${selectedSchedule.id}`)
+    setLoading(false)
+    fetch(`/api/ask?scheduleId=${scheduleId}`)
       .then(r => r.json())
       .then(data => { if (live) setMessages(data.messages || []) })
       .catch(() => {})
     return () => { live = false }
-  }, [selectedSchedule])
+  }, [scheduleId])
 
+  // Keep the newest message in view by scrolling the conversation itself, never the page.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const el = scrollerRef.current
+    if (el && (messages.length || loading)) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [messages, loading])
 
   const handleSend = async (question?: string) => {
     const q = question || input.trim()
-    if (!q || !selectedSchedule || !canAsk) return
+    if (!q || !selectedSchedule || !canAsk || loading) return
+    const sid = selectedSchedule.id
     setInput('')
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: q, createdAt: new Date().toISOString() }
@@ -71,6 +79,7 @@ export default function AskPage() {
         body: JSON.stringify({ question: q, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
+      if (openId.current !== sid) return
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(), role: 'assistant',
         content: data.answer || (res.ok ? 'No answer came back. Try asking again.' : data.error || 'The question could not be answered. Try again in a moment.'),
@@ -78,6 +87,7 @@ export default function AskPage() {
       }
       setMessages(prev => [...prev, aiMsg])
     } catch {
+      if (openId.current !== sid) return
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(), role: 'assistant',
         content: 'Network error. Please try again.',
@@ -96,10 +106,12 @@ export default function AskPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100dvh - 104px)' }} /* desktop: 48px header + 40px tab row = 88px; mobile: 48px header + 64px bottom bar = 112px, dvh handles notch */>
+    // The layout makes this page exactly one screen high (on screens at least 640px tall), so the chat fills
+    // what is left under the project header and only the conversation scrolls. Shorter screens scroll the page.
+    <div className="flex flex-col flex-1 min-h-[420px] [@media(min-height:640px)]:min-h-0">
 
       {/* Chat area */}
-      <div className="flex-1 overflow-auto p-5 md:p-6" tabIndex={0} role="region" aria-label="Conversation">
+      <div ref={scrollerRef} className="flex-1 min-h-0 overflow-auto p-5 md:p-6" tabIndex={0} role="region" aria-label="Conversation">
 
         {messages.length === 0 && (
           <div className="max-w-[560px] mx-auto">
@@ -111,8 +123,8 @@ export default function AskPage() {
             <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
               {SUGGESTED.map(q => (
-                <button key={q} onClick={() => handleSend(q)}
-                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-[13.5px] text-warm-700 transition-colors">
+                <button key={q} onClick={() => handleSend(q)} disabled={!canAsk || loading}
+                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-[13.5px] text-warm-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
                   {q}
                 </button>
               ))}
@@ -143,7 +155,6 @@ export default function AskPage() {
               </div>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
       </div>
 

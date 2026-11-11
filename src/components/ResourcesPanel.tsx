@@ -29,6 +29,8 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
   const [staffing, setStaffing] = useState<Record<string, number>>({})
   const [refresh, setRefresh] = useState(0)
 
+  // Figures belong to one schedule or plan: a different one starts empty.
+  useEffect(() => { setData(null) }, [base])
   useEffect(() => {
     let live = true
     setLoading(true); setError('')
@@ -36,7 +38,7 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
     fetch(`${base}?${q}`).then(async r => {
       const d = await r.json().catch(() => ({}))
       if (!live) return
-      if (!r.ok) { setError(d.error || 'Could not load the resource analysis.'); setData(null) } else setData(d)
+      if (!r.ok) setError(d.error || 'Could not load the resource analysis.'); else setData(d)
     }).catch(() => live && setError('Network error. Check your connection and try again.')).finally(() => live && setLoading(false))
     return () => { live = false }
   }, [base, bucket, basis, selected, staffing, refresh])
@@ -44,11 +46,12 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
   const resources = useMemo(() => data?.resources ?? [], [data])
   const current = resources.find(r => r.id === selected) ?? resources.find(r => r.overAllocatedDays > 0) ?? resources[0] ?? null
 
-  if (error) return <Alert tone="error">{error}</Alert>
-  if (!data) return <p className="text-[13px] text-warm-600" role="status">{loading ? 'Loading resources…' : ''}</p>
+  const retry = <Button variant="secondary" onClick={() => setRefresh(x => x + 1)}>Try again</Button>
+  if (!data) return error ? <div className="space-y-2"><Alert tone="error">{error}</Alert>{retry}</div> : <p className="text-[13px] text-warm-600" role="status">{loading ? 'Loading resources…' : ''}</p>
 
   return (
     <div className="space-y-6">
+      {error && <div className="space-y-2"><Alert tone="error">{error} The figures below are the last ones that loaded.</Alert>{retry}</div>}
       <div className="flex flex-wrap items-center gap-4 text-[13px] text-warm-700">
         <label className="flex items-center gap-2">Period
           <select value={bucket} onChange={e => setBucket(e.target.value as HistogramBucket)} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-1">

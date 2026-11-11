@@ -150,14 +150,41 @@ function emitRows(nodes: WbsNode[], t: Record<string, CpmTimes>): WbsRow[] {
   return rows
 }
 
+/**
+ * Reads source WBS paths like "1.2.3 Foundations": the code path, then the leaf name after the first
+ * space. A code or band name that itself holds a space ("Level 1", "Site Work.A") cannot be told
+ * from that form by one path alone, but it shows across the schedule: two different paths would share
+ * a code and disagree on its name ("Level" named "1" and "2"). Those paths are kept whole (the text is
+ * the code path, its last part the name) so distinct WBS nodes are never merged.
+ */
+export function sourceWbsSplitter(paths: Iterable<string | null | undefined>): (path: string) => { code: string; name: string } | null {
+  const split = (p: string) => p.trim().match(/^(\S+)(?:\s+(.+))?$/)
+  const namesOf = new Map<string, Set<string>>()
+  for (const p of paths) {
+    const m = p ? split(p) : null
+    if (!m || !m[2]) continue
+    let set = namesOf.get(m[1])
+    if (!set) namesOf.set(m[1], (set = new Set()))
+    set.add(m[2])
+  }
+  return path => {
+    const m = split(path)
+    if (!m) return null
+    if (m[2] && (namesOf.get(m[1])?.size ?? 0) > 1) return { code: path.trim().replace(/\s+/g, ' '), name: '' }
+    return { code: m[1], name: m[2] || '' }
+  }
+}
+
 /** WBS tree from source paths like "1.2.3 Foundations" (P6 short names joined by '.', leaf name after a space). */
 function buildSourceWbs(s: GeneratedSchedule, root: string, order: (a: PlanActivity, b: PlanActivity) => number, t: Record<string, CpmTimes>) {
   const top: WbsNode[] = []
   const byKey = new Map<string, WbsNode>()
+  const splitPath = sourceWbsSplitter(s.activities.map(a => a.wbs))
   const nodeFor = (path: string): WbsNode | null => {
-    const m = path.trim().match(/^(\S+)(?:\s+(.+))?$/)
-    if (!m) return null
-    const parts = m[1].split('.').filter(Boolean)
+    const sp = splitPath(path)
+    if (!sp) return null
+    const m = [path, sp.code, sp.name]
+    const parts = sp.code.split('.').map(x => x.trim()).filter(Boolean)
     let parent: WbsNode | null = null
     let key = ''
     parts.forEach((part, i) => {

@@ -107,7 +107,7 @@ function deepLinkedScheduleId(pathname: string, params: { get(name: string): str
 }
 
 /** Opens the schedule a deep link names once the list is loaded (and again whenever the link changes). */
-function ScheduleDeepLink({ schedules, select }: { schedules: Schedule[]; select: (s: Schedule) => void }) {
+function ScheduleDeepLink({ schedules, loaded, select, onMissing }: { schedules: Schedule[]; loaded: boolean; select: (s: Schedule) => void; onMissing: (missing: boolean) => void }) {
   const pathname = usePathname()
   const params = useSearchParams()
   const wanted = deepLinkedScheduleId(pathname, params)
@@ -119,7 +119,37 @@ function ScheduleDeepLink({ schedules, select }: { schedules: Schedule[]; select
     applied.current = wanted
     select(s)
   }, [wanted, schedules, select])
+  // The link names a project that is not in this user's list (deleted, or another organization's).
+  useEffect(() => { onMissing(!!wanted && loaded && !schedules.some(x => x.id === wanted)) }, [wanted, loaded, schedules, onMissing])
   return null
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** A modal dialog: named by its heading, takes focus when it opens, keeps Tab inside, closes on Escape and gives focus back. */
+function Dialog({ labelledBy, onClose, className, children }: { labelledBy: string; onClose: () => void; className: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null
+    ref.current?.focus()
+    return () => { if (before && document.contains(before)) before.focus() }
+  }, [])
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { e.stopPropagation(); onClose(); return }
+    if (e.key !== 'Tab' || !ref.current) return
+    const items = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => el.offsetParent !== null)
+    if (!items.length) { e.preventDefault(); return }
+    const first = items[0], last = items[items.length - 1], at = document.activeElement
+    if (e.shiftKey && (at === first || at === ref.current)) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus() }
+  }
+  return (
+    <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onKeyDown={onKeyDown} className={`${className} focus:outline-none`}>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 /* ─── Layout ─────────────────────────────────────────── */
@@ -131,6 +161,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [schedules,        setSchedules]        = useState<Schedule[]>([])
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [metrics,          setMetrics]          = useState<Record<string, unknown> | null>(null)
+  const [authError,        setAuthError]        = useState(false)
+  const [schedulesLoaded,  setSchedulesLoaded]  = useState(false)
+  const [schedulesError,   setSchedulesError]   = useState(false)
+  const [linkMissing,      setLinkMissing]      = useState(false)
 
   const [showUpload,       setShowUpload]       = useState(false)
   const [showScheduleList, setShowScheduleList] = useState(false)
@@ -148,6 +182,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [resend,           setResend]           = useState<{ busy: boolean; note: string; ok: boolean }>({ busy: false, note: '', ok: false })
   const can = useCallback((p: string) => permissions.includes(p), [permissions])
   const inProject = isProjectPage(pathname)
+  // Ask AI is a chat: on screens tall enough, the page is exactly one screen high and only the conversation scrolls.
+  const fillScreen = pathname.startsWith('/dashboard/ask')
   // Sidebar: a full 240px panel on desktops, a 72px icon rail on tablets (iPad portrait), and the user's
   // own choice once they press the collapse/expand button (remembered in this browser).
   const [railPref, setRailPref] = useState<'open' | 'closed' | null>(null)
@@ -183,19 +219,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setMfaSetupRequired(!!data.security?.mfaSetupRequired)
       setEmailUnconfirmed(!!data.security?.emailDelivery && !data.security?.emailVerified)
       setPlatformAdmin(data.platformAdmin === true)
-    })
+    }).catch(() => setAuthError(true))
   }, [router])
 
   // The organization requires two-step verification: everything else waits until it's set up.
+  // Two-step verification may have just been turned on (Account page), so ask again before sending anyone back there.
   useEffect(() => {
-    if (mfaSetupRequired && pathname !== '/dashboard/account') router.push('/dashboard/account?setup=mfa')
+    if (!mfaSetupRequired || pathname === '/dashboard/account') return
+    let live = true
+    fetch('/api/auth').then(r => (r.ok ? r.json() : null)).catch(() => null).then(data => {
+      if (!live) return
+      if (data?.user && data.security && !data.security.mfaSetupRequired) setMfaSetupRequired(false)
+      else router.push('/dashboard/account?setup=mfa')
+    })
+    return () => { live = false }
   }, [mfaSetupRequired, pathname, router])
 
   /* ── Data ── */
-  const refreshSchedules = useCallback(async () => {
-    const res  = await fetch('/api/schedules')
-    const data = await res.json().catch(() => ({}))
-    const list: Schedule[] = data.schedules || []
+  const loadSchedules = useCallback(async (honorLink: boolean) => {
+    // A failed load is not "no projects": keep what is on screen and say the list could not be loaded.
+    const res  = await fetch('/api/schedules').catch(() => null)
+    const data = res?.ok ? await res.json().catch(() => null) : null
+    if (!data || !Array.isArray(data.schedules)) { setSchedulesError(true); return }
+    const list: Schedule[] = data.schedules
+    setSchedulesError(false)
+    setSchedulesLoaded(true)
     setSchedules(list)
     setSelectedSchedule(cur => {
       if (cur) {
@@ -206,10 +254,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       if (!list.length) return cur
       // Honor a deep link on first load instead of flashing the newest schedule.
-      const wanted = typeof window === 'undefined' ? null : deepLinkedScheduleId(window.location.pathname, new URLSearchParams(window.location.search))
-      return list.find(s => s.id === wanted) ?? list[0]
+      const wanted = !honorLink || typeof window === 'undefined' ? null : deepLinkedScheduleId(window.location.pathname, new URLSearchParams(window.location.search))
+      // A link to a project that is not in the list opens nothing (the header says so), never a different project.
+      if (wanted) return list.find(s => s.id === wanted) ?? null
+      return list[0]
     })
   }, [])
+  const refreshSchedules = useCallback(() => loadSchedules(true), [loadSchedules])
 
   // Only the latest selection's metrics may land (a slower earlier request must not overwrite them).
   const metricsFor = useRef<string | null>(null)
@@ -250,7 +301,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const res = await fetch(`/api/schedules?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => null)
     if (!res?.ok) { const d = res ? await res.json().catch(() => ({})) : {}; alert(d.error || 'The upload was not deleted. Try again.'); return }
     setSelectedSchedule(null); setMetrics(null)
-    await refreshSchedules()
+    await loadSchedules(false) // the address still names the upload that was just deleted
     router.push('/dashboard')
   }
 
@@ -302,8 +353,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-warm-50 flex items-center justify-center">
-        <div className="text-warm-400 text-[14px]">Loading…</div>
+      <div className="min-h-screen bg-warm-50 flex items-center justify-center px-6">
+        {authError ? (
+          <div role="alert" className="max-w-sm text-center">
+            <p className="text-[15px] text-navy-950 font-semibold">RunF9 could not load.</p>
+            <p className="text-[14px] text-warm-600 mt-1">Check your connection and try again.</p>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-full text-[14px] font-semibold hover:bg-accent-700">Try again</button>
+          </div>
+        ) : (
+          <div className="text-warm-600 text-[14px]">Loading…</div>
+        )}
       </div>
     )
   }
@@ -316,7 +375,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
-      <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} select={setSelectedSchedule} /></Suspense>
+      <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} loaded={schedulesLoaded} select={setSelectedSchedule} onMissing={setLinkMissing} /></Suspense>
       {/*
        * LAYOUT STRATEGY
        * ─────────────────────────────────────────────────────────
@@ -331,7 +390,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        *   - Content area is full-width scrollable
        * ─────────────────────────────────────────────────────────
        */}
-      <div className="min-h-screen bg-warm-50 md:flex">
+      <div className={`min-h-screen bg-warm-50 md:flex ${fillScreen ? '[@media(min-height:640px)]:min-h-0' : ''}`}>
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Sidebar (desktop) ─────────────────────────────── */}
@@ -394,7 +453,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </aside>
 
-        <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        <div className={`flex-1 min-w-0 flex flex-col min-h-screen ${fillScreen ? '[@media(min-height:640px)]:min-h-0 [@media(min-height:640px)]:h-[100dvh]' : ''}`}>
           {/* ── Top bar (phones) ─────────────────────────────── */}
           <header className="md:hidden glass-bar sticky top-0 z-40 h-14 flex items-center justify-between px-4 border-b border-white/5">
             <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[21px]" /></Link>
@@ -439,7 +498,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     )}
                   </div>
                 ) : (
-                  <p className="text-[14px] text-warm-600 pb-2"><Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
+                  <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-navy-950 font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
                 )}
                 {/* Tabs scroll sideways on narrow screens: the right edge fades to show there are more, and the current tab is scrolled into view */}
                 <nav ref={tabsRef} aria-label="Project" className="relative flex gap-1 overflow-x-auto -mx-1 mt-3 [mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)] lg:[mask-image:none]">
@@ -464,7 +523,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* ── Main content ────────────────────────────────── */}
           {/* pb-20 on phones = space for the bottom bar */}
-          <main id="main" tabIndex={-1} className="flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none">
+          <main id="main" tabIndex={-1} className={`flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none ${fillScreen ? 'flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
             {emailUnconfirmed && pathname !== '/dashboard/account' && (
               <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-[13px] text-warm-700">
                 <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -479,7 +538,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </div>
             )}
-            <div key={pathname} className="max-w-6xl mx-auto md:px-3 page-enter">
+            {schedulesError && (
+              <p role="alert" className="bg-status-at-risk-bg border-b border-status-at-risk px-4 md:px-8 py-2 text-[13px] text-status-at-risk">
+                Your projects could not be loaded. <button type="button" onClick={() => { refreshSchedules() }} className="underline font-medium">Try again</button>
+              </p>
+            )}
+            <div key={pathname} className={`max-w-6xl mx-auto md:px-3 page-enter ${fillScreen ? 'w-full flex-1 flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
               {children}
               <AskTextHost />
             </div>
@@ -504,10 +568,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Upload Modal ──────────────────────────────────────── */}
         {showUpload && (
-          <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+          <Dialog labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Upload a schedule</h2>
+                <h2 id="upload-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Upload a schedule</h2>
                 <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
 
@@ -537,8 +600,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Link href="/dashboard/quality" onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
-                    <button onClick={() => setShowUpload(false)} className="flex-1 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors">Done</button>
+                    {uploadSummary.dataQuestions > 0 && (
+                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
+                    )}
+                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-md text-[13.5px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-medium hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
                   </div>
                 </div>
               ) : (
@@ -548,14 +613,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <select name="projectType" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                  <div id="upload-tag-h" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
+                  <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
+                    <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
                       <option value="">Facility type…</option>
                       {PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                     </select>
-                    <input name="region" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
-                    <input name="grossSqft" type="number" min={0} placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
+                    <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
+                    <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
                   </div>
                   <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
                 </div>
@@ -578,8 +643,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 <div className="mb-5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
-                  <input type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
+                  <label htmlFor="upload-version" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
+                  <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
@@ -588,17 +653,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
               </form>
               )}
-            </div>
-          </div>
+          </Dialog>
         )}
 
         {/* ── Schedule List Modal ───────────────────────────────── */}
         {showScheduleList && (
-          <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
+          <Dialog labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Switch project</h2>
+                <h2 id="switch-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Switch project</h2>
                 <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
@@ -631,17 +694,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 + Upload a new project
               </button>
               )}
-            </div>
-          </div>
+          </Dialog>
         )}
 
         {/* ── Settings Modal ────────────────────────────────────── */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+          <Dialog labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Account</h2>
+                <h2 id="account-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Account</h2>
                 <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               <div className="space-y-3">
@@ -694,8 +755,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <LogOut size={14} /> Sign Out
                 </button>
               </div>
-            </div>
-          </div>
+          </Dialog>
         )}
 
       </div>

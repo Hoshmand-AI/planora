@@ -6,7 +6,7 @@
 
 import { askText } from '@/components/AskText'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { fmtDate, fmtDates } from '@/lib/format'
+import { fmtDate, fmtDates, fmtDay } from '@/lib/format'
 import { postJson } from './ui'
 import { PlainEnglishEdit, type EditPreview } from './PlainEnglishEdit'
 
@@ -63,9 +63,11 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
   const [lastAdded, setLastAdded] = useState<string[]>([])
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/schedules/${scheduleId}/edits`)
-    const d = await r.json().catch(() => ({}))
-    if (r.ok) setData(d); else setErr(d.error || 'Could not load edits.')
+    try {
+      const r = await fetch(`/api/schedules/${scheduleId}/edits`)
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) setData(d); else setErr(d.error || 'Could not load edits.')
+    } catch { setErr('Could not load edits. Check your connection and reload.') }
   }, [scheduleId])
   useEffect(() => { load() }, [load, refreshKey])
 
@@ -138,7 +140,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
               <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">plain English</span>}{e.status === 'skipped' && <span className="block text-[11.5px] text-status-attention">Not applied: {e.note}</span>}</td>
               <td className={td}>{fmtDates(e.before)}</td><td className={td}>{fmtDates(e.after)}</td><td className={td}>{e.reason}</td>
-              <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDate(e.at)}</span></td>
+              <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDay(e.at)}</span></td>
               {canEdit && data.editable && <td className={td}><button type="button" disabled={busy} onClick={() => revert(e)} className="text-accent-600 hover:underline">Revert</button></td>}
             </tr>))}</tbody></table></div>
       )}
@@ -246,7 +248,7 @@ export interface RiskInputsView { ranges: RangeRow[]; events: (EventRow & { name
 /** The scheduler's ranges and risk events; saving re-runs the analysis. Probability is entered in %. */
 export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { scheduleId: string; inputs: RiskInputsView; canEdit: boolean; onSaved: () => void }) {
   const [ranges, setRanges] = useState<RangeRow[]>(inputs.ranges.map(r => ({ ...r, activityId: r.code || r.activityId })))
-  const [events, setEvents] = useState<EventRow[]>(inputs.events.map(e => ({ ...e, activityId: e.code || e.activityId, probability: Math.round(Number(e.probability) * 100) })))
+  const [events, setEvents] = useState<EventRow[]>(inputs.events.map(e => ({ ...e, activityId: e.code || e.activityId, probability: Math.round(Number(e.probability) * 10000) / 100 })))
   const [commitments, setCommitments] = useState<CommitmentRow[]>((inputs.commitments ?? []).map(c => ({ ...c, activityId: c.code || c.activityId })))
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -280,7 +282,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
         <tbody>{events.map((r, i) => (
           <tr key={i}>
             <td className={td}><input aria-label="Event name" disabled={!canEdit} value={r.name} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} className={`${input} w-48`} /></td>
-            <td className={td}><input aria-label="Probability percent" type="number" min={1} max={100} disabled={!canEdit} value={r.probability} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, probability: e.target.value } : x))} className={cell} /></td>
+            <td className={td}><input aria-label="Probability percent" type="number" min={1} max={100} step="any" disabled={!canEdit} value={r.probability} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, probability: e.target.value } : x))} className={cell} /></td>
             <td className={td}><input aria-label="Impact work days" type="number" min={1} disabled={!canEdit} value={r.impactDays} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, impactDays: e.target.value } : x))} className={cell} /></td>
             <td className={td}><input aria-label="Affected activity or milestone ID" disabled={!canEdit} value={r.activityId} onChange={e => setEvents(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} /></td>
             {canEdit && <td className={td}><button type="button" onClick={() => setEvents(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
@@ -301,7 +303,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
           <button type="button" disabled={busy} onClick={save} className={primary}>{busy ? 'Saving…' : 'Save and re-run'}</button>
         </div>
       )}
-      {inputs.updatedAt && <p className="text-[12px] text-warm-600">Last changed {fmtDate(inputs.updatedAt)}.</p>}
+      {inputs.updatedAt && <p className="text-[12px] text-warm-600">Last changed {fmtDay(inputs.updatedAt)}.</p>}
       {err && <p role="alert" className="text-status-at-risk">{err}</p>}
     </div>
   )

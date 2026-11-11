@@ -482,7 +482,7 @@ export const GAO_RULES: RuleDef[] = [
       const stale = !!(r.recordedAt && isValidDate(dd) && toDayNumber(r.recordedAt.slice(0, 10)) < toDayNumber(dd))
       return {
         result: stale ? 'warning' : 'pass',
-        metric: `${plural(r.ranges, 'range')}, ${plural(r.events, 'risk event')} recorded${r.recordedAt ? ` (${r.recordedAt.slice(0, 10)})` : ''}`,
+        metric: `${plural(r.ranges, 'range')}, ${plural(r.events, 'risk event')} recorded${r.recordedAt ? ` (${fmtDate(r.recordedAt)})` : ''}`,
         evidence: [],
         recommendation: stale ? 'The risk inputs predate this update\'s data date: review the ranges and events and run the analysis again.' : 'No action needed.',
         reason: `Source: ${r.source}`,
@@ -519,7 +519,7 @@ export const GAO_RULES: RuleDef[] = [
       const off = net.all.filter(a => (isValidDate(a.actualStart) && toDayNumber(a.actualStart) > d) || (isValidDate(a.actualFinish) && toDayNumber(a.actualFinish) > d))
       return {
         result: off.length ? 'fail' : 'pass',
-        metric: `${plural(off.length, 'activity', 'activities')} with an actual date after ${dd}`,
+        metric: `${plural(off.length, 'activity', 'activities')} with an actual date after ${fmtDate(dd)}`,
         evidence: codes(off),
         recommendation: off.length ? 'Correct the actual dates or move the data date, then reschedule.' : 'No action needed.',
       }
@@ -561,8 +561,11 @@ export const GAO_RULES: RuleDef[] = [
       const off: string[] = []
       for (const a of net.all) {
         const started = a.status === 'in_progress' || a.status === 'complete' || (a.percentComplete ?? 0) > 0
-        if (started && !isValidDate(a.actualStart)) off.push(`${a.code} (no actual start)`)
-        if (a.status === 'complete' && !isValidDate(a.actualFinish)) off.push(`${a.code} (no actual finish)`)
+        // A milestone is one event: the actual date of its kind is its whole status.
+        const startOnly = a.type === 'milestone' && a.milestoneKind !== 'finish' && isValidDate(a.actualStart)
+        const finishOnly = a.type === 'milestone' && a.milestoneKind !== 'start' && isValidDate(a.actualFinish)
+        if (started && !isValidDate(a.actualStart) && !finishOnly) off.push(`${a.code} (no actual start)`)
+        if (a.status === 'complete' && !isValidDate(a.actualFinish) && !startOnly) off.push(`${a.code} (no actual finish)`)
       }
       return {
         result: off.length ? 'fail' : 'pass',
@@ -590,7 +593,7 @@ export const GAO_RULES: RuleDef[] = [
       })
       return {
         result: off.length ? 'fail' : 'pass',
-        metric: `${plural(off.length, 'open activity', 'open activities')} forecast before ${dd}`,
+        metric: `${plural(off.length, 'open activity', 'open activities')} forecast before ${fmtDate(dd)}`,
         evidence: codes(off),
         recommendation: off.length ? 'Status the listed activities (actuals or remaining duration) and reschedule so no remaining work sits before the data date.' : 'No action needed.',
       }

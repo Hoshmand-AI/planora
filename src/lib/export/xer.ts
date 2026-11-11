@@ -37,6 +37,8 @@ const dt = (d: string | null | undefined, time: string) => (d ? `${d.slice(0, 10
 /** Finish time of day for a calendar: 08:00 start, its work hours, plus a lunch hour on 8h+ days. */
 const finishTime = (hours: number) => {
   const end = 8 + hours + (hours >= 8 ? 1 : 0)
+  // More than 15 hours cannot start at 08:00: clndrData writes one period from 00:00, ending at `hours`.
+  if (hours > 15 && hours < 24) return `${String(Math.floor(hours)).padStart(2, '0')}:${String(Math.round((hours % 1) * 60)).padStart(2, '0')}`
   return end >= 24 ? '23:59' : `${String(Math.floor(end)).padStart(2, '0')}:${String(Math.round((end % 1) * 60)).padStart(2, '0')}`
 }
 /**
@@ -58,17 +60,27 @@ function serial(iso: string): number {
 
 function hhmm(h: number): string {
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60)
+  // The end of the day is 00:00 in P6 (a 24-hour day is s|00:00|f|00:00), never 24:00.
+  if (hh >= 24) return '00:00'
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+/**
+ * Work periods of a day as [start, end] hours: 08:00 start with a 12:00-13:00 lunch on days over
+ * 6 hours; days over 15 hours do not fit after 08:00 and are one period from 00:00 (as msp-xml does).
+ */
+export function xerWorkPeriods(hoursPerDay: number): [number, number][] {
+  const h = Math.max(0, Math.min(24, hoursPerDay))
+  if (h > 15) return [[0, h]]
+  return h > 6 ? [[8, 12], [13, 9 + h]] : [[8, 8 + h]]
 }
 
 /** P6 clndr_data: working days 1=Sunday..7=Saturday with time intervals; exceptions are holidays. */
 export function clndrData(c: WorkCalendar): string {
-  const lunch = c.hoursPerDay > 6
-  const first = lunch ? 4 : c.hoursPerDay
+  const periods = xerWorkPeriods(c.hoursPerDay)
   const day = (d: number) => {
     if (!c.workDays.includes(d as WorkCalendar['workDays'][number])) return `(0||${d + 1}()())`
-    const parts = [`(0||0(s|08:00|f|${hhmm(8 + first)})())`]
-    if (lunch) parts.push(`(0||1(s|${hhmm(8 + first + 1)}|f|${hhmm(8 + c.hoursPerDay + 1)})())`)
+    const parts = periods.map(([from, to], i) => `(0||${i}(s|${hhmm(from)}|f|${hhmm(to)})())`)
     return `(0||${d + 1}()(${parts.join('')}))`
   }
   const days = [0, 1, 2, 3, 4, 5, 6].map(day).join('')

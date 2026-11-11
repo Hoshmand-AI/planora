@@ -1,7 +1,7 @@
 import { api, json, body, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { projectScope } from '@/lib/rag/scope'
-import { requirementReviews, saveRequirementReview, scopedChunks } from '@/lib/rag/store'
+import { requirementReviews, saveRequirementReview, scopedChunks, DEFAULT_CHUNK_LIMIT } from '@/lib/rag/store'
 import { extractRequirements } from '@/lib/rag/requirements'
 import type { RetrievalScope } from '@/lib/rag/types'
 
@@ -9,8 +9,9 @@ import type { RetrievalScope } from '@/lib/rag/types'
 // are suggestions with citations: a person confirms or dismisses each one, and nothing is applied
 // to a schedule or to the quality rules automatically.
 
-async function candidates(scope: RetrievalScope) {
+async function candidates(scope: RetrievalScope, seen?: { truncated: boolean }) {
   const chunks = await scopedChunks(scope, { includeUnreviewed: true })
+  if (seen) seen.truncated = chunks.length >= DEFAULT_CHUNK_LIMIT
   const trustOf = new Map(chunks.map(c => [c.documentId, c.trust]))
   const found = extractRequirements(chunks.map(c => ({ chunkId: c.chunkId, documentId: c.documentId, title: c.title, section: c.section, page: c.page, pageEnd: c.pageEnd, ordinal: c.ordinal, text: c.text, flagged: c.flagged })))
   const reviews = await requirementReviews(scope.orgId, [...new Set(found.map(f => f.documentId))])
@@ -19,7 +20,10 @@ async function candidates(scope: RetrievalScope) {
 
 export const GET = api<{ id: string }>({ permission: 'read' }, async (_req, { params, auth }) => {
   const { scope } = await projectScope(auth.orgId, params.id)
-  return json({ requirements: await candidates(scope), note: 'Candidates found by rules in the documents. Confirm the ones that apply; nothing is applied automatically.' })
+  const seen = { truncated: false }
+  const requirements = await candidates(scope, seen)
+  return json({ requirements, note: 'Candidates found by rules in the documents. Confirm the ones that apply; nothing is applied automatically.',
+    ...(seen.truncated ? { truncated: true, truncatedNote: `This project has more document text than is checked in one pass: only the first ${DEFAULT_CHUNK_LIMIT.toLocaleString('en-US')} passages were read (approved documents first, then the oldest). Newer documents may not be covered.` } : {}) })
 })
 
 /** Record a decision on a candidate: { documentId, key, status: 'confirmed' | 'dismissed' }. */

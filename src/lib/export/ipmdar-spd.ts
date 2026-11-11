@@ -17,7 +17,7 @@ import { crc32 as zlibCrc32, deflateRawSync } from 'zlib'
 import type { GeneratedSchedule, PlanActivity, WorkCalendar } from '@/lib/planning/types'
 import type { ResourceKind } from '@/lib/planning/resource-types'
 import { countWorkDaysInclusive, isValidDate, workDaysBetween } from '@/lib/planning/calendar'
-import { buildWbs } from './wbs'
+import { buildWbs, sourceWbsSplitter } from './wbs'
 import type { WbsNode } from './wbs'
 
 /* ─── Names fixed by the specification ───────────────── */
@@ -158,6 +158,11 @@ export interface IpmdarSpdOptions {
    * carry a source WBS (uploaded schedules). True also outlines RunF9's own phases.
    */
   outline?: boolean
+  /**
+   * Activity IDs of level-of-effort activities the caller left out of the schedule it passes in.
+   * They are not in the dataset; a warning names them so the omission is never silent.
+   */
+  omittedLevelOfEffort?: string[]
 }
 
 export interface IpmdarSpdResult {
@@ -296,7 +301,8 @@ export function buildIpmdarSpd(input: GeneratedSchedule, opts: IpmdarSpdOptions 
   const badConstraint: string[] = []
   let planningLevelDefaulted = 0
 
-  const sourceWbsId = (a: PlanActivity) => (a.wbs ? spdStringId(a.wbs.trim().split(/\s+/)[0]) : '')
+  const splitWbs = sourceWbsSplitter((s.activities || []).map(a => a.wbs))
+  const sourceWbsId = (a: PlanActivity) => (a.wbs ? spdStringId(splitWbs(a.wbs)?.code ?? '') : '')
 
   for (const a of s.activities || []) {
     const label = spdString(a.code) || spdString(a.name) || a.id
@@ -396,6 +402,8 @@ export function buildIpmdarSpd(input: GeneratedSchedule, opts: IpmdarSpdOptions 
   if (badCal.length) warnings.push(`${plural(badCal.length, 'activity refers', 'activities refer')} to a calendar that is not in the schedule; the default calendar is written instead: ${sample(badCal)}.`)
   if (planningLevelDefaulted) warnings.push(`Tasks.TaskPlanningLevelID is required for activities, and the schedule does not say which are work packages, planning packages or control accounts; "ACTIVITY" (none of the others applies) is written for all ${plural(planningLevelDefaulted, 'activity', 'activities')}.`)
   if (loe.length) warnings.push(`${plural(loe.length, 'level-of-effort activity is', 'level-of-effort activities are')} written as HAMMOCK tasks spanning the work they are tied to, with late dates equal to early dates and zero float when RunF9 did not calculate them: ${sample(loe)}.`)
+  const omittedLoe = (opts.omittedLevelOfEffort || []).map(c => spdString(c)).filter(Boolean)
+  if (omittedLoe.length) warnings.push(`${plural(omittedLoe.length, 'level-of-effort activity is', 'level-of-effort activities are')} not in this dataset, and neither are ${omittedLoe.length === 1 ? 'its' : 'their'} relationships: ${sample(omittedLoe)}. Add ${omittedLoe.length === 1 ? 'it' : 'them'} in the receiving tool if the submission must carry level-of-effort work.`)
   if (noActualStart.length) warnings.push(`${plural(noActualStart.length, 'started activity has', 'started activities have')} no actual start date (required once a task has started); ActualStartDate is left out: ${sample(noActualStart)}.`)
   if (noActualFinish.length) warnings.push(`${plural(noActualFinish.length, 'completed activity has', 'completed activities have')} no actual finish date (required once a task has finished); ActualFinishDate is left out: ${sample(noActualFinish)}.`)
   if (partBaseline.length) warnings.push(`${plural(partBaseline.length, 'activity has', 'activities have')} only one of the two baseline dates; the SPD baseline fields must be all present or all absent, so they are left out: ${sample(partBaseline)}.`)

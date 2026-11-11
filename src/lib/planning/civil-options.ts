@@ -30,6 +30,17 @@ export const WINTER_SHUTDOWN = { from: '12-01', to: '03-31', label: 'December 1 
 /** Water / wastewater: most process structures planned individually (pour, cure, leak test, backfill). */
 export const WW_MAX_STRUCTURES = 12
 
+/**
+ * Counts the plan caps (see civilOptionsFrom). When an answer is above the cap the generator says so
+ * in the assumptions and notes instead of reducing it silently.
+ */
+export const CIVIL_COUNT_CAPS: { type: ProjectType; questionId: string; max: number; noun: string; planned: string; advice: string }[] = [
+  { type: 'highway_bridge', questionId: 'civil.mot_phases', max: 4, noun: 'maintenance-of-traffic stages', planned: 'the plan builds 4 stages, the most it details.', advice: 'Add the other stages as activities, or treat a planned stage as standing for more than one.' },
+  { type: 'highway_bridge', questionId: 'civil.utility_owners', max: 12, noun: 'utility owners', planned: 'utility relocation time is sized for 12 owners, the most the plan sizes for.', advice: 'Lengthen the relocation activity if more owners must be sequenced.' },
+  { type: 'transit_rail', questionId: 'transit.stations', max: 20, noun: 'stations', planned: 'station work is sized for 20 stations, the most the plan sizes for.', advice: 'Lengthen the station activities or add the other stations as activities.' },
+  { type: 'epc_industrial', questionId: 'epc.hydrotest_systems', max: 6, noun: 'test systems', planned: 'the plan details 6 systems, the most it tests and turns over one by one.', advice: 'Add the other systems as activities, or treat a planned system as standing for more than one.' },
+]
+
 const SEASONAL_TYPES: ProjectType[] =['highway_bridge', 'aviation']
 const IN_WATER_TYPES: ProjectType[] = ['highway_bridge', 'marine_civil_works']
 

@@ -38,10 +38,12 @@ export function BetaAdmin() {
   const [filter, setFilter] = useState('')
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/platform/beta')
-    const d = await res.json().catch(() => ({}))
-    if (!res.ok) { setMsg({ tone: 'error', text: d.error || 'Could not load the beta.', section: 'top' }); return }
-    setData(d)
+    try {
+      const res = await fetch('/api/platform/beta')
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setMsg({ tone: 'error', text: d.error || 'Could not load the beta.', section: 'top' }); return }
+      setData(d)
+    } catch { setMsg({ tone: 'error', text: 'Could not load the beta. Check your connection and reload.', section: 'top' }) }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -63,6 +65,7 @@ export function BetaAdmin() {
 
   return (
     <div className="px-4 md:px-6 py-6 max-w-5xl space-y-5">
+      {note('top')}
       <div>
         <h1 className="page-title">Beta access</h1>
         <p className="text-[13.5px] text-warm-600">

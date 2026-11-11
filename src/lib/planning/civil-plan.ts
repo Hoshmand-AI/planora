@@ -46,12 +46,13 @@ function seasonDates(fromMD: string, toMD: string, y0: number, y1: number): stri
  * Paving, striping and seeding go on a seasonal calendar with no work days in the winter shutdown, so
  * the CPM cannot put them in winter (pilot finding: northern-state paving was scheduled in January).
  */
-export function applySeasonalCalendar(acts: Map<string, PlanActivity>, calendars: WorkCalendar[], seasonalIds: Set<string>, field: WorkCalendar, notes: string[], assumptions: Assumption[]): void {
+export function applySeasonalCalendar(acts: Map<string, PlanActivity>, calendars: WorkCalendar[], seasonalIds: Set<string>, field: WorkCalendar, notes: string[], assumptions: Assumption[], startYear = 2026): void {
   if (!seasonalIds.size) return
   const base = (id: string) => id.replace(/#\d+$/, '')
   const affected = [...acts.values()].filter(a => seasonalIds.has(base(a.id)))
   if (!affected.length) return
-  const y0 = Number((field.holidays[0] || '2026-01-01').slice(0, 4)) - 1
+  // Without holidays on the field calendar (holidays off, or outside the US) the years come from the project start.
+  const y0 = Number((field.holidays[0] || `${startYear}-01-01`).slice(0, 4)) - 1
   const holidays = [...new Set([...field.holidays, ...seasonDates(WINTER_SHUTDOWN.from, WINTER_SHUTDOWN.to, y0, y0 + 8)])].sort()
   calendars.push({
     id: SEASON_CAL, name: `Seasonal field work — no paving, striping or seeding ${WINTER_SHUTDOWN.label}`, workDays: field.workDays, hoursPerDay: field.hoursPerDay,

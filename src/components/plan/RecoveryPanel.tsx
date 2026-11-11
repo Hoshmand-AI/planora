@@ -74,11 +74,11 @@ export function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: Recovery
       <div className="flex items-start gap-4">
         <Robot mood="worried" size={52} className="flex-shrink-0 -ml-1" />
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-status-at-risk">Finish is {r.gapDays} days after the required date</div>
+          <div className="text-[12.5px] font-semibold text-status-at-risk">Finish is {r.gapDays} day{r.gapDays === 1 ? '' : 's'} after the required date</div>
           <h3 id="recovery-title" className="text-[17px] md:text-[18px] font-semibold text-navy-950 tracking-[-0.01em] mt-0.5">Forecast {fmtDate(r.finish)} vs required {fmtDate(r.required)}</h3>
           <p className="text-[13.5px] text-warm-700 mt-1">
             {best
-              ? <>{best.meetsDate ? 'Good news: ' : ''}<span className="font-medium text-navy-950">{best.title}</span> would finish {fmtDate(best.newFinish)}{best.meetsDate ? ', in time for the required date.' : `, ${best.daysSaved} days sooner.`}{meeting > 1 ? ` ${meeting} options meet the date on their own.` : ''}</>
+              ? <>{best.meetsDate ? 'Good news: ' : ''}<span className="font-medium text-navy-950">{best.title}</span> would finish {fmtDate(best.newFinish)}{best.meetsDate ? ', in time for the required date.' : `, ${best.daysSaved} day${best.daysSaved === 1 ? '' : 's'} sooner.`}{meeting > 1 ? ` ${meeting} options meet the date on their own.` : ''}</>
               : 'None of the modeled levers saves time on its own. See why below, and what you can change.'}
           </p>
         </div>

@@ -21,9 +21,13 @@ export function Integrations() {
   const [key, setKey] = useState({ name: '', role: 'viewer', expiresInDays: '365' })
   const [hook, setHook] = useState<{ url: string; events: string[] }>({ url: '', events: ['plan.publish', 'plan.review'] })
 
+  const [loadErr, setLoadErr] = useState(false)
   const load = useCallback(async () => {
-    const res = await fetch(URL_)
-    if (res.ok) setData(await res.json())
+    try {
+      const res = await fetch(URL_)
+      if (!res.ok) throw new Error('load')
+      setData(await res.json()); setLoadErr(false)
+    } catch { setLoadErr(true) }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -37,7 +41,11 @@ export function Integrations() {
     return r.data
   }
 
-  if (!data) return null
+  if (!data) return loadErr ? (
+    <Section title="Integrations: API and webhooks">
+      <div className="space-y-2"><Alert tone="error">Could not load integrations. Check your connection and try again.</Alert><Button variant="secondary" onClick={load}>Try again</Button></div>
+    </Section>
+  ) : null
   return (
     <Section title="Integrations: API and webhooks" description="Connect RunF9 to BI dashboards, a data warehouse or your own tools. API keys act with a limited role and can be revoked at any time; webhooks send signed notifications when things happen. Everything here is in the audit log. The developer guide (endpoints, webhook signatures) is available from support@hoshmand.ai.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}

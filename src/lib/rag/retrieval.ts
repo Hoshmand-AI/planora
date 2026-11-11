@@ -147,12 +147,21 @@ export function buildGetDocumentSql(s: RetrievalScope, documentId: string): Buil
   return { text: `WITH ${sc.cte} SELECT d.* FROM project_documents d ${sc.join} WHERE ${sc.where} AND d.id = ${ps.p(documentId)}`, values: ps.values }
 }
 
-/** Every passage of the visible documents (for requirement extraction), in reading order. */
-export function buildChunksSql(s: RetrievalScope, o: { includeUnreviewed: boolean; limit: number }): Built {
+/**
+ * Every passage of the visible documents (for requirement extraction), in reading order. The optional
+ * filters (one document, document types, project or organization documents) only narrow the result
+ * further, inside the same authorization SQL, so the row limit is spent on the passages asked for.
+ */
+export function buildChunksSql(s: RetrievalScope, o: { includeUnreviewed: boolean; limit: number; documentId?: string; docTypes?: readonly string[]; docScope?: DocScope }): Built {
   const ps = new Params()
   ps.p(s.orgId); ps.p(s.scheduleId)
   const sc = scope(s.access, ps)
   const unreviewed = ps.p(o.includeUnreviewed)
+  const narrow = [
+    o.documentId !== undefined ? ` AND d.id = ${ps.p(o.documentId)}` : '',
+    o.docTypes !== undefined ? ` AND d.doc_type = ANY(${ps.p([...o.docTypes])}::text[])` : '',
+    o.docScope !== undefined ? ` AND d.scope = ${ps.p(o.docScope)}` : '',
+  ].join('')
   const limit = ps.p(o.limit)
   return {
     text: `WITH ${sc.cte}
@@ -161,7 +170,7 @@ export function buildChunksSql(s: RetrievalScope, o: { includeUnreviewed: boolea
       FROM document_chunks c
       JOIN project_documents d ON d.id = c.document_id AND d.org_id = c.org_id
       ${sc.join}
-      WHERE c.org_id = $1 AND ${sc.where} AND (${unreviewed}::boolean OR d.trust = 'approved')
+      WHERE c.org_id = $1 AND ${sc.where} AND (${unreviewed}::boolean OR d.trust = 'approved')${narrow}
       ORDER BY tier ASC, d.created_at ASC, c.ordinal ASC
       LIMIT ${limit}`,
     values: ps.values,

@@ -32,7 +32,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
 type Body = { action?: string; id?: string; provider?: string; name?: string; config?: Record<string, unknown>; secret?: Record<string, unknown> }
 
 export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
-  const body = (await req.json().catch(() => ({}))) as Body
+  const body = (await jsonObject(req)) as Body
   const rl = await hit(`storage:org:${auth.orgId}`, 30, 3600)
   if (!rl.ok) throw new ApiError(429, 'Too many storage changes this hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
 
