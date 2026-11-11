@@ -152,6 +152,18 @@ export async function assignToWorkspace(orgId: string, item: { type: 'schedule' 
       const moved = s.project_key
         ? await q(`UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND (id=$2 OR (project_key=$4 AND source_type <> 'generated' AND workspace_id IS NOT DISTINCT FROM $5))`, [orgId, s.id, workspaceId, s.project_key, s.workspace_id ?? null])
         : await q('UPDATE schedules SET workspace_id=$3 WHERE org_id=$1 AND id=$2', [orgId, s.id, workspaceId])
+      // The project's register, morning-brief subscriptions and inboxes are filed under the series inside its
+      // workspace (registerKey): they move with it.
+      if (s.project_key) {
+        const key = (ws: string | null) => (ws ? `ws:${ws}|${s.project_key}` : String(s.project_key))
+        const from = key((s.workspace_id as string) ?? null), to = key(workspaceId)
+        if (from !== to) {
+          await q('UPDATE project_items SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
+          await q('UPDATE project_inboxes SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
+          await q('DELETE FROM brief_subscriptions b WHERE b.org_id=$1 AND b.project_key=$2 AND EXISTS (SELECT 1 FROM brief_subscriptions x WHERE x.org_id=$1 AND x.project_key=$3 AND x.user_id=b.user_id)', [orgId, from, to])
+          await q('UPDATE brief_subscriptions SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
+        }
+      }
       return { name: String(s.name), before: (s.workspace_id as string) ?? null, schedules: moved.rowCount ?? 0, plans: 0 }
     }
     const cur = await q('SELECT id, name, workspace_id FROM plans WHERE id=$1 AND org_id=$2 FOR UPDATE', [item.id, orgId])

@@ -473,7 +473,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
       name,
       wbs: isSummary ? ownWbs : parentWbs || ownWbs,
       duration,
-      remainingDuration: remTxt ? days(remTxt, 'Task.RemainingDuration') : status === 'complete' ? 0 : duration,
+      remainingDuration: remTxt ? (elapsedDuration ? Math.min(duration, Math.round((mspDurationHours(remTxt, 24) / 24 * 5) / 7)) : days(remTxt, 'Task.RemainingDuration')) : status === 'complete' ? 0 : duration,
       percentComplete: pct,
       earlyStart: isoDatePrefix(tagText(own, 'EarlyStart')) || isoDatePrefix(tagText(own, 'Start')),
       earlyFinish: isoDatePrefix(tagText(own, 'EarlyFinish')) || isoDatePrefix(tagText(own, 'Finish')),

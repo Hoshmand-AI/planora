@@ -19,7 +19,7 @@ export async function loadTiaContext(scheduleId: string, orgId: string, basis: S
   }
   let previous: TiaPrevious | null = null
   if (s.projectKey) {
-    const series = orderSeries(await getScheduleSeries(orgId, s.projectKey))
+    const series = orderSeries(await getScheduleSeries(orgId, s.projectKey, s.workspaceId ?? null))
     const idx = series.findIndex(x => x.id === s.id)
     const prev = idx > 0 ? series.slice(0, idx).reverse().find(x => !s.dataDate || !x.dataDate || x.dataDate < s.dataDate) : undefined
     const p = prev ? await loadScheduleData(prev.id, orgId).catch(() => null) : null

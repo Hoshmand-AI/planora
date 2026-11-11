@@ -10,6 +10,7 @@ import { extractDocument, DocumentRejected } from './extract'
 import { buildChunksSql, buildGetDocumentSql, buildListDocumentsSql, rowToRetrieved, HybridRetriever, PostgresFtsRetriever } from './retrieval'
 import { embed, embeddingsActive } from './embeddings'
 import { log } from '@/lib/server/log'
+import { hasControlMarkings, mostRestrictive } from '@/lib/server/classification'
 import type { DocScope, DocType, RetrievalScope, RetrievedChunk, StoredDocument, Trust } from './types'
 
 export const MAX_CHUNKS_PER_DOCUMENT = 4000
@@ -113,6 +114,9 @@ export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
   if (!drafts.length) throw new DocumentRejected('No usable text was found in this document.', 'empty')
   if (drafts.length > MAX_CHUNKS_PER_DOCUMENT) throw new DocumentRejected('This document is too long to index in one piece. Split it and upload the parts.', 'too_long')
   const sha256 = createHash('sha256').update(i.content).digest('hex')
+  // The document's own banner or portion markings (CUI, FOUO, NOFORN...) make it CUI at least, whatever the
+  // project's setting says: its passages then never go to a cloud model (grounding.ts).
+  const classification = drafts.some(d => hasControlMarkings(`${d.heading ?? ''}\n${d.text}`)) ? mostRestrictive(i.classification, 'cui') : i.classification
   const screened = drafts.map(d => ({ ...d, findings: detectInjection(`${d.heading ?? ''}\n${d.text}`) }))
   const flagged = screened.filter(c => c.findings.length)
   const id = randomUUID()
@@ -125,7 +129,7 @@ export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
     if (dup.rows[0]) throw new DocumentRejected('This exact file is already attached here.', 'duplicate')
     await q(`INSERT INTO project_documents (id, org_id, scope, schedule_id, title, file_name, format, doc_type, trust, classification, sha256, size_bytes, page_count, chunk_count, flagged_count, uploaded_by, read_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'unreviewed',$9,$10,$11,$12,$13,$14,$15,$16)`,
-    [id, i.orgId, i.scope, i.scheduleId, i.title, i.fileName.slice(0, 255), format, i.docType, i.classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy, readBy])
+    [id, i.orgId, i.scope, i.scheduleId, i.title, i.fileName.slice(0, 255), format, i.docType, classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy, readBy])
     // Batched inserts (one statement per 200 passages).
     for (let k = 0; k < screened.length; k += 200) {
       const batch = screened.slice(k, k + 200)

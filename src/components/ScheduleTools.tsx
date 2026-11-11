@@ -4,9 +4,9 @@
 // reasons), what-if / recovery options, Monte Carlo risk with the scheduler's own ranges and risk
 // events, exports back to P6 / MS Project / Excel, the original file, and how RunF9 schedules it.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Disclosure } from './Disclosure'
-import { fmtDate } from '@/lib/format'
+import { fmtDate, fmtDates } from '@/lib/format'
 import { EditsPanel, RecoveryPanel, RiskInputsPanel, type RiskInputsView } from './UploadedScheduleEdits'
 
 interface SeriesRow { id: string; version: string; dataDate: string | null; forecastFinish: string | null; varianceDays: number | null; status: string | null }
@@ -69,22 +69,30 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       setSeries(d.series || [])
       setCmp(d.comparison || null)
       setCmpMsg(d.message || d.error || '')
-    }).catch(() => {})
+    }).catch(() => { if (live) setCmpMsg('Could not load the comparison. Check your connection and reload.') })
     return () => { live = false }
   }, [scheduleId, base, basis])
   useEffect(() => { setSra(null) }, [basis])
 
+  // The basis the page shows now: an answer for another basis (switched while it ran) is dropped.
+  const basisNow = useRef(basis)
+  basisNow.current = basis
   const runRisk = async () => {
+    const asked = basis
     setBusy(true); setSraErr('')
-    const r = await fetch(`/api/schedules/${scheduleId}/risk${basis === 'scenario' ? '?basis=scenario' : ''}`)
-    const d = await r.json().catch(() => ({}))
-    setBusy(false)
-    if (r.ok) setSra(d); else setSraErr(d.error || 'Risk analysis failed.')
+    try {
+      const r = await fetch(`/api/schedules/${scheduleId}/risk${asked === 'scenario' ? '?basis=scenario' : ''}`)
+      const d = await r.json().catch(() => ({}))
+      if (basisNow.current !== asked) return
+      if (r.ok) setSra(d); else setSraErr(d.error || 'Risk analysis failed.')
+    } catch { setSraErr('Could not reach RunF9. Check your connection and try again.') } finally { setBusy(false) }
   }
   const patch = async (body: Record<string, unknown>) => {
-    const r = await fetch('/api/schedules', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scheduleId, ...body }) })
-    const d = await r.json().catch(() => ({}))
-    setNotes(r.ok ? (d.warnings ?? []) : [d.error || 'The change was not saved.'])
+    try {
+      const r = await fetch('/api/schedules', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scheduleId, ...body }) })
+      const d = await r.json().catch(() => ({}))
+      setNotes(r.ok ? (d.warnings ?? []) : [d.error || 'The change was not saved.'])
+    } catch { setNotes(['The change was not saved: could not reach RunF9.']) }
     onChanged()
   }
   const restricted = classification === 'cui' || classification === 'classified'
@@ -127,12 +135,12 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             {cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).length > 0 && (
               <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Duration, constraint and calendar changes</caption>
                 <thead><tr><th className={th}>ID</th><th className={th}>Activity</th><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th></tr></thead>
-                <tbody>{cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).slice(0, 20).map((c, i) => <tr key={i}><td className={td}>{c.code}</td><td className={td}>{c.name}</td><td className={td}>{c.field}</td><td className={td}>{String(c.before ?? '—')}</td><td className={td}>{String(c.after ?? '—')}</td></tr>)}</tbody></table></div>
+                <tbody>{cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).slice(0, 20).map((c, i) => <tr key={i}><td className={td}>{c.code}</td><td className={td}>{c.name}</td><td className={td}>{c.field}</td><td className={td}>{fmtDates(String(c.before ?? '—'))}</td><td className={td}>{fmtDates(String(c.after ?? '—'))}</td></tr>)}</tbody></table></div>
             )}
             {(cmp.logicAdded.length + cmp.logicDeleted.length) > 0 && (
               <p><span className="font-semibold text-navy-950">Logic:</span> {cmp.logicAdded.slice(0, 8).map(l => `+ ${l.pred}→${l.succ} ${l.type}`).concat(cmp.logicDeleted.slice(0, 8).map(l => `− ${l.pred}→${l.succ} ${l.type}`)).join(' · ')}</p>
             )}
-            {cmp.actualsRewritten.length > 0 && <p className="border-l-2 border-status-at-risk pl-2"><span className="font-semibold">Actuals rewritten:</span> {cmp.actualsRewritten.map(c => `${c.code} ${c.field.replace('_', ' ')} ${fmtDate(String(c.before))} → ${fmtDate(String(c.after))}`).join('; ')}</p>}
+            {cmp.actualsRewritten.length > 0 && <p className="border-l-2 border-status-at-risk pl-2"><span className="font-semibold">Actuals rewritten:</span> {cmp.actualsRewritten.map(c => `${c.code} ${c.field.replace('_', ' ')} ${c.before ? fmtDate(String(c.before)) : 'none'} → ${c.after ? fmtDate(String(c.after)) : 'none'}`).join('; ')}</p>}
             {(cmp.added.length + cmp.deleted.length) > 0 && <p><span className="font-semibold text-navy-950">Added:</span> {cmp.added.map(a => a.code).join(', ') || 'none'} · <span className="font-semibold text-navy-950">Deleted:</span> {cmp.deleted.map(a => a.code).join(', ') || 'none'}</p>}
           </div>
         )}
@@ -188,7 +196,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
           ))}
         </div>
         <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
-        {!restricted && <p className="text-[12px] text-warm-600 mt-1">The IPMDAR dataset follows the DoD Schedule Performance Dataset format, version 1.0, and is marked UNCLASSIFIED. Run it through the government&apos;s validator and add your contract details before you submit it.</p>}
+        {!restricted && <p className="text-[12px] text-warm-600 mt-1">The IPMDAR dataset follows the DoD Schedule Performance Dataset format, version 1.0, and carries the UNCLASSIFIED marking only when this schedule&apos;s classification is set to Unclassified; otherwise the marking is left for you to fill. Run it through the government&apos;s validator and add your contract details before you submit it.</p>}
         {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 

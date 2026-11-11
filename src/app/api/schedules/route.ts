@@ -405,7 +405,7 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     await audit({ action: 'schedule.relabel', targetType: 'schedule', targetId: s.id, detail: { name: s.name, before: s.version, after: version } })
     // Relabeling can make (or stop making) this upload the series Baseline; the next read re-measures variance.
     if (s.projectKey) {
-      const series = await getScheduleSeries(ctx.orgId, s.projectKey)
+      const series = await getScheduleSeries(ctx.orgId, s.projectKey, s.workspaceId ?? null)
       if (series.some(x => x.id !== s.id && x.version.trim().toLowerCase() === version!.toLowerCase())) warnings.push(`Another upload of this project is also labelled "${version}".`)
     }
   }
@@ -465,7 +465,7 @@ export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: c
     let next: string | null = null
     let chosen: { id: string; version: string; dataDate: string | null } | null = null
     if (typeof raw === 'string' && raw.trim()) {
-      const series = s.projectKey ? await getScheduleSeries(ctx.orgId, s.projectKey) : []
+      const series = s.projectKey ? await getScheduleSeries(ctx.orgId, s.projectKey, s.workspaceId ?? null) : []
       const hit = series.find(x => x.id === raw.trim())
       if (!hit || hit.id === s.id) return NextResponse.json({ error: 'The baseline must be another upload of the same project.', code: 'invalid_baseline' }, { status: 400 })
       if (hit.dataDate && s.dataDate && hit.dataDate > s.dataDate) return NextResponse.json({ error: `${hit.version} has a later data date (${fmtDate(hit.dataDate)}) than this upload, so it cannot be its baseline.`, code: 'invalid_baseline' }, { status: 400 })

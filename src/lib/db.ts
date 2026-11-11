@@ -439,11 +439,17 @@ export async function isRunF9ExportSha(orgId: string, sha256: string): Promise<b
 }
 
 /** Every upload in the same update series, oldest data date first. */
-export async function getScheduleSeries(orgId: string, projectKey: string): Promise<Schedule[]> {
+/**
+ * `workspaceId` (a workspace id, or null for organization-wide) keeps the series inside one workspace:
+ * two walled matters can hold a project with the same P6 name, and one's updates are not the other's.
+ * Pass the schedule's own workspace whenever the series is "this project's updates".
+ */
+export async function getScheduleSeries(orgId: string, projectKey: string, workspaceId?: string | null): Promise<Schedule[]> {
   await initSchema()
   const ws = await workspaceScope('workspace_id', 3)
-  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'${ws.and}
-    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey, ...ws.params])
+  const same = workspaceId === undefined ? '' : ` AND workspace_id IS NOT DISTINCT FROM $${3 + ws.params.length}`
+  const res = await query(`SELECT * FROM schedules WHERE org_id=$1 AND project_key=$2 AND source_type <> 'generated'${ws.and}${same}
+    ORDER BY data_date NULLS FIRST, uploaded_at`, [orgId, projectKey, ...ws.params, ...(workspaceId === undefined ? [] : [workspaceId])])
   return res.rows.map(rowToSchedule)
 }
 

@@ -86,7 +86,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy('saml'); setMsg(null); setHelp(null)
-    const groupRoles = form.groupRoles.split('\n').map(l => l.split('=')).filter(p => p.length === 2 && p[0].trim()).map(([group, role]) => ({ group: group.trim(), role: role.trim().toLowerCase() }))
+    const groupRoles = form.groupRoles.split('\n').map(l => { const i = l.lastIndexOf('='); return i < 0 ? [] : [l.slice(0, i), l.slice(i + 1)] }).filter(p => p.length === 2 && p[0].trim() && p[1].trim()).map(([group, role]) => ({ group: group.trim(), role: role.trim().toLowerCase() }))
     const r = await postJson('/api/org/saml', { action: 'save', saml: {
       enabled: form.enabled, enforce: form.enforce, idpEntityId: form.idpEntityId, ssoUrl: form.ssoUrl, certs: form.certs, nameIdFormat: form.nameIdFormat,
       attributes: { email: form.email, name: form.name, groups: form.groups }, defaultRole: form.defaultRole, groupRoles, domains: form.domains.split(/[\s,]+/).filter(Boolean),

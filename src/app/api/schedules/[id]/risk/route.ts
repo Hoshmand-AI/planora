@@ -36,7 +36,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   const key = `${data.schedule.id}:${basis}:${data.analysis.progressMode}:${basis === 'scenario' ? editsFingerprint(data.edits) : ''}:${inputs.updatedAt ?? ''}:${milestones.map(m => `${m.id}@${m.required}`).join(',')}`
   let result = cache.get(key)
   if (!result) {
-    const g = uploadedToGenerated(data.schedule, data.activities, data.relationships, data.cpm, data.analysis, basis === 'scenario' ? data.edits : [])
+    const g = uploadedToGenerated(data.schedule, data.activities, data.relationships, data.cpm, data.analysis, basis === 'scenario' ? data.edits : [], { assumeFinishOfCompleted: true })
     const history = await loadFirmHistory(auth.orgId, (data.schedule.projectType as ProjectType) || undefined)
     result = runSra(g, {}, history, { inputs: { ranges: inputs.ranges, events: inputs.events, commitments: inputs.commitments, milestones, nameRules: true } })
     const note = basisWarning(basis, data.editsApplied)

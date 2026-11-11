@@ -301,6 +301,9 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
   const [reason, setReason] = useState('')
   const opts = useCallback(() => ({ mode, allowFinishExtension: mode === 'level' && extend, availability: staffing, resource: selected, bucket }), [mode, extend, staffing, selected, bucket])
 
+  // A preview belongs to the options it was run with: changing them clears it, so what is saved is what was shown.
+  useEffect(() => { setPreview(null) }, [mode, extend, staffing])
+
   const run = async () => {
     setBusy(true); setErr(''); setMsg('')
     const r = await postJson(base, opts())

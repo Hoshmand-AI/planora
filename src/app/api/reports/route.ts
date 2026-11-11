@@ -38,7 +38,7 @@ export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
   // The previous upload of the same project, for the "since the last update" sections.
   let comparison = null
   if (schedule.projectKey) {
-    const series = await getScheduleSeries(auth.orgId, schedule.projectKey)
+    const series = await getScheduleSeries(auth.orgId, schedule.projectKey, schedule.workspaceId ?? null)
     const idx = series.findIndex(s => s.id === schedule.id)
     const prev = idx > 0 ? await loadScheduleData(series[idx - 1].id, auth.orgId, { basis }) : null
     if (prev) {

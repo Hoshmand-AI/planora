@@ -5,7 +5,7 @@
 // be kept in RunF9 or in a connected storage. Renders the form fields the upload APIs read:
 // file | sourceConnectionId + sourceKey, and keepIn (src/lib/storage/upload-source.ts).
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Cloud, Folder, FileText, Laptop, Loader2, ChevronRight } from 'lucide-react'
 
@@ -37,17 +37,22 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
     return () => { live = false }
   }, [])
 
+  // The connection on screen: a listing that arrives for another one is dropped.
+  const current = useRef('')
   const browse = useCallback(async (id: string, prefix?: string) => {
+    current.current = id
     setBrowsing(true); setBrowseError('')
     try {
       const res = await fetch(`/api/storage/${encodeURIComponent(id)}/objects${prefix !== undefined ? `?prefix=${encodeURIComponent(prefix)}` : ''}`)
       const d = await res.json().catch(() => ({}))
+      if (current.current !== id) return
       if (!res.ok) { setBrowseError(d.error || 'Could not list the files.'); setListing(null); return }
       setListing(d)
     } catch { setBrowseError('Could not reach RunF9. Try again.') } finally { setBrowsing(false) }
   }, [])
 
   const choose = (id: string) => {
+    current.current = id
     setFrom(id); setPicked(''); setListing(null)
     if (id !== 'computer') browse(id)
   }

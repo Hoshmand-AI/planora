@@ -2,6 +2,7 @@
 // analysis and exports to P6 / MS Project / Excel. Activity IDs, the source WBS, progress, baseline
 // dates, calendars, constraints and the required finish are carried over unchanged.
 
+import { assumedFinishOf } from './complete-schedule'
 import type { Activity, Relationship, Schedule } from '@/lib/db'
 import type { ScheduleAnalysis } from '@/lib/analysis/schedule-analysis'
 import { CONSTRAINT_TYPES, type CanonicalCategory, type ConstraintType, type CpmResult, type GeneratedSchedule, type Override, type PlanActivity, type PlanLink } from './types'
@@ -42,7 +43,7 @@ export function editOverrides(edits: AppliedEdit[]): Map<string, Override[]> {
  *   `levelOfEffort`, which carries the file's dates). Only for exports that write them out (MS Project
  *   XML); the CPM, risk analysis and the other exports leave LOE out, as P6 does when scheduling.
  */
-export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = [], opts: { includeLoe?: boolean; resources?: ResourceData | null } = {}): GeneratedSchedule {
+export function uploadedToGenerated(s: Schedule, activities: Activity[], relationships: Relationship[], cpm: CpmResult | null, analysis: ScheduleAnalysis | null, edits: AppliedEdit[] = [], opts: { includeLoe?: boolean; resources?: ResourceData | null; assumeFinishOfCompleted?: boolean } = {}): GeneratedSchedule {
   const overrides = editOverrides(edits)
   const calendars = s.calendars?.length ? s.calendars : [defaultCalendar()]
   const defaultCalendarId = s.defaultCalendarId && calendars.some(c => c.id === s.defaultCalendarId) ? s.defaultCalendarId : calendars[0].id
@@ -58,7 +59,11 @@ export function uploadedToGenerated(s: Schedule, activities: Activity[], relatio
       milestoneKind: a.activityType === 'milestone' && a.milestoneKind ? a.milestoneKind : undefined,
       calendarId: a.calendarId && calendars.some(c => c.id === a.calendarId) ? a.calendarId : defaultCalendarId,
       constraint: a.constraintType && CSTR.has(a.constraintType) && a.constraintDate ? { type: a.constraintType as ConstraintType, date: a.constraintDate } : undefined,
-      actualStart: a.actualStart, actualFinish: a.actualFinish,
+      // For analysis (risk simulation), work marked complete without an actual finish is done, as in the main
+      // calculation (complete-schedule.ts). Exports keep the file's own dates and invent none.
+      ...(opts.assumeFinishOfCompleted && a.status === 'complete' && !a.actualFinish
+        ? { actualStart: a.actualStart ?? assumedFinishOf(a, s.dataDate), actualFinish: assumedFinishOf(a, s.dataDate) }
+        : { actualStart: a.actualStart, actualFinish: a.actualFinish }),
       category, phase: phaseOf(category),
       rationale: { summary: `From the uploaded file ${s.fileName}`, sources: [{ kind: 'file', label: s.fileName }], confidence: 'medium' },
       wbs: a.wbs || undefined, status: a.status, percentComplete: a.percentComplete,

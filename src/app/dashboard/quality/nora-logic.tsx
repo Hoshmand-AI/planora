@@ -10,6 +10,7 @@ import { ArrowRight, Download, Loader2 } from 'lucide-react'
 import { MoodTile, Robot, type RobotMood } from '@/components/Robot'
 import { Disclosure } from '@/components/Disclosure'
 import { postJson } from '@/components/ui'
+import { useApp } from '../layout'
 import type { LogicSuggestion, LogicAssistResult } from '@/lib/logic-assist/suggest'
 import { suggestionsCsv, SUGGESTION_KIND_LABEL } from '@/lib/logic-assist/csv'
 
@@ -44,6 +45,7 @@ function headline(d: Data): { mood: RobotMood; title: string; sub: string } {
 }
 
 export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; canEdit: boolean }) {
+  const { refreshMetrics } = useApp()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
@@ -92,6 +94,8 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
   const applied = (s: LogicSuggestion) => {
     setStatus(`Added ${s.predecessor.code} → ${s.successor.code} to the “With RunF9 edits” scenario. The uploaded file is unchanged; you can revert it from the schedule dashboard’s edits.`)
     load()
+    // Overview and the tab badges count RunF9 edits from the shared project state.
+    refreshMetrics()
   }
   return (
     <section aria-labelledby="nora-logic-h" id="nora-logic" className="space-y-3">

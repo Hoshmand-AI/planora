@@ -110,7 +110,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   let sinceLastUpdate: DailyBrief['changed']['sinceLastUpdate'] = null
   if (s.projectKey) {
     try {
-      const series = orderSeries(await getScheduleSeries(orgId, s.projectKey))
+      const series = orderSeries(await getScheduleSeries(orgId, s.projectKey, s.workspaceId ?? null))
       const idx = series.findIndex(x => x.id === s.id)
       const prev = idx > 0 ? series[idx - 1] : undefined
       const p = prev ? await loadScheduleData(prev.id, orgId) : null
