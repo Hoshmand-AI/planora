@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Loader2, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
 import { askText } from '@/components/AskText'
-import { fmtDate, fmtDay } from '@/lib/format'
+import { fmtDay } from '@/lib/format'
 import { formatMb, tooLargeMessage } from '@/lib/upload-limit'
 
 interface Doc {
@@ -25,6 +25,7 @@ interface Candidate {
   fromFlaggedPassage: boolean; documentTrust: string; review: { status: string; createdAt: string } | null
 }
 
+const passages = (n: number) => `${n} passage${n === 1 ? '' : 's'}`
 const badge = 'inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium border'
 const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   ? <span className={`${badge} bg-status-on-track-bg border-status-on-track/40 text-status-on-track`}>Approved</span>
@@ -38,17 +39,22 @@ export default function DocumentsPage() {
   const [requirements, setRequirements] = useState<Candidate[] | null>(null)
   const base = selectedSchedule ? `/api/schedules/${encodeURIComponent(selectedSchedule.id)}/documents` : ''
 
+  // Only the newest request may land: a slow answer for one project must never be listed under another.
+  const seq = useRef(0)
   const load = useCallback(async () => {
     if (!base) return
+    const mine = ++seq.current
     setError('')
     try {
       const [l, r] = await Promise.all([fetch(base), fetch(`${base}/requirements`)])
       const ld = await l.json().catch(() => ({}))
+      if (mine !== seq.current) return
       if (!l.ok) { setError(ld.error || 'Could not load documents.'); return }
       setData(ld)
       const rd = await r.json().catch(() => ({}))
+      if (mine !== seq.current) return
       setRequirements(r.ok ? rd.requirements : [])
-    } catch { setError('Network error. Check your connection and try again.') }
+    } catch { if (mine === seq.current) setError('Network error. Check your connection and try again.') }
   }, [base])
   useEffect(() => { setData(null); setRequirements(null); load() }, [load])
 
@@ -68,7 +74,7 @@ export default function DocumentsPage() {
   const remove = async (d: Doc) => {
     if (!window.confirm(`Delete "${d.title}"? Its text and search index are removed immediately. This can't be undone.`)) return
     const r = await postJson(`${base}/${d.id}`, {}, 'DELETE')
-    setNotice(r.ok ? { tone: 'success', text: `"${d.title}" was deleted with its ${r.data.passagesDeleted} passages.` } : { tone: 'error', text: r.data.error || 'Could not delete the document.' })
+    setNotice(r.ok ? { tone: 'success', text: `"${d.title}" was deleted with its ${passages(Number(r.data.passagesDeleted))}.` } : { tone: 'error', text: r.data.error || 'Could not delete the document.' })
     load()
   }
 
@@ -107,7 +113,7 @@ export default function DocumentsPage() {
                       {d.classification && d.classification !== 'unclassified' && <span className={`${badge} bg-status-at-risk-bg border-status-at-risk/40 text-status-at-risk`}>{d.classification.toUpperCase()}</span>}
                     </div>
                     <div className="text-[12px] text-warm-500 mt-0.5">
-                      {data.docTypes.find(t => t.id === d.docType)?.label ?? d.docType} · {d.format.toUpperCase()}{d.pageCount ? ` · ${d.pageCount} pages` : ''} · {d.chunkCount} passages · added {fmtDay(d.createdAt)}{d.uploadedByName ? ` by ${d.uploadedByName}` : ''}
+                      {data.docTypes.find(t => t.id === d.docType)?.label ?? d.docType} · {d.format.toUpperCase()}{d.pageCount ? ` · ${d.pageCount} pages` : ''} · {passages(d.chunkCount)} · added {fmtDay(d.createdAt)}{d.uploadedByName ? ` by ${d.uploadedByName}` : ''}
                       {d.scope === 'project' && d.anchorName && d.scheduleId !== selectedSchedule.id ? ` · attached to ${d.anchorName}${d.anchorVersion ? ` (${d.anchorVersion})` : ''}` : ''}
                     </div>
                     {d.readBy === 'ai_vision' && (
@@ -163,7 +169,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
       const d = await res.json().catch(() => ({}))
       if (!res.ok) onDone({ tone: 'error', text: d.error || (res.status === 413 ? tooLargeMessage('document', data.limits.maxBytes) : 'Upload failed.') })
       else {
-        onDone(d.warning ? { tone: 'warning', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). ${d.warning}` } : { tone: 'success', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). It is unreviewed until an admin or reviewer approves it.` })
+        onDone(d.warning ? { tone: 'warning', text: `"${d.document.title}" was added (${passages(d.document.chunkCount)}). ${d.warning}` } : { tone: 'success', text: `"${d.document.title}" was added (${passages(d.document.chunkCount)}). It is unreviewed until an admin or reviewer approves it.` })
         setTitle(''); setOrgStandard(false); setFormKey(k => k + 1)
       }
     } catch { onDone({ tone: 'error', text: 'Network error. Check your connection and try again.' }) }
@@ -178,7 +184,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   const submitPaste = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setBusy(true)
-    const name = (pasteTitle.trim() || `${pasteTypes.find(t => t.id === pasteType)?.label ?? 'Note'} ${fmtDate(new Date().toISOString().slice(0, 10))}`).slice(0, 150)
+    const name = (pasteTitle.trim() || `${pasteTypes.find(t => t.id === pasteType)?.label ?? 'Note'} ${fmtDay(new Date().toISOString())}`).slice(0, 150)
     const fd = new FormData()
     fd.set('file', new File([pasted], `${name.replace(/[^\w .-]+/g, ' ').trim() || 'note'}.txt`, { type: 'text/plain' }))
     fd.set('title', name)
@@ -187,7 +193,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
       const res = await fetch(base, { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) onDone({ tone: 'error', text: d.error || 'The text was not added.' })
-      else { onDone({ tone: d.warning ? 'warning' : 'success', text: `"${d.document.title}" was added (${d.document.chunkCount} passages). Anything in it that affects the schedule shows on the Today tab, quoted with its source.${d.warning ? ` ${d.warning}` : ''}` }); setPasted(''); setPasteTitle('') }
+      else { onDone({ tone: d.warning ? 'warning' : 'success', text: `"${d.document.title}" was added (${passages(d.document.chunkCount)}). Anything in it that affects the schedule shows on the Today tab, quoted with its source.${d.warning ? ` ${d.warning}` : ''}` }); setPasted(''); setPasteTitle('') }
     } catch { onDone({ tone: 'error', text: 'Network error. Check your connection and try again.' }) }
     setBusy(false)
   }
@@ -393,7 +399,7 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
                   <div>
                     <span className="font-medium text-navy-950">{i.name}</span>
-                    <span className="text-warm-600"> · token {i.prefix}… · {i.received} received{i.lastUsedAt ? `, last ${fmtDay(i.lastUsedAt)}` : ''} · created {fmtDate(i.createdAt)}</span>
+                    <span className="text-warm-600"> · token {i.prefix}… · {i.received} received{i.lastUsedAt ? `, last ${fmtDay(i.lastUsedAt)}` : ''} · created {fmtDay(i.createdAt)}</span>
                   </div>
                   <button type="button" onClick={() => turnOff(i)} className="text-[12.5px] font-medium text-status-at-risk hover:underline">Turn off</button>
                 </li>
