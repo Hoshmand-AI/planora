@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Disclosure } from '@/components/Disclosure'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
 import { Alert, postJson } from '@/components/ui'
+import { Markdown } from '@/components/Markdown'
 import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
 import type { BriefAlert, ProjectWatch } from '@/lib/analysis/project-watch'
@@ -45,6 +46,9 @@ export default function TodayPage() {
   const [copied, setCopied] = useState(false)
   const [mailed, setMailed] = useState('')
   const [busy, setBusy] = useState('')
+  // Without an AI model, a clause cannot be explained: the button says so instead of returning a readout.
+  const [aiOff, setAiOff] = useState(false)
+  useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
   const canWrite = can('schedule.write')
 
   // Only the newest request may land: a slow answer for one project must never show under another.
@@ -290,11 +294,7 @@ export default function TodayPage() {
                 <span className="font-medium text-navy-950">{fmtDates(c.text)}</span>
                 <q className="mt-1 block text-warm-700">{c.quote}</q>
                 <span className="mt-1 block text-[12px] text-warm-600">{c.citation.includes(c.title) ? c.citation : `${c.title} ${c.citation}`}</span>
-                {can('ai.use') && (
-                  <Link className="mt-1 inline-block text-[12.5px] font-medium text-accent-600 hover:underline" href={`/dashboard/ask?schedule=${encodeURIComponent(sid!)}&docs=1&unreviewed=1&q=${encodeURIComponent(`In ${c.title}, this clause reads: "${c.quote.slice(0, 280)}". In plain language, what does it require of us, by when, and what happens if we miss it? Given where the schedule stands today, what should we do this week? Cite the clause and any related clause.`)}`}>
-                    What does this clause mean for us?
-                  </Link>
-                )}
+                {(can('ai.use') || aiOff) && <ExplainClause key={`${sid}:${c.title}:${c.quote.slice(0, 40)}`} scheduleId={sid!} title={c.title} quote={c.quote} aiOff={aiOff} />}
               </li>
             ))}</ul>
           )}
@@ -441,5 +441,45 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
         </Disclosure>
       )}
     </section>
+  )
+}
+
+/**
+ * One contract clause explained by the AI model against the project's documents and today's schedule:
+ * what it requires, by when, what happens if it is missed, and what to do this week. The answer cites
+ * the passages it used. It goes through /api/ask, so the same permission, rate limit and CUI rules apply.
+ */
+function ExplainClause({ scheduleId, title, quote, aiOff }: { scheduleId: string; title: string; quote: string; aiOff: boolean }) {
+  const [state, setState] = useState<{ busy: boolean; answer: string; error: string }>({ busy: false, answer: '', error: '' })
+  const question = `In ${title}, this clause reads: "${quote.slice(0, 280)}". In plain language, what does it require of us, by when, and what happens if we miss it? Given where the schedule stands today, what should we do this week? Cite the clause and any related clause.`
+  const ask = async () => {
+    if (state.busy) return
+    setState({ busy: true, answer: '', error: '' })
+    try {
+      const r = await postJson('/api/ask', { question, scheduleId, useDocuments: true, includeUnreviewed: true })
+      const answer = typeof r.data.answer === 'string' ? r.data.answer : ''
+      setState({ busy: false, answer, error: r.ok && answer ? '' : String(r.data.error || 'The clause could not be explained. Try again in a moment.') })
+    } catch { setState({ busy: false, answer: '', error: 'Could not reach RunF9. Check your connection and try again.' }) }
+  }
+  if (aiOff) return <p className="mt-1 text-[12.5px] text-warm-600">AI is turned off, so this clause is quoted but not explained. An admin can turn AI on under Organization.</p>
+  return (
+    <div className="mt-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button type="button" onClick={ask} disabled={state.busy} className="text-[12.5px] font-medium text-accent-600 hover:underline disabled:opacity-60">
+          {state.busy ? <><Loader2 size={12} className="inline animate-spin -mt-0.5 mr-1" aria-hidden />Reading the contract…</> : state.answer ? 'Explain again' : 'Explain this clause'}
+        </button>
+        <Link className="text-[12.5px] text-warm-600 hover:underline" href={`/dashboard/ask?schedule=${encodeURIComponent(scheduleId)}&docs=1&unreviewed=1&q=${encodeURIComponent(question)}`}>Ask a follow-up in Ask AI</Link>
+      </div>
+      <div aria-live="polite">
+        {state.error && <p className="mt-1 text-[12.5px] text-status-at-risk">{state.error}</p>}
+        {state.answer && (
+          <div className="mt-2 rounded-md border border-warm-200 bg-white p-3 text-[13px] text-warm-700">
+            <p className="mb-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-warm-600">What this means for the project (AI, from your documents)</p>
+            <Markdown text={state.answer} />
+            <p className="mt-2 text-[11.5px] text-warm-600">Written by an AI model from the cited passages. Read the clause itself before acting on it; this is not legal advice.</p>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
