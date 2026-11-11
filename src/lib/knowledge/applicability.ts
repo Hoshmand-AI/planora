@@ -58,7 +58,11 @@ export function appliesTri(a: Applicability, p: ProjectProfile): Tri {
 
   const fed = effectiveFederal(p)
   if (a.federalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'yes' : 'no')
-  if (a.nonFederalOnly) r.push(fed === undefined ? 'unknown' : fed ? 'no' : 'yes')
+  if (a.nonFederalOnly) {
+    // Federal money on non-federal land still needs the local permit; only work on federal property does not.
+    const offFederalLand = fed === true && onInstallation(p, fed) === 'no'
+    r.push(fed === undefined ? 'unknown' : fed && !offFederalLand ? 'no' : 'yes')
+  }
   if (a.federalInstallationOnly) r.push(onInstallation(p, fed))
   if (a.nonInstallationOnly) {
     const on = onInstallation(p, fed)
