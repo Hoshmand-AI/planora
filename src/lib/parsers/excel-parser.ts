@@ -269,26 +269,63 @@ function normalizeExcelValue(v: ExcelJS.CellValue): Cell {
   return String(v)
 }
 
-async function loadSheets(buffer: Buffer, isCsv: boolean): Promise<{ name: string; grid: Cell[][] }[]> {
+/** Rows and columns read from one worksheet; anything beyond is reported, never dropped silently. */
+export const MAX_SHEET_ROWS = 50000
+export const MAX_SHEET_COLS = 200
+/** Unpacked size of a workbook's sheets and shared text above which it is refused before loading (no real schedule comes close). */
+export const MAX_WORKBOOK_XML_BYTES = 200 * 1024 * 1024
+
+/**
+ * Unpacked size of the worksheets and shared strings of an .xlsx, read from the ZIP directory without
+ * unpacking anything; null when the directory cannot be read (the loader then reports the file).
+ */
+export function workbookXmlBytes(buffer: Buffer): number | null {
+  const EOCD = 0x06054b50, ENTRY = 0x02014b50
+  let end = -1
+  for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 22 - 65535); i--) if (buffer.readUInt32LE(i) === EOCD) { end = i; break }
+  if (end < 0) return null
+  const count = buffer.readUInt16LE(end + 10)
+  let at = buffer.readUInt32LE(end + 16)
+  let total = 0
+  for (let n = 0; n < count; n++) {
+    if (at + 46 > buffer.length || buffer.readUInt32LE(at) !== ENTRY) return null
+    const size = buffer.readUInt32LE(at + 24)
+    const nameLen = buffer.readUInt16LE(at + 28), extraLen = buffer.readUInt16LE(at + 30), commentLen = buffer.readUInt16LE(at + 32)
+    const name = buffer.toString('latin1', at + 46, at + 46 + nameLen).toLowerCase()
+    // 0xFFFFFFFF marks a ZIP64 entry: over 4 GB, far beyond the limit.
+    if (/^xl\/(worksheets\/[^/]+\.xml|sharedstrings\.xml)$/.test(name)) total += size === 0xffffffff ? Number.MAX_SAFE_INTEGER / 4 : size
+    at += 46 + nameLen + extraLen + commentLen
+  }
+  return total
+}
+
+interface LoadedSheet { name: string; grid: Cell[][]; cut?: { rows: number; cols: number } }
+
+async function loadSheets(buffer: Buffer, isCsv: boolean): Promise<LoadedSheet[]> {
   if (isCsv) {
     let text: string
     try { text = new TextDecoder('utf-8', { fatal: true }).decode(buffer) } catch { text = buffer.toString('latin1') }
     return [{ name: 'CSV', grid: parseCsv(text) }]
   }
+  const xmlBytes = workbookXmlBytes(buffer)
+  if (xmlBytes !== null && xmlBytes > MAX_WORKBOOK_XML_BYTES) {
+    throw new Error(`This workbook is too large to import: its sheets unpack to about ${Math.round(xmlBytes / (1024 * 1024)).toLocaleString('en-US')} MB (the limit is ${MAX_WORKBOOK_XML_BYTES / (1024 * 1024)} MB). Delete unused rows, columns and sheets, or export only the schedule table, and upload again.`)
+  }
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer as unknown as ArrayBuffer)
-  const sheets: { name: string; grid: Cell[][] }[] = []
+  const sheets: LoadedSheet[] = []
   wb.eachSheet(ws => {
     const grid: Cell[][] = []
-    const rows = Math.min(ws.rowCount, 50000)
-    const cols = Math.min(ws.columnCount, 200)
+    const rows = Math.min(ws.rowCount, MAX_SHEET_ROWS)
+    const cols = Math.min(ws.columnCount, MAX_SHEET_COLS)
     for (let r = 1; r <= rows; r++) {
       const row = ws.getRow(r)
       const out: Cell[] = []
       for (let c = 1; c <= cols; c++) out.push(normalizeExcelValue(row.getCell(c).value))
       grid.push(out)
     }
-    sheets.push({ name: ws.name, grid })
+    const cut = ws.rowCount > rows || ws.columnCount > cols ? { rows: ws.rowCount - rows, cols: ws.columnCount - cols } : undefined
+    sheets.push({ name: ws.name, grid, ...(cut ? { cut } : {}) })
   })
   return sheets
 }
@@ -438,6 +475,19 @@ export async function parseSpreadsheet(buffer: Buffer, fileName: string, schedul
     // P6's USERDATA sheet holds only the exporter's layout settings.
     const others = sheets.filter(x => x !== sheet && !relSheets.some(r => r.x === x) && !/^userdata$/i.test(x.name.trim()) && x.grid.some(r => r.some(c => cellText(c) !== '')))
     if (others.length) ex.add({ severity: 'warning', entity: 'other', field: 'Worksheets', disposition: 'dropped', count: others.length, examples: others.map(x => x.name), message: `Only worksheet${read.length > 1 ? 's' : ''} ${read.map(n => `"${n}"`).join(' and ')} ${read.length > 1 ? 'were' : 'was'} read; the other sheets were not imported` })
+  }
+  // A sheet longer or wider than the reader's limits is cut: say so, loudly, for every sheet that was read.
+  for (const x of [sheet, ...relSheets.map(r => r.x)] as LoadedSheet[]) {
+    if (!x.cut) continue
+    const n = (v: number) => v.toLocaleString('en-US')
+    if (x.cut.rows > 0) {
+      warnings.push(`Worksheet "${x.name}" has more than ${n(MAX_SHEET_ROWS)} rows: the last ${n(x.cut.rows)} ${x.cut.rows === 1 ? 'row was' : 'rows were'} NOT imported. Split the schedule into smaller files, or upload the P6 (.xer) or MS Project (.xml) file instead.`)
+      ex.add({ severity: 'loss', entity: 'activity', field: `${x.name} (rows beyond ${n(MAX_SHEET_ROWS)})`, disposition: 'dropped', count: x.cut.rows, message: `Rows after row ${n(MAX_SHEET_ROWS)} of the worksheet were not imported` })
+    }
+    if (x.cut.cols > 0) {
+      warnings.push(`Worksheet "${x.name}" has more than ${MAX_SHEET_COLS} columns: the last ${n(x.cut.cols)} ${x.cut.cols === 1 ? 'column was' : 'columns were'} NOT imported. Move the schedule columns into the first ${MAX_SHEET_COLS} and upload again.`)
+      ex.add({ severity: 'loss', entity: 'other', field: `${x.name} (columns beyond ${MAX_SHEET_COLS})`, disposition: 'dropped', count: x.cut.cols, message: `Columns after column ${MAX_SHEET_COLS} of the worksheet were not imported` })
+    }
   }
   // Cost columns (Budget, Actual cost, BCWS, ...) are not schedule fields but earned value reads them
   // from the stored file (./costs.ts), so they are not reported as ignored.

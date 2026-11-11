@@ -14,6 +14,7 @@ import { runWithRequest } from './context'
 import { emailConfigured, sendEmail } from './email'
 import { log, errorFields } from './log'
 import { resolveWorkspaceAccess } from './workspaces'
+import { mayUseRunF9 } from './signup-policy'
 import { loadDailyBrief } from './brief-service'
 
 export type BriefAudience = 'pm' | 'field' | 'client'
@@ -54,6 +55,10 @@ export async function unsubscribe(orgId: string, userId: string, projectKey: str
   return ((await query('DELETE FROM brief_subscriptions WHERE org_id=$1 AND user_id=$2 AND project_key=$3', [orgId, userId, projectKey])).rowCount ?? 0) > 0
 }
 
+/** A member whose access was revoked gets no brief: the same rule as signing in (see auth.ts). */
+export const mayReceiveBrief = (u: { email: unknown; beta_access_at: unknown; beta_revoked_at: unknown }, env: Record<string, string | undefined> = process.env): boolean =>
+  mayUseRunF9({ email: String(u.email), betaAccessAt: u.beta_access_at ? String(u.beta_access_at) : null, betaRevokedAt: u.beta_revoked_at ? String(u.beta_revoked_at) : null }, env)
+
 /**
  * Sends today's brief to every subscriber who has not had it yet. Safe to call any number of times:
  * each subscription is claimed for the day before its email is built. Working days only. Never throws.
@@ -67,11 +72,12 @@ export async function sendDueBriefs(now = new Date(), origin = (process.env.APP_
     await initSchema()
     const orgs = (await query('SELECT id FROM organizations')).rows.map(r => String(r.id))
     for (const orgId of orgs) {
-      const subs = (await query(`SELECT b.id, b.user_id, b.project_key, b.schedule_id, b.audience, u.email, u.name, u.role
+      const subs = (await query(`SELECT b.id, b.user_id, b.project_key, b.schedule_id, b.audience, u.email, u.name, u.role, u.beta_access_at, u.beta_revoked_at
         FROM brief_subscriptions b JOIN users u ON u.id = b.user_id AND u.org_id = b.org_id
         WHERE b.org_id=$1 AND u.disabled_at IS NULL AND (b.last_sent_on IS NULL OR b.last_sent_on < $2::date) LIMIT ${MAX_PER_RUN}`, [orgId, day])).rows
       for (const s of subs) {
         if (out.sent >= MAX_PER_RUN) return out
+        if (!mayReceiveBrief(s)) continue
         const claim = await query('UPDATE brief_subscriptions SET last_sent_on=$3::date WHERE id=$1 AND org_id=$2 AND (last_sent_on IS NULL OR last_sent_on < $3::date) RETURNING id', [s.id, orgId, day])
         if (!claim.rowCount) continue
         try {

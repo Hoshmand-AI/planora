@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useApp } from '../layout'
 import { BarChart3, Activity, FileText, CheckCircle, Download, X, Loader2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
@@ -35,10 +35,19 @@ export default function ReportsPage() {
   const unrevId = useId()
   const [report, setReport] = useState<{ type: string; content: string; scheduleName: string; generatedAt: string } | null>(null)
 
+  const [error, setError] = useState('')
+  const canGenerate = can('ai.use')
+  // A report belongs to the project it was written for: never leave it on screen under another project.
+  const scheduleId = selectedSchedule?.id ?? null
+  const current = useRef(scheduleId)
+  useEffect(() => { current.current = scheduleId; setReport(null); setError(''); setGenerating(null) }, [scheduleId])
+
   const handleGenerate = async (reportType: string) => {
-    if (!selectedSchedule) return
+    if (!selectedSchedule || !canGenerate) return
+    const sid = selectedSchedule.id
     setGenerating(reportType)
     setReport(null)
+    setError('')
     try {
       const res  = await fetch('/api/reports', {
         method: 'POST',
@@ -46,14 +55,13 @@ export default function ReportsPage() {
         body: JSON.stringify({ reportType, scheduleId: selectedSchedule.id, ...(useDocs ? { useDocuments: true, includeUnreviewed: withUnreviewed } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
-      setReport({
-        type: reportType,
-        content: data.content || data.error || 'Report generation failed.',
-        scheduleName: data.scheduleName,
-        generatedAt: data.generatedAt,
-      })
+      if (current.current !== sid) return
+      // A failure is an error message, never a "report" that can be downloaded.
+      if (!res.ok || !data.content) setError(data.error || 'The report was not generated. Try again.')
+      else setReport({ type: reportType, content: data.content, scheduleName: data.scheduleName, generatedAt: data.generatedAt })
     } catch {
-      setReport({ type: reportType, content: 'Network error. Please try again.', scheduleName: '', generatedAt: '' })
+      if (current.current !== sid) return
+      setError('Network error. Please try again.')
     }
     setGenerating(null)
   }
@@ -124,12 +132,14 @@ export default function ReportsPage() {
           </label>
         )}
       </div>
+      {error && <p role="alert" className="mb-4 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
+      {!canGenerate && <p className="mb-4 text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3">Your role cannot generate reports. Ask an admin for access.</p>}
       <div className="grid md:grid-cols-2 gap-3">
         {REPORT_TYPES.map(rt => (
           <button
             key={rt.id}
             onClick={() => handleGenerate(rt.id)}
-            disabled={generating !== null}
+            disabled={generating !== null || !canGenerate}
             className="bg-warm-100 border border-warm-200 rounded-lg p-5 flex gap-4 items-start text-left hover:border-warm-300 transition-colors disabled:opacity-50"
           >
             <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0">

@@ -29,11 +29,13 @@ export default function HistoryPage() {
   const [data, setData] = useState<HistoryData | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState<string | null>(null)
+  // Tagging a schedule changes it, so only roles that may change schedules get live controls.
+  const canTag = can('schedule.write')
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/history')
-    const d = await res.json()
-    if (!res.ok) { setError(d.error || 'Could not load firm data.'); return }
+    const res = await fetch('/api/history').catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) { setError(d.error || (res ? 'Could not load firm data.' : 'Network error. Check your connection and reload the page.')); return }
     setData(d)
   }, [])
   useEffect(() => { load() }, [load])
@@ -82,12 +84,12 @@ export default function HistoryPage() {
                     <td className="py-2 pr-2 text-navy-950">{s.name} <span className="text-warm-500">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
                       <span className="block text-[11.5px] text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
                     <td className="py-2 pr-2">
-                      <select aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]">
+                      <select disabled={!canTag} aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]">
                         <option value="">—</option>{PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                       </select>
                     </td>
-                    <td className="py-2 pr-2"><input aria-label={`State for ${s.name}`} defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px] uppercase" /></td>
-                    <td className="py-2 pr-2"><input type="number" aria-label={`Gross square feet for ${s.name}`} defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]" /></td>
+                    <td className="py-2 pr-2"><input disabled={!canTag} aria-label={`State for ${s.name}`} defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px] uppercase" /></td>
+                    <td className="py-2 pr-2"><input type="number" disabled={!canTag} aria-label={`Gross square feet for ${s.name}`} defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-md px-1.5 py-1 text-[12px]" /></td>
                     <td className="py-2 text-right tabular-nums text-warm-600">{s.activityCount.toLocaleString()}</td>
                   </tr>
                 ))}

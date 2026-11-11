@@ -163,14 +163,17 @@ export function checkInputs(s: AnalyzableSchedule): DataQuestion[] {
   /* progress_without_actual_start / complete_without_actual_finish */
   for (const a of real) {
     const pct = a.percentComplete ?? 0
-    if ((pct > 0 || a.status === 'in_progress' || a.status === 'complete') && !a.actualStart) {
+    // A milestone is one event: the actual date of its kind is its whole status.
+    const startOnly = a.type === 'milestone' && a.milestoneKind !== 'finish' && !!a.actualStart
+    const finishOnly = a.type === 'milestone' && a.milestoneKind !== 'start' && !!a.actualFinish
+    if ((pct > 0 || a.status === 'in_progress' || a.status === 'complete') && !a.actualStart && !finishOnly) {
       push({
         id: `progress_without_actual_start:${a.code}`, severity: 'warning', rule: 'progress_without_actual_start', activityCodes: [a.code],
         question: `Activity ${label(a)} shows progress (${a.status === 'complete' ? 'complete' : `${pct}% complete`}) but has no actual start — when did it start?`,
         detail: 'Without an actual start the schedule cannot tell earned progress from forecast.',
       }, (n) => `${n} more activities show progress without an actual start — when did they start?`)
     }
-    if ((a.status === 'complete' || pct >= 100) && !a.actualFinish) {
+    if ((a.status === 'complete' || pct >= 100) && !a.actualFinish && !startOnly) {
       push({
         id: `complete_without_actual_finish:${a.code}`, severity: 'warning', rule: 'complete_without_actual_finish', activityCodes: [a.code],
         question: `Activity ${label(a)} is marked complete but has no actual finish — when did it finish?`,

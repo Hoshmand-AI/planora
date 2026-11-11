@@ -7,13 +7,15 @@
 // domain → the member is signed in, or created just-in-time with the organization's default role.
 
 import { createHash, createPublicKey, randomBytes } from 'crypto'
-import { resolveTxt } from 'dns/promises'
+import { lookup, resolveTxt } from 'dns/promises'
+import { isIP } from 'net'
 import jwt from 'jsonwebtoken'
 import { initSchema, query } from '@/lib/db'
 import { decrypt, encrypt } from './crypto'
 import { ApiError } from './api'
 import { isRole, type Role } from './permissions'
-import { egressProblem } from './egress'
+import { airgapped, egressProblem } from './egress'
+import { isPrivateAddress } from './webhooks'
 
 export interface SsoConfig {
   enabled: boolean
@@ -76,6 +78,35 @@ export function validateIssuer(issuer: string): void {
   if (outside) throw new ApiError(400, outside)
 }
 
+const hostOf = (url: string) => new URL(url).hostname.replace(/^\[|\]$/g, '')
+/** True when the host is, or resolves to, a private or internal address; null when it does not resolve. */
+async function resolvesPrivate(host: string): Promise<boolean | null> {
+  if (isIP(host)) return isPrivateAddress(host)
+  try { const a = await lookup(host, { all: true }); return a.length ? a.some(x => isPrivateAddress(x.address)) : null } catch { return null }
+}
+
+/**
+ * A URL taken from the provider's discovery document gets the checks the issuer gets (https, and
+ * inside the network when air-gapped), plus one more for the two this server connects to itself
+ * (token endpoint, signing keys): an issuer on the public internet may not send us to a private or
+ * internal address. An identity provider that is itself inside the network is unaffected.
+ * Returns the problem, or null.
+ */
+export async function endpointProblem(url: unknown, issuer: string, opts: { fetched: boolean } = { fetched: true }): Promise<string | null> {
+  let u: URL
+  try { u = new URL(String(url)) } catch { return 'The identity provider configuration has an address that is not a URL.' }
+  if (u.protocol !== 'https:' && !(insecureAllowed() && u.protocol === 'http:')) return 'The identity provider configuration has an address that does not use https.'
+  const outside = egressProblem(u.toString())
+  if (outside) return outside
+  if (!opts.fetched || airgapped() || insecureAllowed()) return null
+  const host = hostOf(u.toString()), issuerHost = hostOf(issuer)
+  if (host.toLowerCase() === issuerHost.toLowerCase()) return null
+  const priv = await resolvesPrivate(host)
+  if (priv === null) return `The identity provider configuration points to ${host}, which does not resolve.`
+  if (priv && (await resolvesPrivate(issuerHost)) !== true) return `The identity provider configuration points to ${host}, a private or internal network address, which is not allowed.`
+  return null
+}
+
 interface Discovery { issuer: string; authorization_endpoint: string; token_endpoint: string; jwks_uri: string }
 const discoveryCache = new Map<string, { at: number; d: Discovery }>()
 const jwksCache = new Map<string, { at: number; keys: Record<string, unknown>[] }>()
@@ -95,14 +126,18 @@ export async function discover(issuer: string): Promise<Discovery> {
   const d = await getJson(`${issuer}/.well-known/openid-configuration`) as Discovery
   if (!d.authorization_endpoint || !d.token_endpoint || !d.jwks_uri) throw new ApiError(502, 'The identity provider configuration is incomplete.')
   if (d.issuer?.replace(/\/+$/, '') !== issuer) throw new ApiError(502, `The provider reports issuer ${d.issuer}, which doesn't match ${issuer}.`)
+  const bad = await endpointProblem(d.authorization_endpoint, issuer, { fetched: false }) || await endpointProblem(d.token_endpoint, issuer) || await endpointProblem(d.jwks_uri, issuer)
+  if (bad) throw new ApiError(502, bad)
   discoveryCache.set(issuer, { at: Date.now(), d })
   return d
 }
 
-async function signingKey(jwksUri: string, kid: string | undefined): Promise<ReturnType<typeof createPublicKey>> {
+async function signingKey(jwksUri: string, kid: string | undefined, issuer: string): Promise<ReturnType<typeof createPublicKey>> {
   const load = async (force: boolean) => {
     const hit = jwksCache.get(jwksUri)
     if (!force && hit && Date.now() - hit.at < 3_600_000) return hit.keys
+    const bad = await endpointProblem(jwksUri, issuer)
+    if (bad) throw new ApiError(502, bad)
     const keys = ((await getJson(jwksUri)) as { keys?: Record<string, unknown>[] }).keys || []
     jwksCache.set(jwksUri, { at: Date.now(), keys })
     return keys
@@ -170,7 +205,7 @@ export async function finishSso(params: URLSearchParams, stateCookie: string | u
   const config = await ssoConfigFor(st.orgId)
   if (!config.enabled || !config.clientSecretEnc) throw new ApiError(400, 'Single sign-on is not set up for this organization.')
   const d = await discover(config.issuer)
-  const outside = egressProblem(d.token_endpoint)
+  const outside = egressProblem(d.token_endpoint) || await endpointProblem(d.token_endpoint, config.issuer)
   if (outside) throw new ApiError(400, outside)
   const res = await fetch(d.token_endpoint, {
     method: 'POST', signal: AbortSignal.timeout(10_000),
@@ -178,10 +213,14 @@ export async function finishSso(params: URLSearchParams, stateCookie: string | u
     body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: st.callbackUrl, client_id: config.clientId, client_secret: decrypt(config.clientSecretEnc), code_verifier: st.verifier }),
   })
   const tok = await res.json().catch(() => ({})) as { id_token?: string; error?: string; error_description?: string }
-  if (!res.ok || !tok.id_token) throw new ApiError(401, `The identity provider refused the sign-in (${tok.error_description || tok.error || res.status}).`)
+  if (!res.ok || !tok.id_token) {
+    // Only plain words from the provider's answer (as for the callback's error text above).
+    const why = String(tok.error_description || tok.error || '').replace(/[^\w .,:;'()-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+    throw new ApiError(401, `The identity provider refused the sign-in (${why || res.status}).`)
+  }
   const header = jwt.decode(tok.id_token, { complete: true })?.header
   if (!header || !['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'PS256'].includes(header.alg)) throw new ApiError(401, 'Unsupported token signature algorithm.')
-  const key = await signingKey(d.jwks_uri, header.kid)
+  const key = await signingKey(d.jwks_uri, header.kid, config.issuer)
   let claims: Record<string, unknown>
   try {
     claims = jwt.verify(tok.id_token, key, { algorithms: [header.alg as jwt.Algorithm], issuer: config.issuer, audience: config.clientId, clockTolerance: 60 }) as Record<string, unknown>

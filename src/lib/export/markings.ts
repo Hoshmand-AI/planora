@@ -4,7 +4,7 @@
 // every page or document and a designation indicator block ("Controlled by", "CUI Category", "POC")
 // on the first page. Each format carries them where a reader will see them on opening the file:
 //   - PDF and Markdown reports: banner at the top and bottom, designation block on the first page;
-//   - Excel: the first rows of every sheet, plus the print header/footer;
+//   - Excel: the first rows of every sheet (markFilledSheet), plus the print header/footer;
 //   - MS Project XML: the project Title, Subject and the project summary task's Notes;
 //   - P6 XER: a project notebook topic (WBSMEMO on the project node) holding the banner and designation.
 //     Prefixing the P6 project name is NOT a marking (it is truncated and lost on re-import);
@@ -63,6 +63,39 @@ export function markingRows(m: ExportMarking): string[][] {
   return [[m.banner], [m.designation.join(' · ')]]
 }
 
+/** The parts of an ExcelJS worksheet the marking touches (kept structural so this file stays free of ExcelJS). */
+interface MarkableSheet {
+  insertRows(pos: number, values: unknown[][]): unknown
+  getRow(n: number): { font: unknown }
+  headerFooter: unknown
+  views: unknown[]
+  autoFilter?: unknown
+}
+
+/**
+ * Put the marking on a sheet that already has its content: the banner and designation become the
+ * first rows (everything else moves down, with its frozen header and filter row) and the banner goes
+ * into the print header/footer. Returns the number of rows added (0 without a marking).
+ */
+export function markFilledSheet(ws: MarkableSheet, m: ExportMarking | null | undefined): number {
+  if (!m) return 0
+  const rows = markingRows(m)
+  const n = rows.length
+  ws.insertRows(1, rows)
+  rows.forEach((_, j) => { ws.getRow(j + 1).font = j === 0 ? { bold: true, size: 12, color: { argb: 'FF7A1F12' } } : { size: 9, color: { argb: 'FF4A4540' } } })
+  ws.headerFooter = { oddHeader: `&C&B${m.banner}`, oddFooter: `&C&B${m.banner}&R&P / &N` }
+  ws.views = (ws.views || []).map(v => {
+    const view = v as { state?: string; ySplit?: number }
+    return view && view.state === 'frozen' && view.ySplit ? { ...view, ySplit: view.ySplit + n } : v
+  })
+  const af = ws.autoFilter as { from?: unknown; to?: unknown } | string | null | undefined
+  if (af && typeof af === 'object') {
+    const down = (a: unknown) => (a && typeof a === 'object' && typeof (a as { row?: unknown }).row === 'number' ? { ...(a as object), row: (a as { row: number }).row + n } : a)
+    ws.autoFilter = { ...af, from: down(af.from), to: down(af.to) }
+  }
+  return n
+}
+
 /** MS Project XML title for a marked export (the title is what MS Project shows in File > Info). */
 export function markedTitle(projectName: string, m: ExportMarking | null): string {
   return m ? `${m.banner} - ${projectName}` : projectName
@@ -70,10 +103,21 @@ export function markedTitle(projectName: string, m: ExportMarking | null): strin
 
 const htmlEsc = (v: string) => v.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!))
 
+/** Thrown when an XER has nowhere to carry the marking: the export must be refused, not sent unmarked. */
+export class XerMarkingError extends Error {
+  constructor() {
+    super('This P6 file has no WBS to carry the required marking, so it cannot be exported as XER. Use the Excel, PDF or MS Project XML export, which carry the markings.')
+    this.name = 'XerMarkingError'
+  }
+}
+
 /**
  * Add the marking to an XER as a project notebook topic ("CUI Marking") on each project's root WBS
  * node: a MEMOTYPE row and a WBSMEMO row per project, appended to existing tables or as new tables.
  * Every other line is kept exactly as it was.
+ * A project whose WBS has no project node (files written by other tools, or trimmed by hand) carries
+ * the topic on its first top-level WBS node instead. A file with no WBS node at all cannot carry the
+ * marking: XerMarkingError is thrown, never an unmarked file returned.
  */
 export function markXer(xer: string, m: ExportMarking | null): string {
   if (!m) return xer
@@ -93,8 +137,20 @@ export function markXer(xer: string, m: ExportMarking | null): string {
     else if (tag === '%F' && cur) { cur.fields = cols.slice(1).map(f => f.trim()); cur.lastLine = i }
     else if (tag === '%R' && cur) { cur.rows.push(Object.fromEntries(cur.fields.map((f, j) => [f, cols[j + 1] ?? '']))); cur.lastLine = i }
   })
-  const projNodes = (tables.get('PROJWBS')?.rows ?? []).filter(r => r['proj_node_flag'] === 'Y' && r['wbs_id'])
-  if (!projNodes.length) return xer
+  const wbsRows = (tables.get('PROJWBS')?.rows ?? []).map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v.trim()]))).filter(r => r['wbs_id'])
+  const projNodes = wbsRows.filter(r => r['proj_node_flag'] === 'Y')
+  // Projects without a project node: the first top-level node (no parent in the file), else the first node.
+  const marked = new Set(projNodes.map(r => r['proj_id'] ?? ''))
+  const wbsIds = new Set(wbsRows.map(r => r['wbs_id']))
+  for (const top of [true, false]) {
+    for (const r of wbsRows) {
+      const proj = r['proj_id'] ?? ''
+      if (marked.has(proj) || (top && r['parent_wbs_id'] && wbsIds.has(r['parent_wbs_id']))) continue
+      marked.add(proj)
+      projNodes.push(r)
+    }
+  }
+  if (!projNodes.length) throw new XerMarkingError()
 
   const maxId = (t: T | undefined, f: string) => (t?.rows ?? []).reduce((mx, r) => Math.max(mx, Number(r[f]) || 0), 0)
   const memoTypeTable = tables.get('MEMOTYPE')

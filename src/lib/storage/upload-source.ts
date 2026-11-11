@@ -22,6 +22,9 @@ const asApiError = (e: unknown): never => {
   throw e
 }
 
+/** True when an object key lies inside the connection's folder (any key when the connection has no folder). */
+export const keyInsidePrefix = (key: string, prefix: string | undefined | null): boolean => !prefix || (key.startsWith(prefix) && key.length > prefix.length)
+
 /** The uploaded bytes: from the computer, or imported from a connected storage. */
 export async function readUploadSource(form: FormData, orgId: string, maxBytes: number, tooLarge: string): Promise<UploadSource | null> {
   const file = form.get('file')
@@ -36,6 +39,8 @@ export async function readUploadSource(form: FormData, orgId: string, maxBytes: 
   const open = await openStorageConnection(orgId, connectionId)
   if (!open) throw new ApiError(404, 'That cloud storage connection no longer exists.', 'not_found')
   if (!open.connection.canRead) throw new ApiError(400, `RunF9 cannot read from ${open.connection.name}. Test the connection in Organization > Cloud storage.`)
+  // Stay inside the connection's folder, as browsing does (api/storage/[id]/objects).
+  if (!keyInsidePrefix(key, open.connection.config.prefix)) throw new ApiError(400, `That file is outside the folder ${open.connection.name} is connected to. Choose a file from that folder.`, 'outside_folder')
   try {
     const bytes = await open.client.get(key, maxBytes)
     return { fileName: key.split('/').pop() || 'file', bytes, from: { connectionId, key, location: open.connection.location } }

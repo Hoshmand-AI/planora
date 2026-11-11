@@ -33,10 +33,15 @@ export function AskTextHost() {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const inputId = useId()
+  // Where the press began: a text selection dragged out of the box and released on the backdrop is not a click on it.
+  const downOnBackdrop = useRef(false)
+  const pendingRef = useRef<Pending | null>(null)
+  pendingRef.current = pending
 
   useEffect(() => {
     open = p => { setValue(''); setPending(prev => { prev?.resolve(null); return p }) }
-    return () => { open = null }
+    // Unmounted while open (a page change): answer the caller with "cancelled" instead of leaving it waiting.
+    return () => { open = null; pendingRef.current?.resolve(null) }
   }, [])
   useEffect(() => {
     const d = ref.current
@@ -52,7 +57,8 @@ export function AskTextHost() {
   const text = value.trim()
   return (
     <dialog ref={ref} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); finish(null) }}
-      onClick={e => { if (e.target === ref.current) finish(null) }}
+      onMouseDown={e => { downOnBackdrop.current = e.target === ref.current }}
+      onClick={e => { if (e.target === ref.current && downOnBackdrop.current) finish(null) }}
       className="rounded-xl border border-warm-200 bg-white p-0 w-[min(440px,calc(100vw-32px))] shadow-xl backdrop:bg-navy-950/40">
       <form className="p-5" onSubmit={e => { e.preventDefault(); if (pending.required && !text) return; finish(text) }}>
         <h2 id={titleId} className="text-[16px] font-semibold text-navy-950 mb-3">{pending.title}</h2>

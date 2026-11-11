@@ -47,6 +47,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
   // Thresholds come from the check itself, so organization-specific limits read correctly.
   const pct = /(\d+(?:\.\d+)?)%/.exec(c.threshold)?.[1] ?? '5'
   const days = /> (\d+)d/.exec(c.threshold)?.[1] ?? '44'
+  const index = /(\d+\.\d+)/.exec(c.threshold)?.[1] ?? '0.95'
   const filter: GuidanceAction[] = c.offenders.length ? [{ kind: 'filter', label: `Show the ${c.offenders.length} activities`, codes: c.offenders }] : []
   switch (c.id) {
     case 1: return {
@@ -68,7 +69,7 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
       actions: [...filter],
     }
     case 4: return {
-      id: 4, meaning: 'Fewer than 90% of relationships are finish-to-start.',
+      id: 4, meaning: `Fewer than ${/(\d+(?:\.\d+)?)%/.exec(c.threshold)?.[1] ?? '90'}% of relationships are finish-to-start.`,
       whyItMatters: 'Heavy use of SS/FF logic makes the path hard to follow and can hide the true driver.',
       steps: ['Convert SS/FF pairs to finish-to-start by splitting activities into smaller pieces (e.g. by floor or area).', `Change the logic ${where}.`],
       actions: [...filter],
@@ -129,13 +130,13 @@ export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
       steps: ['Look for constraints and long lags on the critical path and replace them with logic.'], actions: [...filter],
     }
     case 13: return {
-      id: 13, meaning: 'Critical Path Length Index below 0.95: the remaining time is not enough for the remaining critical work.',
+      id: 13, meaning: `Critical Path Length Index below ${index}: the remaining time is not enough for the remaining critical work.`,
       whyItMatters: 'A CPLI below 1.0 means the finish date is at risk without recovery.',
       steps: ctx.generated ? ['Recover time on the critical path or agree a new date — see the recovery options.'] : [recoverySteps[1], 'Or agree a new date with the owner.'],
       actions: recoveryActions,
     }
     case 14: return {
-      id: 14, meaning: 'Baseline Execution Index below 0.95: fewer activities finished than the baseline planned by now.',
+      id: 14, meaning: `Baseline Execution Index below ${index}: fewer activities finished than the baseline planned by now.`,
       whyItMatters: 'The team is completing work more slowly than planned.', steps: ['Compare the missed activities with the baseline and plan catch-up for the critical ones.'], actions: [...filter],
     }
     default: return { id: c.id, meaning: c.explanation, whyItMatters: '', steps: [], actions: [...filter] }

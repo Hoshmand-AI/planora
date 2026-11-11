@@ -42,9 +42,13 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   let signals: ReturnType<typeof extractSignals> = []
   let docChunks: WatchChunk[] = []
   try {
-    const all = (await scopedChunks({ orgId, scheduleId: s.id, access: await currentWorkspaceAccess() }, { includeUnreviewed: true, limit: 3000 })).filter(c => !c.flagged && c.scope === 'project')
-    docChunks = all.map(c => ({ documentId: c.documentId, title: c.title, docType: c.docType, citation: c.citation, text: c.text }))
-    const chunks = all.filter(c => SIGNAL_DOC_TYPES.includes(c.docType))
+    const scope = { orgId, scheduleId: s.id, access: await currentWorkspaceAccess() }
+    const all = (await scopedChunks(scope, { includeUnreviewed: true, limit: 3000, docScope: 'project' })).filter(c => !c.flagged && c.scope === 'project')
+    // Correspondence is read by its own query: a large specification book cannot crowd the emails,
+    // minutes and daily reports (the newest passages) out of the limit above.
+    const chunks = (await scopedChunks(scope, { includeUnreviewed: true, limit: 3000, docScope: 'project', docTypes: SIGNAL_DOC_TYPES })).filter(c => !c.flagged && c.scope === 'project')
+    const seenChunk = new Set(all.map(c => c.chunkId))
+    docChunks = [...all, ...chunks.filter(c => !seenChunk.has(c.chunkId))].map(c => ({ documentId: c.documentId, title: c.title, docType: c.docType, citation: c.citation, text: c.text }))
     signals = extractSignals(chunks.map(c => ({ documentId: c.documentId, title: c.title, docType: c.docType, citation: c.citation, text: c.text })),
       data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, open: a.status !== 'complete' && !a.actualFinish })))
   } catch (err) { log('warn', 'correspondence signals unavailable', { error: (err as Error).message }) }

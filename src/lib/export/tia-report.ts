@@ -9,7 +9,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { RESPONSIBILITY_LABELS, TIA_DISCLAIMER, type DelayEvent, type TiaResult, type TiaRun } from '@/lib/analysis/tia'
 import { addProvenance, provenanceMarkdown, type Provenance } from './provenance'
-import { markingRows, type ExportMarking } from './markings'
+import { markFilledSheet, type ExportMarking } from './markings'
 import { neutralizeFormula } from './csv'
 import { pdfSafe } from './pdf'
 
@@ -157,12 +157,8 @@ export async function exportTiaXlsx(input: TiaReportInput, prov: Provenance, mar
   sheet(wb, 'Concurrency', ['ID', 'Activity', 'Indicator', 'Slip (cd)', 'Overlaps event', 'Detail', 'Note'], r.concurrency.flags.map(f => [f.code, f.name, INDICATOR[f.indicator], f.slipCd, f.overlapsEvent ? 'Yes' : 'No', f.detail, f.label]))
   sheet(wb, 'Evidence', ['Reference', 'Link'], e.evidence.map(x => [x.label, x.url ?? '']), [60, 80])
   sheet(wb, 'Assumptions', ['Assumption'], [...r.assumptions, ...r.validation.warnings.map(w => `Warning: ${w}`), ...r.warnings.map(w => `Warning: ${w}`)].map(a => [a]), [140])
-  if (marking) {
-    wb.worksheets.forEach((ws, i) => {
-      ws.headerFooter = { oddHeader: `&C&B${marking.banner}`, oddFooter: `&C&B${marking.banner}&R&P / &N` }
-      if (i === 0) ws.insertRows(1, markingRows(marking))
-    })
-  }
+  // CUI marking: banner and designation rows first on every sheet, banner in the print header/footer.
+  if (marking) wb.worksheets.forEach(ws => { markFilledSheet(ws, marking) })
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
 

@@ -305,7 +305,8 @@ export function runSra(s: GeneratedSchedule, answers: Record<string, Answer>, fi
       const m = triangular(phi(z), d)
       samples[i].push(m)
       const dur = Math.max(1, Math.round(a.duration * m))
-      return { ...a, duration: dur, remaining: a.remaining != null ? Math.max(1, Math.round(a.remaining * m)) : undefined }
+      // Work in progress with nothing left to do stays at 0: no day is invented for it.
+      return { ...a, duration: dur, remaining: a.remaining != null ? (a.remaining > 0 ? Math.max(1, Math.round(a.remaining * m)) : 0) : undefined }
     })
     // Discrete risk events: each occurs with its probability and adds its impact to one activity.
     events.forEach(({ e, i }, k) => {

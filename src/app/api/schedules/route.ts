@@ -37,6 +37,8 @@ const workCounts = (acts: { activityType: string; actualFinish: string | null }[
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
 import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, isLessRestrictive } from '@/lib/server/classification'
 import { can } from '@/lib/server/permissions'
+import { log } from '@/lib/server/log'
+import { jsonObject } from '../json-body'
 import { deploymentKind } from '@/lib/llm/provider'
 import { workspaceForNewItem } from '@/lib/server/workspaces'
 
@@ -136,7 +138,8 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
   const quota = await hit(`upload:org:${ctx.orgId}`, LIMITS.uploadsPerOrg.limit, LIMITS.uploadsPerOrg.windowSec)
   if (!quota.ok) throw new ApiError(429, 'Your organization has uploaded a lot of files in the last hour. Try again later.', 'rate_limited', { retryAfterSec: quota.retryAfterSec })
   {
-    const formData = await req.formData()
+    let formData: FormData
+    try { formData = await req.formData() } catch { throw new ApiError(400, 'Send the schedule as multipart form data with a "file" field.') }
     const picked = formData.get('file')
     const requestedName = (picked && typeof picked !== 'string' ? picked.name : String(formData.get('sourceKey') || '').split('/').pop()) || null
     const versionInput = ((formData.get('version') as string) || '').trim().slice(0, 40)
@@ -178,6 +181,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     try {
       parsed = await parseScheduleFile(file.name, bytes, scheduleId, { projectId: projectIdInput })
     } catch (err) {
+      // A parser's own message says what is wrong with the file; a programming error's text is not shown.
+      if (err instanceof TypeError || err instanceof RangeError || err instanceof ReferenceError || err instanceof SyntaxError) {
+        log('warn', 'schedule parse failed', { error: err.message })
+        return NextResponse.json({ error: 'RunF9 could not read this file. Check that it is a complete export and try again.' }, { status: 400 })
+      }
       return NextResponse.json({ error: (err as Error).message }, { status: 400 })
     }
 
@@ -376,7 +384,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
  * Every change is audited; `warnings` explains settings that will not behave as the caller may expect.
  */
 export const PATCH = api({ permission: 'schedule.write' }, async (req, { auth: ctx }) => {
-  const body = await req.json().catch(() => ({}))
+  const body = await jsonObject(req)
   const s = body.id ? await getScheduleById(String(body.id), ctx.orgId) : undefined
   if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const typeErr = projectTypeError(body.projectType)

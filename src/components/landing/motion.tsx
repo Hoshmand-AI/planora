@@ -73,7 +73,7 @@ export function CountUp({ value, duration = 1400 }: { value: number; duration?: 
     }
     setN(0)
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); started.current = false }
   }, [inView, value, duration])
   return <span ref={ref}>{n.toLocaleString('en-US')}</span>
 }

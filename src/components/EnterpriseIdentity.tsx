@@ -57,10 +57,16 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
   const [tokenName, setTokenName] = useState('')
   const [help, setHelp] = useState<{ value: string; hosts: string[] } | null>(null)
 
-  const load = useCallback(async () => {
-    const [a, b] = await Promise.all([fetch('/api/org/saml'), fetch('/api/org/scim')])
-    if (a.ok) { const d = await a.json() as SamlData; setSaml(d); setForm(toForm(d.saml)) }
-    if (b.ok) setScim(await b.json())
+  const [loadErr, setLoadErr] = useState(false)
+  // keepForm: a reload after a SCIM token change must not wipe unsaved edits in the SAML form.
+  const load = useCallback(async (keepForm = false) => {
+    try {
+      const [a, b] = await Promise.all([fetch('/api/org/saml'), fetch('/api/org/scim')])
+      if (!a.ok) throw new Error('load')
+      const d = await a.json() as SamlData
+      setSaml(d); setForm(f => (keepForm && f ? f : toForm(d.saml))); setLoadErr(false)
+      if (b.ok) setScim(await b.json())
+    } catch { setLoadErr(true) }
   }, [])
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -70,7 +76,11 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
     if (result) setMsg({ tone: result === 'ok' ? 'success' : 'error', text: q.get('saml_message') || (result === 'ok' ? 'Test sign-in succeeded.' : 'Test sign-in failed.'), section: 'saml' })
   }, [])
 
-  if (!saml || !form) return null
+  if (!saml || !form) return loadErr ? (
+    <Section id="saml" title="SAML single sign-on and SCIM provisioning">
+      <div className="space-y-2"><Alert tone="error">Could not load the single sign-on settings. Check your connection and try again.</Alert><Button type="button" variant="secondary" onClick={() => load()}>Try again</Button></div>
+    </Section>
+  ) : null
   const note = (section: 'saml' | 'scim') => msg?.section === section ? <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div> : null
   const assignable = roles.filter(r => r.id !== 'owner')
 
@@ -85,8 +95,12 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
   }
 
   const save = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy('saml'); setMsg(null); setHelp(null)
-    const groupRoles = form.groupRoles.split('\n').map(l => { const i = l.lastIndexOf('='); return i < 0 ? [] : [l.slice(0, i), l.slice(i + 1)] }).filter(p => p.length === 2 && p[0].trim() && p[1].trim()).map(([group, role]) => ({ group: group.trim(), role: role.trim().toLowerCase() }))
+    e.preventDefault(); setMsg(null); setHelp(null)
+    // A line that is not "group = role" is reported, not dropped: a dropped line would leave those members on the default role.
+    const bad = form.groupRoles.split('\n').map(l => l.trim()).find(l => { const i = l.lastIndexOf('='); return !!l && (i < 0 || !l.slice(0, i).trim() || !l.slice(i + 1).trim()) })
+    if (bad) { setMsg({ tone: 'error', text: `Group to role mapping: “${bad.slice(0, 120)}” is not in the form “group = role”. Nothing was saved.`, section: 'saml' }); return }
+    setBusy('saml')
+    const groupRoles =form.groupRoles.split('\n').map(l => { const i = l.lastIndexOf('='); return i < 0 ? [] : [l.slice(0, i), l.slice(i + 1)] }).filter(p => p.length === 2 && p[0].trim() && p[1].trim()).map(([group, role]) => ({ group: group.trim(), role: role.trim().toLowerCase() }))
     const r = await postJson('/api/org/saml', { action: 'save', saml: {
       enabled: form.enabled, enforce: form.enforce, idpEntityId: form.idpEntityId, ssoUrl: form.ssoUrl, certs: form.certs, nameIdFormat: form.nameIdFormat,
       attributes: { email: form.email, name: form.name, groups: form.groups }, defaultRole: form.defaultRole, groupRoles, domains: form.domains.split(/[\s,]+/).filter(Boolean),
@@ -107,7 +121,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
     setBusy(null)
     if (!r.ok) { setMsg({ tone: 'error', text: String(r.data.error || 'Something went wrong.'), section: 'scim' }); return null }
     if (ok) setMsg({ tone: 'success', text: ok, section: 'scim' })
-    await load()
+    await load(true)
     return r.data
   }
 

@@ -79,8 +79,11 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
       document.getElementById('deployment')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     sync()
+    // A second click on the same chip changes no hash, so follow the click as well.
+    const onClick = (e: MouseEvent) => { if ((e.target as Element | null)?.closest?.('a[href^="#deployment-"]')) setTimeout(sync) }
     window.addEventListener('hashchange', sync)
-    return () => window.removeEventListener('hashchange', sync)
+    document.addEventListener('click', onClick)
+    return () => { window.removeEventListener('hashchange', sync); document.removeEventListener('click', onClick) }
   }, [])
   const select = (i: number) => { const n = (i + OPTIONS.length) % OPTIONS.length; setActive(n); tabs.current[n]?.focus() }
   const onKey = (e: React.KeyboardEvent) => {

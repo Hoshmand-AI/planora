@@ -204,8 +204,10 @@ interface PlanItem { code: string; budget: number; start: string | null; finish:
 function timePhase(items: PlanItem[]) {
   const dated = items.filter(i => i.start && i.finish && i.budget !== 0)
   if (!dated.length) return null
-  const s0 = Math.min(...dated.map(i => toDayNumber(i.start!)))
-  const f0 = Math.max(...dated.map(i => toDayNumber(i.finish!)))
+  // Both ends of every item: a baseline finish before its start is spread over the same days (swapped
+  // below), so the window must cover it or its planned value would fall outside and be lost.
+  const s0 = Math.min(...dated.map(i => Math.min(toDayNumber(i.start!), toDayNumber(i.finish!))))
+  const f0 = Math.max(...dated.map(i => Math.max(toDayNumber(i.start!), toDayNumber(i.finish!))))
   const inc = new Float64Array(f0 - s0 + 2)
   const perItem = new Map<string, { s: number; f: number; perDay: number; days: number[] }>()
   for (const i of dated) {
@@ -275,6 +277,8 @@ export function computeEvm(input: EvmInput): EvmAnalysis {
     plan.push({ code, budget, start: start ?? finish, finish, cal: (a?.calendarId && calById.get(a.calendarId)) || defCal, loe: a?.activityType === 'loe' })
   }
   const tp = timePhase(plan)
+  const reversed = plan.filter(p => p.budget !== 0 && p.start && p.finish && toDayNumber(p.finish) < toDayNumber(p.start)).map(p => p.code)
+  if (reversed.length) notes.push(`${reversed.length} budgeted ${reversed.length === 1 ? 'activity has' : 'activities have'} a baseline finish before the baseline start (${reversed.slice(0, 8).join(', ')}${reversed.length > 8 ? ', …' : ''}); ${reversed.length === 1 ? 'its' : 'their'} budget is planned over the days between the two dates. Check the baseline dates.`)
   if (!tp) return notAvailable(input, [{ code: 'no_baseline_dates', message: 'No budgeted activity has baseline start and finish dates, so the budget cannot be time-phased into planned value.' }])
   const bac = round(plan.reduce((t, p) => t + p.budget, 0))
   if (undated.length) notes.push(`${undated.length} budgeted ${undated.length === 1 ? 'activity has' : 'activities have'} no baseline dates (${undated.slice(0, 8).join(', ')}${undated.length > 8 ? ', …' : ''}); ${undated.length === 1 ? 'its' : 'their'} budget is in BAC but not in planned value.`)

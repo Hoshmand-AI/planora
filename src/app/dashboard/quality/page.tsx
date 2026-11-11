@@ -6,7 +6,7 @@ import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, Chevr
 import { askText } from '@/components/AskText'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
-import { fmtDate, fmtDates } from '@/lib/format'
+import { fmtDay, fmtDates } from '@/lib/format'
 import { FINDING_DISPOSITIONS, FINDING_LABELS, SUBMISSION_DISPOSITIONS, SUBMISSION_LABELS, type FindingDisposition, type ItemDisposition, type ReviewState, type SubmissionDisposition } from '@/lib/analysis/review'
 import Link from 'next/link'
 import { StandardsPanel } from './standards-panel'
@@ -43,11 +43,14 @@ export default function QualityPage() {
   const [selected, setSelected] = useState<number | null>(null)
 
   const loadingFor = useRef<string | null>(null)
+  const saving = useRef(false)
   const load = useCallback(async () => {
     if (!selectedSchedule) return
     setLoading(true); setError('')
     const id = selectedSchedule.id
     loadingFor.current = id
+    // Never keep one project's report on screen (or post answers to it) after another project is opened.
+    setData(d => (d && d.schedule.id === id ? d : null))
     try {
       const res = await fetch(`/api/schedules/${id}/quality`)
       const d = await res.json().catch(() => ({}))
@@ -66,15 +69,24 @@ export default function QualityPage() {
       if (answer === null) return
       note = answer
     }
-    const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: q.id, response, note }) })
-    if (res.ok) setData(d => d && ({ ...d, dataQuestions: d.dataQuestions.map(x => x.id === q.id ? { ...x, response: { response, note } } : x) }))
-    else setError((await res.json().catch(() => ({}))).error || 'Your answer was not saved.')
+    // One save at a time: a double click must not send the answer twice.
+    if (saving.current) return
+    saving.current = true
+    try {
+      const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: q.id, response, note }) })
+      if (res.ok) setData(d => d && ({ ...d, dataQuestions: d.dataQuestions.map(x => x.id === q.id ? { ...x, response: { response, note } } : x) }))
+      else setError((await res.json().catch(() => ({}))).error || 'Your answer was not saved.')
+    } catch { setError('Network error. Your answer was not saved.') } finally { saving.current = false }
   }
 
   const decide = async (id: number, response: 'intentional' | 'will_fix', note: string) => {
-    const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: `dcma:${id}`, response, note }) })
-    if (res.ok) setData(d => d && ({ ...d, guidance: d.guidance.map(g => g.id === id ? { ...g, decision: { response, note } } : g) }))
-    else setError((await res.json().catch(() => ({}))).error || 'Your decision was not saved.')
+    if (saving.current) return
+    saving.current = true
+    try {
+      const res = await fetch(`/api/schedules/${data!.schedule.id}/quality`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: `dcma:${id}`, response, note }) })
+      if (res.ok) setData(d => d && ({ ...d, guidance: d.guidance.map(g => g.id === id ? { ...g, decision: { response, note } } : g) }))
+      else setError((await res.json().catch(() => ({}))).error || 'Your decision was not saved.')
+    } catch { setError('Network error. Your decision was not saved.') } finally { saving.current = false }
   }
   // Reviewer dispositions (reviewer / admin / owner): per finding or question, and for the submission.
   const postReview = async (body: Record<string, unknown>): Promise<string | null> => {
@@ -243,7 +255,7 @@ export default function QualityPage() {
             <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
             <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the schedule dashboard.</p>
             <div className="space-y-3">
-              {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
+              {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
           </section>
         )}
@@ -267,7 +279,7 @@ export default function QualityPage() {
                     <div className="text-[12px] text-warm-500 mt-1">{fmtDates(q.detail)}</div>
                     {q.response ? (
                       <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
-                    ) : (
+                    ) : !can('schedule.write') ? null : (
                       <div className="flex flex-wrap gap-2 mt-2.5">
                         <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">Yes, intentional</button>
                         <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">No — will fix in source</button>
@@ -345,7 +357,7 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
   )
 }
 
-function QualityGuide({ g, check, onDecide, disposition, reviewer, onDispose, startOpen }: { startOpen: boolean; g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
+function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, onDispose, startOpen }: { startOpen: boolean; canDecide: boolean; g: Quality['guidance'][number]; check: DcmaReport['checks'][number]; onDecide: (id: number, r: 'intentional' | 'will_fix', note: string) => void; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
   // Only the first open item starts expanded, so the list reads as a short to-do list.
   const [open, setOpen] = useState(startOpen)
   const [note, setNote] = useState('')
@@ -371,9 +383,9 @@ function QualityGuide({ g, check, onDecide, disposition, reviewer, onDispose, st
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
           {g.decision ? (
             <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
-          ) : (
+          ) : !canDecide ? null : (
             <div className="flex flex-wrap gap-2 items-center">
-              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+              <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
               <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 disabled:opacity-40">Accept with justification</button>
               <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
             </div>
@@ -405,7 +417,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
         <p className="text-[12.5px] text-warm-700">
           <span className="font-semibold text-navy-950">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
           {disposition.justification ? ` — “${disposition.justification}”` : ''}
-          <span className="text-warm-500"> · {disposition.reviewer ?? 'reviewer'}, {fmtDate(disposition.createdAt)}</span>
+          <span className="text-warm-500"> · {disposition.reviewer ?? 'reviewer'}, {fmtDay(disposition.createdAt)}</span>
           {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950">Change</button>}
         </p>
       ) : (
@@ -444,7 +456,7 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
       <h2 id="submission-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
       {s && !editing ? (
         <div className="text-[13.5px] text-warm-700 space-y-1">
-          <p><span className="font-semibold text-navy-950">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDate(s.createdAt)}</span>
+          <p><span className="font-semibold text-navy-950">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
             {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950 text-[12.5px]">Change</button>}</p>
           {s.comments && <p className="whitespace-pre-wrap">{s.comments}</p>}
           <p className="text-[12px] text-warm-500">Findings and questions dispositioned: {counts}</p>

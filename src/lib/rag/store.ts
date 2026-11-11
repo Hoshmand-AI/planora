@@ -5,16 +5,25 @@
 import { createHash, randomUUID } from 'crypto'
 import { initSchema, query, withTransaction } from '@/lib/db'
 import { chunkDocument } from './chunk'
-import { detectInjection } from './injection'
+import { detectInjection, safeDocumentTitle } from './injection'
 import { extractDocument, DocumentRejected } from './extract'
 import { buildChunksSql, buildGetDocumentSql, buildListDocumentsSql, rowToRetrieved, HybridRetriever, PostgresFtsRetriever } from './retrieval'
 import { embed, embeddingsActive } from './embeddings'
 import { log } from '@/lib/server/log'
 import { hasControlMarkings, mostRestrictive } from '@/lib/server/classification'
+import { fmtDate } from '@/lib/format'
 import type { DocScope, DocType, RetrievalScope, RetrievedChunk, StoredDocument, Trust } from './types'
 
 export const MAX_CHUNKS_PER_DOCUMENT = 4000
 export const MAX_DOCUMENTS_PER_PROJECT = 200
+/** Room kept for documents people add by hand: a project inbox stops this many documents short of the limit. */
+export const DOCUMENTS_RESERVED_FOR_UPLOADS = 50
+/** Most passages one scopedChunks() read returns unless the caller asks for fewer. */
+export const DEFAULT_CHUNK_LIMIT = 5000
+
+/** How many documents a project may hold before this source is refused (an inbox leaves room for uploads). */
+export const documentLimitFor = (source: 'upload' | 'inbox' | undefined): number =>
+  source === 'inbox' ? MAX_DOCUMENTS_PER_PROJECT - DOCUMENTS_RESERVED_FOR_UPLOADS : MAX_DOCUMENTS_PER_PROJECT
 
 const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null)
 
@@ -82,9 +91,9 @@ export async function getDocument(s: RetrievalScope, documentId: string): Promis
   return row ? rowToDocument(row) : undefined
 }
 
-export async function scopedChunks(s: RetrievalScope, o: { includeUnreviewed: boolean; limit?: number }): Promise<RetrievedChunk[]> {
+export async function scopedChunks(s: RetrievalScope, o: { includeUnreviewed: boolean; limit?: number; documentId?: string; docTypes?: readonly string[]; docScope?: DocScope }): Promise<RetrievedChunk[]> {
   await initSchema()
-  const b = buildChunksSql(s, { includeUnreviewed: o.includeUnreviewed, limit: o.limit ?? 5000 })
+  const b = buildChunksSql(s, { includeUnreviewed: o.includeUnreviewed, limit: o.limit ?? DEFAULT_CHUNK_LIMIT, documentId: o.documentId, docTypes: o.docTypes, docScope: o.docScope })
   return (await query(b.text, b.values)).rows.map(rowToRetrieved)
 }
 
@@ -98,6 +107,8 @@ export interface IngestInput {
   classification: string | null
   uploadedBy: string
   content: Buffer
+  /** 'inbox' for a message received through a project inbox: it stops short of the document limit (documentLimitFor) */
+  source?: 'upload' | 'inbox'
   /** Read scanned pages / drawing sheets with AI (rag/vision.ts), when the uploader may */
   readImages?: import('./extract').ReadImages
   /** Why AI page reading is not available here (added to the scanned-PDF message) */
@@ -119,17 +130,22 @@ export async function ingestDocument(i: IngestInput): Promise<IngestResult> {
   const classification = drafts.some(d => hasControlMarkings(`${d.heading ?? ''}\n${d.text}`)) ? mostRestrictive(i.classification, 'cui') : i.classification
   const screened = drafts.map(d => ({ ...d, findings: detectInjection(`${d.heading ?? ''}\n${d.text}`) }))
   const flagged = screened.filter(c => c.findings.length)
+  // The title is written into what a model reads, so one that reads like instructions to an AI is replaced.
+  const title = safeDocumentTitle(i.title, `Document added ${fmtDate(new Date().toISOString().slice(0, 10))}`)
   const id = randomUUID()
   await withTransaction(async q => {
     if (i.scheduleId) {
       const n = await q(`SELECT COUNT(*)::int AS n FROM project_documents WHERE org_id=$1 AND schedule_id=$2 AND deleted_at IS NULL`, [i.orgId, i.scheduleId])
-      if (Number(n.rows[0].n) >= MAX_DOCUMENTS_PER_PROJECT) throw new DocumentRejected(`This project already has ${MAX_DOCUMENTS_PER_PROJECT} documents. Delete ones you no longer need first.`, 'too_many_documents')
+      // An inbox may not fill the project: the last slots are kept for documents added by hand.
+      const count = Number(n.rows[0].n)
+      if (count >= MAX_DOCUMENTS_PER_PROJECT) throw new DocumentRejected(`This project already has ${MAX_DOCUMENTS_PER_PROJECT} documents. Delete ones you no longer need first.`, 'too_many_documents')
+      if (count >= documentLimitFor(i.source)) throw new DocumentRejected(`This project's inbox is full: the project holds ${count} documents and the remaining room is kept for documents added by hand. Delete messages you no longer need first.`, 'too_many_documents')
     }
     const dup = await q(`SELECT id FROM project_documents WHERE org_id=$1 AND COALESCE(schedule_id,'')=COALESCE($2,'') AND sha256=$3 AND deleted_at IS NULL`, [i.orgId, i.scheduleId, sha256])
     if (dup.rows[0]) throw new DocumentRejected('This exact file is already attached here.', 'duplicate')
     await q(`INSERT INTO project_documents (id, org_id, scope, schedule_id, title, file_name, format, doc_type, trust, classification, sha256, size_bytes, page_count, chunk_count, flagged_count, uploaded_by, read_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'unreviewed',$9,$10,$11,$12,$13,$14,$15,$16)`,
-    [id, i.orgId, i.scope, i.scheduleId, i.title, i.fileName.slice(0, 255), format, i.docType, classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy, readBy])
+    [id, i.orgId, i.scope, i.scheduleId, title, i.fileName.slice(0, 255), format, i.docType, classification, sha256, i.content.length, pageCount, screened.length, flagged.length, i.uploadedBy, readBy])
     // Batched inserts (one statement per 200 passages).
     for (let k = 0; k < screened.length; k += 200) {
       const batch = screened.slice(k, k + 200)

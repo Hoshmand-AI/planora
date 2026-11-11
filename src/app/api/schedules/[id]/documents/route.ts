@@ -82,7 +82,8 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
     } })
     return json({
       document: d, flaggedChunks: r.flaggedChunks,
-      ...(r.flaggedChunks.length ? { warning: `${r.flaggedChunks.length} passage${r.flaggedChunks.length === 1 ? '' : 's'} contain${r.flaggedChunks.length === 1 ? 's' : ''} text that reads like instructions to an AI. ${r.flaggedChunks.length === 1 ? 'It is' : 'They are'} never sent to a model and ${r.flaggedChunks.length === 1 ? 'is' : 'are'} shown with a warning in search results.` } : {}),
+      ...(d.title !== title ? { titleNote: `The title read like instructions to an AI, so the document was saved as "${d.title}".` } : {}),
+      ...(r.flaggedChunks.length ? { warning: `${r.flaggedChunks.length} passage${r.flaggedChunks.length === 1 ? '' : 's'} contain${r.flaggedChunks.length === 1 ? 's' : ''} text that reads like instructions to an AI. ${r.flaggedChunks.length === 1 ? 'It is' : 'They are'} left out of what is sent to a model and ${r.flaggedChunks.length === 1 ? 'is' : 'are'} shown with a warning in search results.` } : {}),
     })
   } catch (err) {
     // Not added (duplicate, unreadable…): take back the copy just saved in the firm's storage.

@@ -4,7 +4,7 @@ import { api, body as readBody } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { addScheduleEdits, revertScheduleEdit } from '@/lib/db'
 import { loadScheduleData } from '@/lib/planning/service'
-import { applyScheduleEdits, reasonError, validateEditChange, type ScheduleEdit } from '@/lib/planning/uploaded-edits'
+import { applyScheduleEdits, reasonError, revertLoopError, validateEditChange, type ScheduleEdit } from '@/lib/planning/uploaded-edits'
 
 // Edits build the what-if scenario, so this route always works on it (validation against the edited
 // network, forecasts with the edits). The schedule as submitted is unchanged and stays the default
@@ -79,6 +79,9 @@ export const DELETE = api<{ id: string }>({ permission: 'schedule.write' }, asyn
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const edits = ids.map(id => data.edits.find(e => e.id === id))
   if (!ids.length || edits.some(e => !e)) return NextResponse.json({ error: ids.length > 1 ? 'One of those edits is not active.' : 'No active edit with that id.' }, { status: 404 })
+  // Reverting a removal can bring back a relationship that now closes a loop with a later edit.
+  const loop = revertLoopError(data.imported.activities, data.imported.relationships, data.edits, ids)
+  if (loop) return NextResponse.json({ error: loop, code: 'revert_creates_loop' }, { status: 409 })
   const done: typeof data.edits = []
   for (const edit of edits as typeof data.edits) {
     if (await revertScheduleEdit(data.schedule.id, auth.orgId, edit.id, auth.userId, reason.slice(0, 1000))) done.push(edit)

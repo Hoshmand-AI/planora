@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
+  const { selectedSchedule, metrics, metricsError, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
   const [tab, setTab] = useState<'overview' | 'evm'>('overview')
   useEffect(() => {
@@ -100,24 +100,31 @@ export default function ProjectPage() {
 
       {/* The first answer: will we finish on time? Then four numbers that explain it. */}
       <section aria-label="Schedule health" className="space-y-4">
+        {!m && metricsError && (
+          <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">
+            RunF9 could not load this schedule&apos;s numbers. <button type="button" onClick={() => { refreshMetrics() }} className="underline font-medium">Try again</button>
+          </p>
+        )}
         <FinishHero status={status} forecastFinish={forecastFinish}
           mustFinishBy={(mx.mustFinishBy as string) || null} baselineFinish={(mx.baselineFinish as string) || null}
           projectStart={(mx.projectStart as string) || null} dataDate={selectedSchedule.dataDate ?? null}
-          reason={!m ? 'Reading this schedule…' : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : '')
+          reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : '')
             : status === 'no_baseline' ? (isBaselineUpload
               ? 'This upload is the baseline. Upload a status update of the same project and RunF9 measures variance against it.'
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')
             : null}
           note={undatedNote} />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
+          {/* Until the numbers arrive the tiles show a dash, never a made-up 0 */}
+          {m ? <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
+            : <CounterTile mood="idle" value="—" label="complete" sub="Progress (by duration)" />}
           <CounterTile mood={varianceTone}
-            value={varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
+            value={!m ? '—' : varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Schedule variance"
-            sub={varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
+            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
-            value={criticalPath && !criticalPath.determined ? '—' : String(criticalCount)} label="Critical activities"
-            sub={criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
+            value={!m || (criticalPath && !criticalPath.determined) ? '—' : String(criticalCount)} label="Critical activities"
+            sub={!m ? (metricsError ? 'not available' : 'loading…') : criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
           <Link href={`/dashboard/quality?schedule=${selectedSchedule.id}`} className="block rounded-2xl card-lift">
             <CounterTile mood={!quality ? 'idle' : quality.failing ? 'waiting' : 'done'}
               value={quality ? `${quality.passed}/${quality.applicable}` : '—'} label="Quality checks pass"

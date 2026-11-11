@@ -20,8 +20,17 @@ import { runSra } from '@/lib/planning/sra'
 import { loadFirmHistory } from '@/lib/planning/service'
 import type { ProjectType } from '@/lib/planning/types'
 import { loadPlanContext, planView } from '../context'
-import { CSV_CUI_REFUSAL, exportMarking, markText, markXer } from '@/lib/export/markings'
+import { CSV_CUI_REFUSAL, exportMarking, markText, markXer as markXerRaw, XerMarkingError } from '@/lib/export/markings'
 import { classificationFromAnswer } from '@/lib/server/classification'
+
+/** A marked XER that cannot carry its marking is refused with the reason, never sent unmarked. */
+const markXer: typeof markXerRaw = (text, marking) => {
+  try { return markXerRaw(text, marking) } catch (err) {
+    if (err instanceof XerMarkingError) throw new ApiError(409, err.message, 'xer_marking')
+    throw err
+  }
+}
+
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 

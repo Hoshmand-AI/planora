@@ -50,8 +50,11 @@ export const DEFAULT_DCMA_RULES: DcmaRules = { maxPct: 5, minFsPct: 90, highFloa
 export function normalizeDcmaRules(raw: unknown): DcmaRules {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const n = (k: keyof DcmaRules, lo: number, hi: number, step = 1) => {
-    const v = Number(r[k])
-    return Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v / step) / Math.round(1 / step))) : DEFAULT_DCMA_RULES[k]
+    // An emptied field arrives as '', null or 0 (Number('') in the form); no range admits 0, so all
+    // of them, like any non-numeric value, mean "not set" and fall back to the default.
+    const x = r[k]
+    const v = typeof x === 'number' ? x : typeof x === 'string' && x.trim() !== '' ? Number(x) : NaN
+    return Number.isFinite(v) && v !== 0 ? Math.min(hi, Math.max(lo, Math.round(v / step) / Math.round(1 / step))) : DEFAULT_DCMA_RULES[k]
   }
   return { maxPct: n('maxPct', 1, 25), minFsPct: n('minFsPct', 50, 100), highFloatDays: n('highFloatDays', 10, 260), highDurationDays: n('highDurationDays', 5, 260), indexTarget: n('indexTarget', 0.8, 1, 0.01) }
 }
@@ -166,12 +169,14 @@ function indexText(v: number, ok: boolean, target: number): string {
 
 /**
  * Execution against the baseline as of the data date (DCMA #11 Missed Tasks and #14 BEI): tasks
- * baselined to finish strictly BEFORE the data date vs tasks actually finished (DCMA convention:
- * milestones, LOE and summaries are excluded from numerator and denominator alike). The data date is the
+ * baselined to finish strictly BEFORE the data date vs baselined tasks actually finished (DCMA convention:
+ * milestones, LOE and summaries are excluded from numerator and denominator alike). Both sides count
+ * the same population, tasks with a baseline finish: a completed task with no baseline (added after
+ * the baseline) is reported as `unbaselinedCompleted`, not counted, or it would mask missed work. The data date is the
  * first day of the remaining work, so work baselined to finish on it is not yet due (DCMA guidance). Null when it cannot be measured
  * (no data date, no baselines, a fresh baseline, or nothing due yet).
  */
-export function baselineExecution(activities: AnalyzableActivity[], dataDate: string | null | undefined): { due: number; missed: number; completed: number; bei: number; dueCodes: string[]; missedCodes: string[]; openDueCodes: string[] } | null {
+export function baselineExecution(activities: AnalyzableActivity[], dataDate: string | null | undefined): { due: number; missed: number; completed: number; unbaselinedCompleted: number; bei: number; dueCodes: string[]; missedCodes: string[]; openDueCodes: string[] } | null {
   if (!isValidDate(dataDate)) return null
   const all = activities.filter(isExecutionTask)
   const withBaseline = all.filter((a) => isValidDate(a.baselineFinish))
@@ -180,9 +185,10 @@ export function baselineExecution(activities: AnalyzableActivity[], dataDate: st
   const due = withBaseline.filter((a) => toDayNumber(a.baselineFinish!) < toDayNumber(dataDate))
   if (!due.length) return null
   const missed = due.filter((a) => !isValidDate(a.actualFinish) || toDayNumber(a.actualFinish) > toDayNumber(a.baselineFinish!))
-  const completed = all.filter(isCompleteActivity).length
+  const completed = withBaseline.filter(isCompleteActivity).length
+  const unbaselinedCompleted = all.filter((a) => !isValidDate(a.baselineFinish) && isCompleteActivity(a)).length
   return {
-    due: due.length, missed: missed.length, completed, bei: completed / due.length,
+    due: due.length, missed: missed.length, completed, unbaselinedCompleted, bei: completed / due.length,
     dueCodes: due.map((a) => a.code), missedCodes: missed.map((a) => a.code), openDueCodes: due.filter((a) => !isCompleteActivity(a)).map((a) => a.code),
   }
 }
@@ -648,7 +654,8 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
         : `total float of ${tf} ${units} (${hidden ? `its own float ${baseTf} less the ${hidden} work days a mandatory constraint hides` : 'its own float, as shown on the activity'}; target ${target.basis})`
       const held = hidden ? ` by logic (${fmtDate(scheduled)} as scheduled, held by a mandatory constraint)` : ''
       add({
-        id: 13, name: 'CPLI', metric: shown, threshold: thr, result: ok ? 'pass' : 'fail',
+        // A ratio at or above the target that still fails says why, so it does not read as a contradiction.
+        id: 13, name: 'CPLI', metric: tf < 0 && cpli >= R.indexTarget ? `${shown} (negative float)` : shown, threshold: thr, result: ok ? 'pass' : 'fail',
         offenders: ok ? [] : [fm.code],
         explanation: !ok
           ? tf < 0 && cpli >= R.indexTarget
@@ -665,14 +672,15 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
   } else {
     const ex = baselineExecution(s.activities, dataDate)!
     const { completed, bei } = ex
+    const notCounted = ex.unbaselinedCompleted ? ` ${plural(ex.unbaselinedCompleted, 'completed task')} with no baseline ${ex.unbaselinedCompleted === 1 ? 'is' : 'are'} not counted.` : ''
     const ok = roundIndex(bei) >= R.indexTarget
     const shown = fmtIndex(bei)
     add({
       id: 14, name: 'BEI', metric: shown, threshold: `≥ ${R.indexTarget.toFixed(2)}`, result: ok ? 'pass' : 'fail',
       offenders: ok ? [] : cap(ex.openDueCodes),
       explanation: ok
-        ? `${completed} tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so the team is keeping pace with the plan.`
-        : `Only ${completed} tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.`,
+        ? `${completed} baselined tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so the team is keeping pace with the plan.${notCounted}`
+        : `Only ${completed} baselined tasks are complete against ${due.length} baselined to finish before the data date (BEI ${shown}), so work is falling behind the baseline.${notCounted}`,
     })
   }
 

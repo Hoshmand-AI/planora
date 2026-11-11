@@ -75,7 +75,8 @@ describe('DCMA #12 / #13 with mandatory constraints', () => {
       links: [fs('S', 'A'), fs('A', 'F')],
     }
     const c = check(runDcma(s), 13)
-    expect(Number(c.metric)).toBeGreaterThanOrEqual(0.95)
+    // The metric now names the reason next to the ratio ("0.99 (negative float)"), so read the leading number.
+    expect(parseFloat(c.metric)).toBeGreaterThanOrEqual(0.95)
     expect(c.result).toBe('fail')
     expect(c.explanation).toMatch(/negative float/)
   })

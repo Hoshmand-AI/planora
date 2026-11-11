@@ -8,6 +8,7 @@ import { elicit } from '@/lib/planning/elicitation'
 import { PROJECT_TYPES, projectTypeError } from '@/lib/planning/types'
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
 import { workspaceForNewItem } from '@/lib/server/workspaces'
+import { jsonObject } from '../json-body'
 
 export const GET = api({ permission: 'read', apiKey: true }, async (_req, { auth: ctx }) => {
   const plans = await listPlans(ctx.orgId)
@@ -22,7 +23,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (_req, { auth
 })
 
 export const POST = api({ permission: 'plan.write' }, async (req, { auth: ctx }) => {
-  const { name, sample, projectType, workspaceId: requestedWorkspace } = await req.json().catch(() => ({}))
+  const { name, sample, projectType, workspaceId: requestedWorkspace } = await jsonObject(req)
   // Matter / engagement workspace the plan belongs to (restricted members default to theirs).
   const workspaceId = await workspaceForNewItem(ctx.orgId, await currentWorkspaceAccess(), requestedWorkspace)
   if (sample === true) {

@@ -100,13 +100,22 @@ async function main() {
   /* ── The tool questions its own inputs ── */
   r = await A.get(`/api/schedules/${xerId}/quality`)
   ok(r.status === 200 && r.data.dcma.checks.length === 14, `Quality: DCMA ${r.data.dcma.passed}/${r.data.dcma.applicable}, ${r.data.dataQuestions.length} data questions`)
-  const dq = r.data.dataQuestions[0]
-  if (dq) {
-    console.log(`    e.g. "${dq.question}"`)
-    r = await A.post(`/api/schedules/${xerId}/quality`, { questionId: dq.id, response: 'intentional', note: 'Owner approved' })
-    ok(r.status === 200, 'Scheduler answers a data question')
-    r = await A.get(`/api/schedules/${xerId}/quality`)
-    ok(r.data.dataQuestions.find(q => q.id === dq.id).response?.response === 'intentional', 'Answer persisted')
+  {
+    // A file with a known input problem (work marked complete with no actual finish), so the answer path always runs.
+    const odd = ['Act ID,Activity Name,OD,Start,Finish,Actual Start,Actual Finish,% Complete,Preds', 'Q100,NTP,0,2027-01-04,2027-01-04,2027-01-04,2027-01-04,100,',
+      'Q110,Pour footings,10,2027-01-05,2027-01-18,2027-01-05,,100,Q100', 'Q120,Cure footings,5,2027-01-19,2027-01-25,,,0,Q110'].join('\n')
+    const up = await upload(A, 'data-questions.csv', odd, { dataDate: '2027-01-20' })
+    const qid = up.data.schedule?.id
+    r = await A.get(`/api/schedules/${qid}/quality`)
+    const dq = r.data.dataQuestions?.[0]
+    ok(up.status === 200 && !!dq, `The tool questions its inputs: ${r.data.dataQuestions?.length} data question(s) on a file with a known problem`, r.data.dataQuestions ?? up.data)
+    if (dq) {
+      console.log(`    e.g. "${dq.question}"`)
+      r = await A.post(`/api/schedules/${qid}/quality`, { questionId: dq.id, response: 'intentional', note: 'Owner approved' })
+      ok(r.status === 200, 'Scheduler answers a data question')
+      r = await A.get(`/api/schedules/${qid}/quality`)
+      ok(r.data.dataQuestions.find(q => q.id === dq.id).response?.response === 'intentional', 'Answer persisted')
+    }
   }
 
   /* ── Firm history: three completed hospitals ── */

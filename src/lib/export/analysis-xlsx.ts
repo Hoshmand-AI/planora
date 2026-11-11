@@ -13,7 +13,7 @@ import { fmtDate, fmtDates } from '@/lib/format'
 import { EVM_PRINCIPLE_NOTE, percentTypeLabel, type EvmAnalysis, type EvmTrendPoint } from '@/lib/analysis/evm'
 import { neutralizeFormula } from './csv'
 import { addProvenance, type Provenance } from './provenance'
-import { markingRows, type ExportMarking } from './markings'
+import { markFilledSheet, type ExportMarking } from './markings'
 
 const DATE_FMT = 'mm/dd/yyyy'
 const ISO = /^\d{4}-\d{2}-\d{2}/
@@ -48,17 +48,12 @@ function addSheet(wb: ExcelJS.Workbook, name: string, cols: Col[], rows: Record<
 
 /**
  * CUI marking for a restricted schedule's workbook: the banner and designation as the first rows of
- * the first (Provenance) sheet, and the banner in every sheet's print header/footer. Call last.
+ * every sheet (headers, frozen panes and filters move down), and the banner in every sheet's print
+ * header/footer. Call last.
  */
 function markWorkbook(wb: ExcelJS.Workbook, m: ExportMarking | null | undefined): void {
   if (!m) return
-  wb.worksheets.forEach((ws, i) => {
-    ws.headerFooter = { oddHeader: `&C&B${m.banner}`, oddFooter: `&C&B${m.banner}&R&P / &N` }
-    if (i !== 0) return
-    const rows = markingRows(m)
-    ws.insertRows(1, rows)
-    rows.forEach((_, j) => { ws.getRow(j + 1).font = j === 0 ? { bold: true, size: 12, color: { argb: 'FF7A1F12' } } : { size: 9, color: { argb: 'FF4A4540' } } })
-  })
+  wb.worksheets.forEach(ws => { markFilledSheet(ws, m) })
 }
 
 /* ─── Update comparison ──────────────────────────────── */

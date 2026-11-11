@@ -21,6 +21,8 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
   const [result, setResult] = useState<{ proposals: Proposal[]; note: string | null; method: string; alreadyAnswered: string[] } | null>(null)
   const [pick, setPick] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState('')
+  // Bumped after saving so the file box is emptied along with the chosen file.
+  const [inputKey, setInputKey] = useState(0)
   if (!canWrite) return null
 
   const read = async () => {
@@ -29,27 +31,29 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
     const fd = new FormData()
     fd.append('file', file)
     if (drawing) fd.append('drawing', 'true')
-    const r = await fetch(`/api/plans/${planId}/prefill`, { method: 'POST', body: fd })
-    const d = await r.json().catch(() => ({}))
-    setBusy(false)
-    if (!r.ok) { setErr(d.error || 'The document could not be read.'); return }
-    setResult(d)
-    // Pre-tick the questions that are not answered yet.
-    setPick(Object.fromEntries((d.proposals as Proposal[]).map(p => [p.questionId, !(d.alreadyAnswered as string[]).includes(p.questionId)])))
+    try {
+      const r = await fetch(`/api/plans/${planId}/prefill`, { method: 'POST', body: fd })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(d.error || 'The document could not be read.'); return }
+      setResult(d)
+      // Pre-tick the questions that are not answered yet.
+      setPick(Object.fromEntries((d.proposals as Proposal[]).map(p => [p.questionId, !(d.alreadyAnswered as string[]).includes(p.questionId)])))
+    } catch { setErr('The document could not be read. Check your connection and try again.') } finally { setBusy(false) }
   }
 
   const use = async () => {
     if (!result || !file) return
     const chosen = result.proposals.filter(p => pick[p.questionId])
     if (!chosen.length) return
-    setBusy(true)
-    await onSave(Object.fromEntries(chosen.map(p => [p.questionId, {
-      status: 'known' as const, value: p.value, source: 'file' as const,
-      note: `From ${file.name}${p.page != null ? `, p.${p.page}` : ''}: "${p.quote.slice(0, 300)}"`,
-    }])))
-    setBusy(false)
+    setBusy(true); setErr('')
+    try {
+      await onSave(Object.fromEntries(chosen.map(p => [p.questionId, {
+        status: 'known' as const, value: p.value, source: 'file' as const,
+        note: `From ${file.name}${p.page != null ? `, p.${p.page}` : ''}: "${p.quote.slice(0, 300)}"`,
+      }])))
+    } catch { setErr('The answers were not saved. Try again.'); return } finally { setBusy(false) }
     setSaved(`${chosen.length} answer${chosen.length === 1 ? '' : 's'} saved from ${file.name}.`)
-    setResult(null); setFile(null)
+    setResult(null); setFile(null); setInputKey(k => k + 1)
   }
 
   return (
@@ -60,7 +64,7 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
           <div className="flex flex-wrap items-center gap-3">
             <label className="inline-flex items-center gap-2">
               <span className="sr-only">Document</span>
-              <input type="file" accept=".pdf,.docx,.txt,.md" onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(null); setErr('') }} className="text-[13px]" />
+              <input key={inputKey} type="file" accept=".pdf,.docx,.txt,.md" onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(null); setErr('') }} className="text-[13px]" />
             </label>
             <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={drawing} onChange={e => setDrawing(e.target.checked)} /> It is a drawing set</label>
             <button type="button" onClick={read} disabled={!file || busy} className="pressable rounded-full bg-navy-950 text-white px-4 py-1.5 text-[13px] font-semibold disabled:opacity-50">

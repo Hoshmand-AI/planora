@@ -55,6 +55,11 @@ describe('CUI / classified data never goes to a cloud model', () => {
     const resolve = classificationResolver(new Request('http://x/api/plans/p1/suggest', { method: 'POST' }), '/api/plans/p1/suggest', 'o1')
     expect(await resolve!()).toBe('classified')
     expect(classificationResolver(new Request('http://x/api/portfolio'), '/api/portfolio', 'o1')).toBeUndefined()
+    // A percent-encoded path is matched as the router matches it, so the guard cannot be skipped by encoding.
+    expect(classificationResolver(new Request('http://x/api/%70lans/p1/suggest', { method: 'POST' }), '/api/%70lans/p1/suggest', 'o1')).toBeTypeOf('function')
+    expect(classificationResolver(new Request('http://x/api/%73chedules/s1/brief'), '/api/%73chedules/s1/brief', 'o1')).toBeTypeOf('function')
+    // A path that cannot be decoded is treated as classified.
+    expect(await classificationResolver(new Request('http://x/api/plans/p1'), '/api/plans/%E0%A4%A', 'o1')!()).toBe('classified')
   })
 
   it('shows the commercial-cloud CUI warning in the AI status', () => {

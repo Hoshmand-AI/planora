@@ -228,7 +228,7 @@ export function uploadedRecoveryOptions(net: NetworkInput, opts: { maxOptions?: 
       id: `overlap-${r.predecessorId}-${r.successorId}`, title: `Overlap ${p.activityId} → ${s.activityId}: FS → SS +${lag}d`,
       description: `Start ${s.activityId} ${s.name} when ${p.activityId} ${p.name} is about half done, instead of after it finishes (split the work ${split.by}).`,
       tradeoff: `Needs a real split of the work (${split.unit}) and coordination of two crews working next to each other. If ${s.activityId} cannot finish before ${p.activityId}, also add an FF relationship.`,
-      changes: [{ kind: 'link_set', predecessorId: r.predecessorId, successorId: r.successorId, type: 'SS', lag }],
+      changes: [{ kind: 'link_set', predecessorId: r.predecessorId, successorId: r.successorId, type: 'SS', lag, fromType: 'FS' }],
       reason: `What-if: overlap ${p.activityId} and ${s.activityId} (FS → SS +${lag}d), work split ${split.by}`,
     })
   }

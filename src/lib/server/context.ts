@@ -42,8 +42,20 @@ const storage = new AsyncLocalStorage<RequestInfo>()
 export const runWithRequest = <T>(info: RequestInfo, fn: () => Promise<T>) => storage.run(info, fn)
 export const currentRequest = (): RequestInfo | undefined => storage.getStore()
 
-export function clientIp(headers: Headers): string | null {
+/**
+ * The client address. By default the first X-Forwarded-For entry: right when the proxy in front SETS
+ * the header (Vercel, or nginx as in docs/operations/ON-PREM-INSTALL.md). A load balancer that APPENDS
+ * to whatever the client sent (an AWS Application Load Balancer) makes the first entry client-chosen;
+ * there, set RUNF9_TRUSTED_PROXY_HOPS to the number of proxies you run in front (1 for one load
+ * balancer) and the entry that proxy added is used instead.
+ */
+export function clientIp(headers: Headers, hops: string | undefined = process.env.RUNF9_TRUSTED_PROXY_HOPS): string | null {
   const fwd = headers.get('x-forwarded-for')
-  if (fwd) return fwd.split(',')[0].trim() || null
+  if (fwd) {
+    const parts = fwd.split(',').map(p => p.trim())
+    const n = Number(hops)
+    const at = hops && Number.isInteger(n) && n >= 1 ? Math.max(0, parts.length - n) : 0
+    return parts[at] || null
+  }
   return headers.get('x-real-ip')
 }

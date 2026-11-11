@@ -55,15 +55,17 @@ export default function TimelinePage() {
   const [full, setFull] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    setActivities(null); setSelected(null); setOpen({}); setFull({})
+    setActivities(null); setSelected(null); setOpen({}); setFull({}); setLoadError(false)
     if (!selectedSchedule) return
     let live = true
     fetch(`/api/schedules?id=${selectedSchedule.id}`)
-      .then(r => r.json())
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('load'))))
       .then(data => { if (live) setActivities(data.activities || []) })
-      .catch(() => { if (live) setActivities([]) })
+      // A failed load is not an empty schedule: say so instead of "No activities".
+      .catch(() => { if (live) { setActivities([]); setLoadError(true) } })
     return () => { live = false }
   }, [selectedSchedule])
 
@@ -156,7 +158,7 @@ export default function TimelinePage() {
           <p><strong className="text-navy-950">{impact.changed.length} {impact.changed.length === 1 ? 'activity was' : 'activities were'} changed in RunF9 in the last {impact.windowDays} days.</strong>{' '}
             {impact.movedCount > 0 ? `${impact.movedCount} open ${impact.movedCount === 1 ? 'activity moves' : 'activities move'} because of it` : 'No other activity moves because of it'}
             {impact.finishMovedDays ? `, and the finish is ${Math.abs(impact.finishMovedDays)} day${Math.abs(impact.finishMovedDays) === 1 ? '' : 's'} ${impact.finishMovedDays > 0 ? 'later' : 'earlier'}` : impact.finishMovedDays === 0 ? ', and the finish does not move' : ''}.
-            {' '}They are marked below until the changes are {impact.windowDays} days old. The bars show the schedule as submitted; a mark such as +5d is the move with the edits.</p>
+            {' '}{impact.changed.length + impact.movedCount === 1 ? 'It is marked below until the change is' : 'They are marked below until the changes are'} {impact.windowDays} days old. The bars show the schedule as submitted; a mark such as +5d is the move with the edits.</p>
           <ul className="mt-1.5 space-y-0.5 text-[12.5px]">{impact.changed.slice(0, 4).map(c => <li key={c.id}>{fmtDates(c.what)}: {fmtDates(c.before)} → {fmtDates(c.after)}</li>)}</ul>
           <button type="button" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(v => !v)} className="mt-2 pressable rounded-full border border-navy-900 bg-white px-3 py-1 text-[12.5px] font-semibold text-navy-950">{onlyChanged ? 'Show all activities' : 'Show only changed and moved'}</button>
         </div>
@@ -188,6 +190,8 @@ export default function TimelinePage() {
 
       {activities === null ? (
         <div className="space-y-2" aria-busy="true">{[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
+      ) : loadError ? (
+        <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13.5px] text-status-at-risk">The schedule could not be loaded. Check your connection and reload the page.</p>
       ) : (
         <div className="lg:flex lg:items-start lg:gap-4">
           <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-warm-200 bg-white">

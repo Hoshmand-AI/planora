@@ -7,7 +7,7 @@ import type {
 } from './types'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS, isCivilType } from './types'
 import { resolveRegional, SUPPORTED_STATES } from '@/lib/knowledge/regions'
-import { US_STATES } from '@/lib/knowledge/us-states'
+import { US_STATES, US_TERRITORIES } from '@/lib/knowledge/us-states'
 import { listLongLeadItems } from '@/lib/knowledge/long-lead'
 import { appliesTri, effectiveFederal } from '@/lib/knowledge/applicability'
 import { categoryLabel } from '@/lib/semantic/taxonomy'
@@ -58,7 +58,7 @@ const US_WORDS = /\b(usa|u\.s\.a?\.?|us|united states|america)\b/i
 const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /**
  * The location typed instead of picking a US state ("Ontario, Canada", "Dubai") is outside the US
- * unless it names the US or a US state.
+ * unless it names the US, a US state or a US territory (Guam, Puerto Rico…).
  */
 export function isOutsideUS(answers: Record<string, Answer>): boolean {
   const a = answers['project.state']
@@ -66,6 +66,8 @@ export function isOutsideUS(answers: Record<string, Answer>): boolean {
   const t = a.value.trim()
   if (US_WORDS.test(t)) return false
   const lower = t.toLowerCase()
+  // "British Virgin Islands" is not the US territory.
+  if (US_TERRITORIES.some(tr => new RegExp(`\\b${escapeRe(tr.name.toLowerCase())}\\b`).test(lower.replace(/\bbritish virgin islands\b/g, ' ')))) return false
   return !US_STATES.some(st => new RegExp(`\\b${escapeRe(st.name.toLowerCase())}\\b`).test(lower))
 }
 
@@ -363,8 +365,9 @@ function baseQuestions(p: ProjectProfile, answers: Record<string, Answer>, ctx: 
     why: 'About 11 non-work days per year that most schedules forget.',
     fallback: { value: true, explanation: 'Federal holidays are non-work days.' },
   })
-  // Interior fit-outs have no exterior exposure to carry weather days for.
-  if (!ti) qs.push({
+  // Interior fit-outs have no exterior exposure to carry weather days for. Civil networks have no
+  // dry-in to carry the allowance to, so the answer would change nothing: not asked.
+  if (!ti && !civil) qs.push({
     id: 'calendar.weather', section: 'calendar', kind: 'boolean', impact: 30, allowWithheld: false,
     prompt: 'Include regional weather days for exterior work?',
     why: 'We add a weather allowance based on the region\'s adverse months that overlap earthwork through dry-in.',
@@ -542,10 +545,13 @@ export function milestoneTargetsFor(p: ProjectProfile): MilestoneTarget[] {
   const list = (p.projectType && CIVIL_MILESTONES[p.projectType]) || MILESTONE_TARGETS
   // Transit with trackwork out of scope (e.g. a station rehabilitation): there is no track to complete.
   if (p.projectType === 'transit_rail' && p.civil?.trackwork === false && p.civil.guideway !== 'elevated_segmental') return list.filter(m => m.key !== 'track')
+  // A tunnel has no in-water work, and landside-only airport work reopens no runway or taxiway.
+  if (p.projectType === 'marine_civil_works' && p.civil?.marineScope === 'tunnel') return list.filter(m => m.key !== 'cofferdam_removed')
+  if (p.projectType === 'aviation' && p.civil?.airportArea === 'landside') return list.filter(m => m.key !== 'airfield_reopen')
   return list
 }
 /** Every milestone target key across project types (for date checks on stored answers). */
-const ALL_MILESTONE_TARGETS: MilestoneTarget[] = [...MILESTONE_TARGETS, ...Object.values(CIVIL_MILESTONES).flat()].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)
+export const ALL_MILESTONE_TARGETS: MilestoneTarget[] = [...MILESTONE_TARGETS, ...Object.values(CIVIL_MILESTONES).flat()].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)
 
 /** Which milestone a gated category must precede, for delivery/permit vs target checks. */
 const GATE_TO_MILESTONE: Partial<Record<CanonicalCategory, string>> = {
@@ -699,6 +705,8 @@ function assumptionFor(q: Question, a: Answer, permits: PermitSpec[], longLead: 
     bufferDays = 20
   } else if (q.id === 'security.withheld_days') {
     bufferDays = 0 // reserved via placeholders, not general contingency
+  } else if (q.id === 'project.required_finish') {
+    bufferDays = 0 // no deadline does not make the work take longer; a project may have none
   } else if (q.impact >= 60) {
     bufferDays = 10
   } else if (q.impact >= 40) {
@@ -753,18 +761,37 @@ function findConflicts(answers: Record<string, Answer>, p: ProjectProfile, permi
 
 /* ─── Answer validation ──────────────────────────────── */
 
+/** Largest accepted value per unit (anything larger is a typing mistake and can stall generation). */
+const NUMBER_MAX: Record<string, number> = {
+  stories: 200, constraints: 50, weeks: 520, 'work days': 10_000, acres: 1_000_000, 'USD millions': 1_000_000,
+  stages: 50, 'utility owners': 100, stations: 200, structures: 500, systems: 500,
+}
+const NUMBER_MAX_DEFAULT = 1_000_000_000
+
+/** A yyyy-mm-dd date that exists on the calendar (not 2027-02-31) in a plannable year. */
+function dateError(v: unknown): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Enter a date (yyyy-mm-dd).'
+  const y = Number(v.slice(0, 4)), m = Number(v.slice(5, 7)), d = Number(v.slice(8, 10))
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  if (m < 1 || m > 12 || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return 'That date does not exist. Check the month and day.'
+  if (y < 1990 || y > 2100) return 'Enter a date between 1990 and 2100.'
+  return null
+}
+
 export function validateAnswer(q: Question, a: Answer): string | null {
   if (a.status !== 'known') return q.allowWithheld || a.status === 'unknown' ? null : 'This question cannot be withheld.'
   const v = a.value
   switch (q.kind) {
     case 'number': {
       const n = num(v)
-      if (n === undefined) return 'Enter a number.'
+      if (n === undefined || !Number.isFinite(n)) return 'Enter a number.'
       if (n < 0) return 'Must be zero or more.'
       if (q.unit === '%' && n > 100) return 'Must be between 0 and 100.'
+      const max = (q.unit && NUMBER_MAX[q.unit]) || NUMBER_MAX_DEFAULT
+      if (n > max) return `Must be ${max.toLocaleString('en-US')} or less.`
       return null
     }
-    case 'date': return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? null : 'Enter a date (yyyy-mm-dd).'
+    case 'date': return dateError(v)
     case 'boolean': return bool(v) === undefined ? 'Answer yes or no.' : null
     case 'choice':
       if (q.options?.some(o => o.value === v)) return null

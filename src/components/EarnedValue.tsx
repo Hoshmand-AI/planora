@@ -62,10 +62,12 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
   const m = evm.metrics!
   const $ = (n: number | null | undefined) => fmtMoney(n, evm.currency)
   const es = evm.earnedSchedule
+  // The file's own currency in the plain-words tiles ("$" when the file names none), as fmtMoney does.
+  const unit = evm.currency?.symbol || (evm.currency?.code ? `${evm.currency.code} ` : '$')
   const tone = (v: number | null | undefined, good: (x: number) => boolean) => (v == null ? undefined : good(v) ? 'on-track' as const : 'attention' as const)
   const tiles: { label: string; value: string; meaning: string; tone?: 'on-track' | 'attention' }[] = [
-    { label: 'SPI', value: idx(m.spi), tone: tone(m.spi, x => x >= 1), meaning: m.spi == null ? 'No work was planned before the data date.' : `For every $1 of work planned to date, $${m.spi.toFixed(2)} of work was done.` },
-    { label: 'CPI', value: idx(m.cpi), tone: tone(m.cpi, x => x >= 1), meaning: m.cpi == null ? 'Needs actual costs in the file.' : `For every $1 spent, $${m.cpi.toFixed(2)} of budgeted work was done.` },
+    { label: 'SPI', value: idx(m.spi), tone: tone(m.spi, x => x >= 1), meaning: m.spi == null ? 'No work was planned before the data date.' : `For every ${unit}1 of work planned to date, ${unit}${m.spi.toFixed(2)} of work was done.` },
+    { label: 'CPI', value: idx(m.cpi), tone: tone(m.cpi, x => x >= 1), meaning: m.cpi == null ? 'Needs actual costs in the file.' : `For every ${unit}1 spent, ${unit}${m.cpi.toFixed(2)} of budgeted work was done.` },
     { label: 'Schedule variance (SV)', value: $(m.sv), tone: tone(m.sv, x => x >= 0), meaning: m.sv < 0 ? 'Less work done than planned by the data date (in budget terms).' : 'At or ahead of the planned work.' },
     { label: 'Cost variance (CV)', value: $(m.cv), tone: tone(m.cv, x => x >= 0), meaning: m.cv == null ? 'Needs actual costs in the file.' : m.cv < 0 ? 'The work done cost more than its budget.' : 'The work done cost no more than its budget.' },
     { label: 'Estimate at completion (EAC)', value: $(m.eacCpi), meaning: m.eacCpi == null ? 'Needs actual costs in the file.' : `Forecast total cost if cost efficiency continues (BAC ÷ CPI). With schedule efficiency too: ${$(m.eacCpiSpi)}.` },
@@ -95,7 +97,7 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
         {es && (
           <li className="bg-warm-50 border border-warm-200 rounded-lg p-4">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Earned schedule</div>
-            <div className={`text-[22px] font-bold tabular-nums leading-none ${es.svT < 0 ? 'text-status-attention' : 'text-status-on-track'}`}>{es.svT > 0 ? '+' : ''}{es.svT} days</div>
+            <div className={`text-[22px] font-bold tabular-nums leading-none ${es.svT < 0 ? 'text-status-attention' : 'text-status-on-track'}`}>{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
             <p className="text-[12px] text-warm-600 mt-2 leading-snug">The work done was planned by {fmtDate(es.esDate)}: SV(t) {es.svT} calendar days, SPI(t) {idx(es.spiT)}.{es.forecastFinish ? ` At this rate the work finishes about ${fmtDate(es.forecastFinish)} (baseline ${fmtDate(es.baselineFinish)}).` : ''}</p>
           </li>
         )}
@@ -175,7 +177,8 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
   const sy = (v: number) => H - B - (v / yMax) * (H - T - B)
   const path = (pts: { date?: string; v: number }[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.date!).toFixed(1)},${sy(p.v).toFixed(1)}`).join(' ')
   const ticksY = [0, 0.25, 0.5, 0.75, 1].map(f => f * yMax / 1.05)
-  const ticksX = Array.from({ length: 5 }, (_, i) => new Date(x0 + ((x1 - x0) * i) / 4).toISOString().slice(0, 10))
+  // One label when every point shares a date (five identical labels would be drawn on top of each other).
+  const ticksX = Array.from({ length: x1 === x0 ? 1 : 5 },(_, i) => new Date(x0 + ((x1 - x0) * i) / 4).toISOString().slice(0, 10))
   const $ = (n: number | null | undefined) => fmtMoney(n, evm.currency)
   const dd = evm.dataDate
   const summary = `Cumulative planned value rises to ${$(m.bac)} by ${fmtDate(evm.earnedSchedule?.baselineFinish ?? pvPts[pvPts.length - 1]?.date)}. At the data date ${fmtDate(dd)}: planned ${$(m.pv)}, earned ${$(m.ev)}${m.ac != null ? `, actual cost ${$(m.ac)}` : ''}.`

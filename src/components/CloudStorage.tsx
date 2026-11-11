@@ -96,13 +96,18 @@ export function CloudStorage({ manage }: { manage: boolean }) {
   const [aws, setAws] = useState<AwsInfo | null>(null)
   const [useKey, setUseKey] = useState(false)
 
+  const [loadErr, setLoadErr] = useState(false)
   const load = useCallback(async () => {
-    const res = await fetch('/api/storage')
-    const d = await res.json().catch(() => ({}))
-    setConnections(d.connections ?? [])
-    setProviders(d.providers ?? [])
-    setSignIn(d.signIn ?? { azure: false, gcp: false, aws: false })
-    setAws(d.aws ?? null)
+    try {
+      const res = await fetch('/api/storage')
+      if (!res.ok) throw new Error('load')
+      const d = await res.json()
+      setConnections(d.connections ?? [])
+      setProviders(d.providers ?? [])
+      setSignIn(d.signIn ?? { azure: false, gcp: false, aws: false })
+      setAws(d.aws ?? null)
+      setLoadErr(false)
+    } catch { setLoadErr(true) }
   }, [])
   useEffect(() => { load() }, [load])
   // Back from a Microsoft or Google sign-in (/api/storage/oauth/callback).
@@ -115,16 +120,18 @@ export function CloudStorage({ manage }: { manage: boolean }) {
   const canSignIn = (p: Provider) => p !== 's3' && signIn[p]
 
   const post = async (body: Record<string, unknown>) => {
-    const res = await fetch('/api/storage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const d = await res.json().catch(() => ({}))
-    return { ok: res.ok, d }
+    try {
+      const res = await fetch('/api/storage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const d = await res.json().catch(() => ({}))
+      return { ok: res.ok, d }
+    } catch { return { ok: false, d: { error: 'Network error. Check your connection and try again.' } } }
   }
 
   const test = async (c: Connection) => {
     setBusy(c.id); setNote(null)
     const { ok, d } = await post({ action: 'test', id: c.id })
     setBusy(null)
-    setNote(ok ? { tone: d.status.read || d.status.write ? 'success' : 'error', text: `${c.name}: ${d.status.detail}` } : { tone: 'error', text: d.error || 'Test failed.' })
+    setNote(ok && d.status ? { tone: d.status.read || d.status.write ? 'success' : 'error', text: `${c.name}: ${d.status.detail}` } : { tone: 'error', text: d.error || 'Test failed.' })
     load()
   }
   const remove = async (c: Connection) => {
@@ -139,8 +146,9 @@ export function CloudStorage({ manage }: { manage: boolean }) {
   return (
     <Section id="cloud-storage" title="Cloud storage" description="Connect your AWS, Azure or Google Cloud storage, or a client’s. Then choose it when uploading: import schedules and documents from it, and keep the original files there instead of in RunF9.">
       {note && <div className="mb-3"><Alert tone={note.tone}>{note.text}</Alert></div>}
+      {loadErr && <div className="mb-3 space-y-2"><Alert tone="error">Could not load your cloud storage. Check your connection and try again.</Alert><Button variant="secondary" onClick={load}>Try again</Button></div>}
       {connections === null ? (
-        <p className="text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</p>
+        loadErr ? null : <p className="text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</p>
       ) : (
         <>
           {connections.length > 0 && (

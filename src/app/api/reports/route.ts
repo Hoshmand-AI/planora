@@ -16,11 +16,12 @@ import { CostCache, evmInputFor, evmSeriesFrom } from '@/lib/planning/evm-servic
 import { computeEvm, type EvmAnalysis, type EvmTrendPoint } from '@/lib/analysis/evm'
 import { reportGrounding } from '@/lib/rag/answer'
 import { projectClassification, projectScope } from '@/lib/rag/scope'
+import { jsonObject } from '../json-body'
 
 const REPORT_TYPES = Object.keys(REPORT_TITLES) as ReportType[]
 
 export const POST = api({ permission: 'ai.use' }, async (req, { auth }) => {
-  const body = await req.json()
+  const body = await jsonObject(req)
   const { reportType, scheduleId } = body
   // Reports are on the schedule as submitted unless the request asks for the scenario ({ basis: 'scenario' }).
   const basis = basisFrom(body && typeof body === 'object' ? body : null)

@@ -333,7 +333,7 @@ export function runCpm(input: CpmInput): CpmResult {
           // Start-to-finish: the successor finishes by the end of the last work day before the predecessor starts
           // (the Friday, when the predecessor starts on a Monday), not on the predecessor's first day.
           { const b = shift(p.es, ed.lag, p.c); finishP = Math.max(finishP, c.isWork(b - 1) ? b : c.prev(b - 1) + 1) }
-          finishLBL = Math.max(finishLBL, shift(p.logicEs, ed.lag, p.c))
+          { const b = shift(p.logicEs, ed.lag, p.c); finishLBL = Math.max(finishLBL, c.isWork(b - 1) ? b : c.prev(b - 1) + 1) }
           break
       }
     }

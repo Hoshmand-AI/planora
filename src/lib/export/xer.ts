@@ -37,6 +37,8 @@ const dt = (d: string | null | undefined, time: string) => (d ? `${d.slice(0, 10
 /** Finish time of day for a calendar: 08:00 start, its work hours, plus a lunch hour on 8h+ days. */
 const finishTime = (hours: number) => {
   const end = 8 + hours + (hours >= 8 ? 1 : 0)
+  // More than 15 hours cannot start at 08:00: clndrData writes one period from 00:00, ending at `hours`.
+  if (hours > 15 && hours < 24) return `${String(Math.floor(hours)).padStart(2, '0')}:${String(Math.round((hours % 1) * 60)).padStart(2, '0')}`
   return end >= 24 ? '23:59' : `${String(Math.floor(end)).padStart(2, '0')}:${String(Math.round((end % 1) * 60)).padStart(2, '0')}`
 }
 /**
@@ -58,17 +60,27 @@ function serial(iso: string): number {
 
 function hhmm(h: number): string {
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60)
+  // The end of the day is 00:00 in P6 (a 24-hour day is s|00:00|f|00:00), never 24:00.
+  if (hh >= 24) return '00:00'
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+/**
+ * Work periods of a day as [start, end] hours: 08:00 start with a 12:00-13:00 lunch on days over
+ * 6 hours; days over 15 hours do not fit after 08:00 and are one period from 00:00 (as msp-xml does).
+ */
+export function xerWorkPeriods(hoursPerDay: number): [number, number][] {
+  const h = Math.max(0, Math.min(24, hoursPerDay))
+  if (h > 15) return [[0, h]]
+  return h > 6 ? [[8, 12], [13, 9 + h]] : [[8, 8 + h]]
 }
 
 /** P6 clndr_data: working days 1=Sunday..7=Saturday with time intervals; exceptions are holidays. */
 export function clndrData(c: WorkCalendar): string {
-  const lunch = c.hoursPerDay > 6
-  const first = lunch ? 4 : c.hoursPerDay
+  const periods = xerWorkPeriods(c.hoursPerDay)
   const day = (d: number) => {
     if (!c.workDays.includes(d as WorkCalendar['workDays'][number])) return `(0||${d + 1}()())`
-    const parts = [`(0||0(s|08:00|f|${hhmm(8 + first)})())`]
-    if (lunch) parts.push(`(0||1(s|${hhmm(8 + first + 1)}|f|${hhmm(8 + c.hoursPerDay + 1)})())`)
+    const parts = periods.map(([from, to], i) => `(0||${i}(s|${hhmm(from)}|f|${hhmm(to)})())`)
     return `(0||${d + 1}()(${parts.join('')}))`
   }
   const days = [0, 1, 2, 3, 4, 5, 6].map(day).join('')
@@ -235,6 +247,12 @@ export interface XerEdits {
   tasks: Map<string, { remainingDays?: number; originalDays?: number; constraint?: { type: ConstraintType; date: string } | null; progress?: { actualStart: string; actualFinish: string | null } }>
   setLinks: { pred: string; succ: string; type: LinkType; lagDays: number }[]
   removeLinks: { pred: string; succ: string }[]
+  /**
+   * The link edits one by one, in the order they were made. A pair of activities can have more than
+   * one relationship (SS and FF); each edit changes or removes one of them, the first, as RunF9's
+   * own model does. When absent, removeLinks then setLinks are applied the same way.
+   */
+  linkOps?: ({ kind: 'set'; pred: string; succ: string; type: LinkType; lagDays: number } | { kind: 'remove'; pred: string; succ: string })[]
 }
 
 type EditLike = { status: 'applied' | 'skipped'; change: { kind: string; activityId?: string; remaining?: number; actualStart?: string; actualFinish?: string | null; predecessorId?: string; successorId?: string; type?: LinkType; lag?: number; constraint?: { type: ConstraintType; date: string } | null } }
@@ -246,6 +264,7 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
   const tasks: XerEdits['tasks'] = new Map()
   const set = new Map<string, XerEdits['setLinks'][number]>()
   const removed = new Map<string, XerEdits['removeLinks'][number]>()
+  const linkOps: NonNullable<XerEdits['linkOps']> = []
   for (const e of edits) {
     if (e.status !== 'applied') continue
     const c = e.change
@@ -264,11 +283,11 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
       const pred = src(c.predecessorId), succ = src(c.successorId)
       if (!pred || !succ) continue
       const key = `${pred}>${succ}`
-      if (c.kind === 'link_set') { removed.delete(key); set.set(key, { pred, succ, type: c.type || 'FS', lagDays: c.lag ?? 0 }) }
-      else { set.delete(key); removed.set(key, { pred, succ }) }
+      if (c.kind === 'link_set') { removed.delete(key); set.set(key, { pred, succ, type: c.type || 'FS', lagDays: c.lag ?? 0 }); linkOps.push({ kind: 'set', pred, succ, type: c.type || 'FS', lagDays: c.lag ?? 0 }) }
+      else { set.delete(key); removed.set(key, { pred, succ }); linkOps.push({ kind: 'remove', pred, succ }) }
     }
   }
-  return { tasks, setLinks: [...set.values()], removeLinks: [...removed.values()] }
+  return { tasks, setLinks: [...set.values()], removeLinks: [...removed.values()], linkOps }
 }
 
 /**
@@ -281,7 +300,7 @@ export function xerEditsFrom(activities: { id: string; sourceId?: string | null;
 export function exportXerFromOriginal(original: string, updates: Map<string, XerTaskUpdate>, opts: { forecastFinish?: string | null; edits?: XerEdits | null; progressMode?: ProgressMode | null } = {}): string {
   const tables = readXerTables(original)
   const cal = new Map((tables['CALENDAR'] || []).map(c => [c['clndr_id'], xerCalendarTimes(c)]))
-  const edits = opts.edits && (opts.edits.tasks.size || opts.edits.setLinks.length || opts.edits.removeLinks.length) ? opts.edits : null
+  const edits = opts.edits && (opts.edits.tasks.size || opts.edits.setLinks.length || opts.edits.removeLinks.length || opts.edits.linkOps?.length) ? opts.edits : null
   const projOfTasks = new Set<string>()
   for (const t of tables['TASK'] || []) if (updates.has(t['task_id']) && t['proj_id']) projOfTasks.add(t['proj_id'])
   const projCal = new Map((tables['PROJECT'] || []).map(p => [p['proj_id'], p['clndr_id']]))
@@ -301,9 +320,32 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
     return (t && (cal.get(t['clndr_id']) || cal.get(projCal.get(t['proj_id']) || ''))) || cal.get(defaultCal || '')
   }
   const linkKey = (pred: string, succ: string) => `${pred.trim()}>${succ.trim()}`
-  const setLinks = new Map((edits?.setLinks || []).map(l => [linkKey(l.pred, l.succ), l]))
-  const removeLinks = new Set((edits?.removeLinks || []).map(l => linkKey(l.pred, l.succ)))
-  const pendingAdds = new Map(setLinks)
+  // Replay the link edits on the file's own TASKPRED rows. A pair can have several rows (SS and FF):
+  // an edit changes or removes the first one still there, as RunF9's model does, and adds a row only
+  // when the pair has none left. `rowFate` holds, per pair, what happens to its 1st, 2nd, ... row.
+  type LinkSet = XerEdits['setLinks'][number]
+  const rowFate = new Map<string, ('keep' | 'remove' | LinkSet)[]>()
+  const pendingAdds = new Map<string, LinkSet>()
+  const linkOps: NonNullable<XerEdits['linkOps']> = edits?.linkOps
+    ?? [...(edits?.removeLinks || []).map(l => ({ kind: 'remove' as const, ...l })), ...(edits?.setLinks || []).map(l => ({ kind: 'set' as const, ...l }))]
+  if (linkOps.length) {
+    for (const p of tables['TASKPRED'] || []) {
+      const key = linkKey(p['pred_task_id'] || '', p['task_id'] || '')
+      rowFate.set(key, [...(rowFate.get(key) || []), 'keep'])
+    }
+    for (const op of linkOps) {
+      const key = linkKey(op.pred, op.succ)
+      const fates = rowFate.get(key) || []
+      const first = fates.findIndex(f => f !== 'remove')
+      if (op.kind === 'set') {
+        const l: LinkSet = { pred: op.pred, succ: op.succ, type: op.type, lagDays: op.lagDays }
+        if (first >= 0) fates[first] = l
+        else pendingAdds.set(key, l)
+      } else if (first >= 0) fates[first] = 'remove'
+      else pendingAdds.delete(key)
+    }
+  }
+  const rowSeen = new Map<string, number>()
   let nextPredId = Math.max(0, ...(tables['TASKPRED'] || []).map(p => Number(p['task_pred_id']) || 0)) + 1
   const predFields = ['task_pred_id', 'task_id', 'pred_task_id', 'proj_id', 'pred_proj_id', 'pred_type', 'lag_hr_cnt']
   /** New TASKPRED rows for the relationships added in RunF9, in the table's own column order. */
@@ -351,10 +393,11 @@ export function exportXerFromOriginal(original: string, updates: Map<string, Xer
     const set = (f: string, v: string) => { const i = idx.get(f); if (i === undefined) return; while (cols.length <= i) cols.push(''); cols[i] = v }
     if (table === 'TASKPRED' && edits) {
       const key = linkKey(get('pred_task_id'), get('task_id'))
-      if (removeLinks.has(key)) return []
-      const l = setLinks.get(key)
-      if (!l) return [line]
-      pendingAdds.delete(key)
+      const nth = rowSeen.get(key) ?? 0
+      rowSeen.set(key, nth + 1)
+      const l = rowFate.get(key)?.[nth] ?? 'keep'
+      if (l === 'remove') return []
+      if (l === 'keep') return [line]
       set('pred_type', PRED[l.type])
       set('lag_hr_cnt', hrs(l.lagDays, calOfTask(get('pred_task_id').trim())?.hoursPerDay || 8))
       return [cols.join('\t')]

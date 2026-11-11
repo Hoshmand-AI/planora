@@ -8,7 +8,7 @@ import ExcelJS from 'exceljs'
 import type { ConstraintType, GeneratedSchedule } from '@/lib/planning/types'
 import { buildWbs, type WbsRow } from './wbs'
 import { fmtDate } from '@/lib/format'
-import { markingRows, type ExportMarking } from './markings'
+import { markFilledSheet, markingRows, type ExportMarking } from './markings'
 
 /**
  * CUI marking: the banner and designation as the first rows of a sheet (call before adding content)
@@ -146,7 +146,7 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
   ;[3, 8].forEach(r => { readme.getRow(readmeOff + r).font = { bold: true } })
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 4, visibility: 'visible' }]
   // Provenance last, so the import sheets keep their positions.
-  if (prov) addProvenance(wb, prov, `${projectName} — import workbook`)
+  if (prov) markFilledSheet(addProvenance(wb, prov, `${projectName} — import workbook`), mk)
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
@@ -158,6 +158,9 @@ const WBS_FILL = ['FFFFE699', 'FFC6E0B4', 'FFBDD7EE', 'FFF8CBAD']
 const BAR_CRIT = 'FFE0301E'
 const BAR_NONCRIT = 'FF3CB44B'
 const BAR_WBS = 'FF1F1F1F'
+
+/** Rows x week columns up to which the P6 layout styles every time-scale cell (grid lines, WBS band fill). */
+export const P6_LAYOUT_STYLED_CELLS = 1_000_000
 
 function mondayOf(iso: string): number {
   const d = new Date(iso.slice(0, 10) + 'T00:00:00Z')
@@ -186,6 +189,11 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   const weeks = Math.min(520, Math.floor((mondayOf(finish) - w0) / WEEK) + 1)
   const FIXED = ['Activity ID', 'Activity Name', 'Original Duration', 'Start', 'Finish', 'Total Float', 'Critical']
   const G0 = FIXED.length + 1 // first Gantt column (1-based)
+  // Very large schedules: styling every cell of every row across the time scale takes minutes and
+  // gigabytes. Past this size only the bars are drawn in the time scale (no grid lines or band fill
+  // there); the data columns and the bars are unchanged.
+  const lean = rows.length * weeks > P6_LAYOUT_STYLED_CELLS
+  const styledTo = lean ? G0 : G0 + weeks
 
   ws.getCell(off + 1, 1).value = projectName
   ws.getCell(off + 1, 1).font = { bold: true, size: 16, color: { argb: 'FF0F2140' } }
@@ -246,7 +254,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
       const n = row.node!
       const fill = WBS_FILL[(n.level - 1) % WBS_FILL.length]
       xr.values = [n.code, n.name, '', toDate(n.start), toDate(n.finish), '', n.critical ? 'Yes' : '']
-      for (let c = 1; c < G0 + weeks; c++) ws.getCell(r, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
+      for (let c = 1; c < styledTo; c++) ws.getCell(r, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
       xr.font = { bold: true }
       ws.getCell(r, 2).alignment = { indent: (n.level - 1) * 2 }
       xr.outlineLevel = n.level - 1
@@ -262,7 +270,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
       paintBar(r, tm?.earlyStart, tm?.earlyFinish, tm?.critical ? BAR_CRIT : BAR_NONCRIT, a.type === 'milestone')
       ws.getCell(r, 2).note = a.rationale.summary.slice(0, 800)
     }
-    for (let c = 1; c < G0 + weeks; c++) {
+    for (let c = 1; c < styledTo; c++) {
       const cell = ws.getCell(r, c)
       cell.border = { bottom: { style: 'hair', color: { argb: 'FFD9D9D9' } }, right: c < G0 ? { style: 'hair', color: { argb: 'FFD9D9D9' } } : undefined }
     }
@@ -298,7 +306,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
     const src = prov.sources[0]
     ws.getCell(off + 3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src ? sourceSha(src) : 'not recorded'} · RunF9 ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} · Basis: ${src ? sourceBasis(src) : 'as submitted'} — see the Provenance sheet`
     ws.getCell(off + 3, 1).font = { size: 9, color: { argb: 'FF6B6359' } }
-    addProvenance(wb, prov, `${projectName} — P6 layout`)
+    markFilledSheet(addProvenance(wb, prov, `${projectName} — P6 layout`), opts.marking)
   }
 
   return Buffer.from(await wb.xlsx.writeBuffer())

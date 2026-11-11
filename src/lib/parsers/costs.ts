@@ -416,7 +416,11 @@ export async function costDataFromFile(fileName: string, content: Buffer): Promi
     return xerCostData(decodeXer(content).text)
   }
   if (ext === '.xml' || ext === '.pmxml') {
-    const text = new TextDecoder('utf-8').decode(content)
+    // Same decoding as the importer (./index.ts): UTF-16 by its byte-order mark, UTF-8, else Windows-1252.
+    let text: string
+    if (content.length >= 2 && content[0] === 0xff && content[1] === 0xfe) text = new TextDecoder('utf-16le').decode(content.subarray(2))
+    else if (content.length >= 2 && content[0] === 0xfe && content[1] === 0xff) text = new TextDecoder('utf-16be').decode(content.subarray(2))
+    else { try { text = new TextDecoder('utf-8', { fatal: true }).decode(content) } catch { text = (await import('./xer-codec')).decodeCp1252(content) } }
     return isP6Xml(text) ? p6XmlCostData(text) : ext === '.xml' ? mspCostData(text) : null
   }
   if (ext === '.csv') {

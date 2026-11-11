@@ -4,9 +4,11 @@ import { audit } from '@/lib/server/audit'
 import { deletePlan, savePlan } from '@/lib/db'
 import { applyAnswers, elicit } from '@/lib/planning/elicitation'
 import type { Answer } from '@/lib/planning/types'
-import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, planMarkedClassified } from '@/lib/server/classification'
+import { classificationFromAnswer, classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, isLessRestrictive, planMarkedClassified } from '@/lib/server/classification'
+import { can } from '@/lib/server/permissions'
 import { deploymentKind } from '@/lib/llm/provider'
 import { elicitationContext, loadPlanContext, planView } from './context'
+import { jsonObject } from '../../json-body'
 
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
@@ -22,8 +24,8 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
 export const PATCH = api<{ id: string }>({ permission: 'plan.write', apiKey: true }, async (req, { params, auth }) => {
   const r = await loadPlanContext(req, params.id, auth)
   const { plan, ctx } = r
-  const body = await req.json().catch(() => ({}))
-  const incoming = (body.answers || {}) as Record<string, Partial<Answer> | null>
+  const body = await jsonObject(req)
+  const incoming = (body.answers && typeof body.answers === 'object' ? body.answers : {}) as Record<string, Partial<Answer> | null>
   const now = new Date().toISOString()
   // The commercial cloud does not take a plan marked classified: refused before anything is saved.
   const refusal = planMarkedClassified({ 'security.classification': { status: incoming['security.classification']?.status ?? 'known', value: incoming['security.classification']?.value } })
@@ -39,6 +41,13 @@ export const PATCH = api<{ id: string }>({ permission: 'plan.write', apiKey: tru
   if (Object.keys(result.invalid).length) {
     const [qid, msg] = Object.entries(result.invalid)[0]
     return NextResponse.json({ error: `${qid}: ${msg}`, code: 'invalid_answer', errors: { ...result.errors, ...result.invalid } }, { status: 400 })
+  }
+  // Lowering a marking re-opens cloud AI and unmarked exports, so it takes an administrator (as on a schedule).
+  const markedBefore = classificationFromAnswer(originalAnswers['security.classification'])
+  const markedAfter = classificationFromAnswer(result.answers['security.classification'])
+  if (isLessRestrictive(markedAfter, markedBefore) && !can(auth.role, 'org.manage')) {
+    await audit({ action: 'plan.classification_refused', targetType: 'plan', targetId: plan.id, detail: { plan: plan.name, before: markedBefore, requested: markedAfter, reason: 'downgrade_needs_admin' } })
+    return NextResponse.json({ error: 'Only an organization admin can lower a security marking (for example CUI to unclassified). Ask an admin to make this change.', code: 'downgrade_needs_admin' }, { status: 403 })
   }
   const errors = result.errors
   let answers = result.answers

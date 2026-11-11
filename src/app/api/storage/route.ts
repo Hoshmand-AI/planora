@@ -9,6 +9,7 @@ import { validateSignInLocation } from '@/lib/storage/providers'
 import { encrypt } from '@/lib/server/crypto'
 import { appOrigin } from '@/lib/server/email'
 import { randomUUID } from 'crypto'
+import { jsonObject } from '../json-body'
 
 /** Where a published copy of public/cloud/aws-storage-role.yaml lives (CloudFormation quick-create needs an S3 URL). */
 const awsTemplateUrl = () => (process.env.RUNF9_AWS_TEMPLATE_URL || '').trim()
@@ -32,7 +33,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
 type Body = { action?: string; id?: string; provider?: string; name?: string; config?: Record<string, unknown>; secret?: Record<string, unknown> }
 
 export const POST = api({ permission: 'org.manage' }, async (req, { auth }) => {
-  const body = (await req.json().catch(() => ({}))) as Body
+  const body = (await jsonObject(req)) as Body
   const rl = await hit(`storage:org:${auth.orgId}`, 30, 3600)
   if (!rl.ok) throw new ApiError(429, 'Too many storage changes this hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
 

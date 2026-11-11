@@ -228,6 +228,8 @@ export async function loadScheduleData(id: string, orgId: string, opts: { basis?
     editedActivityIds: useEdits ? edited.editedActivityIds : [],
     /** Activities the scenario edits, whichever basis was loaded */
     scenarioActivityIds: edited.editedActivityIds,
+    /** The network as imported, before any edit (to check a revert with revertLoopError) */
+    imported: { activities: importedActivities, relationships: importedRelationships },
   }
 }
 

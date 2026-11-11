@@ -52,10 +52,12 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
 
   const load = useCallback(async () => {
     setError('')
-    const res = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/logic-suggestions`)
-    const d = await res.json().catch(() => ({}))
-    if (!res.ok) { setError(d.error || 'RunF9 could not read this schedule’s logic.'); return }
-    setData(d)
+    try {
+      const res = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/logic-suggestions`)
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(d.error || 'RunF9 could not read this schedule’s logic.'); return }
+      setData(d)
+    } catch { setError('Network error. Check your connection and reload the page.') }
   }, [scheduleId])
   useEffect(() => { setData(null); setStatus(''); load() }, [load])
 
@@ -179,6 +181,8 @@ function LinkText({ s }: { s: LogicSuggestion }) {
   )
 }
 
+const LINK_TYPE_NAME: Record<string, string> = { FS: 'finish-to-start', SS: 'start-to-start', FF: 'finish-to-finish', SF: 'start-to-finish' }
+
 function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }: { s: LogicSuggestion; scheduleId: string; canApply: boolean; onApplied: (s: LogicSuggestion) => void; compact?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState(`Suggested fix: ${s.reason}`)
@@ -212,7 +216,7 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
           <label className="block text-[12px] text-warm-600">Reason (kept with the edit and in the audit log)
             <input value={reason} onChange={e => setReason(e.target.value)} className="block mt-0.5 w-full border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700" />
           </label>
-          <p className="text-[12px] text-warm-600">Adds a finish-to-start link to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
+          <p className="text-[12px] text-warm-600">Adds a {LINK_TYPE_NAME[s.type] ?? s.type} link{s.lag ? ` with a ${Math.abs(s.lag)}-day ${s.lag > 0 ? 'lag' : 'lead'}` : ''} to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
             <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3 py-1.5 rounded-md border border-warm-300 text-[12.5px] text-navy-950">Cancel</button>

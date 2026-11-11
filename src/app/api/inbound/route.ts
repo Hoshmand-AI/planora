@@ -104,7 +104,7 @@ export const POST = publicApi(async req => {
     try {
       const r = await ingestDocument({
         orgId: inbox.orgId, scope: 'project', scheduleId: schedule.id, title, fileName: `inbox-${inbox.id.slice(0, 8)}.${ext}`,
-        docType, classification, uploadedBy: String(u.id), content, whyNoAi: null,
+        docType, classification, uploadedBy: String(u.id), content, whyNoAi: null, source: 'inbox',
       })
       const d = r.document
       await markInboxUsed(inbox.orgId, inbox.id)

@@ -10,7 +10,7 @@ import { isCivilType } from './types'
 import { runCpm } from './cpm'
 import { nextActivityCode } from './overrides'
 import { usFederalHolidaysRange, addCalendarDays, nextWorkDay } from './calendar'
-import { elicit, known, knownBool, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor } from './elicitation'
+import { elicit, known, knownBool, profileFrom, questionBank, unansweredAssumption, milestoneTargetsFor, ALL_MILESTONE_TARGETS } from './elicitation'
 import { historyDuration, historyForPlan, type FirmHistory } from './history'
 import { templatesFor, computeTemplateDuration, mapToSelected, genericVariant } from '@/lib/knowledge/templates'
 import { resolveRegional } from '@/lib/knowledge/regions'
@@ -19,7 +19,7 @@ import { categoryLabel, phaseOf } from '@/lib/semantic/taxonomy'
 import { midSentence } from '@/lib/format'
 import { addDataCenterBackbone } from './backbone'
 import { applyEarthworkQuantity, applyFederalInstallation, applyInWaterWindow, applySeasonalCalendar, applyStateAgencyCertification } from './civil-plan'
-import { WW_MAX_STRUCTURES } from './civil-options'
+import { WW_MAX_STRUCTURES, CIVIL_COUNT_CAPS } from './civil-options'
 
 export interface GenerateInput {
   answers: Record<string, Answer>
@@ -117,7 +117,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   const notes: string[] = [
     'Permit review times and lead times are reference ranges. Verify with the Authority Having Jurisdiction and suppliers before baselining.',
   ]
-  if (regional.climate.adverseMonths.length && profile.projectType !== 'interiors_ti') notes.push(`Regional climate: ${regional.climate.adverseNote}`)
+  if (regional.climate.adverseMonths.length && profile.projectType !== 'interiors_ti') notes.push(`Regional climate: ${regional.climate.adverseNote}${isCivilType(profile.projectType) ? ' No weather days are added to this schedule for this project type: allow for weather in the durations, or add weather days as activities.' : ''}`)
   if (profile.outsideUS) notes.push('Project outside the US: no US permits, federal requirements or US holidays are planned. Add the local approvals and public holidays to this schedule.')
   if (start !== requestedStart) notes.push(`The target start ${requestedStart} is not a working day, so Notice to Proceed is set to the next working day, ${start}.`)
 
@@ -163,6 +163,16 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
       assumptions.push({ questionId: 'ww.structures', text: `${Math.round(asked)} process structures were answered; the plan details ${WW_MAX_STRUCTURES} structures individually (pour, cure, leak test, backfill), so each planned structure stands for about ${Math.round((asked / WW_MAX_STRUCTURES) * 10) / 10} of them. Add the rest as activities if they are poured separately.`, bufferDays: 0, kind: 'inferred' })
       notes.push(`Process structures capped at ${WW_MAX_STRUCTURES} (you answered ${Math.round(asked)}): see the assumptions.`)
     }
+  }
+  // Other counts the plan caps (traffic stages, utility owners, stations, test systems): say so, never silently.
+  for (const cap of CIVIL_COUNT_CAPS) {
+    if (cap.type !== profile.projectType) continue
+    const asked = num(known(answers, cap.questionId))
+    if (asked === undefined || Math.round(asked) <= cap.max) continue
+    // Utility owners only size the plan while relocations are still to be done.
+    if (cap.questionId === 'civil.utility_owners' && profile.civil?.utilities !== 'by_others' && profile.civil?.utilities !== 'by_contractor') continue
+    assumptions.push({ questionId: cap.questionId, text: `${Math.round(asked)} ${cap.noun} were answered; ${cap.planned} ${cap.advice}`, bufferDays: 0, kind: 'inferred' })
+    notes.push(`${cap.noun.charAt(0).toUpperCase()}${cap.noun.slice(1)} capped at ${cap.max} (you answered ${Math.round(asked)}): see the assumptions.`)
   }
 
   /* ── Template activities ── */
@@ -392,7 +402,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   // or steel package on a renovation), one is added, so a delivery never gates mobilization or demolition.
   const installTarget = (it: LongLeadSpec): string => {
     const cat = mapToSelected(installCategory(it), profile)
-    return resolveCat(cat) ?? addInstallActivity(b, cat, it, profile, { hoursFactor, resolveCat, ntpId: ntp.id })
+    return resolveCat(cat) ?? addInstallActivity(b, cat, it, profile, { hoursFactor, resolveCat, ntpId: ntp.id, answered: known(answers, `procure.${it.id}.status`) !== undefined })
   }
   for (const it of bank.longLead) {
     const qid = `procure.${it.id}.status`
@@ -556,7 +566,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   // Splitting at an overlap point can leave a tail segment whose only successor was the overlap.
   closeOpenEnds(b, ntp.id, finishId, scId)
   // Paving, striping and seeding in a northern winter shutdown: seasonal calendar (after splitting).
-  if (civil) applySeasonalCalendar(b.acts, calendars, seasonal, calendars[0], notes, assumptions)
+  if (civil) applySeasonalCalendar(b.acts, calendars, seasonal, calendars[0], notes, assumptions, startYear)
 
   /* ── Seasonal windows (northern winters): weather-sensitive work runs on a calendar with the window off ── */
   // Building types only: civil networks carry their own winter shutdown (applySeasonalCalendar above).
@@ -624,6 +634,12 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     endAct.constraint = { type: 'FNLT', date: target }
     endAct.rationale = { ...endAct.rationale, assumptions: [...(endAct.rationale.assumptions || []), `Must finish by the “${m.label}” target of ${target} (from the interview).`] }
     milestoneTargets.push({ key: m.key, label: m.label, target, activityId: endAct.id })
+  }
+  // A target answered for a milestone this plan does not have (a tunnel has no in-water work) is said, never dropped silently.
+  for (const m of ALL_MILESTONE_TARGETS) {
+    const target = known(answers, `milestone.${m.key}.target`)
+    if (typeof target !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target) || milestoneTargets.some(t => t.key === m.key)) continue
+    assumptions.push({ questionId: `milestone.${m.key}.target`, text: `The “${m.label}” target of ${target.slice(5, 7)}/${target.slice(8, 10)}/${target.slice(0, 4)} is not held: this plan has no activity that reaches that milestone. Put the date on the right activity as a constraint, or clear the answer.`, bufferDays: 0, kind: 'inferred' })
   }
 
   /* ── Qualified answers: the team's own words travel with the activities they affect ── */
@@ -723,22 +739,27 @@ const INSTALL_BEFORE: Partial<Record<CanonicalCategory, CanonicalCategory[]>> = 
  * a roof on a renovation): after demolition (or mobilization), before the work it must precede.
  */
 function addInstallActivity(b: Builder, cat: CanonicalCategory, it: LongLeadSpec, profile: ProjectProfile,
-  ctx: { hoursFactor: number; resolveCat: (c: CanonicalCategory) => string | undefined; ntpId: string }): string {
+  ctx: { hoursFactor: number; resolveCat: (c: CanonicalCategory) => string | undefined; ntpId: string; answered?: boolean }): string {
   const id = `install-${cat}`
   const existing = b.acts.get(id)
   if (existing) {
-    existing.rationale = { ...existing.rationale, assumptions: [...(existing.rationale.assumptions || []), `Also installs ${midSentence(it.name)}.`] }
+    existing.rationale = { ...existing.rationale, assumptions: [...(existing.rationale.assumptions || []), `Also installs ${midSentence(it.name)}${ctx.answered === false ? ' (assumed in scope; its procurement question is not answered)' : ''}.`] }
     return id
   }
   const def = genericVariant(cat)
   const scale = INSTALL_SCALE[cat] ?? 1
   const duration = def && !def.milestone ? Math.max(1, Math.round(computeTemplateDuration(def, profile) * scale * ctx.hoursFactor)) : 10
-  const why = `The interview has ${midSentence(it.name)} in scope, but this ${profile.scope?.startsWith('renovation') ? 'renovation' : 'project'}'s network had no activity installing it, so one was added for the delivery to feed (not mobilization).`
+  const kindOfWork = profile.scope?.startsWith('renovation') ? 'renovation' : 'project'
+  // A default is not an answer: only say "the interview has it in scope" when the question was answered.
+  const assumed = ctx.answered === false
+  const why = assumed
+    ? `${it.name} is assumed to be in scope (its procurement question is not answered yet). This ${kindOfWork}'s network had no activity installing it, so one was added for the delivery to feed (not mobilization).`
+    : `The interview has ${midSentence(it.name)} in scope, but this ${kindOfWork}'s network had no activity installing it, so one was added for the delivery to feed (not mobilization).`
   b.add({
     id, name: INSTALL_NAMES[cat] ?? `Install ${midSentence(it.name)}`, category: cat, phase: phaseOf(cat), type: 'task', duration, calendarId: FIELD,
     rationale: {
       summary: `${duration} work days${scale !== 1 ? ` (${Math.round(scale * 100)}% of the new-construction template)` : ''}. ${why}`,
-      sources: [src('template', 'RunF9 activity template'), src('user', 'Item in scope (procurement question)')],
+      sources: [src('template', 'RunF9 activity template'), assumed ? src('assumption', 'Item assumed in scope', 'Procurement question not answered') : src('user', 'Item in scope (procurement question)')],
       confidence: 'low',
       assumptions: ['Answer the item "Not in scope" if this work is not part of the project.'],
     },

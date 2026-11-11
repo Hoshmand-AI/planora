@@ -108,9 +108,9 @@ export default function PlanPage() {
   }, [])
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/plans/${id}`)
-    const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Could not load plan.'); return }
+    const res = await fetch(`/api/plans/${id}`).catch(() => null)
+    const data = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok || !data.plan) { setError(data.error || (res ? 'Could not load plan.' : 'Network error. Check your connection and reload the page.')); return }
     // A plan that already has a schedule opens on it; a new one opens on the interview.
     if (!opened.current) { opened.current = true; if (data.plan?.generated) setTab('schedule') }
     setView(data)
@@ -219,8 +219,10 @@ export default function PlanPage() {
   }
   const remove = async () => {
     if (!confirm('Delete this plan? This cannot be undone.')) return
-    const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' })
-    if (res.ok) router.push('/dashboard/plan')
+    const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (res?.ok) { router.push('/dashboard/plan'); return }
+    const d = res ? await res.json().catch(() => ({})) : {}
+    setError(d.error || 'The plan was not deleted. Try again.')
   }
 
   if (!view) {
@@ -460,6 +462,8 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
   recovery: RecoveryPlan | null; onRecover: (id: string) => void; onInterview: () => void
   focusCodes: string[] | null; onClearFocus: () => void
 }) {
+  // Changing a plan needs plan.write: read-only roles see the schedule and its reasons, without the controls.
+  const canWrite = useApp().can('plan.write')
   const g = plan.generated!
   const t = g.cpm?.times || {}
   const [open, setOpen] = useState<string | null>(null)
@@ -484,7 +488,7 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
           </div>
         ))}
       </dl>
-      {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
+      {recovery && <RecoveryPanel r={recovery} busy={canWrite ? busy : 'read-only'} onRecover={onRecover} onInterview={onInterview} />}
       {focusCodes && (
         <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
           <span className="flex-1">Showing the {focusCodes.length} activities flagged by the quality check. Open one to see why it is there and override it.</span>
@@ -501,7 +505,7 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
       )}
 
       {textEdit && <div className="mb-4">{textEdit}</div>}
-      <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />
+      {canWrite && <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />}
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         {(['all', 'critical', 'low', 'overridden'] as const).map(f => (
@@ -510,10 +514,10 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
           </button>
         ))}
         <span className="flex-1" />
-        <button onClick={() => { if (confirm('Rebuild from the interview and discard all overrides?')) onRegenerateFresh() }} disabled={!!busy} className="text-[12px] text-warm-500 hover:text-status-at-risk">Discard overrides & rebuild</button>
+        {canWrite && <button onClick={() => { if (confirm('Rebuild from the interview and discard all overrides?')) onRegenerateFresh() }} disabled={!!busy} className="text-[12px] text-warm-500 hover:text-status-at-risk">Discard overrides & rebuild</button>}
       </div>
 
-      <p className="text-[12.5px] text-warm-500 mb-2">Click any activity to see why it is there and how it is sequenced, or to override it.</p>
+      <p className="text-[12.5px] text-warm-500 mb-2">Open any activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</p>
       <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white/70 border border-warm-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-[12.5px] min-w-[760px]">
           <thead>
@@ -529,7 +533,7 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
               const width = tm ? Math.max(0.6, ((Date.parse(tm.earlyFinish) - Date.parse(tm.earlyStart) + 86_400_000) / span) * 100) : 0
               return (
                 <ActivityRows key={a.id} a={a} tm={tm} left={left} width={width} open={open === a.id} onToggle={() => setOpen(o => o === a.id ? null : a.id)}
-                  links={g.links} byId={byId} onEdit={onEdit} busy={busy} />
+                  links={g.links} byId={byId} onEdit={onEdit} busy={busy} canWrite={canWrite} />
               )
             })}
           </tbody>
@@ -563,18 +567,18 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 mb-4">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Add an activity</div>
       <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+        <input value={name} onChange={e => setName(e.target.value)} aria-label="Activity name" placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
         <div className="md:col-span-2 flex items-center gap-2">
-          <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} className="w-20 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+          <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label="Duration in work days (0 for a milestone)" className="w-20 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
           <span className="text-[12px] text-warm-500">work days (0 = milestone)</span>
         </div>
-        <select value={after} onChange={e => setAfter(e.target.value)} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+        <select value={after} onChange={e => setAfter(e.target.value)} aria-label="Starts after" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
           <option value="">Starts after…</option>{activities.map(opt)}
         </select>
-        <select value={before} onChange={e => setBefore(e.target.value)} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+        <select value={before} onChange={e => setBefore(e.target.value)} aria-label="Must finish before" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
           <option value="">Must finish before… (default: substantial completion)</option>{activities.map(opt)}
         </select>
-        <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+        <input value={reason} onChange={e => setReason(e.target.value)} aria-label="Reason for adding this activity" placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
         <div className="md:col-span-2 flex gap-2">
           <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
             if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); setOpen(false) }
@@ -586,10 +590,10 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
   )
 }
 
-function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit, busy }: {
+function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit, busy, canWrite }: {
   a: PlanActivity; tm?: { earlyStart: string; earlyFinish: string; lateStart: string; lateFinish: string; totalFloat: number; freeFloat: number; critical: boolean }
   left: number; width: number; open: boolean; onToggle: () => void
-  links: PlanLink[]; byId: Map<string, PlanActivity>; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null
+  links: PlanLink[]; byId: Map<string, PlanActivity>; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null; canWrite: boolean
 }) {
   const preds = links.filter(l => l.to === a.id)
   const succs = links.filter(l => l.from === a.id)
@@ -602,7 +606,12 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
   return (
     <>
       <tr onClick={onToggle} className={`border-b border-warm-200 cursor-pointer hover:bg-warm-50 ${a.placeholder ? 'bg-warm-200/40' : ''}`}>
-        <td className="px-3 py-2 text-warm-400">{open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</td>
+        <td className="px-3 py-2 text-warm-400">
+          {/* The keyboard and screen-reader way to open the row (a click anywhere on the row does the same) */}
+          <button type="button" aria-expanded={open} aria-label={`${a.code} ${a.name}: details`} onClick={e => { e.stopPropagation(); onToggle() }} className="grid place-items-center w-6 h-6 -m-1 rounded text-warm-600 hover:text-navy-950">
+            {open ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
+          </button>
+        </td>
         <td className="px-2 py-2 font-mono text-[11.5px] text-warm-500">{a.code}</td>
         <td className="px-2 py-2 text-navy-950">
           <div className="flex items-center gap-1.5">
@@ -636,17 +645,18 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
 
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
                 {preds.length === 0 && <p className="text-[12.5px] text-warm-500">No predecessors (project start).</p>}
-                {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} />)}
-                {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} />)}
+                {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
+                {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
               </div>
 
               <div className="space-y-3">
+                {canWrite && <>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">Override (your call wins)</div>
-                <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason (required, kept in the audit trail)"
+                <input value={reason} onChange={e => setReason(e.target.value)} aria-label={`Reason for changing ${a.code}`} placeholder="Reason (required, kept in the audit trail)"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700" />
                 {a.type !== 'milestone' && (
                   <div className="flex gap-2 items-center">
-                    <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} className="w-24 bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+                    <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label={`Duration of ${a.code} in work days`} className="w-24 bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
                     <span className="text-[12px] text-warm-500">work days</span>
                     <button disabled={!!busy || !reason.trim() || Number(dur) === a.duration} onClick={async () => { if (await onEdit({ kind: 'duration', activityId: a.id, value: Number(dur), reason })) setReason('') }}
                       className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Set duration</button>
@@ -654,14 +664,14 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                 )}
                 <div className="flex flex-wrap gap-2 items-center">
                   <Link2 size={13} className="text-warm-400" />
-                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} aria-label={`Successor to add after ${a.code}`} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
                     <option value="">Add successor…</option>
                     {[...byId.values()].filter(x => x.id !== a.id).map(x => <option key={x.id} value={x.id}>{x.code} {x.name}</option>)}
                   </select>
-                  <select value={linkType} onChange={e => setLinkType(e.target.value)} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
+                  <select value={linkType} onChange={e => setLinkType(e.target.value)} aria-label="Link type" className="bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]">
                     {['FS', 'SS', 'FF', 'SF'].map(x => <option key={x}>{x}</option>)}
                   </select>
-                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" className="w-16 bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]" />
+                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]" />
                   <button disabled={!!busy || !reason.trim() || !linkTarget} onClick={async () => { if (await onEdit({ kind: 'add_link', from: a.id, to: linkTarget, type: linkType, lag: Number(linkLag) || 0, reason })) { setReason(''); setLinkTarget('') } }}
                     className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Link</button>
                 </div>
@@ -669,6 +679,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                   <button disabled={!!busy || !reason.trim()} onClick={async () => { if (confirm(`Remove ${a.code}? Its predecessors will be linked to its successors.`)) await onEdit({ kind: 'remove_activity', activityId: a.id, reason }) }}
                     className="flex items-center gap-1 text-[12.5px] text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
                 )}
+                </>}
                 {a.overrides?.map((o, i) => (
                   <p key={i} className="text-[12px] text-warm-500">{fmtDateTime(o.at)} — {o.by}: {o.field} {o.from !== undefined ? `${String(o.from)} → ` : ''}{String(o.to ?? '')} · “{o.reason}”</p>
                 ))}
@@ -681,7 +692,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
   )
 }
 
-function LinkRow({ l, other, dir, onEdit, busy }: { l: PlanLink; other?: PlanActivity; dir: 'after' | 'before'; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null }) {
+function LinkRow({ l, other, dir, onEdit, busy, canWrite }: { l: PlanLink; other?: PlanActivity; dir: 'after' | 'before'; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null; canWrite: boolean }) {
   const remove = async () => {
     const reason = await askText({ title: 'Remove this relationship', label: 'Reason (kept in the audit trail)', required: true, confirmLabel: 'Remove' })
     if (reason && reason.trim()) await onEdit({ kind: 'remove_link', linkId: l.id, reason })
@@ -690,7 +701,7 @@ function LinkRow({ l, other, dir, onEdit, busy }: { l: PlanLink; other?: PlanAct
     <div className="text-[12.5px] text-warm-600 py-1 flex gap-2 items-start">
       <span className="font-mono text-[11px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
       <span className="flex-1"><span className="font-medium text-navy-950">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
-      <button disabled={!!busy} onClick={remove} title="Remove relationship" className="text-warm-400 hover:text-status-at-risk flex-shrink-0"><X size={12} /></button>
+      {canWrite && <button disabled={!!busy} onClick={remove} title="Remove relationship" aria-label={`Remove the relationship with ${other?.code ?? 'this activity'}`} className="text-warm-600 hover:text-status-at-risk flex-shrink-0"><X size={12} aria-hidden="true" /></button>}
     </div>
   )
 }
@@ -705,6 +716,8 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
   onShowCodes: (codes: string[]) => void; onInterview: () => void
 }) {
+  const { can } = useApp()
+  const canWrite = can('plan.write'), canReview = can('plan.review')
   const [verdict, setVerdict] = useState('approve')
   const [comment, setComment] = useState('')
   const [reviewer, setReviewer] = useState('')
@@ -744,7 +757,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         </section>
       )}
 
-      {recovery && <RecoveryPanel r={recovery} busy={busy} onRecover={onRecover} onInterview={onInterview} />}
+      {recovery && <RecoveryPanel r={recovery} busy={canWrite ? busy : 'read-only'} onRecover={onRecover} onInterview={onInterview} />}
 
       <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
 
@@ -837,6 +850,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
+        {!canReview ? <p className="text-[12.5px] text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
           <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]">
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
@@ -845,6 +859,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-navy-950 hover:bg-navy-900 text-white rounded-full text-[13px] font-semibold py-2 disabled:opacity-50">Record review</button>
           <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
         </div>
+        )}
       </section>
     </div>
   )
@@ -857,6 +872,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
   /** Only the first open decision starts expanded, so the list reads as a short to-do list */
   startOpen: boolean
 }) {
+  const canWrite = useApp().can('plan.write')
   const [open, setOpen] = useState(startOpen)
   const accept = g.actions.find(a => a.kind === 'accept') as Extract<Guide['actions'][number], { kind: 'accept' }> | undefined
   const [note, setNote] = useState(accept?.suggestedNote || '')
@@ -884,7 +900,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
           {g.decision && (
             <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">
               {g.decision.decision === 'accept' ? 'Accepted' : 'Marked to fix'} by {g.decision.by} on {fmtDateTime(g.decision.at)}{g.decision.note ? ` — “${g.decision.note}”` : ''}
-              <button onClick={() => onDecide(key, null, '')} className="ml-2 underline text-warm-500">Undo</button>
+              {canWrite && <button onClick={() => onDecide(key, null, '')} className="ml-2 underline text-warm-600">Undo</button>}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
@@ -894,15 +910,15 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
                 ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-full bg-navy-950 text-white text-[12.5px] font-medium">{a.label}</button>
                 : a.kind === 'interview'
                   ? <button key={i} onClick={onInterview} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
-                  : !g.decision && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}…</button>)}
-            {!g.decision && !accept && (
+                  : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}…</button>)}
+            {!g.decision && !accept && canWrite && (
               <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-dashed border-warm-400 text-[12.5px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
             )}
-            {!g.decision && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">I&apos;ll fix it</button>}
+            {!g.decision && canWrite && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">I&apos;ll fix it</button>}
           </div>
-          {accepting && !g.decision && (
+          {accepting && !g.decision && canWrite && (
             <div className="flex flex-col gap-2">
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Why this is acceptable for this project (goes into the Basis of Schedule)" className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]" />
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} aria-label={`Why check ${g.id} is acceptable for this project`} placeholder="Why this is acceptable for this project (goes into the Basis of Schedule)" className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]" />
               <button disabled={!!busy || note.trim().length < 10} onClick={async () => { if (await onDecide(key, 'accept', note)) setAccepting(false) }} className="self-start bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Record decision</button>
             </div>
           )}

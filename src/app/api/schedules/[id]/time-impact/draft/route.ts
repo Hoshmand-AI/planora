@@ -3,7 +3,8 @@ import { api, body as readBody, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { can } from '@/lib/server/permissions'
 import { log } from '@/lib/server/log'
-import { chatJson, AiQuotaError } from '@/lib/llm/provider'
+import { chatJson, AiQuotaError, RestrictedDataError } from '@/lib/llm/provider'
+import { AiProviderError, AiRefusalError } from '@/lib/llm/gateway'
 import { loadTiaContext } from '@/lib/server/tia-service'
 import { projectClassification, projectScope } from '@/lib/rag/scope'
 import { getDocument, scopedChunks } from '@/lib/rag/store'
@@ -30,7 +31,8 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
   const { scope } = await projectScope(auth.orgId, params.id)
   const doc = await getDocument(scope, documentId)
   if (!doc) return NextResponse.json({ error: 'That document is not one of this project’s documents.' }, { status: 404 })
-  const all = (await scopedChunks(scope, { includeUnreviewed: true })).filter(c => c.documentId === doc.id)
+  // Only this document's passages are read (filtered in SQL, so a large project never cuts a recent document off).
+  const all = (await scopedChunks(scope, { includeUnreviewed: true, documentId: doc.id })).filter(c => c.documentId === doc.id)
   if (!all.length) throw new ApiError(422, 'That document has no readable text.', 'empty_document')
   const flagged = all.filter(c => c.flagged)
   const usable = all.filter(c => !c.flagged).slice(0, MAX_DRAFT_PASSAGES)
@@ -55,7 +57,8 @@ export const POST = api<{ id: string }>({ permission: 'schedule.write' }, async 
     } catch (err) {
       if (err instanceof AiQuotaError) throw new ApiError(429, err.message, 'ai_quota')
       log('warn', 'model call failed', { purpose: 'tia.fragnet_draft', error: (err as Error).message })
-      reason = `The AI model could not be used (${(err as Error).message.replace(/\.$/, '')}).`
+      // Only messages written for users (provider, refusal, restricted data) are shown.
+      reason = err instanceof AiProviderError || err instanceof AiRefusalError || err instanceof RestrictedDataError ? `The AI model could not be used (${err.message.replace(/\.$/, '')}).` : 'The AI model could not be used.'
     }
   }
   if (!draft) draft = rulesDraft(usable, ctx.net, doc.title, reason ?? 'No AI model is available.')

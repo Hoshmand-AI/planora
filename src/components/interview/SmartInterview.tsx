@@ -218,10 +218,12 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
 
   // Number keys pick an option, like a well-made form on a Mac.
   useEffect(() => {
-    if (!choices || disabled) return
+    if (!choices || disabled || busy) return
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) || e.metaKey || e.ctrlKey || e.altKey) return
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      // Only when nothing else has focus, or focus is inside this card: a digit typed on another control is not an answer.
+      if (t && t !== document.body && !ref.current?.contains(t)) return
       const n = Number(e.key)
       if (n >= 1 && n <= Math.min(9, choices.length)) { e.preventDefault(); submit(choices[n - 1].value) }
     }

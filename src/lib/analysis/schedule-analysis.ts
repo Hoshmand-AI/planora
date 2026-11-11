@@ -369,7 +369,7 @@ export function analyzeSchedule(input: {
     )
     if (ex) {
       const R = DEFAULT_DCMA_RULES
-      if (roundIndex(ex.bei) < R.indexTarget) bump('attention', `Baseline execution index is ${fmtIndex(ex.bei)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} tasks complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.`)
+      if (roundIndex(ex.bei) < R.indexTarget) bump('attention', `Baseline execution index is ${fmtIndex(ex.bei)}, below ${R.indexTarget.toFixed(2)}: ${ex.completed} tasks complete against ${ex.due} baselined to finish before ${fmtDate(input.dataDate)}.${ex.unbaselinedCompleted ? ` ${ex.unbaselinedCompleted} completed ${ex.unbaselinedCompleted === 1 ? 'task' : 'tasks'} with no baseline ${ex.unbaselinedCompleted === 1 ? 'is' : 'are'} not counted.` : ''}`)
       if (ex.missed / ex.due > R.maxPct / 100) bump('attention', `${ex.missed} of ${ex.due} tasks baselined to finish before ${fmtDate(input.dataDate)} finished late or not at all.`)
     }
   }
