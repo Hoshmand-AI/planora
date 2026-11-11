@@ -290,6 +290,11 @@ export default function TodayPage() {
                 <span className="font-medium text-navy-950">{fmtDates(c.text)}</span>
                 <q className="mt-1 block text-warm-700">{c.quote}</q>
                 <span className="mt-1 block text-[12px] text-warm-600">{c.citation.includes(c.title) ? c.citation : `${c.title} ${c.citation}`}</span>
+                {can('ai.use') && (
+                  <Link className="mt-1 inline-block text-[12.5px] font-medium text-accent-600 hover:underline" href={`/dashboard/ask?schedule=${encodeURIComponent(sid!)}&docs=1&unreviewed=1&q=${encodeURIComponent(`In ${c.title}, this clause reads: "${c.quote.slice(0, 280)}". In plain language, what does it require of us, by when, and what happens if we miss it? Given where the schedule stands today, what should we do this week? Cite the clause and any related clause.`)}`}>
+                    What does this clause mean for us?
+                  </Link>
+                )}
               </li>
             ))}</ul>
           )}
