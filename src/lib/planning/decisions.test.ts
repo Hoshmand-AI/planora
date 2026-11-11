@@ -160,7 +160,7 @@ describe('uploaded files without calculated results', () => {
     const b = projectBrief(s, [{ ...mk('M', 0), name: 'Substantial Completion', activityType: 'milestone', earlyFinish: '2028-02-15' }, { ...mk('F', 20), category: 'foundations', earlyStart: '2026-10-01' }])
     expect(b.summary).toMatch(/data center project in VA/)
     expect(b.summary).toMatch(/09\/01\/2026 to 03\/01\/2028/)
-    expect(b.summary).toMatch(/Substantial Completion by 02\/15\/2028/)
+    expect(b.summary).toMatch(/Substantial Completion, now forecast for 02\/15\/2028/)
   })
 
   it('does not guess a project type from names', () => {

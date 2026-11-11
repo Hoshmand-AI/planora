@@ -119,7 +119,7 @@ export default function TodayPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
-          <h1 className="page-title">Today, {fmtDate(b.asOf)}</h1>
+          <h1 className="page-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h1>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
         </div>
         <label className="text-[12px] text-warm-600">Brief for
@@ -236,6 +236,7 @@ export default function TodayPage() {
           {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
             <li key={i} className="text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
+          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12.5px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet on the Delays tab: the result can differ, because added work sits where the document ties it.</p>}
           <form className="flex flex-wrap items-end gap-2 pt-1" onSubmit={e => { e.preventDefault(); if (whatIf.activity.trim()) setRanWhatIf({ ...whatIf }) }}>
             <datalist id="wi-acts">{data.activities.slice(0, 2000).map(a => <option key={a.id} value={a.code}>{a.name}</option>)}</datalist>
             <label className="text-[12px] text-warm-600">If this activity<input list="wi-acts" value={whatIf.activity} onChange={e => setWhatIf(w => ({ ...w, activity: e.target.value }))} placeholder="Activity ID" className={`${input} block mt-0.5 w-36`} /></label>

@@ -56,7 +56,7 @@ export default function HistoryPage() {
     <div className="px-4 md:px-6 py-6 md:py-8 space-y-5">
       {error ? <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p> : null}
       <div>
-        <h1 className="page-title">Firm data</h1>
+        <h1 className="page-title">Firm insights</h1>
         <p className="text-[13.5px] text-warm-500 mt-1 max-w-3xl"><Lock size={13} className="inline mr-1.5 -mt-0.5" />{data.privacy} Workspace: <span className="font-medium text-navy-950">{data.organization?.name}</span></p>
       </div>
 

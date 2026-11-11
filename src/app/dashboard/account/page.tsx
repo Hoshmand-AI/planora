@@ -225,7 +225,7 @@ function AccountPage() {
           const d = await act('delete', { action: 'delete_account', currentPassword: del.password, code: del.code, confirm: del.confirm })
           if (d) window.location.href = '/'
         }}>
-          <Field label={`Type ${data.user.email} to confirm`}>{p => <input {...p} required className={inputClass} value={del.confirm} onChange={e => setDel({ ...del, confirm: e.target.value })} />}</Field>
+          <Field label="Type your email address to confirm">{p => <input {...p} required placeholder={data.user.email} className={inputClass} value={del.confirm} onChange={e => setDel({ ...del, confirm: e.target.value })} />}</Field>
           <Field label="Password">{p => <input {...p} type="password" required autoComplete="current-password" className={inputClass} value={del.password} onChange={e => setDel({ ...del, password: e.target.value })} />}</Field>
           {data.mfa.enabled && <Field label="Authenticator code">{p => <input {...p} inputMode="numeric" className={inputClass} value={del.code} onChange={e => setDel({ ...del, code: e.target.value })} />}</Field>}
           <div className="sm:col-span-2"><Button type="submit" variant="danger" disabled={busy === 'delete' || del.confirm !== data.user.email}>Delete my account</Button></div>

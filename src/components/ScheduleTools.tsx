@@ -220,7 +220,14 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             </select>
           </label>
           <label className="block">Security classification{' '}
-            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={classification ?? 'unclassified'} onChange={e => patch({ classification: e.target.value })}>
+            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={classification ?? 'unclassified'} onChange={e => {
+              const next = e.target.value
+              const was = classification ?? 'unclassified'
+              const msg = next === 'unclassified'
+                ? `Remove the ${was === 'cui' ? 'CUI' : 'classified'} marking from this schedule? Exports will no longer carry the markings, and AI features and CSV export become available for it again.`
+                : `Mark this schedule ${next === 'cui' ? 'CUI' : 'classified'}? Every export will carry the markings, and CSV export and cloud AI are turned off for it. Only keep ${next === 'cui' ? 'CUI' : 'classified material'} on a deployment your organization has approved for it.`
+              if (window.confirm(msg)) patch({ classification: next })
+            }}>
               <option value="unclassified">Unclassified</option>
               <option value="cui">CUI</option>
               <option value="classified">Classified</option>

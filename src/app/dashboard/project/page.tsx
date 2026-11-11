@@ -187,7 +187,7 @@ export default function ProjectPage() {
 
         {nearTerm && (nearTerm.inProgress.length > 0 || nearTerm.starting.length > 0) && (
           <section aria-labelledby="near-term-h">
-            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-1">Near-Term Outlook</h2>
+            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-1">Near-term outlook</h2>
             <p className="text-[12px] text-warm-500 mb-3">
               {nearTerm.basis === 'data_date' ? 'Data date' : 'Today'} {fmtDate(nearTerm.windowStart)} to {fmtDate(nearTerm.windowEnd)} (14 days). Durations are remaining work days.
             </p>
@@ -203,7 +203,7 @@ export default function ProjectPage() {
 
         {drivingTasks.length > 0 && (
           <section>
-            <h2 className="font-display text-[18px] text-navy-950 mb-3">Driving Tasks</h2>
+            <h2 className="font-display text-[18px] text-navy-950 mb-3">Driving tasks</h2>
             <div className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
               {drivingTasks.slice(0, 8).map((task, i) => (
                 <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < drivingTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>

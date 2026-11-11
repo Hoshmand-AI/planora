@@ -94,7 +94,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
   const top = adds.slice(0, TOP)
   const canApply = canEdit && data.editable
   const applied = (s: LogicSuggestion) => {
-    setStatus(`Added ${s.predecessor.code} → ${s.successor.code} to the “With RunF9 edits” scenario. The uploaded file is unchanged; you can revert it from the schedule dashboard’s edits.`)
+    setStatus(`Added ${s.predecessor.code} → ${s.successor.code} to the “With RunF9 edits” scenario. The uploaded file is unchanged; you can revert it under Edits on the Overview tab.`)
     load()
     // Overview and the tab badges count RunF9 edits from the shared project state.
     refreshMetrics()

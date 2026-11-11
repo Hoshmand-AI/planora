@@ -390,7 +390,7 @@ export default function OrgPage() {
             }}>Transfer</Button>
           </div>
           <div className="flex flex-wrap gap-2 items-end">
-            <Field label={`Type "${data.org.name}" to delete the organization`}>{p => <input {...p} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
+            <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
             <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
               if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
               if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'

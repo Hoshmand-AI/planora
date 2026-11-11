@@ -253,7 +253,7 @@ export default function QualityPage() {
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
             <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
-            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the schedule dashboard.</p>
+            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the Overview tab.</p>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>

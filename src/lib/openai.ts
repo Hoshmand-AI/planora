@@ -200,7 +200,7 @@ function offlineAnswer(stats: Record<string, string | number>, critical: Activit
     `_No AI model is available (${status.error || 'offline mode'}), so this is a direct readout of the schedule data._`,
     '',
     ...(brief ? ['**About this project:** ' + brief.summary, ''] : []),
-    `**Summary:** ${stats.totalActivities} activities — ${stats.completedCount} complete, ${stats.inProgressCount} in progress, ${stats.notStartedCount} not started. ${stats.criticalCount} critical, ${stats.negativeFloatCount} with negative float. ${stats.missingPredecessors} missing predecessors, ${stats.missingSuccessors} missing successors.`,
+    `**Summary:** ${stats.totalActivities} activities — ${stats.completedCount} complete, ${stats.inProgressCount} in progress, ${stats.notStartedCount} not started. ${stats.criticalCount} critical, ${stats.negativeFloatCount} with negative float. ${stats.missingPredecessors} missing predecessor${stats.missingPredecessors === 1 ? '' : 's'}, ${stats.missingSuccessors} missing successor${stats.missingSuccessors === 1 ? '' : 's'}.`,
     '',
     '**Critical path (first 10):**',
     ...critical.slice(0, 10).map(a => `- ${a.activityId} ${a.name}: ${a.earlyStart} → ${a.earlyFinish}, float ${a.totalFloat}d`),
