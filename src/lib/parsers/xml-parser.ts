@@ -507,7 +507,7 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
 
   // Without an activity code of their own, tasks are known by their MS Project row ID, which renumbers when rows are
   // inserted or deleted. Say so: comparing two updates then matches by row, not by task.
-  if (idKeyed > 0) ex.add({ severity: 'warning', entity: 'activity', field: 'Task.ID', disposition: 'defaulted', count: idKeyed, message: 'Tasks are identified by their row ID. If rows were inserted or deleted since the previous update, comparisons between updates match different tasks; give tasks a unique ID or WBS code in MS Project to make them stable' })
+  if (idKeyed > 0) ex.add({ severity: 'warning', entity: 'activity', field: 'Task.ID', disposition: 'defaulted', count: idKeyed, message: 'Tasks without a code of their own are identified by their MS Project row number. When rows are renumbered between updates, RunF9 keeps each task on its earlier ID using the Unique ID in the file' })
   if (inactive > 0) warnings.push(`${inactive} inactive task${inactive === 1 ? ' was' : 's were'} left out (MS Project does not schedule inactive tasks)`)
   const relationships: Relationship[] = []
   let summaryLinks = 0

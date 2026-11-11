@@ -326,6 +326,21 @@ async function main() {
   r = await A.get('/api/history')
   ok(!r.data.schedules.some(s => s.id === pubId), 'Generated schedules never pollute firm history')
 
+  /* ── MS Project: a row inserted between updates does not shift every task's identity ── */
+  {
+    const task = (uid, id, name, start, finish, pred) => `<Task><UID>${uid}</UID><ID>${id}</ID><Name>${name}</Name><Duration>PT40H0M0S</Duration><Start>${start}T08:00:00</Start><Finish>${finish}T17:00:00</Finish>${pred ? `<PredecessorLink><PredecessorUID>${pred}</PredecessorUID><Type>1</Type></PredecessorLink>` : ''}</Task>`
+    const file = (tasks, status) => `<?xml version="1.0"?><Project xmlns="http://schemas.microsoft.com/project"><Name>Renumber ${stamp}</Name><Title>Renumber ${stamp}</Title><StartDate>2027-03-01T08:00:00</StartDate><StatusDate>${status}T17:00:00</StatusDate><MinutesPerDay>480</MinutesPerDay><Tasks>${tasks.join('')}</Tasks></Project>`
+    r = await upload(A, 'renumber-1.xml', file([task(1, 1, 'Excavate', '2027-03-01', '2027-03-05'), task(2, 2, 'Form footings', '2027-03-08', '2027-03-12', 1), task(3, 3, 'Pour footings', '2027-03-15', '2027-03-19', 2)], '2027-03-01'))
+    ok(r.status === 200, 'MS Project update 1 uploaded', r.data)
+    // Update 2: a new task (Unique ID 9) is inserted as row 2; the two tasks below move down a row.
+    r = await upload(A, 'renumber-2.xml', file([task(1, 1, 'Excavate', '2027-03-01', '2027-03-05'), task(9, 2, 'Dewater', '2027-03-08', '2027-03-12', 1), task(2, 3, 'Form footings', '2027-03-15', '2027-03-19', 9), task(3, 4, 'Pour footings', '2027-03-22', '2027-03-26', 2)], '2027-03-08'))
+    const mid = r.data.schedule?.id
+    ok(r.status === 200 && (r.data.summary?.warnings || []).some(w => /Rows were renumbered in MS Project/.test(w)), 'MS Project update 2: renumbered rows are noticed and said', r.data.summary?.warnings ?? r.data)
+    r = await A.get(`/api/schedules/compare?id=${mid}`)
+    const cmp = r.data.comparison
+    ok(r.status === 200 && cmp && cmp.added.length === 1 && cmp.added[0].name === 'Dewater' && cmp.deleted.length === 0, `Comparison follows the task, not the row: ${cmp?.added.length} added (${cmp?.added.map(a => a.name).join(', ')}), ${cmp?.deleted.length} deleted`, r.data)
+  }
+
   /* ── Daily Brief: the living schedule, its register, its correspondence and recent changes ── */
   {
     const iso = d => d.toISOString().slice(0, 10)

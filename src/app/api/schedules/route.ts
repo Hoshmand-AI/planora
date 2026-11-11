@@ -1,3 +1,4 @@
+import { alignMspIds } from '@/lib/parsers/msp-identity'
 import { NextResponse } from 'next/server'
 import { createHash, randomUUID as uuid } from 'crypto'
 import { api, ApiError } from '@/lib/server/api'
@@ -214,6 +215,16 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
           warnings: [warning], importExceptions: existing.importExceptions ?? null,
         },
       })
+    }
+
+    // MS Project: when rows were renumbered since the previous update, each task keeps its earlier ID
+    // (matched by Unique ID), so comparisons, delay analysis and saved edits follow the task, not the row.
+    if (parsed.sourceType === 'ms_xml') {
+      const previous = [...series].reverse().find(x => x.sourceType === 'ms_xml')
+      if (previous) {
+        const aligned = alignMspIds(await getActivities(previous.id), parsed.activities)
+        if (aligned.note) parsed.warnings.unshift(aligned.note)
+      }
     }
 
     // Workspace (matter): the one asked for, else the update series' workspace, else the default for
