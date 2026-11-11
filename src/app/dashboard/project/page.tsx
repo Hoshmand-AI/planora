@@ -194,6 +194,7 @@ export default function ProjectPage() {
             {nearTerm.inProgress.length > 0 && (
               <NearTermList title={`In progress (${nearTerm.inProgressCount})`} rows={nearTerm.inProgress.slice(0, 5)} inProgress />
             )}
+            {nearTerm.inProgressCount > 5 && nearTerm.inProgress.length > 0 && <p className="-mt-1 mb-3 text-[12.5px] text-warm-600">and {nearTerm.inProgressCount - 5} more in progress; the Schedule tab lists them all.</p>}
             {nearTerm.starting.length > 0 && (
               <NearTermList title={`Starting by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
             )}

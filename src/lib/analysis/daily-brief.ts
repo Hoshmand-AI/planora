@@ -192,11 +192,17 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   // Deadline.
   const req = i.required
   const fc = day(i.milestoneForecast) ?? day(i.forecastFinish)
-  const daysBehind = req && fc ? diff(req.date, fc) : null
+  // A date in the past cannot be a forecast for work that is not finished: the file is stale (or the
+  // milestone is pinned to its date by a constraint). The lateness is then counted to today.
+  const targetAct = req?.milestone ? i.activities.find(a => a.activityId === req.milestone!.code) : null
+  const targetDone = targetAct ? done(targetAct) : i.activities.filter(isWork).every(done)
+  const passed = !!req && !!fc && fc < today && !targetDone
+  const daysBehind = req && fc ? diff(req.date, passed ? today : fc) : null
   const status: DailyBrief['headline']['status'] = daysBehind == null ? 'unknown' : daysBehind > 0 ? 'behind' : daysBehind < 0 ? 'ahead' : 'on_track'
   const target = req?.milestone ? `${req.milestone.code} ${req.milestone.name}` : 'the project finish'
   const headlineText = daysBehind == null
     ? (fc ? `Forecast finish ${us(fc)}. No required date is set, so RunF9 cannot say whether that is late; set the contract milestone on the Overview.` : 'The schedule has no calculated finish yet.')
+    : passed && daysBehind > 0 ? `Behind: ${target} was required ${us(req!.date)} and is not finished, ${plural(daysBehind, 'calendar day')} ago. The schedule still shows it on ${us(fc)}, a date that has passed: update the schedule to get a real forecast.`
     : daysBehind > 0 ? `Behind: ${target} is forecast ${us(fc)}, ${plural(daysBehind, 'calendar day')} after the required ${us(req!.date)}.`
       : daysBehind < 0 ? `Ahead: ${target} is forecast ${us(fc)}, ${plural(-daysBehind, 'calendar day')} before the required ${us(req!.date)}.`
         : `On time: ${target} is forecast ${us(fc)}, the required date.`

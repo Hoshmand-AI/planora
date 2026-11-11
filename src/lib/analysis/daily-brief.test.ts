@@ -29,6 +29,17 @@ describe('daily brief', () => {
     expect(previousWorkday('2026-11-10')).toBe('2026-11-09')
   })
 
+  it('a required date that has passed with the work unfinished is behind, even when the file still shows that date', () => {
+    // The finish equals the required date (a milestone pinned by a "Finish On" constraint), and today is long after it.
+    const d = new Date(finish + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 134)
+    const late = buildDailyBrief(input({ today: d.toISOString().slice(0, 10), required: { date: finish, source: 'A1070 FO constraint', milestone: null } }))
+    expect(late.headline.status).toBe('behind')
+    expect(late.headline.daysBehind).toBe(134)
+    expect(late.audiences.pm.join(' ')).toMatch(/is not finished, 134 calendar days ago/)
+    // On the required date itself, with the forecast on it, it is on time.
+    expect(buildDailyBrief(input({ required: { date: finish, source: 'Contract', milestone: null } })).headline.status).toBe('on_track')
+  })
+
   it('says how many days behind against the required date, and ahead when early', () => {
     const d = new Date(finish + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 12)
     const late = buildDailyBrief(input({ required: { date: d.toISOString().slice(0, 10), source: 'Contract', milestone: null } }))
