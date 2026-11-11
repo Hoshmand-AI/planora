@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Disclosure } from '@/components/Disclosure'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
 import { Alert, postJson } from '@/components/ui'
-import { fmtDate, fmtDates } from '@/lib/format'
+import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
 import type { BriefAlert, ProjectWatch } from '@/lib/analysis/project-watch'
 import { useApp } from '../layout'
@@ -73,7 +73,7 @@ export default function TodayPage() {
   useEffect(() => { load() }, [load])
 
   const progress = async (row: BriefRow, kind: 'start' | 'finish') => {
-    if (!sid) return
+    if (!sid || busy) return
     setBusy(row.id + kind); setErr('')
     const day = asOf > todayIso() ? todayIso() : asOf
     const r = await postJson(`/api/schedules/${encodeURIComponent(sid)}/edits`, { change: { kind: 'progress', activityId: row.id, actualStart: day, actualFinish: kind === 'finish' ? day : null }, reason: `Progress reported on the Daily Brief (${kind === 'finish' ? 'finished' : 'started'} ${fmtDate(day)})` })
@@ -130,7 +130,7 @@ export default function TodayPage() {
         </p>
         <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
         <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · ${b.changeImpactDays}d` : ''}`]] as const).map(([k, v]) => (
+          {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
             <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[11.5px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
         </dl>
@@ -197,13 +197,13 @@ export default function TodayPage() {
           <List title="Started" rows={b.yesterday.started} empty="No actual starts recorded." plain />
         </Card>
         <Card icon={<CalendarCheck size={15} />} title="Today" sub="What the schedule says happens today">
-          <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
-          <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
-          <List title={`Under way (${b.today.inProgressCount})`} rows={b.today.inProgress.slice(0, 6)} empty="Nothing is in progress." dateLabel="finish" action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
+          <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
+          <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
+          <List title={`Under way (${b.today.inProgressCount})`} rows={b.today.inProgress.slice(0, 6)} empty="Nothing is in progress." dateLabel="finish" action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
         </Card>
         <Card icon={<AlertTriangle size={15} />} title="Should have happened by now" sub={`${b.overdue.finishCount} finish${b.overdue.finishCount === 1 ? '' : 'es'} and ${b.overdue.startCount} start${b.overdue.startCount === 1 ? '' : 's'} without actual dates`}>
-          <List title="Should have finished" rows={b.overdue.shouldHaveFinished} empty="Nothing is past its finish." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
-          <List title="Should have started" rows={b.overdue.shouldHaveStarted} empty="Nothing is past its start." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
+          <List title="Should have finished" rows={b.overdue.shouldHaveFinished} empty="Nothing is past its finish." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
+          <List title="Should have started" rows={b.overdue.shouldHaveStarted} empty="Nothing is past its start." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
           {canWrite && (b.overdue.finishCount + b.overdue.startCount > 0) && <p className="text-[12px] text-warm-600">“Mark started / finished” records the date above as the actual date, as a RunF9 edit with your name (Overview → Edits made in RunF9, where it can be reverted). Update P6 at the next update.</p>}
         </Card>
         <Card icon={<Route size={15} />} title="What is driving the project" sub="The open activities that set the finish date, in order">
@@ -244,7 +244,7 @@ export default function TodayPage() {
           <ul className="space-y-1.5">{b.changed.edits.map((c, i) => (
             <li key={i} className="rounded-lg border-l-2 border-accent-500 bg-accent-100 px-3 py-2 text-[13px] text-warm-700">
               <span className="font-semibold text-navy-950">{fmtDates(c.what)}</span>: {fmtDates(c.before)} → {fmtDates(c.after)}
-              <span className="block text-[12px] text-warm-600">{c.by}, {fmtDate(c.at)} · {c.reason}</span>
+              <span className="block text-[12px] text-warm-600">{c.by}, {fmtDay(c.at)} · {c.reason}</span>
             </li>
           ))}</ul>
         )}
@@ -348,8 +348,9 @@ function Card({ icon, title, sub, children }: { icon: React.ReactNode; title: st
   )
 }
 
-function RowBtn({ label, onClick, busy }: { label: string; onClick: () => void; busy: boolean }) {
-  return <button type="button" onClick={onClick} disabled={busy} className="flex-shrink-0 text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy ? 'Saving…' : label}</button>
+function RowBtn({ label, onClick, busy, disabled }: { label: string; onClick: () => void; busy: boolean; disabled?: boolean }) {
+  // One save at a time: every row waits while another row's progress is being recorded.
+  return <button type="button" onClick={onClick} disabled={busy || disabled} className="flex-shrink-0 text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy ? 'Saving…' : label}</button>
 }
 
 function List({ title, rows, empty, late, showNote, dateLabel, plain, action }: { title: string; rows: BriefRow[]; empty: string; late?: boolean; showNote?: boolean; dateLabel?: string; /** Dates only: no float (work that is already done) */ plain?: boolean; action?: (r: BriefRow) => React.ReactNode }) {
@@ -386,9 +387,14 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
     setF({ ...f, title: '', owner: '', dueDate: '', impactDays: '', activity: '' })
     await onChanged()
   }
+  // The item being closed or reopened: its button waits, so a double click cannot close it and reopen it.
+  const [pending, setPending] = useState('')
   const setStatus = async (i: RegisterItem, status: 'open' | 'closed') => {
+    if (pending) return
+    setPending(i.id); setErr('')
     const r = await postJson(`/api/schedules/${encodeURIComponent(sid)}/register?itemId=${encodeURIComponent(i.id)}`, { status }, 'PATCH')
     if (!r.ok) setErr(r.data.error || 'The item was not updated.'); else await onChanged()
+    setPending('')
   }
   const shown = items.filter(i => showClosed || i.status === 'open')
   return (
@@ -408,9 +414,9 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
               <span className="min-w-0">
                 <span className="mr-1.5 inline-block px-1.5 py-0.5 rounded bg-warm-100 text-[11px] font-bold text-navy-950">{KIND_LABEL[i.kind]}</span>
                 <span className={i.status === 'closed' ? 'text-warm-600 line-through' : 'text-warm-700'}>{i.title}</span>
-                <span className="block text-[12px] text-warm-600">{[i.owner && `owner ${i.owner}`, i.dueDate && `due ${fmtDate(i.dueDate)}${i.status === 'open' && i.dueDate < today ? ' (overdue)' : ''}`, i.impactDays != null && `${i.impactDays} work day${Math.abs(i.impactDays) === 1 ? '' : 's'}`, i.activityCodes?.length ? i.activityCodes.join(', ') : null, i.sourceDocumentId ? 'from a project document' : null, `added ${fmtDate(i.createdAt)}${i.createdByName ? ` by ${i.createdByName}` : ''}`].filter(Boolean).join(' · ')}</span>
+                <span className="block text-[12px] text-warm-600">{[i.owner && `owner ${i.owner}`, i.dueDate && `due ${fmtDate(i.dueDate)}${i.status === 'open' && i.dueDate < today ? ' (overdue)' : ''}`, i.impactDays != null && `${i.impactDays} work day${Math.abs(i.impactDays) === 1 ? '' : 's'}`, i.activityCodes?.length ? i.activityCodes.join(', ') : null, i.sourceDocumentId ? 'from a project document' : null, `added ${fmtDay(i.createdAt)}${i.createdByName ? ` by ${i.createdByName}` : ''}`].filter(Boolean).join(' · ')}</span>
               </span>
-              {canWrite && <button type="button" onClick={() => setStatus(i, i.status === 'open' ? 'closed' : 'open')} className="flex-shrink-0 text-[12px] font-medium text-accent-600 hover:underline">{i.status === 'open' ? 'Close' : 'Reopen'}</button>}
+              {canWrite && <button type="button" disabled={!!pending} onClick={() => setStatus(i, i.status === 'open' ? 'closed' : 'open')} className="flex-shrink-0 text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">{i.status === 'open' ? 'Close' : 'Reopen'}</button>}
             </li>
           ))}
         </ul>

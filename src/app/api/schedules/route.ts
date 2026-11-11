@@ -37,6 +37,7 @@ const workCounts = (acts: { activityType: string; actualFinish: string | null }[
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
 import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, isLessRestrictive } from '@/lib/server/classification'
 import { can } from '@/lib/server/permissions'
+import { log } from '@/lib/server/log'
 import { jsonObject } from '../json-body'
 import { deploymentKind } from '@/lib/llm/provider'
 import { workspaceForNewItem } from '@/lib/server/workspaces'

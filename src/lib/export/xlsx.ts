@@ -159,6 +159,9 @@ const BAR_CRIT = 'FFE0301E'
 const BAR_NONCRIT = 'FF3CB44B'
 const BAR_WBS = 'FF1F1F1F'
 
+/** Rows x week columns up to which the P6 layout styles every time-scale cell (grid lines, WBS band fill). */
+export const P6_LAYOUT_STYLED_CELLS = 1_000_000
+
 function mondayOf(iso: string): number {
   const d = new Date(iso.slice(0, 10) + 'T00:00:00Z')
   const wd = (d.getUTCDay() + 6) % 7
@@ -186,6 +189,11 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   const weeks = Math.min(520, Math.floor((mondayOf(finish) - w0) / WEEK) + 1)
   const FIXED = ['Activity ID', 'Activity Name', 'Original Duration', 'Start', 'Finish', 'Total Float', 'Critical']
   const G0 = FIXED.length + 1 // first Gantt column (1-based)
+  // Very large schedules: styling every cell of every row across the time scale takes minutes and
+  // gigabytes. Past this size only the bars are drawn in the time scale (no grid lines or band fill
+  // there); the data columns and the bars are unchanged.
+  const lean = rows.length * weeks > P6_LAYOUT_STYLED_CELLS
+  const styledTo = lean ? G0 : G0 + weeks
 
   ws.getCell(off + 1, 1).value = projectName
   ws.getCell(off + 1, 1).font = { bold: true, size: 16, color: { argb: 'FF0F2140' } }
@@ -246,7 +254,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
       const n = row.node!
       const fill = WBS_FILL[(n.level - 1) % WBS_FILL.length]
       xr.values = [n.code, n.name, '', toDate(n.start), toDate(n.finish), '', n.critical ? 'Yes' : '']
-      for (let c = 1; c < G0 + weeks; c++) ws.getCell(r, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
+      for (let c = 1; c < styledTo; c++) ws.getCell(r, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
       xr.font = { bold: true }
       ws.getCell(r, 2).alignment = { indent: (n.level - 1) * 2 }
       xr.outlineLevel = n.level - 1
@@ -262,7 +270,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
       paintBar(r, tm?.earlyStart, tm?.earlyFinish, tm?.critical ? BAR_CRIT : BAR_NONCRIT, a.type === 'milestone')
       ws.getCell(r, 2).note = a.rationale.summary.slice(0, 800)
     }
-    for (let c = 1; c < G0 + weeks; c++) {
+    for (let c = 1; c < styledTo; c++) {
       const cell = ws.getCell(r, c)
       cell.border = { bottom: { style: 'hair', color: { argb: 'FFD9D9D9' } }, right: c < G0 ? { style: 'hair', color: { argb: 'FFD9D9D9' } } : undefined }
     }
