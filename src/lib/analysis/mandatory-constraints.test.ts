@@ -191,7 +191,7 @@ describe('brief and reports use the logic-driven milestone dates, labelled', () 
     const br = projectBrief(schedule, done.activities)
     expect(br.nextMilestones.map(m => [m.name, m.date, m.basis ?? 'scheduled'])).toEqual([['Dry-In', '03/27/2026', 'logic'], ['Substantial Completion', '04/10/2026', 'logic']])
     expect(br.nextMilestones[1].scheduled).toBe('03/27/2026')
-    expect(br.summary).toMatch(/Substantial Completion by 04\/10\/2026 \(logic-driven; 03\/27\/2026 as scheduled/)
+    expect(br.summary).toMatch(/Substantial Completion, now forecast for 04\/10\/2026 \(logic-driven; 03\/27\/2026 as scheduled/)
     expect(br.facts).toEqual(expect.arrayContaining([
       { label: 'Forecast (as scheduled, constraints honoured)', value: '03/27/2026' },
       { label: 'Logic-driven (mandatory constraints relaxed)', value: '04/10/2026' },

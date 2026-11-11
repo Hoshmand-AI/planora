@@ -119,7 +119,7 @@ export default function TodayPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
-          <h1 className="page-title">Today, {fmtDate(b.asOf)}</h1>
+          <h1 className="page-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h1>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
         </div>
         <label className="text-[12px] text-warm-600">Brief for
@@ -136,7 +136,7 @@ export default function TodayPage() {
         </p>
         <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
         <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
+          {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue activities', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
             <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[11.5px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
         </dl>
@@ -197,7 +197,7 @@ export default function TodayPage() {
         </div>
       </section>
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<CheckCircle2 size={15} />} title={`Since ${fmtDate(b.yesterday.date)}`} sub="Completed and started, from actual dates">
           <List title="Completed" rows={b.yesterday.completed} empty="No actual finishes recorded." plain />
           <List title="Started" rows={b.yesterday.started} empty="No actual starts recorded." plain />
@@ -236,6 +236,7 @@ export default function TodayPage() {
           {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
             <li key={i} className="text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
+          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12.5px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet on the Delays tab: the result can differ, because added work sits where the document ties it.</p>}
           <form className="flex flex-wrap items-end gap-2 pt-1" onSubmit={e => { e.preventDefault(); if (whatIf.activity.trim()) setRanWhatIf({ ...whatIf }) }}>
             <datalist id="wi-acts">{data.activities.slice(0, 2000).map(a => <option key={a.id} value={a.code}>{a.name}</option>)}</datalist>
             <label className="text-[12px] text-warm-600">If this activity<input list="wi-acts" value={whatIf.activity} onChange={e => setWhatIf(w => ({ ...w, activity: e.target.value }))} placeholder="Activity ID" className={`${input} block mt-0.5 w-36`} /></label>
@@ -292,7 +293,7 @@ export default function TodayPage() {
         )}
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<FileText size={15} />} title="Contract watch" sub="Notice periods, damages and update duties, read from the contract and what they mean today">
           {data.watch.contract.length === 0 ? (
             <p className="text-[13px] text-warm-600">{data.watch.read.contract ? 'No notice period, liquidated damages or update duty was found in the contract documents of this project.' : <>Add the contract and the scheduling specification under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link>. RunF9 will watch the notice periods, the liquidated damages and the update duties against the schedule every day.</>}</p>
@@ -332,7 +333,7 @@ export default function TodayPage() {
 
       <Register sid={sid!} items={items} openCount={openItems.length} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<PlayCircle size={15} />} title="What is missing" sub="Scope and logic the schedule should probably have">
           {b.missing.scope.length > 0 && <div><p className="text-[12.5px] font-semibold text-navy-950">Not found in any activity name or WBS (confirm it is covered):</p><ul className="list-disc pl-5 text-[13px] text-warm-700">{b.missing.scope.map(x => <li key={x}>{x}</li>)}</ul></div>}
           {b.missing.looseEnds > 0 && <p className="text-[13px] text-warm-700">{b.missing.looseEnds} open activit{b.missing.looseEnds === 1 ? 'y has' : 'ies have'} no predecessor or no successor, so a delay there cannot reach the finish date.</p>}

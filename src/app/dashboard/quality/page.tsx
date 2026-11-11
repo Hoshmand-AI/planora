@@ -220,7 +220,7 @@ export default function QualityPage() {
                 className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
                 <span className="text-[11.5px] font-bold text-warm-500 tabular-nums">{c.id}</span>
                 <span className="text-[13.5px] font-semibold text-navy-950 leading-tight">{c.name}</span>
-                <span className={`text-[19px] font-bold tracking-[-0.02em] tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
+                <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[19px] tracking-[-0.02em]'} font-bold tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
                 <span className="text-[11.5px] text-warm-600">target {c.threshold}</span>
               </button>
             ))}
@@ -253,7 +253,7 @@ export default function QualityPage() {
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
             <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
-            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the schedule dashboard.</p>
+            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the Overview tab.</p>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
@@ -527,7 +527,7 @@ function Card({ label, value, sub }: { label: string; value: string; sub: string
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
-      <div className="text-[20px] font-semibold text-navy-950 tabular-nums mt-1">{value}</div>
+      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[20px]'} font-semibold text-navy-950 tabular-nums mt-1 break-words`}>{value}</div>
       <div className="text-[11px] text-warm-400 mt-0.5">{sub}</div>
     </div>
   )

@@ -67,6 +67,7 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       const k = `t${blocks.length}`
       blocks.push(
         <div key={k} className="overflow-x-auto -mx-1 px-1" tabIndex={0} role="region" aria-label="Table (scrolls sideways)">
+          <p className="sm:hidden text-[11.5px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
           <table className="min-w-full text-[12.5px] border-collapse">
             <thead><tr>{head.map((c, j) => <th key={j} scope="col" className="text-left font-semibold text-navy-950 border-b border-warm-300 px-2 py-1.5 align-bottom">{inline(c, `${k}-h${j}`)}</th>)}</tr></thead>
             <tbody>{rows.map((r, ri) => <tr key={ri} className="border-b border-warm-200">{r.map((c, j) => <td key={j} className="px-2 py-1.5 align-top">{inline(c, `${k}-${ri}-${j}`)}</td>)}</tr>)}</tbody>

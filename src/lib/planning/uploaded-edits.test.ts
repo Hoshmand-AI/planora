@@ -270,7 +270,7 @@ describe('reports and quality guidance for uploads', () => {
       const g = c(id)
       expect(g.actions[0]).toEqual({ kind: 'link', label: 'Open what-if and recovery options', href: '/dashboard?schedule=s1#recovery' })
       expect(g.steps.join(' ')).not.toMatch(/Use the recovery options/)
-      expect(g.steps.join(' ')).toMatch(/What-if and recovery on the schedule dashboard/)
+      expect(g.steps.join(' ')).toMatch(/What-if and recovery on the Overview tab/)
     }
     // Without logic (no options), the guidance says to fix the source file.
     const plain = guidanceFor({ id: 7, name: '', metric: '', threshold: '', result: 'fail', offenders: [], explanation: '' }, { generated: false })

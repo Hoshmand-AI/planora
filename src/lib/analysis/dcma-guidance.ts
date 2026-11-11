@@ -33,13 +33,13 @@ interface Ctx {
 
 export function guidanceFor(c: DcmaCheck, ctx: Ctx): CheckGuidance {
   const where = ctx.generated ? 'on the Schedule tab (open the activity → Override)'
-    : ctx.uploadedRecoveryHref ? 'in P6 / MS Project and re-upload, or as a RunF9 edit with a reason (schedule dashboard → Edits made in RunF9)' : 'in P6 / MS Project, then re-upload'
+    : ctx.uploadedRecoveryHref ? 'in P6 / MS Project and re-upload, or as a RunF9 edit with a reason (Overview tab → Edits made in RunF9)' : 'in P6 / MS Project, then re-upload'
   // Recovery for a plan is on its Schedule tab; for an upload, on the schedule dashboard (modeled on its own network).
   const recoverySteps = ctx.generated
     ? ['Decide how to recover the time: shorten or re-sequence the critical path, or move the date.', 'Use the recovery options — each is modeled on the real network with its new finish.']
     : ['Decide how to recover the time: shorten or re-sequence the driving path, or move the date.',
       ctx.uploadedRecoveryHref
-        ? 'Open What-if and recovery on the schedule dashboard: crashing, overlapping and expediting options are modeled on this file\'s own network with the new finish and float. Apply one as a RunF9 edit with a reason, or make the change in P6 / MS Project and re-upload.'
+        ? 'Open What-if and recovery on the Overview tab: crashing, overlapping and expediting options are modeled on this file\'s own network with the new finish and float. Apply one as a RunF9 edit with a reason, or make the change in P6 / MS Project and re-upload.'
         : 'Make the change in P6 / MS Project (shorten or re-sequence driving activities), then re-upload.']
   const recoveryActions: GuidanceAction[] = ctx.generated
     ? (ctx.hasRecovery ? [{ kind: 'recovery', label: 'See recovery options' }] : [])

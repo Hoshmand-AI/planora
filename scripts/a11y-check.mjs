@@ -45,7 +45,7 @@ const PAGES = [
   ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
-  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm data', '/dashboard/history'],
+  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm insights', '/dashboard/history'],
   ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
   // Last, so the pages above keep their no-upload state: an uploaded schedule with a project document,
@@ -65,7 +65,7 @@ const PAGES = [
   // With an uploaded schedule: Home lists both projects (cards, then the table view) and the project page opens.
   ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
   ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
-  ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]'); await page.waitForSelector('text=Driving Tasks') }],
+  ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]'); await page.waitForSelector('text=Driving tasks') }],
   ['Daily brief', '/dashboard/today', async () => { await page.getByText('Are we meeting the deadline?').waitFor() }],
   ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
   ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],

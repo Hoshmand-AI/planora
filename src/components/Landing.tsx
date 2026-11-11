@@ -27,6 +27,12 @@ const DEPLOY_CHIPS: [string, string][] = [['cloud', 'RunF9 Cloud'], ['aws', 'AWS
 
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
   const [scrolled, setScrolled] = useState(false)
   // Request access: email the beta team (RUNF9_ACCESS_REQUEST_EMAIL, else the support address this page
   // already lists). Never the sign-up page: without an invitation it is a dead end for a prospect.
@@ -191,9 +197,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <ul className="divide-y divide-warm-200 border-y border-warm-200">
             {[
               ['Executive Schedule Summary', 'Status, key dates, findings and recommendations in plain language.'],
-              ['Critical Path Report', 'Driving activities, float and low-float paths from the CPM calculation.'],
+              ['Critical & Near-Critical Paths', 'Driving activities, float and low-float paths from the CPM calculation.'],
               ['Baseline vs Current Variance', 'Compares current dates with the baseline stored in your P6 or MS Project file.'],
-              ['Schedule QA/QC Report', 'The DCMA 14-Point results, with the issues and suggested fixes.'],
+              ['Schedule QA/QC Audit', 'The DCMA 14-Point results, with the issues and suggested fixes.'],
               ['Time Impact Analysis', 'The delay event, its fragnet, the impact on each milestone and the driving path before and after, with input and result hashes.'],
             ].map(([t, d], i) => (
               <Reveal as="li" key={t} delay={i * 80} className="py-5">
@@ -225,7 +231,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                 {p.yes.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-700"><CheckCircle size={17} className="text-accent-600 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
                 {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-600"><span aria-hidden="true" className="w-[17px] text-center">—</span><span className="line-through decoration-warm-300">{f}</span><span className="sr-only">(not included)</span></li>)}
               </ul>
-              <Cta href={p.href} className={p.featured ? `${primaryBtn} py-3 text-[15px]` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold py-3 text-[15px] hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
+              <Cta href={p.href} className={p.featured ? `${primaryBtn} px-4 py-3 text-[15px] text-center` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
             </Reveal>
           ))}
         </div>
@@ -264,7 +270,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         <Reveal className="max-w-6xl mx-auto rounded-[36px] bg-navy-950 px-8 py-20 md:py-28 text-center relative overflow-hidden">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
-            <h2 className="text-[36px] md:text-[60px] font-semibold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 in Your Next Schedule</h2>
+            <h2 className="text-[36px] md:text-[60px] font-semibold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 on your next schedule</h2>
             <p className="text-[17px] md:text-[20px] text-navy-200 mt-5 max-w-[620px] mx-auto">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
             <Cta href={primaryHref} className={`${primaryBtn} mt-10 px-8 py-4 text-[17px]`}>{inviteOnly ? 'Request access' : 'Get started free'}</Cta>
             <p className="text-[14px] text-navy-200 mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>

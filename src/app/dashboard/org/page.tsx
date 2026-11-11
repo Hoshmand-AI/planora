@@ -334,6 +334,7 @@ export default function OrgPage() {
               : <Alert tone="error"><XCircle size={14} className="inline mr-1" aria-hidden="true" />Integrity check failed at record #{verify.brokenAt?.seq}: {verify.brokenAt?.reason}</Alert>}
             </div>
           )}
+          <p className="sm:hidden text-[11.5px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
           <div tabIndex={0} role="region" aria-label="Audit log, newest first" className="relative overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <caption className="sr-only">Audit log, newest first</caption>
@@ -390,7 +391,7 @@ export default function OrgPage() {
             }}>Transfer</Button>
           </div>
           <div className="flex flex-wrap gap-2 items-end">
-            <Field label={`Type "${data.org.name}" to delete the organization`}>{p => <input {...p} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
+            <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
             <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
               if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
               if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'
