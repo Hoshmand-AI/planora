@@ -60,6 +60,16 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
 
   // The day's what-if runs: all on the real network, nothing saved.
   const whatIfs: BriefWhatIf[] = []
+  // Why the finish did not move, from the activity's own float: "enough float" is only said when it has it.
+  const absorbed = (a: (typeof data.activities)[number], days: number): string => {
+    const f = Number.isFinite(a.totalFloat) ? Math.round(a.totalFloat) : null
+    if (f == null) return 'other work sets that date.'
+    if (f >= days) return `it has ${f} work day${f === 1 ? '' : 's'} of float, enough to absorb it.`
+    if (f > 0) return `other work sets that date. This activity has only ${f} work day${f === 1 ? '' : 's'} of float, so the work that follows it moves.`
+    return `other work sets that date. This activity has no float left (${f} work day${f === -1 ? '' : 's'}), so a date it must meet itself slips further.`
+  }
+  // A title cut for a heading ends on a whole word.
+  const short = (t: string, n: number) => (t.length <= n ? t : `${t.slice(0, n).replace(/\s+\S*$/, '')}…`)
   const slip = (a: (typeof data.activities)[number], days: number, lead: string): BriefWhatIf | null => {
     if (!base?.measured) return null
     const r = evaluateNetwork(net, [{ kind: 'duration', activityId: a.id, remaining: remainingOf(a) + days }])
@@ -68,7 +78,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     return {
       title: `${lead}: ${a.activityId} ${a.name} +${days} work days`, finishBefore: base.measured, finishAfter: r.measured, days: d,
       text: d > 0 ? `If ${a.activityId} ${a.name} takes ${days} work days longer, the finish moves from ${us(base.measured)} to ${us(r.measured)} (${d} calendar day${d === 1 ? '' : 's'} later).`
-        : `If ${a.activityId} ${a.name} takes ${days} work days longer, the finish stays ${us(base.measured)}: it has enough float to absorb it.`,
+        : `If ${a.activityId} ${a.name} takes ${days} work days longer, the finish stays ${us(base.measured)}: ${absorbed(a, days)}`,
     }
   }
   if (base) {
@@ -84,12 +94,12 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     // What the open change items and the correspondence would do, where they name an activity and a number of days.
     for (const r of register.filter(x => x.status === 'open' && (x.impactDays ?? 0) > 0 && x.activityCodes?.length).slice(0, 2)) {
       const a = r.activityCodes!.map(c => byCode.get(c.toLowerCase())).find(openTask)
-      const w = a ? slip(a, r.impactDays!, `Register: ${r.title.slice(0, 60)}`) : null
+      const w = a ? slip(a, r.impactDays!, `Register: ${short(r.title, 60)}`) : null
       if (w) whatIfs.push(w)
     }
     for (const sg of signals.filter(x => x.activity && x.days && (x.kind === 'delay' || x.kind === 'change')).slice(0, 2)) {
       const a = byId.get(sg.activity!.id)
-      const w = openTask(a) ? slip(a!, Math.min(365, sg.days!), `Correspondence: ${sg.title.slice(0, 50)}`) : null
+      const w = openTask(a) ? slip(a!, Math.min(365, sg.days!), `Correspondence: ${short(sg.title, 50)}`) : null
       if (w) whatIfs.push(w)
     }
     try {

@@ -11,7 +11,7 @@ export default function NotFound() {
         <p className="text-[15px] text-warm-600 mb-8">The link may be out of date, or the page may have moved.</p>
         <div className="flex gap-3 justify-center flex-wrap">
           <Link href="/" className="bg-accent-600 text-white px-6 py-2.5 rounded-full text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Go to the home page</Link>
-          <Link href="/auth" className="border border-warm-300 text-navy-950 px-6 py-2.5 rounded-full text-[14px] font-medium hover:bg-warm-100 transition-colors">Sign in</Link>
+          <Link href="/dashboard" className="border border-warm-300 text-navy-950 px-6 py-2.5 rounded-full text-[14px] font-medium hover:bg-warm-100 transition-colors">Open RunF9</Link>
         </div>
       </div>
     </main>
