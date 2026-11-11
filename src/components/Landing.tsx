@@ -231,7 +231,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                 {p.yes.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-700"><CheckCircle size={17} className="text-accent-600 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
                 {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-600"><span aria-hidden="true" className="w-[17px] text-center">—</span><span className="line-through decoration-warm-300">{f}</span><span className="sr-only">(not included)</span></li>)}
               </ul>
-              <Cta href={p.href} className={p.featured ? `${primaryBtn} py-3 text-[15px]` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold py-3 text-[15px] hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
+              <Cta href={p.href} className={p.featured ? `${primaryBtn} px-4 py-3 text-[15px] text-center` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
             </Reveal>
           ))}
         </div>

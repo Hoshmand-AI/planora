@@ -527,7 +527,7 @@ function Card({ label, value, sub }: { label: string; value: string; sub: string
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
-      <div className="text-[20px] font-semibold text-navy-950 tabular-nums mt-1">{value}</div>
+      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[20px]'} font-semibold text-navy-950 tabular-nums mt-1 break-words`}>{value}</div>
       <div className="text-[11px] text-warm-400 mt-0.5">{sub}</div>
     </div>
   )

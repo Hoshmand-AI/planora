@@ -197,7 +197,7 @@ export default function TodayPage() {
         </div>
       </section>
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<CheckCircle2 size={15} />} title={`Since ${fmtDate(b.yesterday.date)}`} sub="Completed and started, from actual dates">
           <List title="Completed" rows={b.yesterday.completed} empty="No actual finishes recorded." plain />
           <List title="Started" rows={b.yesterday.started} empty="No actual starts recorded." plain />
@@ -293,7 +293,7 @@ export default function TodayPage() {
         )}
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<FileText size={15} />} title="Contract watch" sub="Notice periods, damages and update duties, read from the contract and what they mean today">
           {data.watch.contract.length === 0 ? (
             <p className="text-[13px] text-warm-600">{data.watch.read.contract ? 'No notice period, liquidated damages or update duty was found in the contract documents of this project.' : <>Add the contract and the scheduling specification under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link>. RunF9 will watch the notice periods, the liquidated damages and the update duties against the schedule every day.</>}</p>
@@ -333,7 +333,7 @@ export default function TodayPage() {
 
       <Register sid={sid!} items={items} openCount={openItems.length} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 items-start">
         <Card icon={<PlayCircle size={15} />} title="What is missing" sub="Scope and logic the schedule should probably have">
           {b.missing.scope.length > 0 && <div><p className="text-[12.5px] font-semibold text-navy-950">Not found in any activity name or WBS (confirm it is covered):</p><ul className="list-disc pl-5 text-[13px] text-warm-700">{b.missing.scope.map(x => <li key={x}>{x}</li>)}</ul></div>}
           {b.missing.looseEnds > 0 && <p className="text-[13px] text-warm-700">{b.missing.looseEnds} open activit{b.missing.looseEnds === 1 ? 'y has' : 'ies have'} no predecessor or no successor, so a delay there cannot reach the finish date.</p>}
