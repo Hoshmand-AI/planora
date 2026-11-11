@@ -41,6 +41,8 @@ interface AppContextType {
   refreshSchedules: () => Promise<void>
   metrics: Record<string, unknown> | null
   refreshMetrics: () => Promise<void>
+  /** The open project's numbers could not be loaded (metrics is null): pages say so instead of waiting forever */
+  metricsError: boolean
   /** Organization the user belongs to */
   org: { id: string; name: string; dataLocation?: DataLocation } | null
   /** What the user's role allows (read, plan.write, schedule.write, plan.review, …) */
@@ -51,7 +53,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType>({
   user: null, schedules: [], selectedSchedule: null, setSelectedSchedule: () => {},
-  refreshSchedules: async () => {}, metrics: null, refreshMetrics: async () => {},
+  refreshSchedules: async () => {}, metrics: null, refreshMetrics: async () => {}, metricsError: false,
   org: null, can: () => false, openUpload: () => {},
 })
 
@@ -162,6 +164,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [metrics,          setMetrics]          = useState<Record<string, unknown> | null>(null)
   const [authError,        setAuthError]        = useState(false)
+  const [metricsError,     setMetricsError]     = useState(false)
   const [schedulesLoaded,  setSchedulesLoaded]  = useState(false)
   const [schedulesError,   setSchedulesError]   = useState(false)
   const [linkMissing,      setLinkMissing]      = useState(false)
@@ -266,6 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const metricsFor = useRef<string | null>(null)
   const refreshMetrics = useCallback(async () => {
     metricsFor.current = selectedSchedule?.id ?? null
+    setMetricsError(false)
     if (!selectedSchedule) { setMetrics(null); return }
     const id = selectedSchedule.id
     // Never show one project's numbers under another project's name while the new ones load.
@@ -275,8 +279,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const data = await res.json()
       if (metricsFor.current !== id) return
       setMetrics(data.metrics ? { ...data.metrics, scheduleId: id, brief: data.brief ?? null, warnings: data.schedule?.warnings ?? [] } : null)
+      if (!data.metrics) setMetricsError(true)
     } catch {
-      if (metricsFor.current === id) setMetrics(null)
+      if (metricsFor.current === id) { setMetrics(null); setMetricsError(true) }
     }
   }, [selectedSchedule])
 
@@ -374,7 +379,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in RunF9' } as Record<string, string>)[t] || t
 
   return (
-    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
+    <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, metricsError, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
       <Suspense fallback={null}><ScheduleDeepLink schedules={schedules} loaded={schedulesLoaded} select={setSelectedSchedule} onMissing={setLinkMissing} /></Suspense>
       {/*
        * LAYOUT STRATEGY

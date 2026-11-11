@@ -9,7 +9,7 @@
 
 import type { GeneratedSchedule, PlanActivity, ProgressMode, WorkCalendar } from '@/lib/planning/types'
 import { ExceptionCollector, type ExceptionReport } from '@/lib/parsers/exceptions'
-import { xerText, P6_NAME_MAX } from './xer'
+import { xerText, xerWorkPeriods, P6_NAME_MAX } from './xer'
 import { hasResourceData } from '@/lib/planning/resource-types'
 
 /**

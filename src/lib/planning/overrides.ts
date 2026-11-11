@@ -132,7 +132,19 @@ export function applyEdit(s: GeneratedSchedule, edit: Edit, by: string): { sched
       if (!name) throw new EditError('Give the new activity a name.')
       const v = Math.round(Number(edit.duration))
       if (!Number.isFinite(v) || v < 0 || v > 2000) throw new EditError('Duration must be between 0 and 2000 work days.')
-      const before = edit.before ? getAct(edit.before) : [...acts.values()].find(a => a.category === 'substantial_completion') || [...acts.values()].find(a => a.category === 'final_completion')
+      // No "before" given: tie it to Substantial Completion, unless "after" already follows that milestone (punch
+      // list, close-out), which would close a loop; then to Final Completion, else it is left without a successor.
+      const leadsTo = (from: string, to: string) => {
+        const seen = new Set([from]), stack = [from]
+        while (stack.length) {
+          const n = stack.pop()!
+          if (n === to) return true
+          for (const l of links.values()) if (l.from === n && !seen.has(l.to)) { seen.add(l.to); stack.push(l.to) }
+        }
+        return false
+      }
+      const before = edit.before ? getAct(edit.before)
+        : [[...acts.values()].find(a => a.category === 'substantial_completion'), [...acts.values()].find(a => a.category === 'final_completion')].find(a => a && !leadsTo(a.id, after.id))
       if (before && before.id === after.id) throw new EditError('Pick different activities for "after" and "before".')
       const id = `user:act:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
       const o: Override = { field: 'name', to: name, reason, by, at }

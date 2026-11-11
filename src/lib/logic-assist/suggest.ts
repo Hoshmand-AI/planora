@@ -215,12 +215,13 @@ export function suggestLogic(activities: LogicActivity[], relationships: LogicLi
     const kind: SuggestionKind = needSucc.has(p) ? 'missing_successor' : 'completion_only'
     const cands: Candidate[] = []
     for (const s of acts) {
-      if (s.id === p || (kind === 'completion_only' && finishLike(s.id))) continue
+      // Completed work takes no new logic: the calculation ignores a link into it, so it would fix nothing.
+      if (s.id === p || !open(s) || (kind === 'completion_only' && finishLike(s.id))) continue
       const sc = score(p, s.id)
       if (sc) cands.push({ p, s: s.id, ...sc })
     }
     cands.sort((x, y) => y.score - x.score || proximity(p, x.s) - proximity(p, y.s))
-    if (kind === 'missing_successor' && finish && finish.id !== p) cands.push({ p, s: finish.id, score: 0.32, rule: 'project_finish', reason: 'Nothing follows this activity yet; tying it to the project finish lets a delay show up on the finish date.' })
+    if (kind === 'missing_successor' && finish && finish.id !== p && open(finish)) cands.push({ p, s: finish.id, score: 0.32, rule: 'project_finish', reason: 'Nothing follows this activity yet; tying it to the project finish lets a delay show up on the finish date.' })
     needs.push({ subject: p, side: 'succ', kind, cands: cands.slice(0, 12) })
   }
 

@@ -37,7 +37,7 @@ export interface LevelActivity extends LoadActivity {
 
 /** One recalculation of the network with leveling delays (SNET dates by activity id). */
 export interface ScheduleRun {
-  /** Logic-driven project finish */
+  /** Project finish: the later of the logic-driven and the scheduled finish (a mandatory constraint can hold work later than logic) */
   finish: string | null
   times: Record<string, { earlyStart: string; earlyFinish: string; lateStart: string; totalFloat: number }>
   /** Forecast date of each reported milestone */
@@ -335,7 +335,8 @@ function runUploaded(activities: Activity[], relationships: Relationship[], net:
     const a = actById.get(m.id)
     milestoneDates[m.id] = a?.actualFinish?.slice(0, 10) ?? cpm.violations.find(v => v.id === m.id)?.logicDate ?? cpm.times[m.id]?.earlyFinish ?? null
   }
-  return { finish: cpm.logicFinish, times, milestoneDates }
+  // The scheduled finish, as the dashboard and what-ifs show it (the later of the logic and the scheduled finish).
+  return { finish: done.projectFinish ?? cpm.logicFinish, times, milestoneDates }
 }
 
 /** Leveling network for a plan built in RunF9 (its generated schedule and milestone targets). */
@@ -358,7 +359,7 @@ export function planLevelingNetwork(g: GeneratedSchedule): LevelingNetwork {
       for (const [id, t] of Object.entries(cpm.times)) times[id] = { earlyStart: t.earlyStart, earlyFinish: t.earlyFinish, lateStart: t.lateStart, totalFloat: t.totalFloat }
       const milestoneDates: Record<string, string | null> = {}
       for (const m of milestones) milestoneDates[m.id] = cpm.violations.find(v => v.id === m.id)?.logicDate ?? cpm.times[m.id]?.earlyFinish ?? null
-      return { finish: cpm.logicFinish, times, milestoneDates }
+      return { finish: cpm.logicFinish > cpm.projectFinish ? cpm.logicFinish : cpm.projectFinish, times, milestoneDates }
     } catch {
       return null
     }

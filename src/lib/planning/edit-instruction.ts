@@ -13,7 +13,8 @@ import type { Edit } from './overrides'
 export type EditStep =
   | { op: 'duration'; activityId: string; days?: number; delta?: number }
   | { op: 'link'; from: string; to: string; type: LinkType; lag: number }
-  | { op: 'unlink'; from: string; to: string }
+  /** `type`: the relationship to remove when the instruction names one ("remove the FS link …") */
+  | { op: 'unlink'; from: string; to: string; type?: LinkType }
   | { op: 'constraint'; activityId: string; type: InstructionConstraint; date: string }
   | { op: 'clear_constraint'; activityId: string }
   | { op: 'rename'; activityId: string; name: string }
@@ -128,8 +129,11 @@ export function readClause(clause: string, acts: RefActivity[], opts: { allowStr
   let m: RegExpExecArray | null
 
   // Relationship removal: "remove the link between A and B", "unlink A from B", "A no longer depends on B".
-  if ((m = /^(?:remove|delete|drop|break|cut)\s+(?:the\s+)?(?:link|relationship|tie|logic|dependency)\s+(?:between|from)\s+(.+?)\s+(?:and|to|→|->)\s+(.+)$/i.exec(c)))
-    return two(m[1], m[2], (a, b) => ({ op: 'unlink', from: a.id, to: b.id }))
+  // A stated type ("remove the FS link between A and B") picks that relationship when the two are tied more than once.
+  if ((m = /^(?:remove|delete|drop|break|cut)\s+(?:the\s+)?(?:(FS|SS|FF|SF|(?:finish|start)[- ]to[- ](?:finish|start))\s+)?(?:link|relationship|tie|logic|dependency)\s+(?:between|from)\s+(.+?)\s+(?:and|to|→|->)\s+(.+)$/i.exec(c))) {
+    const type = m[1] ? (m[1].length === 2 ? m[1].toUpperCase() : m[1].toLowerCase().split(/[- ]to[- ]/).map(w => w[0].toUpperCase()).join('')) as LinkType : undefined
+    return two(m[2], m[3], (a, b) => ({ op: 'unlink', from: a.id, to: b.id, ...(type ? { type } : {}) }))
+  }
   if ((m = /^unlink\s+(.+?)\s+(?:and|from|→|->)\s+(.+)$/i.exec(c))) return two(m[1], m[2], (a, b) => ({ op: 'unlink', from: a.id, to: b.id }))
   if ((m = /^(.+?)\s+(?:no longer|does not|doesn't|should not|need not)\s+(?:depends?|wait)\s+(?:on|for)\s+(.+)$/i.exec(c))) return two(m[2], m[1], (a, b) => ({ op: 'unlink', from: a.id, to: b.id }))
 
@@ -261,7 +265,10 @@ export function parseModelSteps(v: unknown, acts: RefActivity[], clauses: number
       out.set(n, { step: days != null ? { op, activityId: a.id, days } : { op, activityId: a.id, delta: delta! } })
     } else if (op === 'link' || op === 'unlink') {
       const a = code('from'), b = code('to'); if (!a) { miss('from'); continue } if (!b) { miss('to'); continue }
-      if (op === 'unlink') { out.set(n, { step: { op, from: a.id, to: b.id } }); continue }
+      if (op === 'unlink') {
+        const t = typeof s.type === 'string' ? s.type.toUpperCase() : ''
+        out.set(n, { step: { op, from: a.id, to: b.id, ...(['FS', 'SS', 'FF', 'SF'].includes(t) ? { type: t as LinkType } : {}) } }); continue
+      }
       const type = String(s.type || 'FS').toUpperCase()
       if (!['FS', 'SS', 'FF', 'SF'].includes(type)) { out.set(n, { error: 'Relationship type must be FS, SS, FF or SF.' }); continue }
       out.set(n, { step: { op, from: a.id, to: b.id, type: type as LinkType, lag: num('lag') ?? 0 } })
@@ -312,7 +319,7 @@ export function toUploadedChange(step: EditStep, acts: RefActivity[]): Record<st
   switch (step.op) {
     case 'duration': return { kind: 'duration', activityId: step.activityId, remaining: targetDays(step, cur(step.activityId)) }
     case 'link': return { kind: 'link_set', predecessorId: step.from, successorId: step.to, type: step.type, lag: step.lag }
-    case 'unlink': return { kind: 'link_remove', predecessorId: step.from, successorId: step.to }
+    case 'unlink': return { kind: 'link_remove', predecessorId: step.from, successorId: step.to, ...(step.type ? { type: step.type } : {}) }
     case 'constraint': return { kind: 'constraint', activityId: step.activityId, constraint: { type: step.type, date: step.date } }
     case 'clear_constraint': return { kind: 'constraint', activityId: step.activityId, constraint: null }
     default: return null
@@ -326,11 +333,12 @@ export function toPlanEdit(step: EditStep, s: GeneratedSchedule, reason: string)
   switch (step.op) {
     case 'duration': { const a = act(step.activityId); if (!a) return 'Activity not found.'; return { kind: 'duration', activityId: a.id, value: targetDays(step, a.duration), reason } }
     case 'link': {
-      const l = linkOf(step.from, step.to)
+      // Tied more than once: the relationship that already has the stated type.
+      const l = s.links.find(x => x.from === step.from && x.to === step.to && x.type === step.type) ?? linkOf(step.from, step.to)
       if (l) return l.type === step.type && l.lag === step.lag ? `Those activities are already tied ${step.type}${step.lag ? ` ${step.lag}d` : ''}.` : { kind: 'link', linkId: l.id, type: step.type, lag: step.lag, reason }
       return { kind: 'add_link', from: step.from, to: step.to, type: step.type, lag: step.lag, reason }
     }
-    case 'unlink': { const l = linkOf(step.from, step.to); if (!l) return 'Those activities are not tied.'; return { kind: 'remove_link', linkId: l.id, reason } }
+    case 'unlink': { const l = step.type ? s.links.find(x => x.from === step.from && x.to === step.to && x.type === step.type) : linkOf(step.from, step.to); if (!l) return step.type ? `Those activities have no ${step.type} tie.` : 'Those activities are not tied.'; return { kind: 'remove_link', linkId: l.id, reason } }
     case 'constraint': return { kind: 'constraint', activityId: step.activityId, constraint: { type: step.type, date: step.date }, reason }
     case 'clear_constraint': return { kind: 'constraint', activityId: step.activityId, constraint: null, reason }
     case 'rename': return { kind: 'rename', activityId: step.activityId, value: step.name, reason }

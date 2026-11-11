@@ -19,8 +19,10 @@ import { scheduledRemaining } from './complete-schedule'
 
 export type ScheduleEditChange =
   | { kind: 'duration'; activityId: string; remaining: number }
-  | { kind: 'link_set'; predecessorId: string; successorId: string; type: LinkType; lag: number }
-  | { kind: 'link_remove'; predecessorId: string; successorId: string }
+  /** `fromType`: the type of the relationship to change, when the two activities are tied more than once (P6 allows SS + FF) */
+  | { kind: 'link_set'; predecessorId: string; successorId: string; type: LinkType; lag: number; fromType?: LinkType }
+  /** `type`: the type of the relationship to remove, when the two activities are tied more than once */
+  | { kind: 'link_remove'; predecessorId: string; successorId: string; type?: LinkType }
   | { kind: 'constraint'; activityId: string; constraint: { type: ConstraintType; date: string } | null }
   /** Progress reported in RunF9 between uploads: the activity started, or started and finished */
   | { kind: 'progress'; activityId: string; actualStart: string; actualFinish: string | null }
@@ -59,6 +61,21 @@ const isoDay = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.te
 const linkText = (type: string, lag: number) => `${type}${lag ? ` ${lag > 0 ? '+' : ''}${lag}d` : ''}`
 const cstrText = (t?: string | null, d?: string | null) => (t && d ? `${t} ${d}` : 'none')
 
+/** Why a new relationship is left out when it would close a loop (see revertLoopError). */
+const LOOP_NOTE = 'This relationship would create a logic loop, so it is not applied.'
+
+/**
+ * The relationship between two activities that a link edit acts on. A pair can be tied more than once
+ * (SS + FF is common in P6): the relationship of the stated current type, else the one that already has
+ * the new type (a lag change), else the first.
+ */
+function linkIndex(rels: Relationship[], predecessorId: string, successorId: string, type?: LinkType, fromType?: LinkType): number {
+  const pair = (r: Relationship) => r.predecessorId === predecessorId && r.successorId === successorId
+  let i = fromType ? rels.findIndex(r => pair(r) && r.type === fromType) : -1
+  if (i < 0 && type) i = rels.findIndex(r => pair(r) && r.type === type)
+  return i >= 0 ? i : rels.findIndex(pair)
+}
+
 /** Remaining work days the CPM uses for an activity. */
 export const remainingOf = (a: Activity) => scheduledRemaining(a) ?? Math.max(0, Math.round(a.duration))
 
@@ -91,7 +108,9 @@ export function applyScheduleEdits(activities: Activity[], relationships: Relati
       const label = `${name(c.predecessorId)} → ${name(c.successorId)}`
       const p = byId.get(c.predecessorId), s = byId.get(c.successorId)
       if (!p || !s || !isWork(p) || !isWork(s)) { skip(label, 'An activity of this relationship is no longer in this schedule.'); continue }
-      const i = rels.findIndex(r => r.predecessorId === c.predecessorId && r.successorId === c.successorId)
+      const i = linkIndex(rels, c.predecessorId, c.successorId, c.type, c.fromType)
+      // A new relationship that would close a loop is left out (it was valid when made; an earlier edit it relied on was reverted).
+      if (i < 0 && reaches(rels, c.successorId, c.predecessorId)) { skip(label, LOOP_NOTE); continue }
       const before = i >= 0 ? linkText(rels[i].type, rels[i].lag) : 'no relationship'
       if (i >= 0) rels[i] = { ...rels[i], type: c.type, lag: c.lag }
       else rels.push({ id: `edit-${e.id}`, scheduleId: p.scheduleId, predecessorId: c.predecessorId, successorId: c.successorId, type: c.type, lag: c.lag })
@@ -99,7 +118,7 @@ export function applyScheduleEdits(activities: Activity[], relationships: Relati
       applied.push({ ...e, label, before, after: linkText(c.type, c.lag), status: 'applied' })
     } else if (c.kind === 'link_remove') {
       const label = `${name(c.predecessorId)} → ${name(c.successorId)}`
-      const r = rels.find(x => x.predecessorId === c.predecessorId && x.successorId === c.successorId)
+      const r = rels.find(x => x.predecessorId === c.predecessorId && x.successorId === c.successorId && (!c.type || x.type === c.type))
       if (!r) { skip(label, 'The relationship is not in the schedule.'); continue }
       rels = rels.filter(x => x !== r)
       edited.add(c.predecessorId); edited.add(c.successorId)
@@ -144,6 +163,20 @@ function reaches(rels: Relationship[], from: string, to: string): boolean {
 }
 
 /**
+ * Why these edits cannot be reverted, or null when they can. Reverting an edit brings back the logic it
+ * changed; a relationship added later (valid at the time) can then close a logic loop. `activities` and
+ * `relationships` are the imported ones, `edits` the active edits in order.
+ */
+export function revertLoopError(activities: Activity[], relationships: Relationship[], edits: ScheduleEdit[], revertIds: readonly string[]): string | null {
+  const drop = new Set(revertIds)
+  const looped = (list: ScheduleEdit[]) => applyScheduleEdits(activities, relationships, list).applied.filter(e => e.status === 'skipped' && e.note === LOOP_NOTE)
+  const already = new Set(looped(edits).map(e => e.id))
+  const hit = looped(edits.filter(e => !drop.has(e.id))).find(e => !already.has(e.id))
+  if (!hit) return null
+  return `This edit cannot be reverted on its own: a relationship added after it (${hit.label}) would then make a logic loop. Revert that relationship first, or revert both together.`
+}
+
+/**
  * Validate a requested change against the current (already edited) network. Activities may be given
  * by RunF9 id or by activity code. Returns the normalized change or a message for the scheduler.
  */
@@ -180,16 +213,22 @@ export function validateEditChange(raw: unknown, activities: Activity[], relatio
       if (!LINK_TYPES.includes(type)) return { error: 'Relationship type must be FS, SS, FF or SF.' }
       const lag = Number(b.lag ?? 0)
       if (!Number.isFinite(lag) || Math.abs(lag) > 1000) return { error: 'Lag must be a number of work days between -1000 and 1000.' }
-      const existing = relationships.find(r => r.predecessorId === p.id && r.successorId === s.id)
+      // The relationship to change, when the request names its current type (a pair can be tied more than once).
+      const fromType = b.fromType == null || b.fromType === '' ? undefined : String(b.fromType).toUpperCase() as LinkType
+      if (fromType && !LINK_TYPES.includes(fromType)) return { error: 'Relationship type must be FS, SS, FF or SF.' }
+      if (fromType && !relationships.some(r => r.predecessorId === p.id && r.successorId === s.id && r.type === fromType)) return { error: `There is no ${fromType} relationship ${p.activityId} → ${s.activityId}.` }
+      const existing = relationships[linkIndex(relationships, p.id, s.id, type, fromType)]
       if (existing && existing.type === type && existing.lag === Math.round(lag)) return { error: `${p.activityId} → ${s.activityId} is already ${linkText(type, Math.round(lag))}.` }
       if (!existing && reaches(relationships, s.id, p.id)) return { error: `${s.activityId} already leads to ${p.activityId}; this relationship would create a logic loop.` }
-      return { change: { kind: 'link_set', predecessorId: p.id, successorId: s.id, type, lag: Math.round(lag) } }
+      return { change: { kind: 'link_set', predecessorId: p.id, successorId: s.id, type, lag: Math.round(lag), ...(fromType ? { fromType } : {}) } }
     }
     case 'link_remove': {
       const p = find(b.predecessorId), s = find(b.successorId)
       if (!p || !s) return { error: 'Name the predecessor and successor of the relationship to remove.' }
-      if (!relationships.some(r => r.predecessorId === p.id && r.successorId === s.id)) return { error: `There is no relationship ${p.activityId} → ${s.activityId}.` }
-      return { change: { kind: 'link_remove', predecessorId: p.id, successorId: s.id } }
+      const type = b.type == null || b.type === '' ? undefined : String(b.type).toUpperCase() as LinkType
+      if (type && !LINK_TYPES.includes(type)) return { error: 'Relationship type must be FS, SS, FF or SF.' }
+      if (!relationships.some(r => r.predecessorId === p.id && r.successorId === s.id && (!type || r.type === type))) return { error: `There is no ${type ? `${type} ` : ''}relationship ${p.activityId} → ${s.activityId}.` }
+      return { change: { kind: 'link_remove', predecessorId: p.id, successorId: s.id, ...(type ? { type } : {}) } }
     }
     case 'constraint': {
       const a = work(b.activityId, 'activity')
