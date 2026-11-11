@@ -84,7 +84,11 @@ const BODY_SCHEDULE_ROUTES = new Set(['/api/ask', '/api/reports'])
  * one; the lookup runs only if the request actually tries to call a model. A failed lookup is
  * treated as classified, so an error never lets restricted content through.
  */
-export function classificationResolver(req: Request, path: string, orgId: string): (() => Promise<string | null>) | undefined {
+export function classificationResolver(req: Request, rawPath: string, orgId: string): (() => Promise<string | null>) | undefined {
+  // The router decodes the path before matching (/api/%61sk is /api/ask); so does the guard. A path that
+  // cannot be decoded is treated as classified (fail closed).
+  let path: string
+  try { path = decodeURIComponent(rawPath) } catch { return async () => 'classified' }
   const plan = /^\/api\/plans\/([^/]+)/.exec(path)?.[1]
   const schedule = /^\/api\/schedules\/([^/]+)/.exec(path)?.[1]
   // Clone before the handler consumes the body.

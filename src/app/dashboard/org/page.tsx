@@ -9,7 +9,7 @@ import { Section, Field, Button, Alert, inputClass, postJson } from '@/component
 import { Integrations } from '@/components/Integrations'
 import { EnterpriseIdentity } from '@/components/EnterpriseIdentity'
 import { Workspaces } from '@/components/Workspaces'
-import { fmtDate, fmtDates, fmtDateTime } from '@/lib/format'
+import { fmtDay, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
 interface Invitation { id: string; email: string; role: string; expiresAt: string; createdAt: string }
@@ -81,10 +81,10 @@ export default function OrgPage() {
   const can = (p: string) => !!data?.you.permissions.includes(p)
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/org')
-    if (res.status === 401) { router.push('/auth'); return }
-    const d = await res.json()
-    if (!res.ok) { setMsg({ tone: 'error', text: d.error, section: 'top' }); return }
+    const res = await fetch('/api/org').catch(() => null)
+    if (res?.status === 401) { router.push('/auth'); return }
+    const d = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) { setMsg({ tone: 'error', text: d.error || (res ? 'The organization could not be loaded. Reload the page to try again.' : 'Network error. Check your connection and reload the page.'), section: 'top' }); return }
     setData(d); if (d.settings) setSettings(d.settings)
     if (d.sso) setSso({ enabled: d.sso.enabled, issuer: d.sso.issuer, clientId: d.sso.clientId, clientSecret: '', domains: d.sso.domains.join(', '), defaultRole: d.sso.defaultRole, enforce: d.sso.enforce })
   }, [router])
@@ -118,7 +118,7 @@ export default function OrgPage() {
     <div className="px-4 md:px-6 py-6 max-w-4xl space-y-5">
       <div>
         <h1 className="page-title">{data.org.name}</h1>
-        <p className="text-[13.5px] text-warm-500">Organization since {fmtDate(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
+        <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
       <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai.">
@@ -197,7 +197,7 @@ export default function OrgPage() {
             <ul className="mt-4 divide-y divide-warm-200 border border-warm-200 rounded-md">
               {data.invitations.map(i => (
                 <li key={i.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
-                  <span><span className="text-navy-950 font-medium">{i.email}</span> · <span className="capitalize">{i.role}</span> · expires {fmtDate(i.expiresAt)}</span>
+                  <span><span className="text-navy-950 font-medium">{i.email}</span> · <span className="capitalize">{i.role}</span> · expires {fmtDay(i.expiresAt)}</span>
                   <Button variant="ghost" onClick={async () => { if (await act('invite', { action: 'revoke_invite', invitationId: i.id }, 'Invitation revoked.')) load() }}>Revoke</Button>
                 </li>
               ))}

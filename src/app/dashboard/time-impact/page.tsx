@@ -5,7 +5,7 @@
 // before / after, concurrency indicators and assumptions — with downloadable reports. The results are
 // a calculation; entitlement is a contractual determination RunF9 does not make (said on the page).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { useApp } from '../layout'
@@ -51,12 +51,15 @@ export default function TimeImpactPage() {
   useEffect(() => {
     setDocs(null); setDraft(null); setDocId('')
     if (!sid || !canWrite) return
+    let live = true
     fetch(`/api/schedules/${sid}/documents`).then(r => r.json()).then(d => {
+      if (!live) return
       const list = ((d.documents ?? []) as { id: string; title: string; docType: string; scope: string }[]).filter(x => x.scope === 'project')
       // Change documents first.
       const rank = (t: string) => (t === 'change_order' ? 0 : t === 'rfi' ? 1 : 2)
       setDocs(list.sort((a, b) => rank(a.docType) - rank(b.docType) || a.title.localeCompare(b.title)))
-    }).catch(() => setDocs([]))
+    }).catch(() => { if (live) setDocs([]) })
+    return () => { live = false }
   }, [sid, canWrite])
   const runDraft = async () => {
     if (!sid || !docId) return
@@ -79,13 +82,19 @@ export default function TimeImpactPage() {
     setSelected((r.data.event as DelayEvent).id)
   }
 
+  // Only the newest request may land: a slow answer for one project must never show under another.
+  const seq = useRef(0)
   const load = useCallback(async () => {
     if (!sid) return
+    const mine = ++seq.current
     setErr('')
-    const r = await fetch(`/api/schedules/${sid}/time-impact`)
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setErr(d.error || 'Could not load the time impact analysis.'); return }
-    setData(d)
+    try {
+      const r = await fetch(`/api/schedules/${sid}/time-impact`)
+      const d = await r.json().catch(() => ({}))
+      if (mine !== seq.current) return
+      if (!r.ok) { setErr(d.error || 'Could not load the time impact analysis.'); return }
+      setData(d)
+    } catch { if (mine === seq.current) setErr('Network error. Check your connection and reload the page.') }
   }, [sid])
   useEffect(() => { setData(null); setSelected(null); load() }, [load])
 

@@ -21,28 +21,31 @@ export default function PlansPage() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [listFailed, setListFailed] = useState(false)
 
   useEffect(() => {
-    fetch('/api/plans').then(r => r.json()).then(d => setPlans(d.plans || [])).catch(() => setError('Could not load plans.'))
+    fetch('/api/plans').then(r => (r.ok ? r.json() : Promise.reject(new Error('load')))).then(d => setPlans(d.plans || [])).catch(() => { setListFailed(true); setError('Your plans could not be loaded. Reload the page to try again.') })
   }, [])
+  // Starting an interview or a sample creates a plan, which needs the right to change plans.
+  const canBuild = can('plan.write')
 
   const create = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setCreating(true); setError('')
     const workspaceId = (new FormData(e.currentTarget).get('workspaceId') as string | null) || undefined
-    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, workspaceId }) })
-    const data = await res.json()
+    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, workspaceId }) }).catch(() => null)
+    const data = res ? await res.json().catch(() => ({})) : {}
     setCreating(false)
-    if (!res.ok) { setError(data.error || 'Could not create plan.'); return }
+    if (!res?.ok || !data.plan) { setError(data.error || (res ? 'Could not create plan.' : 'Network error. Check your connection and try again.')); return }
     router.push(`/dashboard/plan/${data.plan.id}`)
   }
 
   const trySample = async () => {
     setCreating(true); setError('')
-    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sample: true }) })
-    const data = await res.json().catch(() => ({}))
+    const res = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sample: true }) }).catch(() => null)
+    const data = res ? await res.json().catch(() => ({})) : {}
     setCreating(false)
-    if (!res.ok) { setError(data.error || 'Could not create the sample project.'); return }
+    if (!res?.ok || !data.plan) { setError(data.error || (res ? 'Could not create the sample project.' : 'Network error. Check your connection and try again.')); return }
     router.push(`/dashboard/plan/${data.plan.id}`)
   }
 
@@ -60,6 +63,7 @@ export default function PlansPage() {
             RunF9 interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.
             It asks about what it doesn&apos;t know instead of guessing, and shows the reason for every duration and link.
           </p>
+          {!canBuild ? <p className="mt-4 text-[13px] text-warm-600">Your role can&apos;t build schedules. Ask an admin for access.</p> : (
           <form onSubmit={create} className="mt-4 flex flex-col sm:flex-row gap-2">
             <input
               value={name} onChange={e => setName(e.target.value)} required maxLength={120} aria-label="Project name"
@@ -71,6 +75,7 @@ export default function PlansPage() {
               {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Plus size={14} aria-hidden />} Start interview
             </button>
           </form>
+          )}
         </section>
         <section aria-labelledby="upload-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 flex flex-col">
           <h2 id="upload-h" className="text-[17px] font-semibold text-navy-950 flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
@@ -86,25 +91,29 @@ export default function PlansPage() {
       </div>
       {error && <div role="alert" className="border-l-2 border-status-at-risk bg-status-at-risk-bg text-status-at-risk text-[13px] px-3 py-2 rounded-md mb-4">{error}</div>}
 
-      {plans === null ? (
+      {plans === null ? listFailed ? null : (
         <div className="text-warm-500 text-[14px] flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</div>
       ) : plans.length === 0 ? (
         <div className="mood-tile rounded-[14px] border px-6 py-10 text-center" data-mood="idle">
           <Robot mood="idle" size={80} className="mx-auto mb-3" />
           <p className="text-[16px] font-semibold text-navy-950">No plans yet</p>
+          {canBuild ? <>
           <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview, or upload a schedule.</p>
           <p className="text-[14px] text-warm-600 mt-4 max-w-md mx-auto">New to RunF9? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
           <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:border-navy-900 px-4 py-2 text-[13.5px] font-medium disabled:opacity-50">
             {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />} Open a sample project
           </button>
+          </> : <p className="text-[14px] text-warm-600 mt-1">Plans built by your team will show here.</p>}
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between gap-3 mb-3">
             <h2 className="text-[13px] font-medium text-warm-500">Your plans</h2>
+            {canBuild && (
             <button onClick={trySample} disabled={creating} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline disabled:opacity-50">
               <Sparkles size={13} aria-hidden /> Open a sample project
             </button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {plans.map(p => (

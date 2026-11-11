@@ -223,5 +223,8 @@ export async function scimBody<T = Record<string, unknown>>(req: Request): Promi
 
 /** Reads a JSON body; a malformed body is a 400, not a 500. */
 export async function body<T = Record<string, unknown>>(req: Request): Promise<T> {
-  try { return (await req.json()) as T } catch { throw new ApiError(400, 'Request body must be valid JSON.', 'bad_json') }
+  let parsed: unknown
+  try { parsed = await req.json() } catch { throw new ApiError(400, 'Request body must be valid JSON.', 'bad_json') }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new ApiError(400, 'Request body must be a JSON object.', 'bad_json')
+  return parsed as T
 }
