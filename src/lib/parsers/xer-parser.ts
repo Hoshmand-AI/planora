@@ -22,7 +22,11 @@ export function parseXER(content: string, scheduleId: string, opts: { projectId?
   const projects = tables['PROJECT'] || []
   // A P6 export often carries the update together with its baseline project(s). Import one project:
   // the requested one, else a non-baseline project (no orig_proj_id) with the most activities.
-  const taskCount = (pid: string) => (tables['TASK'] || []).filter(t => !t['proj_id'] || t['proj_id'] === pid).length
+  // Counted once: a file with thousands of projects must not rescan the task table for every comparison.
+  const tasksOf = new Map<string, number>()
+  let unowned = 0
+  for (const t of tables['TASK'] || []) { if (!t['proj_id']) unowned++; else tasksOf.set(t['proj_id'], (tasksOf.get(t['proj_id']) ?? 0) + 1) }
+  const taskCount = (pid: string) => (tasksOf.get(pid) ?? 0) + unowned
   const candidates = projects.filter(p => !p['orig_proj_id'])
   const pool = candidates.length ? candidates : projects
   const project = (opts.projectId && projects.find(p => p['proj_id'] === opts.projectId || p['proj_short_name'] === opts.projectId))

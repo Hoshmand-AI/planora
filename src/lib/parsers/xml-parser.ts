@@ -279,8 +279,9 @@ export function parseMSProjectXML(content: string, scheduleId: string): ParsedSc
 
   // A collection opened more often than it is closed is a damaged file; reading on would retry from every
   // opener (minutes on a large file), so it is refused here with a plain message.
-  for (const t of ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports', 'Task', 'PredecessorLink', 'Calendar']) {
-    if (xml.split(`<${t}>`).length !== xml.split(`</${t}>`).length) throw new Error(`This MS Project XML file is damaged: a <${t}> section is not closed. Export it again from MS Project (File → Save As → XML).`)
+  for (const t of ['Calendars', 'Tasks', 'Resources', 'Assignments', 'ExtendedAttributes', 'OutlineCodes', 'WBSMasks', 'Views', 'Filters', 'Groups', 'Tables', 'Maps', 'Reports', 'Task', 'PredecessorLink', 'Calendar', 'Resource', 'Assignment']) {
+    // Openers with attributes count too (<Task a="1">): each unclosed one would rescan to the end of the file.
+    if ((xml.match(new RegExp(`<${t}(?:\\s[^>]*)?(?<!/)>`, 'g'))?.length ?? 0) !== xml.split(`</${t}>`).length - 1) throw new Error(`This MS Project XML file is damaged: a <${t}> section is not closed. Export it again from MS Project (File → Save As → XML).`)
   }
 
   // Project-level fields only (exclude nested collections that also contain <Name>, <Start>, …)

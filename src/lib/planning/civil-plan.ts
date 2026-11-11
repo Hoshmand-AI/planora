@@ -76,7 +76,7 @@ export function applyInWaterWindow(acts: Map<string, PlanActivity>, links: Map<s
   const win = inWaterWindow(answers)
   // Window-limited in-water work (cofferdams, pile driving in water, cofferdam removal) says so in its
   // name; dewatering inside a cofferdam is not limited.
-  const limited = [...acts.values()].filter(a => a.category === 'in_water_work' && a.type === 'task' && /window/i.test(a.name) && first.times[a.id])
+  const limited = [...acts.values()].filter(a => a.type === 'task' && (a.category === 'in_water_work' ? /window/i.test(a.name) : /in-water work window/i.test(a.name)) && first.times[a.id])
   if (!limited.length) return first
   if (!win) {
     if (answers['civil.inwater_open'] || answers['civil.inwater_close']) {

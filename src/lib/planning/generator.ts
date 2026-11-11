@@ -31,6 +31,7 @@ export interface GenerateInput {
 
 const FIELD = 'cal-field'
 const CAL7 = 'cal-7d'
+const OFFICE = 'cal-office'
 
 const WORKWEEKS: Record<string, { days: Weekday[]; hours: number; label: string }> = {
   '5x8': { days: [1, 2, 3, 4, 5], hours: 8, label: '5-day (Mon–Fri) × 8h' },
@@ -100,6 +101,9 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     { id: CAL7, name: 'Calendar days (agency reviews, fabrication, delivery)', workDays: [0, 1, 2, 3, 4, 5, 6], hoursPerDay: 8, holidays: [], canonical: '7-day calendar' },
   ]
   // NTP must fall on a working day, otherwise it displays before the data date (DCMA #9).
+  // Design is office work. When the field works longer days or weekends, design keeps a 5-day, 8-hour week.
+  const officeWeek = ww.hours !== 8 || ww.days.length !== 5 || ww.days.some(d => d === 0 || d === 6)
+  if (officeWeek) calendars.push({ id: OFFICE, name: 'Office work, 5 days x 8 hours (design)', workDays: [1, 2, 3, 4, 5], hoursPerDay: 8, holidays, canonical: '5x8' })
   const start = nextWorkDay(requestedStart, calendars[0])
   // Template productivity assumes 8-hour days.
   const hoursFactor = 8 / ww.hours
@@ -172,6 +176,8 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
   // category (remediation work plans, EPC PO award) are real work, not placeholders.
   const tid = (t: TemplateActivity) => `t-${t.key ?? t.category}`
   const seasonal = new Set<string>()
+  const perCategory = new Map<CanonicalCategory, number>()
+  for (const t of templates) if (!t.milestone) perCategory.set(t.category, (perCategory.get(t.category) ?? 0) + 1)
 
   for (const t of templates) {
     if (skip.has(t.category) && (t.key ?? t.category) === t.category) continue
@@ -179,11 +185,12 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     if (rem !== undefined && rem <= 0) continue
     const isMs = !!t.milestone
     const cal7 = t.calendar === '7d'
+    const office = officeWeek && t.phase === 'design' && !cal7
     if (t.calendar === 'season') seasonal.add(tid(t))
     let duration = 0
     let rationale: Rationale
     const tmplDays = computeTemplateDuration(t, profile)
-    const hist = !isMs && useHistory ? historyDuration(history, t.category, profile.grossSqft) : null
+    const hist = !isMs && useHistory && !cal7 && (perCategory.get(t.category) ?? 0) <= 1 ? historyDuration(history, t.category, profile.grossSqft) : null
     if (isMs) {
       rationale = { summary: `Milestone from the ${labelType(profile)} template.`, sources: [src('template', 'RunF9 activity template', t.note)], confidence: 'high' }
     } else if (hist && rem === undefined) {
@@ -195,13 +202,13 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
         confidence: s.projects >= 3 && s.sameType ? 'high' : 'medium',
       }
     } else {
-      duration = Math.max(1, Math.round(tmplDays * (cal7 ? 1 : hoursFactor) * (rem ?? 1)))
+      duration = Math.max(1, Math.round(tmplDays * (cal7 || office ? 1 : hoursFactor) * (rem ?? 1)))
       const parts = [`base ${t.duration.base}`]
       if (t.duration.perKsf && civil && profile.valueMusd) parts.push(`${t.duration.perKsf}/$1M × ${profile.valueMusd}`)
       else if (t.duration.perKsf && profile.grossSqft) parts.push(`${t.duration.perKsf}/1,000 sf × ${Math.round(profile.grossSqft / 1000)}`)
       if (t.duration.perStory && profile.stories) parts.push(`${t.duration.perStory}/story × ${profile.stories}`)
       rationale = {
-        summary: `${duration} work days from the ${labelType(profile)} template (${parts.join(' + ')}, clamped ${t.duration.min}–${t.duration.max}).${calNote}${rem !== undefined && rem < 1 ? ` Only ${Math.round(rem * 100)}% of this design phase remains (drawings ${pct}% complete).` : ''}${useHistory && history && !hist ? ' Not enough firm history for this activity (need 2+ projects).' : ''}`,
+        summary: `${duration} work days from the ${labelType(profile)} template (${parts.join(' + ')}, clamped ${t.duration.min}–${t.duration.max}).${office ? ' Design keeps a 5-day, 8-hour office week.' : calNote}${rem !== undefined && rem < 1 ? ` Only ${Math.round(rem * 100)}% of this design phase remains (drawings ${pct}% complete).` : ''}${useHistory && history && !hist ? ' Not enough firm history for this activity (need 2+ projects).' : ''}`,
         sources: [src('template', 'RunF9 activity template', t.note), ...(rem !== undefined ? [designSource] : [])],
         confidence: (civil ? profile.valueMusd : profile.grossSqft) ? 'medium' : 'low',
         assumptions: (civil ? profile.valueMusd : profile.grossSqft) ? undefined : [civil ? 'Construction value unknown — sized for a $20M reference project.' : 'Building area unknown — template minimums used.'],
@@ -209,7 +216,7 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     }
     b.add({
       id: tid(t), name: t.name, category: t.category, phase: t.phase, type: isMs ? 'milestone' : 'task',
-      duration, calendarId: cal7 ? CAL7 : FIELD, rationale,
+      duration, calendarId: cal7 ? CAL7 : office ? OFFICE : FIELD, rationale,
     })
   }
 
@@ -302,6 +309,10 @@ export function generateSchedule(input: GenerateInput): GeneratedSchedule {
     const status = a?.status === 'known' ? String(a.value) : 'not_submitted'
     const catalogSrc = src('catalog', pm.name, `${pm.authority}; ${pm.source}`)
     if (status === 'not_required') continue
+    // Federal-only permits (NEPA, Section 106, installation access) follow the federal question's default,
+    // not federal, until the project is confirmed federal or the permit itself is answered: the interview
+    // does not ask about them before that, and the plan says "Assumed not federal".
+    if (pm.appliesWhen?.federalOnly && profile.isFederal === undefined && a?.status !== 'known') continue
     if (civilDbb && OWNER_PRELETTING_PERMITS.has(pm.id)) {
       assumptions.push({ questionId: qid, text: `${pm.name}: obtained by the owner before the contract is let (design-bid-build), so not scheduled.`, bufferDays: 0, kind: 'inferred' })
       continue
