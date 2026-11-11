@@ -38,6 +38,8 @@ export default function TimeImpactPage() {
   const { selectedSchedule, can, openUpload } = useApp()
   const [data, setData] = useState<Overview | null>(null)
   const [err, setErr] = useState('')
+  const [aiOff, setAiOff] = useState(false)
+  useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
   const [selected, setSelected] = useState<string | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [busy, setBusy] = useState(false)
@@ -148,7 +150,7 @@ export default function TimeImpactPage() {
           {canWrite && (
             <form onSubmit={create} className="space-y-2 pt-2 border-t border-warm-200">
               <label htmlFor="new-ev" className="block text-[12px] font-semibold text-warm-700">New delay event</label>
-              <input id="new-ev" className={`${input} w-full`} value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Differing site condition at grid C" maxLength={200} />
+              <input id="new-ev" className={`${input} w-full`} value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Differing site condition" maxLength={200} />
               <button type="submit" className={primary} disabled={busy || newTitle.trim().length < 3}>Add event</button>
             </form>
           )}
@@ -174,7 +176,7 @@ export default function TimeImpactPage() {
         </section>
 
         {draft ? <DraftReview draft={draft} busy={busy} onCreate={createFromDraft} onDiscard={() => setDraft(null)} />
-          : event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use')} onChanged={load} />
+          : event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use') && !aiOff} onChanged={load} />
           : <p className="text-[13px] text-warm-600 py-6">Select a delay event{canWrite ? ' or add one' : ''} to model its fragnet and run the analysis.</p>}
       </div>
     </div>

@@ -235,6 +235,7 @@ export function ProjectsDashboard() {
           )
         })}
       </div>
+      {counts.stale > 0 && <p className="-mt-3 text-[12px] text-warm-600">A project that needs an update can also be counted under its status, so the groups can add up to more than the total.</p>}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2.5">
