@@ -14,13 +14,22 @@ import { buildIpmdarSpd, zipIpmdarSpd } from '@/lib/export/ipmdar-spd'
 import { exportMspXml } from '@/lib/export/msp-xml'
 import { exportScheduleCsv } from '@/lib/export/csv'
 import { exportImportXlsx, exportP6LayoutXlsx } from '@/lib/export/xlsx'
-import { CSV_CUI_REFUSAL, exportMarking, markXer } from '@/lib/export/markings'
+import { CSV_CUI_REFUSAL, exportMarking, markXer as markXerRaw, XerMarkingError } from '@/lib/export/markings'
 import { scheduleClassification } from '@/lib/server/classification'
 import { exportLookaheadXlsx, lookaheadRows } from '@/lib/export/analysis-xlsx'
 import { loadProvenance } from '@/lib/export/provenance'
 import { loadScheduleResources } from '@/lib/planning/resource-service'
 import { exportExceptions, type ExportExceptionFormat } from '@/lib/export/exceptions'
 import { exceptionHeader, summarizeExceptions } from '@/lib/parsers/exceptions'
+
+/** A marked XER that cannot carry its marking is refused with the reason, never sent unmarked. */
+const markXer: typeof markXerRaw = (text, marking) => {
+  try { return markXerRaw(text, marking) } catch (err) {
+    if (err instanceof XerMarkingError) throw new ApiError(409, err.message, 'xer_marking')
+    throw err
+  }
+}
+
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -94,7 +103,7 @@ export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, asy
   // answers what could not be filled or was left out, as JSON, instead of the file.
   if (format === 'ipmdar') {
     if (marking) return NextResponse.json({ error: 'The IPMDAR dataset is not offered for a schedule marked CUI or classified: RunF9 does not decide the security marking that file must carry.', code: 'ipmdar_marking' }, { status: 409 })
-    const spd = buildIpmdarSpd(g, { projectName: schedule.name, ...(classification === 'unclassified' ? { securityMarking: 'UNCLASSIFIED' } : {}), softwareVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7), metadata: { ContractorName: auth.orgName, ProgramName: schedule.name } })
+    const spd = buildIpmdarSpd(g, { projectName: schedule.name, omittedLevelOfEffort: data.activities.filter(x => x.activityType === 'loe').map(x => x.activityId), ...(classification === 'unclassified' ? { securityMarking: 'UNCLASSIFIED' } : {}), softwareVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7), metadata: { ContractorName: auth.orgName, ProgramName: schedule.name } })
     if (req.nextUrl.searchParams.get('report') === '1') return NextResponse.json({ format, basis, files: Object.keys(spd.files), warnings: spd.warnings })
     const zip = zipIpmdarSpd(spd.files)
     const file = `${slug}-ipmdar-spd.zip`

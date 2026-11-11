@@ -279,7 +279,8 @@ export function parseP6Xml(content: string, scheduleId: string, opts: { projectI
     const hpd = hoursPerDay(clndrId)
     const hrs = (field: string, report = false) => {
       const v = childText(t, field)
-      if (v === '') return null
+      // Empty or not a number (a damaged file): no value, never NaN.
+      if (v === '' || !Number.isFinite(parseFloat(v))) return null
       const exact = parseFloat(v) / hpd
       const r = round2(exact)
       if (report && wasRounded(exact, r)) ex.add({ severity: 'info', entity: 'activity', field: `Activity.${field}`, disposition: 'converted', example: code, message: 'Hours converted to work days on the activity calendar and rounded to 0.01 day' })

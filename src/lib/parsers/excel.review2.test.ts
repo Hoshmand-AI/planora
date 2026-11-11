@@ -51,3 +51,33 @@ describe('M7: Excel import limits are never silent', () => {
     await expect(parseSpreadsheet(buf, 'f.xlsx', 's')).rejects.toThrow(/too large to import.*limit is 200 MB/)
   })
 })
+
+// Lower findings of the same review, fixed where the change is a line or two.
+import { readFileSync } from 'fs'
+import path from 'path'
+import { parseP6Xml } from './p6-xml-parser'
+import { parseMSProjectXML } from './xml-parser'
+import { costDataFromFile } from './costs'
+
+const fixture = (name: string) => readFileSync(path.join(__dirname, '__fixtures__', name), 'utf8')
+
+describe('lower findings', () => {
+  it('P6 XML: a non-numeric TotalFloat is no value, not NaN', () => {
+    const xml = fixture('p6-equivalence.xml').replace(/<TotalFloat>[^<]*<\/TotalFloat>/g, '<TotalFloat>n/a</TotalFloat>')
+    const p = parseP6Xml(xml, 's')
+    expect(p.activities.length).toBeGreaterThan(0)
+    expect(p.activities.some(a => Number.isNaN(a.totalFloat))).toBe(false)
+  })
+  it('MS Project XML: a character reference outside Unicode is dropped instead of failing the upload', () => {
+    const xml = fixture('sample-msp.xml').replace('<Name>Site Work</Name>', '<Name>Site&#x110000; Work&#1114112; &#x41;</Name>')
+    const p = parseMSProjectXML(xml, 's')
+    expect(p.activities.some(a => a.name === 'Site Work A')).toBe(true)
+  })
+  it('earned value reads costs from a UTF-16 MS Project file, like the importer does', async () => {
+    const text = fixture('evm-costs-msp.xml')
+    const utf8 = await costDataFromFile('f.xml', Buffer.from(text, 'utf8'))
+    const utf16 = await costDataFromFile('f.xml', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]))
+    expect(utf8).not.toBeNull()
+    expect(utf16).toEqual(utf8)
+  })
+})

@@ -159,11 +159,14 @@ export function p6XmlResourceData(root: XNode, project: XNode, tasks: Map<string
 
 /* ─── MS Project XML ─────────────────────────────────────── */
 
+/** A numeric character reference; one outside Unicode (a damaged or crafted file) is dropped, not thrown. */
+const codePoint = (n: number) => (n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '')
+
 function decodeXml(s: string): string {
   return s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => codePoint(parseInt(d, 10)))
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&')
 }

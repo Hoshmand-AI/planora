@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
+import { ssoErrorMessage } from './sso-error'
 
 function AuthForm() {
   const router = useRouter()
@@ -33,7 +34,8 @@ function AuthForm() {
   // "Forgot password?": request a reset link by email
   const [forgot, setForgot] = useState(searchParams.get('forgot') === '1')
   const [resetNote, setResetNote] = useState('')
-  useEffect(() => { const e = searchParams.get('sso_error'); if (e) { setError(e); setSsoMode(true) } }, [searchParams])
+  // Only our own fixed messages are shown: text from the address bar is never displayed as an error.
+  useEffect(() => { const e = searchParams.get('sso_error'); if (e) { setError(ssoErrorMessage(e)); setSsoMode(true) } }, [searchParams])
   useEffect(() => { if (searchParams.get('verified') === '0') setError('That confirmation link is invalid or has expired. Sign in and resend it from Account → Profile.') }, [searchParams])
 
   const handleSso = async (e: React.FormEvent) => {

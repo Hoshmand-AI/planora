@@ -462,6 +462,8 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
   recovery: RecoveryPlan | null; onRecover: (id: string) => void; onInterview: () => void
   focusCodes: string[] | null; onClearFocus: () => void
 }) {
+  // Changing a plan needs plan.write: read-only roles see the schedule and its reasons, without the controls.
+  const canWrite = useApp().can('plan.write')
   const g = plan.generated!
   const t = g.cpm?.times || {}
   const [open, setOpen] = useState<string | null>(null)
@@ -714,6 +716,8 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
   onShowCodes: (codes: string[]) => void; onInterview: () => void
 }) {
+  const { can } = useApp()
+  const canWrite = can('plan.write'), canReview = can('plan.review')
   const [verdict, setVerdict] = useState('approve')
   const [comment, setComment] = useState('')
   const [reviewer, setReviewer] = useState('')
@@ -868,6 +872,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
   /** Only the first open decision starts expanded, so the list reads as a short to-do list */
   startOpen: boolean
 }) {
+  const canWrite = useApp().can('plan.write')
   const [open, setOpen] = useState(startOpen)
   const accept = g.actions.find(a => a.kind === 'accept') as Extract<Guide['actions'][number], { kind: 'accept' }> | undefined
   const [note, setNote] = useState(accept?.suggestedNote || '')

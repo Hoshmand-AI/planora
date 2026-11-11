@@ -214,7 +214,7 @@ describe('M6: long work days in the rebuilt XER have real clock times', () => {
     const x = exportXer(s, 'Pilot')
     const row = readXerTables(x)['CALENDAR'][0]
     expect(xerCalendarTimes(row)).toMatchObject({ hoursPerDay: 24, start: '00:00', finish: '23:59' })
-    expect(parseXER(x, 's1').schedule.calendars?.[0]?.hoursPerDay).toBe(24)
+    expect(parseXER(x, 's1').calendars[0].hoursPerDay).toBe(24)
     expect(exportExceptions(s, 'xer').records.some(r => r.field.includes('work times'))).toBe(false)
     // Finish times of day on a 16-hour calendar end with its work period.
     const s16 = sched(['1 A'], { calendars: [cal(16)], defaultCalendarId: 'c' } as Partial<GeneratedSchedule>)
@@ -230,14 +230,12 @@ describe('M8: P6 layout on very large schedules', () => {
     // A time-scale cell far from the bar (bars are in the first week).
     return { data: ws.getRow(row).getCell(1), grid: ws.getRow(row).getCell(8 + 200), bar: ws.getRow(row).getCell(8) }
   }
-  const tenYears = { cpm: undefined } as Partial<GeneratedSchedule>
   it('normal schedules keep the grid in the time scale', async () => {
     const s = sched(['1 A', '2 B'])
     s.cpm!.projectFinish = '2036-01-04'
     const c = await gridCell(s)
     expect(c.grid.border?.bottom?.style).toBe('hair')
     expect(c.data.border?.bottom?.style).toBe('hair')
-    void tenYears
   })
   it('past the cell budget only the bars are drawn in the time scale', async () => {
     const n = Math.ceil(P6_LAYOUT_STYLED_CELLS / 520) + 50
