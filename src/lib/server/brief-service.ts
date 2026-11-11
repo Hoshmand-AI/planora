@@ -91,14 +91,17 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
       whatIfs.push(w ?? { title: 'Your what-if', text: `No open activity "${o.whatIf.activity.slice(0, 40)}" in this schedule; use an activity ID from the Schedule tab.`, finishBefore: null, finishAfter: null, days: null })
     }
     if (driver) { const w = slip(driver, 5, 'Default what-if'); if (w) whatIfs.push(w) }
+    // The same activity and slip is run once: a signal already added to the register is not repeated as correspondence.
+    const ran = new Set<string>()
     // What the open change items and the correspondence would do, where they name an activity and a number of days.
     for (const r of register.filter(x => x.status === 'open' && (x.impactDays ?? 0) > 0 && x.activityCodes?.length).slice(0, 2)) {
       const a = r.activityCodes!.map(c => byCode.get(c.toLowerCase())).find(openTask)
       const w = a ? slip(a, r.impactDays!, `Register: ${short(r.title, 60)}`) : null
-      if (w) whatIfs.push(w)
+      if (w) { whatIfs.push(w); ran.add(`${a!.id}:${r.impactDays}`) }
     }
     for (const sg of signals.filter(x => x.activity && x.days && (x.kind === 'delay' || x.kind === 'change')).slice(0, 2)) {
       const a = byId.get(sg.activity!.id)
+      if (a && ran.has(`${a.id}:${Math.min(365, sg.days!)}`)) continue
       const w = openTask(a) ? slip(a!, Math.min(365, sg.days!), `Correspondence: ${short(sg.title, 50)}`) : null
       if (w) whatIfs.push(w)
     }

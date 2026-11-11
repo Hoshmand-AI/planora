@@ -560,10 +560,10 @@ export function evmMarkdown(e: EvmAnalysis | null | undefined, trend?: EvmTrendP
         ['IEAC(t) (planned duration ÷ SPI(t))', es.forecastFinish ? `${fmtDate(es.forecastFinish)} (${es.ieacT} cd)` : '—', `Baseline finish ${fmtDate(es.baselineFinish)}`],
       ] : []),
     ]), '',
-    `_Methods. BAC: ${e.methods.bac} PV: ${e.methods.pv} EV: ${e.methods.ev} AC: ${e.methods.ac}_`, '',
+    `Methods. BAC: ${e.methods.bac} PV: ${e.methods.pv} EV: ${e.methods.ev} AC: ${e.methods.ac}`, '',
     '### By WBS (top level)', t(['WBS', 'BAC', 'PV', 'EV', 'AC', 'SPI', 'CPI'], e.wbs.filter(w => w.level === 0).map(w => [w.label, $(w.bac), $(w.pv), $(w.ev), $(w.ac), fmtIdx(w.spi), fmtIdx(w.cpi)])), '',
     ...(trend && trend.length > 1 ? ['### Trend by update', t(['Update', 'Data date', 'PV', 'EV', 'AC', 'SPI', 'CPI', 'SPI(t)'], trend.map(p => [p.version, fmtDate(p.dataDate), $(p.pv), $(p.ev), $(p.ac), fmtIdx(p.spi), fmtIdx(p.cpi), fmtIdx(p.spiT)])), ''] : []),
-    '### Earned value data integrity', `_${EVM_PRINCIPLE_NOTE}_`, '',
+    '### Earned value data integrity', EVM_PRINCIPLE_NOTE, '',
     flagged.length ? t(['Check', 'Finding', 'Activities'], flagged.map(c => [c.title, c.detail, c.activityCodes.slice(0, 12).join(', ') + (c.activityCodes.length > 12 ? ` (+${c.activityCodes.length - 12})` : '')])) : '_No findings._',
     ...(e.notes.length ? ['', ...e.notes.map(n => `- ${n}`)] : []),
   ]

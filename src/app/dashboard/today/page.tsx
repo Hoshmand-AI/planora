@@ -46,6 +46,8 @@ export default function TodayPage() {
   const [copied, setCopied] = useState(false)
   const [mailed, setMailed] = useState('')
   const [busy, setBusy] = useState('')
+  // The what-if answer last brought into view (so it is scrolled to once, when it arrives).
+  const shownWhatIf = useRef('')
   // Without an AI model, a clause cannot be explained: the button says so instead of returning a readout.
   const [aiOff, setAiOff] = useState(false)
   useEffect(() => { fetch('/api/system').then(r => r.json()).then(d => setAiOff(d.llm?.mode === 'offline')).catch(() => {}) }, [])
@@ -204,6 +206,7 @@ export default function TodayPage() {
           <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
           <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
           <List title={`Under way (${b.today.inProgressCount})`} rows={b.today.inProgress.slice(0, 6)} empty="Nothing is in progress." dateLabel="finish" action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
+          {b.today.inProgressCount > 6 && <p className="text-[12.5px] text-warm-600">and {b.today.inProgressCount - 6} more under way; the Schedule tab lists them all.</p>}
         </Card>
         <Card icon={<AlertTriangle size={15} />} title="Should have happened by now" sub={`${b.overdue.finishCount} finish${b.overdue.finishCount === 1 ? '' : 'es'} and ${b.overdue.startCount} start${b.overdue.startCount === 1 ? '' : 's'} without actual dates`}>
           <List title="Should have finished" rows={b.overdue.shouldHaveFinished} empty="Nothing is past its finish." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
@@ -230,7 +233,7 @@ export default function TodayPage() {
           <List title="Milestones" rows={b.lookahead.milestones} empty="No milestones in the next 30 days." late />
         </Card>
         <Card icon={<Sparkles size={15} />} title="What-if, run today" sub="Recalculated on the real network; nothing is saved">
-          {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.map((w, i) => (
+          {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
             <li key={i} className="text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
           <form className="flex flex-wrap items-end gap-2 pt-1" onSubmit={e => { e.preventDefault(); if (whatIf.activity.trim()) setRanWhatIf({ ...whatIf }) }}>
@@ -239,6 +242,11 @@ export default function TodayPage() {
             <label className="text-[12px] text-warm-600">takes longer by (work days)<input type="number" min={1} max={365} value={whatIf.days} onChange={e => setWhatIf(w => ({ ...w, days: e.target.value }))} className={`${input} block mt-0.5 w-24`} /></label>
             <button type="submit" className={btnPrimary} disabled={!whatIf.activity.trim()}>Run what-if</button>
           </form>
+          <div aria-live="polite">
+            {b.whatIfs.filter(w => w.title.startsWith('Your what-if')).map((w, i) => (
+              <p key={i} ref={el => { if (el && shownWhatIf.current !== w.text) { shownWhatIf.current = w.text; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } }} className="rounded-lg border border-accent-600/40 bg-white p-3 text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</p>
+            ))}
+          </div>
         </Card>
       </div>
 
