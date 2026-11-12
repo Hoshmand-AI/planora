@@ -78,6 +78,8 @@ jobs:
       RUNF9_AZURE_CLIENT_ID: azure-test-client
       RUNF9_AZURE_CLIENT_SECRET: azure-test-secret
       RUNF9_AZURE_AUTHORITY: http://127.0.0.1:4040/ms
+      # Test-only: Microsoft Graph (project mailbox) is the same stand-in.
+      RUNF9_GRAPH_URL: http://127.0.0.1:4040/graph
       RUNF9_GOOGLE_CLIENT_ID: google-test-client
       RUNF9_GOOGLE_CLIENT_SECRET: google-test-secret
       RUNF9_GOOGLE_AUTH_URL: http://127.0.0.1:4040/google/auth

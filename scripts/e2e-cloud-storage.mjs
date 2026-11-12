@@ -227,6 +227,53 @@ if (MOCK) {
   const goog = r.data.connections.find(c => c.name === 'Client D (Google sign-in)')
   ok(ms?.canRead && ms?.canWrite && goog?.canRead && goog?.canWrite && !JSON.stringify(r.data).includes('refresh'), 'signed-in storages can import and keep originals; refresh tokens are never returned', r.data)
 
+  // Project mailbox: sign in with Microsoft, name one Outlook folder, RunF9 copies its new emails.
+  {
+    const mb = `/api/schedules/${first.id}/mailbox`
+    r = await admin.get(mb)
+    ok(r.status === 200 && r.data.offered && r.data.canConnect && r.data.mailboxes.length === 0, 'a project mailbox is offered where Microsoft sign-in is set up', r.data)
+    const connect = async folder => {
+      const s = await admin.post(mb, { action: 'connect_start', folder })
+      if (s.status !== 200) return { start: s, location: '' }
+      const authorize = new URL(s.data.url)
+      const idp = await fetch(authorize, { redirect: 'manual' })
+      const callback = new URL(idp.headers.get('location'))
+      const done = await admin.raw('GET', callback.pathname + callback.search, undefined, { redirect: 'manual' })
+      return { start: s, authorize, status: done.status, location: done.headers.get('location') || '' }
+    }
+    r = await admin.post(mb, { action: 'connect_start', folder: '  ' })
+    ok(r.status === 400, 'a mailbox needs a folder name')
+    let m = await connect('No Such Folder')
+    ok(/mailbox_error=/.test(m.location) && /no top-level mail folder/i.test(decodeURIComponent(m.location)), 'a folder that does not exist is refused, and nothing is saved', m.location)
+    m = await connect('runf9  project')
+    ok(m.authorize.searchParams.get('scope') === 'https://graph.microsoft.com/Mail.Read offline_access' && m.authorize.searchParams.get('code_challenge_method') === 'S256', 'the mailbox sign-in asks only to read mail, with PKCE', m.authorize?.search)
+    ok(m.status === 303 && /\/dashboard\/documents\?mailbox=connected/.test(m.location), 'signing in with Microsoft connects the folder (name matched without regard to case)', m.location)
+    r = await admin.get(mb)
+    const box = r.data.mailboxes[0]
+    ok(r.data.mailboxes.length === 1 && box.address === 'pm@contoso.example' && box.folderName === 'RunF9 Project' && box.received === 1 && /1 new message/.test(box.lastStatus) && /1 skipped/.test(box.lastStatus) && !JSON.stringify(r.data).includes('refresh'),
+      'the first read copies the new email, skips the marked one, and never returns the sign-in', r.data)
+    r = await admin.get(`/api/schedules/${first.id}/documents`)
+    const titles = (r.data.documents || []).map(d => d.title)
+    ok(titles.includes('Switchgear delivery') && !titles.some(t => /CUI|Private|Old thread/.test(t)), 'the email is a project document; the marked, the private and the 90-day-old ones are not', titles)
+    r = await admin.post(mb, { action: 'sync', mailboxId: box.id })
+    ok(r.status === 200 && r.data.received === 0 && /Up to date/.test(r.data.status), 'reading again finds nothing new', r.data)
+    const g = (await (await fetch(`${MOCK}/stats`)).json()).graph
+    ok(g.folders.length >= 2 && g.folders.every(f => f === 'fld-runf9') && g.messages === 2, 'RunF9 asked Microsoft only for the named folder (never the Inbox)', g)
+    m = await connect('RunF9 Project')
+    ok(/mailbox_error=/.test(m.location) && /already connected/i.test(decodeURIComponent(m.location)), 'the same folder cannot be connected twice', m.location)
+    const outsider = new Client()
+    await outsider.post('/api/auth', { action: 'signup', email: `outsider${Date.now()}@example.com`, password: 'correct horse battery staple', name: 'Outsider', company: 'Another Firm' })
+    ok((await outsider.get(mb)).status === 404 && (await outsider.post(mb, { action: 'sync', mailboxId: box.id })).status === 404 && (await outsider.raw('DELETE', `${mb}?mailboxId=${box.id}`)).status === 404, 'another firm cannot see, read or disconnect the mailbox')
+    r = await admin.post(mb, { action: 'sync', mailboxId: 'nope' })
+    ok(r.status === 404, 'an unknown mailbox cannot be read')
+    r = await admin.raw('DELETE', `${mb}?mailboxId=${box.id}`)
+    ok(r.status === 200, 'an admin disconnects the mailbox', r.status)
+    r = await admin.post(mb, { action: 'sync', mailboxId: box.id })
+    ok(r.status === 404, 'a disconnected mailbox is no longer read')
+    r = await admin.get(`/api/schedules/${first.id}/documents`)
+    ok((r.data.documents || []).some(d => d.title === 'Switchgear delivery'), 'emails already copied stay after disconnecting')
+  }
+
   // AWS: the one-click role, then connect with the role ARN.
   r = await admin.post('/api/storage', { action: 'aws_launch', provider: 'aws', config: { bucket: 'client-e', region: 'us-east-1', prefix: 'projects/' } })
   const launch = r.data.launchUrl && new URLSearchParams(r.data.launchUrl.split('#/stacks/quickcreate?')[1])

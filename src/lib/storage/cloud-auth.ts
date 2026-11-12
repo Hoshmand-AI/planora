@@ -79,13 +79,14 @@ async function post(url: string, form: Record<string, string>, env: Env): Promis
 
 export interface OAuthStart { url: string; verifier: string; state: string }
 
-export function startOAuth(provider: 'azure' | 'gcp', redirectUri: string, env: Env = process.env, loginHint?: string): OAuthStart {
+/** `scope` replaces the storage scope for another use of the same Microsoft sign-in (a project mailbox). */
+export function startOAuth(provider: 'azure' | 'gcp', redirectUri: string, env: Env = process.env, loginHint?: string, scope?: string): OAuthStart {
   const app = provider === 'azure' ? azureApp(env) : googleApp(env)
   if (!app) throw new StorageError(`Sign-in with ${provider === 'azure' ? 'Microsoft' : 'Google'} is not set up on this RunF9.`, 400)
   const verifier = randomBytes(32).toString('base64url')
   const state = randomBytes(16).toString('base64url')
   const q = new URLSearchParams({
-    client_id: app.clientId, response_type: 'code', redirect_uri: redirectUri, scope: app.scope, state,
+    client_id: app.clientId, response_type: 'code', redirect_uri: redirectUri, scope: scope || app.scope, state,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
     ...(provider === 'gcp' ? { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'false' } : { prompt: 'select_account' }),
     ...(loginHint ? { login_hint: loginHint } : {}),
@@ -93,21 +94,24 @@ export function startOAuth(provider: 'azure' | 'gcp', redirectUri: string, env: 
   return { url: `${app.authorize}?${q}`, verifier, state }
 }
 
-export async function finishOAuth(provider: 'azure' | 'gcp', code: string, verifier: string, redirectUri: string, env: Env = process.env): Promise<{ refreshToken: string; accessToken: string; expiresIn: number }> {
+export async function finishOAuth(provider: 'azure' | 'gcp', code: string, verifier: string, redirectUri: string, env: Env = process.env, scope?: string): Promise<{ refreshToken: string; accessToken: string; expiresIn: number }> {
   const app = provider === 'azure' ? azureApp(env) : googleApp(env)
   if (!app) throw new StorageError('Sign-in is not set up on this RunF9.', 400)
-  const d = await post(app.token, { grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: app.clientId, client_secret: app.clientSecret, code_verifier: verifier, ...(provider === 'azure' ? { scope: app.scope } : {}) }, env)
+  const d = await post(app.token, { grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: app.clientId, client_secret: app.clientSecret, code_verifier: verifier, ...(provider === 'azure' ? { scope: scope || app.scope } : {}) }, env)
   if (typeof d.refresh_token !== 'string' || typeof d.access_token !== 'string') throw new StorageError('The sign-in did not grant offline access. Try again and accept every permission.', 400)
   return { refreshToken: d.refresh_token, accessToken: d.access_token, expiresIn: Number(d.expires_in) || 3600 }
 }
 
-async function refreshOAuth(provider: 'azure' | 'gcp', refreshToken: string, env: Env): Promise<{ accessToken: string; expiresIn: number; refreshToken?: string }> {
+async function refreshOAuth(provider: 'azure' | 'gcp', refreshToken: string, env: Env, scope?: string): Promise<{ accessToken: string; expiresIn: number; refreshToken?: string }> {
   const app = provider === 'azure' ? azureApp(env) : googleApp(env)
   if (!app) throw new StorageError('Sign-in is no longer set up on this RunF9; reconnect this storage with a key.', 400)
-  const d = await post(app.token, { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: app.clientId, client_secret: app.clientSecret, ...(provider === 'azure' ? { scope: app.scope } : {}) }, env)
+  const d = await post(app.token, { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: app.clientId, client_secret: app.clientSecret, ...(provider === 'azure' ? { scope: scope || app.scope } : {}) }, env)
   if (typeof d.access_token !== 'string') throw new StorageError('The sign-in service did not return an access token.', 502)
   return { accessToken: d.access_token, expiresIn: Number(d.expires_in) || 3600, refreshToken: typeof d.refresh_token === 'string' ? d.refresh_token : undefined }
 }
+
+/** A fresh access token from a stored refresh token, for a use of the sign-in outside storage (a project mailbox). */
+export const refreshOAuthToken = (provider: 'azure' | 'gcp', refreshToken: string, env: Env = process.env, scope?: string) => refreshOAuth(provider, refreshToken, env, scope)
 
 /* ─── AWS role (CloudFormation + STS) ───────────────────── */
 

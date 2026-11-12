@@ -44,7 +44,13 @@ you are done.
    **Value** (shown once) → Vercel `RUNF9_AZURE_CLIENT_SECRET`. Put a calendar reminder to renew it.
 4. **API permissions** → Add a permission → Microsoft APIs → **Azure Storage** → Delegated →
    `user_impersonation` → Add. Then **Grant admin consent** for your directory.
-5. (Later, before selling) **Branding & properties** → add the publisher domain / verify the publisher
+5. **For the project mailbox (RunF9 reads one Outlook folder per project):** API permissions → Add a
+   permission → Microsoft APIs → **Microsoft Graph** → Delegated → tick `Mail.Read` and
+   `offline_access` → Add. No new redirect URI is needed: the mailbox sign-in returns to the same
+   address. Until this permission is added, "Sign in with Microsoft" under Documents → Microsoft 365
+   mailbox ends with Microsoft's permission error and nothing is saved. A customer whose tenant
+   requires admin consent must have their own admin approve RunF9 once.
+6. (Later, before selling) **Branding & properties** → add the publisher domain / verify the publisher
    so customers' admins see a verified app.
 
 ---
