@@ -50,6 +50,8 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       blocks.push(<pre key={`c${blocks.length}`} className="whitespace-pre-wrap font-mono text-[12px] bg-warm-200/50 rounded-md p-3">{body.join('\n')}</pre>)
       continue
     }
+    // A line of only dashes, asterisks or underscores is a divider, not text.
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); blocks.push(<hr key={`r${blocks.length}`} className="border-warm-200" />); i++; continue }
     if (h) {
       flush()
       const k = `h${blocks.length}`

@@ -17,6 +17,7 @@ import type { AuthContext } from '@/lib/auth'
 import { BETA_SIGNIN_MESSAGE, isPlatformAdmin, mayUseRunF9 } from './signup-policy'
 import { emailConfigured } from './email'
 import { auditQuietly } from './audit'
+import { isPlanId, type PlanId } from './entitlements'
 
 export const BETA_INVITE_DAYS = 14
 
@@ -111,7 +112,7 @@ export async function markBetaInviteAccepted(id: string, userId: string, orgId: 
 }
 
 export interface BetaUser {
-  id: string; email: string; name: string; role: string; orgId: string; orgName: string; createdAt: string
+  id: string; email: string; name: string; role: string; orgId: string; orgName: string; orgPlan: string; createdAt: string
   betaAccessAt: string | null; betaRevokedAt: string | null; betaAccessVia: string | null; disabled: boolean
   platformAdmin: boolean; hasAccess: boolean
 }
@@ -119,12 +120,12 @@ export interface BetaUser {
 /** Every account on the instance with its beta status (newest first). */
 export async function listBetaUsers(limit = 500): Promise<BetaUser[]> {
   await initSchema()
-  const res = await query(`SELECT u.id, u.email, u.name, u.role, u.org_id, u.created_at, u.beta_access_at, u.beta_revoked_at, u.beta_access_via, u.disabled_at, o.name AS org_name
+  const res = await query(`SELECT u.id, u.email, u.name, u.role, u.org_id, u.created_at, u.beta_access_at, u.beta_revoked_at, u.beta_access_via, u.disabled_at, o.name AS org_name, o.plan AS org_plan
     FROM users u JOIN organizations o ON o.id = u.org_id ORDER BY u.created_at DESC LIMIT $1`, [limit])
   return res.rows.map(r => {
     const betaAccessAt = iso(r.beta_access_at), betaRevokedAt = iso(r.beta_revoked_at)
     return {
-      id: String(r.id), email: String(r.email), name: String(r.name), role: String(r.role), orgId: String(r.org_id), orgName: String(r.org_name),
+      id: String(r.id), email: String(r.email), name: String(r.name), role: String(r.role), orgId: String(r.org_id), orgName: String(r.org_name), orgPlan: isPlanId(r.org_plan) ? r.org_plan : 'free',
       createdAt: iso(r.created_at)!, betaAccessAt, betaRevokedAt, betaAccessVia: (r.beta_access_via as string) || null, disabled: !!r.disabled_at,
       platformAdmin: isPlatformAdmin(String(r.email)), hasAccess: !!betaAccessAt && !betaRevokedAt,
     }
@@ -153,4 +154,24 @@ export async function restoreBetaAccess(userId: string): Promise<{ email: string
     WHERE id=$1 AND (beta_revoked_at IS NOT NULL OR beta_access_at IS NULL) RETURNING email, org_id`, [userId])
   if (!res.rows[0]) throw new ApiError(409, 'They already have beta access, or the person was not found.')
   return { email: String(res.rows[0].email), orgId: String(res.rows[0].org_id) }
+}
+
+/**
+ * Sets the plan of the organization a person belongs to (platform operators only; the caller checks
+ * that). The organization is looked up from the person, never taken from the request.
+ */
+export async function setPlanForUsersOrg(userId: string, plan: PlanId): Promise<{ orgId: string; name: string; from: string }> {
+  await initSchema()
+  return withTransaction(async q => {
+    const who = await q('SELECT org_id FROM users WHERE id=$1', [userId])
+    if (!who.rows[0]) throw new ApiError(404, 'Person not found.')
+    const orgId = String(who.rows[0].org_id)
+    const cur = await q('SELECT name, plan FROM organizations WHERE id=$1 FOR UPDATE', [orgId])
+    const row = cur.rows[0]
+    if (!row) throw new ApiError(404, 'Organization not found.')
+    const from = isPlanId(row.plan) ? row.plan : 'free'
+    if (from === plan) throw new ApiError(409, `That organization is already on the ${plan} plan.`)
+    await q('UPDATE organizations SET plan=$2 WHERE id=$1', [orgId, plan])
+    return { orgId, name: String(row.name), from }
+  })
 }

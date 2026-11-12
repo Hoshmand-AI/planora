@@ -13,7 +13,7 @@ interface Invite {
   acceptedAt: string | null; revokedAt: string | null; acceptedOrgName?: string | null; status: 'pending' | 'accepted' | 'revoked' | 'expired'
 }
 interface BetaUser {
-  id: string; email: string; name: string; role: string; orgName: string; createdAt: string
+  id: string; email: string; name: string; role: string; orgId: string; orgName: string; orgPlan: string; createdAt: string
   betaAccessAt: string | null; betaRevokedAt: string | null; betaAccessVia: string | null; disabled: boolean; platformAdmin: boolean; hasAccess: boolean
 }
 interface Data { signup: { mode: string; accessRequestEmail: string | null }; emailDelivery: boolean; inviteDays: number; invites: Invite[]; users: BetaUser[] }
@@ -130,7 +130,7 @@ export function BetaAdmin() {
         )}
       </Section>
 
-      <Section title={`People (${data.users.length})`} description="Everyone with a RunF9 account and whether they can sign in. Revoking beta access signs the person out everywhere; their organization keeps its data.">
+      <Section title={`People (${data.users.length})`} description="Everyone with a RunF9 account, whether they can sign in, and their organization's plan. Revoking beta access signs the person out everywhere; their organization keeps its data.">
         {note('users')}
         <div className="mb-3 max-w-sm">
           <Field label="Filter">{p => <input {...p} type="search" className={inputClass} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Email, name or organization" />}</Field>
@@ -146,7 +146,18 @@ export function BetaAdmin() {
               {users.map(u => (
                 <tr key={u.id} className="border-b border-warm-200 last:border-0 align-top">
                   <td className="py-2 pr-3"><div className="text-navy-950 font-medium">{u.name}</div><div className="text-warm-600 text-[12px]">{u.email}{u.disabled ? ' · removed from organization' : ''}</div></td>
-                  <td className="py-2 pr-3 text-warm-700">{u.orgName}<div className="text-warm-600 text-[12px] capitalize">{u.role}</div></td>
+                  <td className="py-2 pr-3 text-warm-700">{u.orgName}<div className="text-warm-600 text-[12px] capitalize">{u.role}</div>
+                    <label className="mt-1 flex items-center gap-1.5 text-[12px] text-warm-600">Plan
+                      <select className="border border-warm-300 rounded px-1.5 py-0.5 bg-white text-navy-950" value={u.orgPlan} disabled={busy === 'users'} aria-label={`Plan for ${u.orgName}`}
+                        onChange={async e => {
+                          const plan = e.target.value
+                          if (!window.confirm(`Put ${u.orgName} on the ${plan === 'pro' ? 'Pro' : plan === 'enterprise' ? 'Enterprise' : 'Free'} plan? It applies to everyone in that organization at once.`)) return
+                          if (await act('users', { action: 'set_plan', userId: u.id, plan }, `${u.orgName} is now on the ${plan === 'pro' ? 'Pro' : plan === 'enterprise' ? 'Enterprise' : 'Free'} plan.`)) load()
+                        }}>
+                        <option value="free">Free</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option>
+                      </select>
+                    </label>
+                  </td>
                   <td className="py-2 pr-3 text-warm-700">
                     {u.platformAdmin ? 'Operator (always)' : u.hasAccess ? `Yes · ${VIA[u.betaAccessVia || ''] || 'Granted'}` : u.betaRevokedAt ? `Revoked ${fmtDay(u.betaRevokedAt)}` : 'No'}
                     {u.betaAccessAt && !u.platformAdmin && u.hasAccess && <div className="text-warm-600 text-[12px]">since {fmtDay(u.betaAccessAt)}</div>}
