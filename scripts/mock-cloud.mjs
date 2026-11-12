@@ -24,7 +24,43 @@ const refresh = new Map()          // refresh token -> provider
 const access = new Map()           // access token -> { provider, until }
 const sessions = new Map()         // aws session token -> { keyId, until }
 const objects = new Map()          // `${ns}/${container}/${key}` -> { body, modified }
-const stats = { refreshes: { azure: 0, gcp: 0 }, assumeRole: 0 }
+const stats = { refreshes: { azure: 0, gcp: 0 }, assumeRole: 0, graph: { folders: [], messages: 0 } }
+
+// Microsoft Graph mail (RUNF9_GRAPH_URL=http://127.0.0.1:4040/graph): one mailbox with two folders.
+// RunF9 may read only the folder it was told to; `stats.graph.folders` records which it asked for.
+const eml = (subject, text, date) => `From: Site Super <super@gc.example>\r\nTo: pm@gc.example\r\nSubject: ${subject}\r\nDate: ${new Date(date).toUTCString()}\r\nContent-Type: text/plain\r\n\r\n${text}\r\n`
+const day = n => new Date(Date.now() - n * 86400_000).toISOString()
+const MAIL = {
+  me: { mail: 'pm@contoso.example', userPrincipalName: 'pm@contoso.example' },
+  folders: [{ id: 'fld-inbox', displayName: 'Inbox' }, { id: 'fld-runf9', displayName: 'RunF9 Project' }],
+  messages: [
+    { id: 'm-1', folder: 'fld-runf9', receivedDateTime: day(3), mime: eml('Switchgear delivery', 'Activity A1000 is delayed 6 days because the switchgear shipment slipped.', day(3)) },
+    { id: 'm-2', folder: 'fld-runf9', receivedDateTime: day(2), mime: eml('CUI // marked note', 'CUI//SP-CTI\nControlled technical information about the facility.', day(2)) },
+    { id: 'm-old', folder: 'fld-runf9', receivedDateTime: day(90), mime: eml('Old thread', 'Activity A1000 was discussed last quarter.', day(90)) },
+    { id: 'm-private', folder: 'fld-inbox', receivedDateTime: day(1), mime: eml('Private', 'Nothing to do with the project.', day(1)) },
+  ],
+}
+function graph(req, res, parts, url) {
+  if (!bearerOk(req, 'azure')) return json(res, 401, { error: { code: 'InvalidAuthenticationToken' } })
+  // /graph/v1.0/me | /me/mailFolders | /me/mailFolders/{id}/messages | /me/messages/{id}/$value
+  const p = parts.slice(2)
+  if (p.length === 1 && p[0] === 'me') return json(res, 200, MAIL.me)
+  if (p.length === 2 && p[1] === 'mailFolders') return json(res, 200, { value: MAIL.folders })
+  if (p.length === 4 && p[1] === 'mailFolders' && p[3] === 'messages') {
+    stats.graph.folders.push(p[2])
+    const since = /receivedDateTime gt (\S+)/.exec(url.searchParams.get('$filter') || '')?.[1]
+    const top = Number(url.searchParams.get('$top') || 10)
+    const value = MAIL.messages.filter(m => m.folder === p[2] && (!since || m.receivedDateTime > since)).sort((a, b) => a.receivedDateTime.localeCompare(b.receivedDateTime)).slice(0, top).map(m => ({ id: m.id, receivedDateTime: m.receivedDateTime }))
+    return json(res, 200, { value })
+  }
+  if (p.length === 4 && p[1] === 'messages' && p[3] === '$value') {
+    const m = MAIL.messages.find(x => x.id === p[2])
+    if (!m) return json(res, 404, { error: { code: 'ErrorItemNotFound' } })
+    stats.graph.messages++
+    res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(m.mime)
+  }
+  return json(res, 404, { error: { code: 'NotFound' } })
+}
 
 const tok = p => `${p}-${randomBytes(12).toString('base64url')}`
 const json = (res, status, data) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(data)) }
@@ -120,6 +156,7 @@ http.createServer(async (req, res) => {
     // Microsoft identity platform: /ms/organizations/oauth2/v2.0/{authorize,token}
     if (parts[0] === 'ms' && parts[4] === 'authorize') return authorize(url, res, 'azure')
     if (parts[0] === 'ms' && parts[4] === 'token' && req.method === 'POST') return tokenEndpoint(req, res, 'azure')
+    if (parts[0] === 'graph') return graph(req, res, parts, url)
     if (url.pathname === '/google/auth') return authorize(url, res, 'gcp')
     if (url.pathname === '/google/token' && req.method === 'POST') return tokenEndpoint(req, res, 'gcp')
     if (parts[0] === 'sts') {

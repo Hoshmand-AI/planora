@@ -97,6 +97,7 @@ export default function DocumentsPage() {
 
       {can('schedule.write') && data && <UploadForm base={base} data={data} canOrg={can('org.manage')} onDone={(n) => { setNotice(n); load() }} />}
       {can('schedule.write') && data && <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />}
+      {can('schedule.write') && data && <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />}
 
       <Section title="Documents" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
@@ -409,6 +410,93 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
           <Button type="button" onClick={create} disabled={busy}>{busy ? 'Creating…' : active.length ? 'Add another inbox' : 'Create the project inbox'}</Button>
         </div>
       )}
+    </Section>
+  )
+}
+
+interface Mailbox { id: string; address: string; folderName: string; createdAt: string; lastSyncAt: string | null; lastStatus: string | null; received: number; revokedAt: string | null }
+
+/**
+ * A Microsoft 365 mail folder connected to the project (src/lib/server/project-mailbox.ts). An admin
+ * signs in with Microsoft and names one folder; RunF9 copies that folder's new emails into the
+ * project's documents every morning and on "Sync now". Hidden where Microsoft sign-in is not set up.
+ */
+function ProjectMailbox({ base, onReceived }: { base: string; onReceived: () => void }) {
+  const [data, setData] = useState<{ mailboxes: Mailbox[]; offered: boolean; canConnect: boolean; available: boolean; firstSyncDays: number } | null>(null)
+  const [folder, setFolder] = useState('RunF9')
+  const [note, setNote] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
+  const [busy, setBusy] = useState('')
+  const load = useCallback(async () => {
+    const r = await fetch(`${base}/mailbox`)
+    if (r.ok) setData(await r.json())
+  }, [base])
+  useEffect(() => { setData(null); load() }, [load])
+  // Microsoft sends the admin back to this page with the outcome in the address.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('mailbox') === 'connected') setNote({ tone: 'success', text: `Connected. RunF9 is reading the folder “${q.get('folder') || 'you named'}”.` })
+    else if (q.get('mailbox_error')) setNote({ tone: 'error', text: q.get('mailbox_error')! })
+    else return
+    window.history.replaceState(null, '', window.location.pathname)
+    onReceived()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const connect = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBusy('connect'); setNote(null)
+    const r = await postJson(`${base}/mailbox`, { action: 'connect_start', folder })
+    if (!r.ok || typeof r.data.url !== 'string') { setBusy(''); setNote({ tone: 'error', text: String(r.data.error || 'The sign-in could not be started.') }); return }
+    window.location.assign(r.data.url)
+  }
+  const sync = async (m: Mailbox) => {
+    setBusy(m.id); setNote(null)
+    const r = await postJson(`${base}/mailbox`, { action: 'sync', mailboxId: m.id })
+    setBusy('')
+    if (!r.ok) { setNote({ tone: 'error', text: String(r.data.error || 'The mailbox could not be read.') }); return }
+    setData(x => x && { ...x, mailboxes: r.data.mailboxes as Mailbox[] })
+    setNote({ tone: String(r.data.status || '').startsWith('Stopped') ? 'error' : 'success', text: String(r.data.status || 'Done.') })
+    if (Number(r.data.received) > 0) onReceived()
+  }
+  const disconnect = async (m: Mailbox) => {
+    if (!window.confirm(`Disconnect ${m.address} (folder “${m.folderName}”)? RunF9 stops reading it and erases its sign-in. Emails already copied stay in the project.`)) return
+    const r = await fetch(`${base}/mailbox?${new URLSearchParams({ mailboxId: m.id })}`, { method: 'DELETE' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) setNote({ tone: 'error', text: d.error || 'The mailbox was not disconnected.' })
+    else setData(x => x && { ...x, mailboxes: d.mailboxes })
+  }
+  if (!data || !data.offered || !data.available) return null
+  const active = data.mailboxes.filter(m => !m.revokedAt)
+  if (!active.length && !data.canConnect) return null
+  return (
+    <Section title="Microsoft 365 mailbox" description="Let RunF9 read one Outlook folder for this project. It copies that folder’s new emails into the project every morning before the brief, and when you press Sync now. It reads only the folder you name, and never sends, changes or deletes mail.">
+      <div className="space-y-3">
+        {note && <Alert tone={note.tone}>{note.text}</Alert>}
+        {active.length > 0 && (
+          <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md bg-white">
+            {active.map(m => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
+                <div className="min-w-0">
+                  <span className="font-medium text-navy-950 break-all">{m.address}</span>
+                  <span className="text-warm-600"> · folder “{m.folderName}” · {m.received} copied · connected {fmtDay(m.createdAt)}</span>
+                  <div className="text-[12px] text-warm-600">{m.lastSyncAt ? `Last read ${fmtDay(m.lastSyncAt)}: ${m.lastStatus || ''}` : 'Not read yet.'}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => sync(m)} disabled={!!busy} className="text-[12.5px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy === m.id ? 'Reading…' : 'Sync now'}</button>
+                  {data.canConnect && <button type="button" onClick={() => disconnect(m)} className="text-[12.5px] font-medium text-status-at-risk hover:underline">Disconnect</button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {data.canConnect ? (
+          <form onSubmit={connect} className="flex flex-wrap items-end gap-2">
+            <Field label="Outlook folder to read">{p => <input {...p} required maxLength={80} className={inputClass} value={folder} onChange={e => setFolder(e.target.value)} />}</Field>
+            <Button type="submit" disabled={busy === 'connect' || !folder.trim()}>{busy === 'connect' ? 'Opening Microsoft…' : 'Sign in with Microsoft'}</Button>
+          </form>
+        ) : <p className="text-[12.5px] text-warm-600">An organization admin connects or disconnects a mailbox.</p>}
+        {data.canConnect && <p className="text-[12px] text-warm-600">Create the folder in Outlook first and move this project’s emails into it, or add an Outlook rule that does. RunF9 starts with the last {data.firstSyncDays} days of that folder. Attachments are not read. Sign in with a work account.</p>}
+      </div>
     </Section>
   )
 }

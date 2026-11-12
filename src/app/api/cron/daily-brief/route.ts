@@ -4,6 +4,11 @@ import { safeEqual } from '@/lib/server/crypto'
 import { appOrigin } from '@/lib/server/email'
 import { sendDueBriefs } from '@/lib/server/brief-digest'
 import { initSchema, query } from '@/lib/db'
+import { syncDueMailboxes } from '@/lib/server/project-mailbox'
+import { log } from '@/lib/server/log'
+
+/** Connected project mailboxes are read first, so the morning brief includes yesterday's emails. A failure here never stops the brief. */
+const readMailboxes = async () => { try { await syncDueMailboxes() } catch (e) { log('error', 'mailbox sync pass failed', { error: (e as Error).message }) } }
 
 /**
  * Called by the scheduler every working morning (vercel.json). Sends the Daily Brief to its subscribers.
@@ -21,10 +26,11 @@ export const GET = publicApi(async req => {
     const claim = await query(`INSERT INTO maintenance_runs (name, last_run_at) VALUES ('daily-brief', NOW())
       ON CONFLICT (name) DO UPDATE SET last_run_at = NOW() WHERE maintenance_runs.last_run_at < NOW() - INTERVAL '10 minutes'
       RETURNING last_run_at`)
-    if (claim.rowCount) await sendDueBriefs(new Date(), origin)
+    if (claim.rowCount) { await readMailboxes(); await sendDueBriefs(new Date(), origin) }
     return NextResponse.json({ ok: true })
   }
   const given = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
   if (!given || !safeEqual(given, secret)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  await readMailboxes()
   return NextResponse.json(await sendDueBriefs(new Date(), origin))
 }, { optionalAuth: false })

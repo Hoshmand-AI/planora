@@ -884,6 +884,32 @@ export const MIGRATIONS: Migration[] = [
     );
     CREATE INDEX IF NOT EXISTS project_inboxes_project_idx ON project_inboxes(org_id, project_key);
     `,
+  },  {
+    id: 26, name: 'project_mailboxes',
+    sql: `
+    -- A Microsoft 365 mail folder connected to a project: RunF9 copies that folder's new messages into
+    -- the project's documents. The refresh token is stored encrypted (secret) and erased on disconnect.
+    -- The mailbox follows the project (its update series) and acts as the admin who connected it.
+    CREATE TABLE IF NOT EXISTS project_mailboxes (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      schedule_id TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'microsoft',
+      address TEXT NOT NULL,
+      folder_id TEXT NOT NULL,
+      folder_name TEXT NOT NULL,
+      secret TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      sync_cursor TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_sync_at TIMESTAMPTZ,
+      last_status TEXT,
+      received_count INTEGER NOT NULL DEFAULT 0,
+      revoked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS project_mailboxes_project_idx ON project_mailboxes(org_id, project_key);
+    `,
   },
 ]
 

@@ -160,6 +160,7 @@ export async function assignToWorkspace(orgId: string, item: { type: 'schedule' 
         if (from !== to) {
           await q('UPDATE project_items SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
           await q('UPDATE project_inboxes SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
+          await q('UPDATE project_mailboxes SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
           await q('DELETE FROM brief_subscriptions b WHERE b.org_id=$1 AND b.project_key=$2 AND EXISTS (SELECT 1 FROM brief_subscriptions x WHERE x.org_id=$1 AND x.project_key=$3 AND x.user_id=b.user_id)', [orgId, from, to])
           await q('UPDATE brief_subscriptions SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
         }
