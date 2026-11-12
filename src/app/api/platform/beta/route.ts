@@ -1,5 +1,6 @@
 // Private beta administration for platform operators (RUNF9_PLATFORM_ADMINS): invite a new firm,
-// list and revoke beta invitations, and revoke or restore a person's beta access. Everyone else gets
+// list and revoke beta invitations, revoke or restore a person's beta access, and set an
+// organization's plan. Everyone else gets
 // 404. Invitation tokens are returned once, to the operator, and are never logged or audited.
 
 import { api, json, body, ApiError } from '@/lib/server/api'
@@ -7,8 +8,9 @@ import { appendAudit, SYSTEM_ORG } from '@/lib/server/audit'
 import { appOrigin, emailConfigured, sendEmail } from '@/lib/server/email'
 import { betaInviteEmail } from '@/lib/server/emails'
 import {
-  BETA_INVITE_DAYS, createBetaInvite, listBetaInvites, listBetaUsers, requirePlatformAdmin, restoreBetaAccess, revokeBetaAccess, revokeBetaInvite,
+  BETA_INVITE_DAYS, createBetaInvite, listBetaInvites, listBetaUsers, requirePlatformAdmin, restoreBetaAccess, revokeBetaAccess, revokeBetaInvite, setPlanForUsersOrg,
 } from '@/lib/server/beta'
+import { isPlanId, entitlementsFor } from '@/lib/server/entitlements'
 import { accessRequestEmail, signupMode } from '@/lib/server/signup-policy'
 
 export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
@@ -22,7 +24,7 @@ export const GET = api({ permission: 'read' }, async (_req, { auth }) => {
   })
 })
 
-type Body = { action?: string; email?: string; company?: string; id?: string; userId?: string }
+type Body = { action?: string; email?: string; company?: string; id?: string; userId?: string; plan?: string }
 
 export const POST = api({ permission: 'read' }, async (req, { auth }) => {
   requirePlatformAdmin(auth)
@@ -65,6 +67,17 @@ export const POST = api({ permission: 'read' }, async (req, { auth }) => {
         { orgId: r.orgId, action: 'beta.access_restored', targetType: 'user', targetId: String(b.userId), detail: { email: r.email } },
       ])
       return json({ success: true })
+    }
+    case 'set_plan': {
+      if (!b.userId || !isPlanId(b.plan)) throw new ApiError(400, 'userId and a plan (free, pro or enterprise) are required.')
+      const r = await setPlanForUsersOrg(String(b.userId), b.plan)
+      // In the operators' log and in the organization's own log, so its admins can see the change.
+      const detail = { from: r.from, to: b.plan }
+      await appendAudit([
+        { orgId: SYSTEM_ORG, action: 'beta.plan_changed', targetType: 'organization', targetId: r.orgId, detail: { ...detail, organization: r.name } },
+        { orgId: r.orgId, action: 'beta.plan_changed', targetType: 'organization', targetId: r.orgId, detail },
+      ])
+      return json({ success: true, plan: b.plan, label: entitlementsFor(b.plan).label })
     }
     default:
       throw new ApiError(400, 'Invalid action')

@@ -124,8 +124,8 @@ async function main() {
   /* ── Non-operators get 404 ── */
   r = await founder.get('/api/platform/beta')
   ok(r.status === 404, 'A non-operator gets 404 from the operator endpoint')
-  for (const action of ['invite', 'revoke_invite', 'revoke_access', 'restore_access']) {
-    r = await founder.post('/api/platform/beta', { action, email: email('sneaky'), userId: 'x', id: 'x' })
+  for (const action of ['invite', 'revoke_invite', 'revoke_access', 'restore_access', 'set_plan']) {
+    r = await founder.post('/api/platform/beta', { action, email: email('sneaky'), userId: 'x', id: 'x', plan: 'enterprise' })
     ok(r.status === 404, `…including POST ${action}`)
   }
   r = await founder.get('/dashboard/platform')
@@ -175,6 +175,19 @@ async function main() {
   ok(r.status === 200, 'Operator restores access')
   r = await member.post('/api/auth', { action: 'signin', email: email('member'), password: PW })
   ok(r.status === 200, 'The person can sign in again')
+  /* ── Plans: only an operator changes an organization's plan ── */
+  const founderRow = ((await ops.get('/api/platform/beta')).data.users || []).find(u => u.orgId === founderOrg)
+  const planBefore = (await founder.get('/api/org')).data.plan.id
+  const planTo = planBefore === 'pro' ? 'free' : 'pro'
+  r = await ops.post('/api/platform/beta', { action: 'set_plan', userId: founderRow.id, plan: 'platinum' })
+  ok(r.status === 400, 'An unknown plan is refused')
+  r = await ops.post('/api/platform/beta', { action: 'set_plan', userId: founderRow.id, plan: planTo })
+  ok(r.status === 200 && r.data.plan === planTo, `Operator sets the firm's plan (${planBefore} → ${planTo})`, r.data)
+  ok((await founder.get('/api/org')).data.plan.id === planTo, 'The firm sees the new plan at once')
+  r = await ops.post('/api/platform/beta', { action: 'set_plan', userId: founderRow.id, plan: planTo })
+  ok(r.status === 409, 'Setting the same plan again is refused')
+  r = await ops.get('/api/platform/beta')
+  ok((r.data.users || []).some(u => u.orgId === founderOrg && u.orgPlan === planTo), 'The operator list shows each organization\'s plan')
   const opsId = (await ops.get('/api/auth')).data.user.id
   r = await ops.post('/api/platform/beta', { action: 'revoke_access', userId: opsId })
   ok(r.status === 400, 'Platform operators can’t be revoked (they always pass)')

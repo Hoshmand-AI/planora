@@ -37,7 +37,7 @@ interface AuditEvent { seq: number; at: string; actorEmail: string | null; actio
 const ACTION_LABELS: Record<string, string> = {
   'auth.signin': 'Signed in', 'auth.signout': 'Signed out', 'auth.signin_failed': 'Failed sign-in', 'auth.locked': 'Account locked', 'auth.mfa_failed': 'Failed verification code',
   'org.created': 'Organization created', 'org.settings_changed': 'Changed policies', 'org.renamed': 'Renamed organization', 'org.ownership_transferred': 'Transferred ownership',
-  'member.invited': 'Invited a member', 'member.joined': 'Joined', 'member.role_changed': 'Changed a role', 'member.removed': 'Removed a member', 'member.invite_revoked': 'Revoked an invitation', 'member.unlocked': 'Unlocked a member',
+  'beta.plan_changed': 'Plan changed by RunF9', 'member.invited': 'Invited a member', 'member.joined': 'Joined', 'member.role_changed': 'Changed a role', 'member.removed': 'Removed a member', 'member.invite_revoked': 'Revoked an invitation', 'member.unlocked': 'Unlocked a member',
   'plan.created': 'Created plan', 'plan.deleted': 'Deleted plan', 'plan.answer': 'Answered', 'plan.note': 'Added a note', 'plan.generate': 'Generated schedule', 'plan.generate_fresh': 'Rebuilt schedule',
   'plan.review': 'Reviewed', 'plan.publish': 'Published baseline', 'plan.decision': 'Quality decision', 'plan.recovery': 'Applied recovery option', 'plan.export': 'Exported', 'plan.ai_suggest': 'AI follow-up questions',
   'schedule.upload': 'Uploaded schedule', 'schedule.upload_duplicate': 'Uploaded a duplicate file', 'schedule.delete': 'Deleted schedule', 'schedule.tag': 'Tagged schedule', 'schedule.data_question': 'Answered data question', 'schedule.activity_category': 'Corrected activity category', 'schedule.dcma_decision': 'Quality decision',
@@ -121,7 +121,7 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai.">
+      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai; the change takes effect at once.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-navy-950 font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
