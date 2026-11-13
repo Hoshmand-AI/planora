@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { CheckCircle, Menu, X, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
-import F9Demo from '@/components/landing/F9Demo'
+import HeroSchedule from '@/components/landing/HeroSchedule'
 import Pillars from '@/components/landing/Pillars'
 import Deployment from '@/components/landing/Deployment'
 import { UpdatesAndDelays } from '@/components/landing/UpdatesAndDelays'
@@ -79,15 +79,15 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero */}
-      <header className="relative px-6 pt-8 md:pt-10 pb-20 md:pb-28 overflow-hidden">
+      <header className="relative px-6 pt-7 md:pt-8 pb-20 md:pb-28 overflow-hidden">
         {/* A soft wash of the accent behind the headline; decorative */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.12),transparent_70%)]" />
         <div className="relative max-w-6xl mx-auto text-center">
-          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-4">
+          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-600" aria-hidden />
             {inviteOnly ? 'Private beta · by invitation' : 'New: the Daily Brief'}
           </a>
-          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[66px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
+          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[60px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
             Construction schedules, calculated and explained.
           </h1>
           <p className="hero-rise [animation-delay:120ms] text-[18px] md:text-[21px] leading-snug text-warm-700 max-w-[820px] mx-auto mt-4 tracking-[-0.01em]">
@@ -95,12 +95,12 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           </p>
           <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-6">
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
-            <a href="#today" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See the Daily Brief</a>
+            <a href="#today" className={`${secondaryBtn} px-5 py-3.5 text-[16px]`}>See the Daily Brief</a>
+            <Link href="/sample-report" className={`${secondaryBtn} px-5 py-3.5 text-[16px]`}>Read a sample report</Link>
           </div>
-          <p className="hero-rise [animation-delay:260ms] text-[15px] text-warm-700 mt-4">Or judge the output first: <Link href="/sample-report" className="font-semibold text-accent-700 underline underline-offset-4">read a sample report</Link>.</p>
         </div>
-        <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
-          <Shot eager height={830} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
+        <div className="relative hero-rise [animation-delay:320ms] max-w-[1120px] mx-auto mt-7">
+          <HeroSchedule />
         </div>
       </header>
 
@@ -108,7 +108,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section aria-label="RunF9 in numbers" className="border-y border-warm-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
           {[
-            [<>14 of 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
+            [<>All 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
             [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
             inviteOnly ? [<>2,300+</>, 'automated tests run on every change to RunF9'] : [<>$0</>, 'to start. No credit card'],
@@ -142,30 +142,25 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Who it is for */}
       <Audiences />
 
-      {/* How it works: the four steps beside the F9 demo */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <Reveal>
-            <h2 className="text-[36px] md:text-[52px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Press F9. Get a finish date you can defend.</h2>
-            <ol className="mt-8 space-y-6">
-              {[
-                { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
-                { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
-                { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
-                { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
-              ].map(({ title, desc }, i) => (
-                <li key={title} className="flex gap-4">
-                  <span aria-hidden className="flex-shrink-0 w-9 h-9 rounded-full bg-accent-600 text-white font-semibold text-[15px] flex items-center justify-center">{i + 1}</span>
-                  <div>
-                    <div className="text-[18px] font-semibold text-navy-950 tracking-[-0.01em]">{title}</div>
-                    <p className="text-[16px] text-warm-700 leading-relaxed mt-1">{desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Reveal>
-          <Reveal><F9Demo /></Reveal>
-        </div>
+      {/* How it works: four steps */}
+      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-32 scroll-mt-12">
+        <Reveal className="text-center max-w-[760px] mx-auto">
+          <h2 className="text-[36px] md:text-[52px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Four steps to a finish date you can defend.</h2>
+        </Reveal>
+        <ol className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
+          {[
+            { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
+            { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
+            { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
+            { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
+          ].map(({ title, desc }, i) => (
+            <Reveal as="li" key={title} delay={i * 80}>
+              <span aria-hidden className="w-10 h-10 rounded-full bg-accent-600 text-white font-semibold text-[16px] flex items-center justify-center">{i + 1}</span>
+              <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em] mt-4">{title}</div>
+              <p className="text-[16px] text-warm-700 leading-relaxed mt-1.5">{desc}</p>
+            </Reveal>
+          ))}
+        </ol>
       </section>
 
       {/* Reports */}
@@ -238,7 +233,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </Reveal>
         <div className="border-t border-warm-200">
           {[
-            ['14 of 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
+            ['All 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
             ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
             ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
             inviteOnly
