@@ -42,8 +42,8 @@ function TabList({ label, items, prefix, panel, tabs, className = '' }: { label:
 
 // ── A real screenshot in a window frame ─────────────────────────────────────────────────────────
 
-/** A screenshot of the product (public/landing/*.webp, 1600x1200, taken from the sample project). */
-export function Shot({ name, alt, label, eager = false, className = '' }: { name: string; alt: string; label: string; eager?: boolean; className?: string }) {
+/** A screenshot of the product (public/landing/*.webp, 1600 wide, taken from the built-in sample projects). */
+export function Shot({ name, alt, label, eager = false, height = 1200, className = '' }: { name: string; alt: string; label: string; eager?: boolean; height?: number; className?: string }) {
   return (
     <figure className={`rounded-[18px] md:rounded-[22px] border border-warm-200 bg-white shadow-[0_40px_80px_-40px_rgba(6,20,27,0.45)] overflow-hidden ${className}`}>
       <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
@@ -53,7 +53,7 @@ export function Shot({ name, alt, label, eager = false, className = '' }: { name
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {/* On a phone the picture is shown larger and cropped to its top-left, so its text stays readable */}
       <div className="aspect-[4/3] overflow-hidden sm:aspect-auto">
-        <img src={`/landing/${name}.webp`} alt={alt} width={1600} height={1200} loading={eager ? 'eager' : 'lazy'} decoding="async" className="block w-[175%] max-w-none sm:w-full h-auto" />
+        <img src={`/landing/${name}.webp`} alt={alt} width={1600} height={height} loading={eager ? 'eager' : 'lazy'} decoding="async" className="block w-[175%] max-w-none sm:w-full h-auto" />
       </div>
     </figure>
   )
@@ -62,8 +62,8 @@ export function Shot({ name, alt, label, eager = false, className = '' }: { name
 // ── The Daily Brief ──────────────────────────────────────────────────────────────────────────────
 
 const BRIEF_VIEWS = [
-  { id: 'brief', tab: 'This morning’s brief', shot: 'today', alt: 'The RunF9 Today page for a sample data center: the forecast is 40 days behind the required date, with eight items that need attention today.' },
-  { id: 'signals', tab: 'Email, meetings and contract', shot: 'signals', alt: 'The Today page showing sentences quoted from meeting minutes, a field report and an email, each tagged as a change, delay or risk, and a contract notice reminder.' },
+  { id: 'brief', tab: 'This morning’s brief', shot: 'today', alt: 'The Today page in RunF9 for a sample data center: the forecast is 40 days behind the required date, and eight items need attention today, including a notice deadline and liquidated damages exposure.' },
+  { id: 'signals', tab: 'Email, meetings and contract', shot: 'signals', alt: 'The Today page in RunF9 showing sentences quoted from meeting minutes, a field report and an email, each tagged as a delay, change or risk, with the activity it names.' },
 ]
 
 const BRIEF_POINTS = [
@@ -99,7 +99,7 @@ export function DailyBrief() {
           <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${v.id}`}>
             <div key={v.id} className="rise-in"><Shot name={v.shot} alt={v.alt} label="RunF9 · Today" className="border-navy-800" /></div>
           </div>
-          <p className="text-[14px] text-navy-200 mt-4 text-center">The Today page in RunF9, on the sample data center project that every account can open.</p>
+          <p className="text-[14.5px] text-navy-200 mt-4 text-center">The Today page in RunF9, on the sample data center project that every account can open.</p>
         </Reveal>
 
         <ul className="mt-16 md:mt-20 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
@@ -119,9 +119,9 @@ export function DailyBrief() {
 // ── Who it is for ────────────────────────────────────────────────────────────────────────────────
 
 const AUDIENCES = [
-  { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Today · What-if', alt: 'What-if results in RunF9: a pending change order, a utility delay and a recovery option, each with the days it moves the finish.',
+  { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Today · What-if', alt: 'What-if results in RunF9: a pending change order, a utility delay and a recovery option, each with the days it moves the finish, beside the work at risk in the next month.',
     points: ['A brief every morning: what drives the finish, what is overdue and what starts today.', 'Each open change is run against the schedule before you price it or send notice.', 'When a date slips, recovery options are re-scheduled on the real network and priced from your labor cost.'] },
-  { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'quality', label: 'RunF9 · Quality', alt: 'The Quality page in RunF9: 10 of 14 DCMA checks pass, with the failing checks listed first.',
+  { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'checks', label: 'RunF9 · Evaluation', alt: 'A failed DCMA check in RunF9: high float, with what it means, why it matters, how to fix it and the activities flagged.',
     points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'All 14 DCMA checks on every submission, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
   { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Schedule', alt: 'The Schedule page in RunF9: a Gantt chart of the sample data center with the critical path and the data date marked.',
     points: ['Reads and writes P6 and MS Project files, so your client’s tools do not change.', 'Time Impact Analysis with hashed inputs and results: the same inputs reproduce the same answer.', 'Each client’s projects sit in their own workspace, and each client’s files can stay in that client’s cloud.'] },

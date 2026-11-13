@@ -24,8 +24,6 @@ const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-
  * Marketing page. While RunF9 is in private beta (RUNF9_SIGNUP not "open") the sign-up calls to
  * action become "Request access" / "Sign in" and the page says access is by invitation.
  */
-// Hero chips: id matches an option in src/components/landing/Deployment.tsx.
-const DEPLOY_CHIPS: [string, string][] = [['cloud', 'RunF9 Cloud'], ['aws', 'AWS'], ['azure', 'Microsoft Azure'], ['gcp', 'Google Cloud'], ['mixed', 'A different cloud per client'], ['onprem', 'Your servers']]
 
 export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly: boolean; accessRequestEmail: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -101,15 +99,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           </div>
         </div>
         <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
-          <Shot eager name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
+          <Shot eager height={1000} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
         </div>
-        {/* Where it runs: each name opens that option in "Run it where your data lives" */}
-        <nav aria-label="Where RunF9 runs" className="relative mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[14.5px] text-warm-700">
-          <span className="mr-1">Runs where your data lives:</span>
-          {DEPLOY_CHIPS.map(([id, label]) => (
-            <a key={id} href={`#deployment-${id}`} className="pressable rounded-full border border-warm-300 bg-white px-3.5 py-1.5 font-medium text-navy-950 hover:border-navy-900">{label}</a>
-          ))}
-        </nav>
       </header>
 
       {/* Facts: each figure is backed by an automated test or the product's own limits (see "Where these numbers come from") */}
@@ -118,7 +109,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             [<>14 of 14</>, 'DCMA 14-Point checks, run automatically'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
-            [<>0 days</>, 'of drift in dates and float when our P6 and MS Project exports are re-imported, in our test set'],
+            [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
             inviteOnly ? [<>3 briefs</>, 'every morning: project manager, field and client'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
