@@ -141,7 +141,7 @@ export function Audiences() {
         <Reveal className="mt-10">
           <TabList label="Who RunF9 is for" items={AUDIENCES} prefix="who" panel="who-panel" tabs={tabs} className="mx-auto" />
           <div id="who-panel" role="tabpanel" aria-labelledby={`who-tab-${a.id}`} className="mt-10">
-            <div key={a.id} className="rise-in grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 items-center">
+            <div key={a.id} className="rise-in grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 items-center">
               <div>
                 <h3 className="text-[26px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">{a.title}</h3>
                 <ul className="mt-6 space-y-4">
