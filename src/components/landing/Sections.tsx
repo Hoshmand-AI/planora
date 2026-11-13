@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react'
 import { ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchCheck, KeyRound, Users, ListChecks, Building2, EyeOff, Database, Lock } from 'lucide-react'
 import { Reveal } from './motion'
+import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
 
 const H2 = 'text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]'
 const LEAD = 'text-[17px] md:text-[19px] text-warm-600 mt-4 leading-snug'
@@ -61,10 +62,71 @@ export function Shot({ name, alt, label, eager = false, height = 1200, className
 
 // ── The Daily Brief ──────────────────────────────────────────────────────────────────────────────
 
-const BRIEF_VIEWS = [
-  { id: 'brief', tab: 'This morning’s brief', shot: 'today', alt: 'The Today page in RunF9 for a sample data center: the forecast is 40 days behind the required date, and eight items need attention today, including a notice deadline and liquidated damages exposure.' },
-  { id: 'signals', tab: 'Email, meetings and contract', shot: 'signals', alt: 'The Today page in RunF9 showing sentences quoted from meeting minutes, a field report and an email, each tagged as a delay, change or risk, with the activity it names.' },
+type BriefTab = { id: string; tab: string }
+const BRIEF_TABS: BriefTab[] = [
+  { id: 'pm', tab: 'Project manager' },
+  { id: 'field', tab: 'Field' },
+  { id: 'client', tab: 'Client' },
+  { id: 'signals', tab: 'Email and meetings' },
+  { id: 'whatif', tab: 'What-ifs' },
 ]
+const SIGNAL_TONE: Record<string, string> = { delay: 'bg-status-at-risk-bg text-status-at-risk', change: 'bg-accent-100 text-accent-700', risk: 'bg-warm-100 text-warm-700' }
+
+/** The brief RunF9 computed for its sample project, as text a visitor can read and switch between readers. */
+function LiveBrief() {
+  const tabs = useTabs(BRIEF_TABS.length)
+  const id = BRIEF_TABS[tabs.active].id
+  const b = SAMPLE_BRIEF
+  // The headline above already carries the first line of the project manager's version, so it is not shown twice.
+  const all = id === 'pm' ? b.audiences.pm : id === 'field' ? b.audiences.field : id === 'client' ? b.audiences.client : null
+  const lines = all ? all.filter(t => t !== b.headline.text) : null
+  return (
+    <div className="rounded-[18px] md:rounded-[22px] border border-navy-800 bg-white shadow-[0_40px_80px_-40px_rgba(6,20,27,0.6)] overflow-hidden">
+      <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
+        <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
+        <span className="ml-3 text-[12.5px] text-navy-200 truncate">RunF9 · Today</span>
+      </div>
+      <div className="p-5 md:p-8">
+        <div className="text-[13.5px] text-warm-600">{b.project} · brief for {b.asOf}</div>
+        <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</p>
+        <p className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-status-at-risk leading-tight mt-1">No. {b.headline.daysBehind} days behind.</p>
+        <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1.5">{b.headline.text}</p>
+
+        <TabList label="Who the brief is for, and what it read" items={BRIEF_TABS} prefix="brief" panel="brief-panel" tabs={tabs} className="mt-6" />
+        <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${id}`} className="mt-5 min-h-[300px]">
+          <div key={id} className="rise-in">
+            {lines && (
+              <ul className="divide-y divide-warm-200 border-y border-warm-200">
+                {lines.map(t => <li key={t} className="py-3.5 text-[15.5px] text-warm-700 leading-relaxed">{t}</li>)}
+              </ul>
+            )}
+            {id === 'signals' && (
+              <ul className="space-y-3">
+                {b.signals.map(g => (
+                  <li key={g.quote} className="rounded-xl border border-warm-200 p-4">
+                    <span className={`inline-block text-[12px] font-semibold uppercase tracking-wide rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
+                    <p className="text-[15.5px] text-navy-950 leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
+                    <p className="text-[14px] text-warm-600 mt-1.5">{g.source}{g.activity ? ` · about ${g.activity}` : ''}{g.days ? ` · ${g.days} work days` : ''}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {id === 'whatif' && (
+              <ul className="divide-y divide-warm-200 border-y border-warm-200">
+                {b.whatIfs.map(w => (
+                  <li key={w.title} className="py-3.5">
+                    <p className="text-[15px] font-semibold text-navy-950 leading-snug">{w.title}</p>
+                    <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1">{w.text}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const BRIEF_POINTS = [
   { icon: ScrollText, title: 'Calculated, not generated', text: 'Computed from the schedule, the project register and your documents. No AI model writes it, so the same inputs always give the same brief.' },
@@ -74,8 +136,6 @@ const BRIEF_POINTS = [
 ]
 
 export function DailyBrief() {
-  const tabs = useTabs(BRIEF_VIEWS.length)
-  const v = BRIEF_VIEWS[tabs.active]
   return (
     <section id="today" aria-labelledby="today-h" className="bg-navy-950 scroll-mt-16">
       <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
@@ -85,22 +145,23 @@ export function DailyBrief() {
           <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
         </Reveal>
 
-        <Reveal className="mt-12 md:mt-16 max-w-[1040px] mx-auto">
-          <div role="tablist" aria-label="Parts of the Today page" onKeyDown={tabs.onKeyDown} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-navy-900 border border-navy-800 w-fit max-w-full mx-auto mb-6">
-            {BRIEF_VIEWS.map((x, i) => (
-              <button
-                key={x.id} ref={el => { tabs.refs.current[i] = el }} type="button" role="tab" id={`brief-tab-${x.id}`}
-                aria-selected={i === tabs.active} aria-controls="brief-panel" tabIndex={i === tabs.active ? 0 : -1}
-                onClick={() => tabs.setActive(i)}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === tabs.active ? 'bg-white text-navy-950' : 'text-navy-200 hover:text-white'}`}
-              >{x.tab}</button>
-            ))}
-          </div>
-          <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${v.id}`}>
-            <div key={v.id} className="rise-in"><Shot name={v.shot} alt={v.alt} label="RunF9 · Today" className="border-navy-800" /></div>
-          </div>
-          <p className="text-[14.5px] text-navy-200 mt-4 text-center">The Today page in RunF9, on the sample data center project that every account can open.</p>
-        </Reveal>
+        <div className="mt-12 md:mt-16 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-8 lg:gap-10 items-start">
+          <Reveal>
+            <LiveBrief />
+            <p className="text-[14.5px] text-navy-200 mt-4">This is the brief RunF9 computed for its sample data center project on {SAMPLE_BRIEF.asOf}, word for word. No AI model wrote it. Switch the reader to see what each one is told.</p>
+          </Reveal>
+          <Reveal>
+            <h3 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">Needs attention today</h3>
+            <ul className="mt-4 space-y-3">
+              {SAMPLE_BRIEF.alerts.map(a => (
+                <li key={a.text} className="flex gap-3 rounded-xl border border-navy-800 bg-navy-900 p-4">
+                  <span className={`self-start flex-shrink-0 text-[12px] font-semibold rounded-full px-2.5 py-0.5 ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-accent-100 text-accent-700'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
+                  <span className="text-[15px] text-navy-200 leading-relaxed">{a.text}</span>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </div>
 
         <ul className="mt-16 md:mt-20 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
           {BRIEF_POINTS.map(({ icon: Icon, title, text }, i) => (
