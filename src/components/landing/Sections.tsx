@@ -77,38 +77,57 @@ export function DailyBrief() {
   const tabs = useTabs(BRIEF_VIEWS.length)
   const v = BRIEF_VIEWS[tabs.active]
   return (
-    <section id="today" aria-labelledby="today-h" className="bg-navy-950 scroll-mt-16">
+    <section id="today" aria-labelledby="today-h" className="scroll-mt-16">
       <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
         <Reveal className="text-center max-w-[820px] mx-auto">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">The Daily Brief</p>
-          <h2 id="today-h" className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-white leading-[1.05] mt-3">Every morning, what changed and what to do about it.</h2>
-          <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-700">The Daily Brief</p>
+          <h2 id="today-h" className={`${H2} mt-3`}>Every morning, what changed and what to do about it.</h2>
+          <p className={LEAD}>RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
         </Reveal>
 
         <Reveal className="mt-12 md:mt-16 max-w-[1040px] mx-auto">
-          <div role="tablist" aria-label="Parts of the Today page" onKeyDown={tabs.onKeyDown} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-navy-900 border border-navy-800 w-fit max-w-full mx-auto mb-6">
-            {BRIEF_VIEWS.map((x, i) => (
-              <button
-                key={x.id} ref={el => { tabs.refs.current[i] = el }} type="button" role="tab" id={`brief-tab-${x.id}`}
-                aria-selected={i === tabs.active} aria-controls="brief-panel" tabIndex={i === tabs.active ? 0 : -1}
-                onClick={() => tabs.setActive(i)}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === tabs.active ? 'bg-white text-navy-950' : 'text-navy-200 hover:text-white'}`}
-              >{x.tab}</button>
-            ))}
-          </div>
+          <TabList label="Parts of the Today page" items={BRIEF_VIEWS} prefix="brief" panel="brief-panel" tabs={tabs} className="mx-auto mb-6" />
           <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${v.id}`}>
-            <div key={v.id} className="rise-in"><Shot name={v.shot} alt={v.alt} label="RunF9 · Today" className="border-navy-800" /></div>
+            <div key={v.id} className="rise-in"><Shot name={v.shot} alt={v.alt} label="RunF9 · Today" /></div>
           </div>
-          <p className="text-[14.5px] text-navy-200 mt-4 text-center">The Today page in RunF9, on the sample data center project that every account can open.</p>
+          <p className="text-[14.5px] text-warm-700 mt-4 text-center">The Today page in RunF9, on the sample data center project that every account can open.</p>
         </Reveal>
 
         <ul className="mt-16 md:mt-20 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
           {BRIEF_POINTS.map(({ icon: Icon, title, text }, i) => (
             <Reveal as="li" key={title} delay={i * 80}>
-              <Icon size={24} strokeWidth={1.6} className="text-accent-400" aria-hidden />
-              <h3 className="text-[18px] font-semibold text-white mt-4 tracking-[-0.01em]">{title}</h3>
-              <p className="text-[16px] text-navy-200 leading-relaxed mt-2">{text}</p>
+              <span className="w-11 h-11 rounded-xl bg-accent-100 text-accent-700 flex items-center justify-center"><Icon size={22} strokeWidth={1.7} aria-hidden /></span>
+              <h3 className="text-[18px] font-semibold text-navy-950 mt-4 tracking-[-0.01em]">{title}</h3>
+              <p className="text-[16px] text-warm-700 leading-relaxed mt-2">{text}</p>
             </Reveal>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+// ── Check it yourself ────────────────────────────────────────────────────────────────────────────
+
+/** Proof a visitor can check without taking our word for it: a real report, the tests, and who built it. */
+export function Proof() {
+  const cards: { icon: typeof ScrollText; title: string; text: string; href: string; cta: string }[] = [
+    { icon: ScrollText, title: 'Read a real report', text: 'The Executive Schedule Summary RunF9 wrote for its sample data center, shown exactly as generated, with the file hash and settings it used.', href: '/sample-report', cta: 'Open the sample report' },
+    { icon: SearchCheck, title: 'See where each figure comes from', text: 'Every number on this page is tied to an automated test. We will run those tests in front of your team.', href: '#evidence', cta: 'Where these numbers come from' },
+    { icon: Users, title: 'Built by a scheduler', text: 'RunF9 is built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field. You talk to the person who built it.', href: 'mailto:support@hoshmand.ai', cta: 'Write to the founder' },
+  ]
+  return (
+    <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
+      <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
+        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">No customer logos yet. Check the work instead.</h2>
+        <ul className="mt-10 grid md:grid-cols-3 gap-5">
+          {cards.map(({ icon: Icon, title, text, href, cta }) => (
+            <li key={title} className="rounded-2xl border border-warm-200 bg-warm-50 p-6 md:p-7 flex flex-col">
+              <span className="w-11 h-11 rounded-xl bg-navy-950 text-white flex items-center justify-center"><Icon size={21} strokeWidth={1.7} aria-hidden /></span>
+              <h3 className="text-[19px] font-semibold text-navy-950 mt-5 tracking-[-0.01em]">{title}</h3>
+              <p className="text-[16px] text-warm-700 leading-relaxed mt-2 flex-1">{text}</p>
+              <a href={href} className="mt-5 text-[15.5px] font-semibold text-accent-700 underline underline-offset-4">{cta}</a>
+            </li>
           ))}
         </ul>
       </div>
