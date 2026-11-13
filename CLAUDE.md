@@ -18,5 +18,8 @@ Rollback: Vercel → Deployments → Instant Rollback.
 - Record material actions with `audit()` from `src/lib/server/audit.ts`; never log secrets or prompt content.
 - Change management: docs/operations/CHANGE-MANAGEMENT.md. If code-owner review is enabled on `main`, PRs touching `.github/CODEOWNERS` paths wait for the owner's approval instead of self-merging.
 
+## The studio site reads this product
+hoshmand.ai shows RunF9 from the public product card, `GET /api/product`, built from `src/lib/product-card.ts` (name, tagline, logo, highlights, updates, release). It refreshes about once a minute. When a PR ships something a customer would notice, add one line to `UPDATES` there (newest first, public-safe wording). A rename or new logo goes there too: the page metadata reads the same constants.
+
 ## Conventions
 See README.md (Tailwind v3 only, raw SQL via `pg`, all firm data scoped by `org_id`, dates shown MM/DD/YYYY via `src/lib/format.ts`, text colors must keep WCAG AA contrast — use the `warm-*` tokens, not `text-white/40`-style faint text).

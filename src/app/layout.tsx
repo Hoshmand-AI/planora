@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans } from 'next/font/google'
 import './globals.css'
 import { siteUrl } from '@/lib/site-url'
+import { PRODUCT_NAME, PRODUCT_SUMMARY, PRODUCT_TAGLINE } from '@/lib/product-card'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -9,8 +10,9 @@ const dmSans = DM_Sans({
   display: 'swap',
 })
 
-const title = 'RunF9 — Construction scheduling, explained'
-const description = 'Build and check construction schedules with a written basis for every duration and link, the DCMA 14-Point Assessment, and native Primavera P6 and MS Project export.'
+// One source with the public product card (/api/product) that hoshmand.ai reads.
+const title = `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`
+const description = PRODUCT_SUMMARY
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),

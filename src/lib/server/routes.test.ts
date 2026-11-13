@@ -14,6 +14,8 @@ const PUBLIC = new Set([
   'cron/daily-brief/route.ts',
   // Project inbox: no session; the caller presents the inbox token (src/lib/server/project-inbox.ts).
   'inbound/route.ts',
+  // The public product card read by hoshmand.ai (src/lib/product-card.ts): landing-page facts only.
+  'product/route.ts',
 ])
 /** Routes that may turn off the cross-site write check (the SAML ACS receives a cross-site HTTP-POST from the IdP). */
 const CSRF_EXEMPT = new Set([
