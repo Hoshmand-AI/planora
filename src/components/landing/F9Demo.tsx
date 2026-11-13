@@ -1,24 +1,18 @@
 'use client'
 
-// The hero's interactive illustration: a small sample schedule that "runs" like pressing F9 in P6.
-// The bars draw left to right (forward pass), the critical path lights up (backward pass), then the
-// finish date lands. Press the key (or F9 on the keyboard) to run it again. Purely illustrative:
-// the numbers are a fixed sample, not a calculation.
+// The F9 picture: the sample data center's schedule, drawn the way pressing F9 in P6 recalculates one.
+// The bars draw left to right (forward pass), the work areas on the critical path light up (backward
+// pass), then the finish date lands against the required date. Press the key (or F9 on the keyboard)
+// to run it again. The dates are RunF9's own calculation for the sample (src/lib/marketing/sample-schedule.ts);
+// only the animation is for show.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { prefersReducedMotion, useInView } from './motion'
+import { SAMPLE_SCHEDULE as SCH } from '@/lib/marketing/sample-schedule'
 
-type Act = { name: string; es: number; dur: number; crit: boolean; float?: number }
-const SPAN = 104
-const ACTS: Act[] = [
-  { name: 'Sitework', es: 0, dur: 14, crit: true },
-  { name: 'Structure', es: 14, dur: 16, crit: true },
-  { name: 'Switchgear', es: 30, dur: 28, crit: true },
-  { name: 'Envelope', es: 40, dur: 30, crit: false, float: 10 },
-  { name: 'Energization', es: 58, dur: 22, crit: true },
-  { name: 'Commissioning', es: 80, dur: 24, crit: true },
-]
-const STATUS = ['Ready to run', 'Forward pass: early dates…', 'Backward pass: critical path found', '5 critical activities · finish 08/17/2027']
+const SPAN = SCH.spanDays
+const ACTS = SCH.rows.map(r => ({ name: r.name, es: r.start, dur: r.days, crit: r.critical > 0 }))
+const STATUS = ['Ready to run', 'Forward pass: early dates…', 'Backward pass: critical path found', `${SCH.critical} critical activities · finish ${SCH.finish}, ${SCH.daysLate} days after the required ${SCH.required}`]
 
 export default function F9Demo() {
   const { ref, inView } = useInView<HTMLDivElement>(0.3)
@@ -61,22 +55,27 @@ export default function F9Demo() {
       <figure className="rounded-[28px] bg-white border border-warm-200 shadow-[0_40px_80px_-40px_rgba(6,20,27,0.35)] p-5 md:p-7">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <div className="text-[12px] font-medium text-warm-600">Sample schedule</div>
-            <div className="text-[15px] font-semibold text-navy-950">Data center · CPM</div>
+            <div className="text-[12.5px] font-medium text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
+            <div className="text-[15px] font-semibold text-navy-950">Schedule calculated by RunF9</div>
           </div>
           <div className={`text-[12.5px] font-semibold rounded-full px-3 py-1 transition-all duration-500 ${phase === 3 ? 'bg-accent-100 text-accent-600 opacity-100' : 'bg-warm-100 text-warm-600'}`}>
-            {phase === 3 ? 'Finish 08/17/2027' : 'Finish —'}
+            {phase === 3 ? `Finish ${SCH.finish}` : 'Finish —'}
           </div>
         </div>
 
-        <div className="space-y-2.5" aria-hidden="true">
+        <div className="relative space-y-2" aria-hidden="true">
+          {/* The data date and the required date, as lines across the bars */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 left-[calc(118px+0.75rem)] md:left-[calc(176px+0.75rem)]">
+            <div className="absolute inset-y-0 border-l border-dashed border-navy-400" style={{ left: `${(SCH.dataDay / SPAN) * 100}%` }} />
+            <div className="absolute inset-y-0 border-l-2 border-[#A64848]" style={{ left: `${(SCH.requiredDay / SPAN) * 100}%`, opacity: phase === 3 ? 1 : 0, transition: 'opacity 500ms ease' }} />
+          </div>
           {ACTS.map((a, i) => {
             const shown = phase >= 1
             const lit = phase >= 2 && a.crit
             return (
-              <div key={a.name} className="grid grid-cols-[96px_1fr] md:grid-cols-[120px_1fr] items-center gap-3">
+              <div key={a.name} className="grid grid-cols-[118px_1fr] md:grid-cols-[176px_1fr] items-center gap-3">
                 <div className="text-[12px] md:text-[12.5px] text-warm-700 truncate">{a.name}</div>
-                <div className="relative h-[18px] rounded-full bg-warm-100">
+                <div className="relative h-[15px] rounded-full bg-warm-100">
                   <div
                     className="absolute top-0 h-full rounded-full"
                     style={{
@@ -86,22 +85,11 @@ export default function F9Demo() {
                       transition: shown ? `width 700ms cubic-bezier(0.22,1,0.36,1) ${i * 140}ms, background-color 500ms ease ${a.crit ? i * 90 : 0}ms` : 'none',
                     }}
                   />
-                  {a.float ? (
-                    <div
-                      className="absolute top-[3px] h-[12px] rounded-full border border-dashed border-navy-400"
-                      style={{
-                        left: `${((a.es + a.dur) / SPAN) * 100}%`,
-                        width: `${(a.float / SPAN) * 100}%`,
-                        opacity: phase >= 2 ? 1 : 0,
-                        transition: phase >= 2 ? 'opacity 500ms ease 200ms' : 'none',
-                      }}
-                    />
-                  ) : null}
                 </div>
               </div>
             )
           })}
-          <div className="grid grid-cols-[96px_1fr] md:grid-cols-[120px_1fr] items-center gap-3 pt-1">
+          <div className="grid grid-cols-[118px_1fr] md:grid-cols-[176px_1fr] items-center gap-3 pt-1">
             <div className="text-[12px] md:text-[12.5px] font-semibold text-navy-950">Finish</div>
             <div className="relative h-[18px]">
               <div
@@ -118,7 +106,11 @@ export default function F9Demo() {
 
         <figcaption className="mt-5 flex items-center justify-between gap-4 border-t border-warm-200 pt-4">
           <span className="text-[13px] text-warm-700" aria-live="polite">{STATUS[phase]}</span>
-          <span className="text-[12px] text-warm-600 hidden sm:inline">Illustrative · <span className="inline-block w-2.5 h-2.5 rounded-full bg-accent-600 align-middle" /> critical path</span>
+          <span className="text-[12.5px] text-warm-600 hidden sm:flex items-center gap-3 flex-shrink-0">
+            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-accent-600 align-middle" /> critical</span>
+            <span><span className="inline-block w-0 h-3 border-l border-dashed border-navy-400 align-middle" /> data date</span>
+            <span><span className="inline-block w-0 h-3 border-l-2 border-[#A64848] align-middle" /> required</span>
+          </span>
         </figcaption>
       </figure>
 
