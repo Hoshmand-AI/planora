@@ -11,14 +11,14 @@ import { prefersReducedMotion, useInView } from './motion'
 type Act = { name: string; es: number; dur: number; crit: boolean; float?: number }
 const SPAN = 104
 const ACTS: Act[] = [
-  { name: 'Excavation', es: 0, dur: 14, crit: true },
-  { name: 'Foundations', es: 14, dur: 16, crit: true },
-  { name: 'Steel erection', es: 30, dur: 28, crit: true },
-  { name: 'MEP rough-in', es: 40, dur: 30, crit: false, float: 10 },
-  { name: 'Enclosure', es: 58, dur: 22, crit: true },
-  { name: 'Finishes', es: 80, dur: 24, crit: true },
+  { name: 'Sitework', es: 0, dur: 14, crit: true },
+  { name: 'Structure', es: 14, dur: 16, crit: true },
+  { name: 'Switchgear', es: 30, dur: 28, crit: true },
+  { name: 'Envelope', es: 40, dur: 30, crit: false, float: 10 },
+  { name: 'Energization', es: 58, dur: 22, crit: true },
+  { name: 'Commissioning', es: 80, dur: 24, crit: true },
 ]
-const STATUS = ['Ready to run', 'Forward pass: early dates…', 'Backward pass: critical path found', '5 critical activities · finish 09/24/2027']
+const STATUS = ['Ready to run', 'Forward pass: early dates…', 'Backward pass: critical path found', '5 critical activities · finish 08/17/2027']
 
 export default function F9Demo() {
   const { ref, inView } = useInView<HTMLDivElement>(0.3)
@@ -62,10 +62,10 @@ export default function F9Demo() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <div className="text-[12px] font-medium text-warm-600">Sample schedule</div>
-            <div className="text-[15px] font-semibold text-navy-950">Two-story office · CPM</div>
+            <div className="text-[15px] font-semibold text-navy-950">Data center · CPM</div>
           </div>
           <div className={`text-[12.5px] font-semibold rounded-full px-3 py-1 transition-all duration-500 ${phase === 3 ? 'bg-accent-100 text-accent-600 opacity-100' : 'bg-warm-100 text-warm-600'}`}>
-            {phase === 3 ? 'Finish 09/24/2027' : 'Finish —'}
+            {phase === 3 ? 'Finish 08/17/2027' : 'Finish —'}
           </div>
         </div>
 

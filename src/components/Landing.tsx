@@ -141,7 +141,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* How it works: the four steps beside the F9 demo */}
       <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <Reveal>
             <h2 className="text-[36px] md:text-[52px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Press F9. Get a finish date you can defend.</h2>
             <ol className="mt-8 space-y-6">
@@ -166,26 +166,27 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </section>
 
       {/* Reports */}
-      <section id="reports" className="bg-white border-y border-warm-200">
-        <div className="max-w-6xl mx-auto px-6 py-24 md:py-28 grid md:grid-cols-[1fr_1.2fr] gap-12 md:gap-20 items-start">
+      <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
+        <div className="max-w-6xl mx-auto px-6 py-24 md:py-32 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
           <Reveal>
-            <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight">Reports, drafted from your numbers.</h2>
-            <p className="text-[16px] md:text-[17px] text-warm-600 leading-relaxed mt-4">Drafted by AI from your schedule’s calculated figures. Review them before you send them: the figures come from the schedule, the wording from the model.</p>
+            <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight">Reports, written from your numbers.</h2>
+            <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
+            <ul className="mt-6 space-y-3">
+              {[
+                ['Executive Schedule Summary', 'status, key dates, findings and recommendations'],
+                ['Critical & Near-Critical Paths', 'driving activities, float and low-float paths'],
+                ['Baseline vs Current Variance', 'current dates against the baseline in your file'],
+                ['Schedule QA/QC Audit', 'the DCMA 14-Point results, with issues and fixes'],
+                ['Time Impact Analysis', 'the delay event, its fragnet and the impact on each milestone'],
+              ].map(([t, d]) => (
+                <li key={t} className="flex gap-2.5 text-[16px] text-warm-700 leading-snug">
+                  <span aria-hidden className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-600" />
+                  <span><span className="font-semibold text-navy-950">{t}:</span> {d}.</span>
+                </li>
+              ))}
+            </ul>
           </Reveal>
-          <ul className="divide-y divide-warm-200 border-y border-warm-200">
-            {[
-              ['Executive Schedule Summary', 'Status, key dates, findings and recommendations in plain language.'],
-              ['Critical & Near-Critical Paths', 'Driving activities, float and low-float paths from the CPM calculation.'],
-              ['Baseline vs Current Variance', 'Compares current dates with the baseline stored in your P6 or MS Project file.'],
-              ['Schedule QA/QC Audit', 'The DCMA 14-Point results, with the issues and suggested fixes.'],
-              ['Time Impact Analysis', 'The delay event, its fragnet, the impact on each milestone and the driving path before and after, with input and result hashes.'],
-            ].map(([t, d], i) => (
-              <Reveal as="li" key={t} delay={i * 80} className="py-5">
-                <div className="text-[17px] font-semibold text-navy-950">{t}</div>
-                <div className="text-[15px] text-warm-600 mt-1">{d}</div>
-              </Reveal>
-            ))}
-          </ul>
+          <Reveal><Shot name="report" label="RunF9 · Reports · Executive Schedule Summary" alt="An Executive Schedule Summary in RunF9 for the sample data center, with a provenance table: the source file, its SHA-256 hash, the data date and the progress mode." /></Reveal>
         </div>
       </section>
 
@@ -240,8 +241,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             inviteOnly
               ? ['3 briefs every morning', 'The Daily Brief is written three ways from the same calculation: for the project manager, for the field and for the client. The client version leaves out internal risk wording. An automated test checks all three on every code change.']
               : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
-          ].map(([term, def]) => (
-            <details key={term} className="group border-b border-warm-200">
+          ].map(([term, def], i) => (
+            <details key={term} open={i === 0} className="group border-b border-warm-200">
               <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-navy-950">
                 {term}
                 <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
