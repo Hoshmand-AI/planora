@@ -116,6 +116,34 @@ export function DailyBrief() {
   )
 }
 
+// ── Check it yourself ────────────────────────────────────────────────────────────────────────────
+
+/** Proof a visitor can check without taking our word for it: a real report, the tests, and who built it. */
+export function Proof() {
+  const cards: { icon: typeof ScrollText; title: string; text: string; href: string; cta: string }[] = [
+    { icon: ScrollText, title: 'Read a real report', text: 'The Executive Schedule Summary RunF9 wrote for its sample data center, shown exactly as generated, with the file hash and settings it used.', href: '/sample-report', cta: 'Open the sample report' },
+    { icon: SearchCheck, title: 'See where each figure comes from', text: 'Every number on this page is tied to an automated test. We will run those tests in front of your team.', href: '#evidence', cta: 'Where these numbers come from' },
+    { icon: Users, title: 'Built by a scheduler', text: 'RunF9 is built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field. You talk to the person who built it.', href: 'mailto:support@hoshmand.ai', cta: 'Write to the founder' },
+  ]
+  return (
+    <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
+      <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
+        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">No customer logos yet. Check the work instead.</h2>
+        <ul className="mt-10 grid md:grid-cols-3 gap-5">
+          {cards.map(({ icon: Icon, title, text, href, cta }) => (
+            <li key={title} className="rounded-2xl border border-warm-200 bg-warm-50 p-6 md:p-7 flex flex-col">
+              <span className="w-11 h-11 rounded-xl bg-navy-950 text-white flex items-center justify-center"><Icon size={21} strokeWidth={1.7} aria-hidden /></span>
+              <h3 className="text-[19px] font-semibold text-navy-950 mt-5 tracking-[-0.01em]">{title}</h3>
+              <p className="text-[16px] text-warm-700 leading-relaxed mt-2 flex-1">{text}</p>
+              <a href={href} className="pressable mt-6 inline-flex items-center justify-center self-start rounded-full border border-warm-300 bg-white px-5 py-2.5 text-[15px] font-semibold text-navy-950 hover:border-navy-900">{cta}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
 // ── Who it is for ────────────────────────────────────────────────────────────────────────────────
 
 const AUDIENCES = [

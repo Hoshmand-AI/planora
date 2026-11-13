@@ -9,7 +9,7 @@ import Pillars from '@/components/landing/Pillars'
 import Deployment from '@/components/landing/Deployment'
 import { UpdatesAndDelays } from '@/components/landing/UpdatesAndDelays'
 import { CountUp, Reveal } from '@/components/landing/motion'
-import { DailyBrief, Audiences, Integrations, Security, Faq, Shot } from '@/components/landing/Sections'
+import { DailyBrief, Proof, Audiences, Integrations, Security, Faq, Shot } from '@/components/landing/Sections'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
 function Cta({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
@@ -99,7 +99,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           </div>
         </div>
         <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
-          <Shot eager height={1000} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
+          <Shot eager height={830} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
         </div>
       </header>
 
@@ -107,7 +107,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section aria-label="RunF9 in numbers" className="border-y border-warm-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
           {[
-            [<>14 of 14</>, 'DCMA 14-Point checks, run automatically'],
+            [<>14 of 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
             [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
             inviteOnly ? [<>3 briefs</>, 'every morning: project manager, field and client'] : [<>$0</>, 'to start. No credit card'],
@@ -120,6 +120,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </div>
         <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[15px] font-medium text-accent-700 underline underline-offset-4">Where these numbers come from</a></div>
       </section>
+
+      <Proof />
 
       {/* The Daily Brief, shown as product */}
       <DailyBrief />
