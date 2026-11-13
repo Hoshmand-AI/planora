@@ -58,9 +58,9 @@ export default function HeroSchedule() {
 
   const done = phase === 3
   const tiles: [string, string][] = [
-    [`${SCH.percentComplete}%`, `complete (${SCH.finished} of ${SCH.activities} activities)`],
+    [`${SCH.percentComplete}%`, 'complete, by duration'],
     [`${SCH.critical}`, 'critical activities'],
-    [`${SCH.checksPassed}/${SCH.checksApplicable}`, 'DCMA quality checks pass'],
+    [`${SCH.checksPassed} of ${SCH.checksApplicable}`, 'checks pass on this sample'],
   ]
 
   return (
@@ -81,7 +81,7 @@ export default function HeroSchedule() {
           </div>
 
           <div className="relative space-y-[7px]" aria-hidden="true">
-            <div className="pointer-events-none absolute inset-y-0 right-0 left-[calc(124px+0.75rem)] md:left-[calc(230px+0.75rem)]">
+            <div className="pointer-events-none absolute inset-y-0 right-0 left-[calc(124px+0.75rem)] md:left-[calc(312px+0.75rem)]">
               <div className="absolute inset-y-0 border-l border-dashed border-navy-700" style={{ left: `${(SCH.dataDay / SPAN) * 100}%` }} />
               <div className="absolute inset-y-0 border-l-2 border-status-at-risk" style={{ left: `${(SCH.requiredDay / SPAN) * 100}%`, opacity: done ? 1 : 0, transition: 'opacity 500ms ease' }} />
             </div>
@@ -89,7 +89,7 @@ export default function HeroSchedule() {
               const shown = phase >= 1
               const lit = phase >= 2 && a.crit
               return (
-                <div key={a.name} className="grid grid-cols-[124px_1fr] md:grid-cols-[230px_1fr] items-center gap-3">
+                <div key={a.name} className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3">
                   <div className="text-[13px] md:text-[14px] text-warm-700 truncate">{a.name}</div>
                   <div className="relative h-[16px] md:h-[18px] rounded-full bg-warm-100">
                     <div
@@ -105,7 +105,7 @@ export default function HeroSchedule() {
                 </div>
               )
             })}
-            <div className="grid grid-cols-[124px_1fr] md:grid-cols-[230px_1fr] items-center gap-3 pt-0.5">
+            <div className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3 pt-0.5">
               <div className="text-[13px] md:text-[14px] font-semibold text-navy-950">Substantial completion</div>
               <div className="relative h-[18px]">
                 <div
@@ -129,7 +129,7 @@ export default function HeroSchedule() {
               <div key={label} className="rounded-xl bg-navy-900 border border-navy-800 px-4 py-2.5">
                 <dt className="sr-only">{label}</dt>
                 <dd className="flex flex-col lg:flex-row lg:items-baseline lg:gap-2.5">
-                  <span className="text-[22px] md:text-[24px] font-semibold tracking-[-0.02em] tabular-nums">{value}</span>
+                  <span className="text-[22px] md:text-[24px] font-semibold tracking-[-0.02em] tabular-nums whitespace-nowrap">{value}</span>
                   <span className="text-[13.5px] text-navy-200 leading-snug">{label}</span>
                 </dd>
               </div>

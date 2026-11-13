@@ -153,13 +153,14 @@ export function DailyBrief() {
           <Reveal>
             <h3 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">Needs attention today</h3>
             <ul className="mt-4 space-y-3">
-              {SAMPLE_BRIEF.alerts.map(a => (
+              {SAMPLE_BRIEF.alerts.slice(0, 5).map(a => (
                 <li key={a.text} className="flex gap-3 rounded-xl border border-navy-800 bg-navy-900 p-4">
                   <span className={`self-start flex-shrink-0 text-[12px] font-semibold rounded-full px-2.5 py-0.5 ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-accent-100 text-accent-700'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
                   <span className="text-[15px] text-navy-200 leading-relaxed">{a.text}</span>
                 </li>
               ))}
             </ul>
+            {SAMPLE_BRIEF.alerts.length > 5 && <p className="text-[14.5px] text-navy-200 mt-3">And {SAMPLE_BRIEF.alerts.length - 5} more to watch in the product.</p>}
           </Reveal>
         </div>
 
@@ -189,7 +190,7 @@ export function Proof() {
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
       <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
-        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">No customer logos yet. Check the work instead.</h2>
+        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">Don’t take our word for it. Check the work.</h2>
         <ul className="mt-10 grid md:grid-cols-3 gap-5">
           {cards.map(({ icon: Icon, title, text, href, cta }) => (
             <li key={title} className="rounded-2xl border border-warm-200 bg-warm-50 p-6 md:p-7 flex flex-col">
