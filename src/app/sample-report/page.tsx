@@ -15,7 +15,10 @@ export default function SampleReportPage() {
     <div className="min-h-screen bg-warm-50">
       <nav className="h-16 flex items-center justify-between px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
         <Link href="/" aria-label="RunF9 home"><Logo variant="dark" size="text-[22px]" /></Link>
-        <Link href="/" className="text-[14px] font-medium text-accent-700 hover:underline">Back to RunF9</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="hidden sm:inline text-[14px] font-medium text-warm-700 hover:text-navy-950">Back to RunF9</Link>
+          <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-4 py-2 text-[14px] font-semibold text-white hover:bg-accent-700">See plans</Link>
+        </div>
       </nav>
       <main className="max-w-[920px] mx-auto px-6 py-10 md:py-14">
         <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-700">Sample report</p>
