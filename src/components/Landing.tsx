@@ -97,6 +97,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
             <a href="#today" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See the Daily Brief</a>
           </div>
+          <p className="hero-rise [animation-delay:260ms] text-[15px] text-warm-700 mt-4">Or judge the output first: <Link href="/sample-report" className="font-semibold text-accent-700 underline underline-offset-4">read a sample report</Link>.</p>
         </div>
         <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
           <Shot eager height={830} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
@@ -110,7 +111,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             [<>14 of 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
             [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
-            inviteOnly ? [<>3 briefs</>, 'every morning: project manager, field and client'] : [<>$0</>, 'to start. No credit card'],
+            inviteOnly ? [<>2,300+</>, 'automated tests run on every change to RunF9'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
               <div className="text-[32px] min-[360px]:text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 tabular-nums leading-none">{value}</div>
@@ -241,7 +242,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
             ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
             inviteOnly
-              ? ['3 briefs every morning', 'The Daily Brief is written three ways from the same calculation: for the project manager, for the field and for the client. The client version leaves out internal risk wording. An automated test checks all three on every code change.']
+              ? ['2,300+ automated tests', 'RunF9 has more than 2,300 automated tests, covering the scheduling engine, the checks, the file formats, security and tenant separation. They all run on every code change, together with end-to-end suites against a live server, and a change that fails any of them is not released.']
               : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
           ].map(([term, def], i) => (
             <details key={term} open={i === 0} className="group border-b border-warm-200">
