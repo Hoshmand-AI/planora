@@ -1,6 +1,8 @@
 // The built-in sample data center schedule as RunF9 calculated it on 11/13/2026 (GET /api/schedules?id=…,
 // release 6866598): its work areas, with the earliest start and latest finish of the activities in each, and how
-// many of them are critical. Drives the F9 picture on the landing page. Regenerate it, do not edit it by hand
+// many of them are critical, with the project's headline figures (percent complete and finished count from the
+// same response's metrics; quality checks from GET /api/schedules/:id/quality). Drives the first screen of the
+// landing page. Regenerate it, do not edit it by hand
 // (docs/marketing/CLAIMS-REGISTER.md).
 export const SAMPLE_SCHEDULE = {
   "project": "Sample: Hyperscale Data Center (60 MW)",
@@ -13,6 +15,10 @@ export const SAMPLE_SCHEDULE = {
   "requiredDay": 657,
   "activities": 46,
   "critical": 14,
+  "finished": 22,
+  "percentComplete": 81,
+  "checksPassed": 10,
+  "checksApplicable": 14,
   "daysLate": 40,
   "rows": [
     {
