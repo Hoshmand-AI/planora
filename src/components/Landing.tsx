@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, MessageSquare, CheckCircle, Activity, BarChart3, Shield, Menu, X, ChevronDown } from 'lucide-react'
+import { CheckCircle, Menu, X, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import F9Demo from '@/components/landing/F9Demo'
@@ -9,7 +9,7 @@ import Pillars from '@/components/landing/Pillars'
 import Deployment from '@/components/landing/Deployment'
 import { UpdatesAndDelays } from '@/components/landing/UpdatesAndDelays'
 import { CountUp, Reveal } from '@/components/landing/motion'
-import { DailyBrief, Audiences, Integrations, Security, Faq } from '@/components/landing/Sections'
+import { DailyBrief, Audiences, Integrations, Security, Faq, Shot } from '@/components/landing/Sections'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
 function Cta({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
@@ -81,35 +81,35 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero */}
-      <header className="relative px-6 pt-14 md:pt-20 pb-24 md:pb-32 overflow-hidden">
+      <header className="relative px-6 pt-8 md:pt-10 pb-20 md:pb-28 overflow-hidden">
         {/* A soft wash of the accent behind the headline; decorative */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.10),transparent_70%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.12),transparent_70%)]" />
         <div className="relative max-w-6xl mx-auto text-center">
-          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-7">
+          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-600" aria-hidden />
             {inviteOnly ? 'Private beta · by invitation' : 'New: the Daily Brief'}
           </a>
-          <h1 className="hero-rise text-[44px] leading-[1.04] md:text-[80px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
+          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[66px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
             Construction schedules, calculated and explained.
           </h1>
-          <p className="hero-rise [animation-delay:120ms] text-[19px] md:text-[23px] leading-snug text-warm-600 max-w-[660px] mx-auto mt-6 tracking-[-0.01em]">
+          <p className="hero-rise [animation-delay:120ms] text-[18px] md:text-[21px] leading-snug text-warm-700 max-w-[820px] mx-auto mt-4 tracking-[-0.01em]">
             Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
           </p>
-          <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-9">
+          <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-6">
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
             <a href="#today" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See the Daily Brief</a>
           </div>
-          {/* Where it runs, up front: each chip opens that option in "Run it where your data lives" */}
-          <nav aria-label="Where RunF9 runs" className="hero-rise [animation-delay:280ms] mt-8 flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[14px] text-warm-600 mr-1">Runs where your data lives:</span>
-            {DEPLOY_CHIPS.map(([id, label]) => (
-              <a key={id} href={`#deployment-${id}`} className="pressable rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900">{label}</a>
-            ))}
-          </nav>
         </div>
-        <div className="relative hero-rise [animation-delay:340ms] max-w-[760px] mx-auto mt-16 md:mt-20 px-2 md:px-0">
-          <F9Demo />
+        <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
+          <Shot eager name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
         </div>
+        {/* Where it runs: each name opens that option in "Run it where your data lives" */}
+        <nav aria-label="Where RunF9 runs" className="relative mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[14.5px] text-warm-700">
+          <span className="mr-1">Runs where your data lives:</span>
+          {DEPLOY_CHIPS.map(([id, label]) => (
+            <a key={id} href={`#deployment-${id}`} className="pressable rounded-full border border-warm-300 bg-white px-3.5 py-1.5 font-medium text-navy-950 hover:border-navy-900">{label}</a>
+          ))}
+        </nav>
       </header>
 
       {/* Facts: each figure is backed by an automated test or the product's own limits (see "Where these numbers come from") */}
@@ -118,23 +118,23 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           {[
             [<>14 of 14</>, 'DCMA 14-Point checks, run automatically'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
-            [<>0 days</>, 'difference in dates and float when our P6 and MS Project exports are re-imported, in our test set'],
-            inviteOnly ? [<>Beta</>, 'Private beta · by invitation'] : [<>$0</>, 'to start. No credit card'],
+            [<>0 days</>, 'of drift in dates and float when our P6 and MS Project exports are re-imported, in our test set'],
+            inviteOnly ? [<>3 briefs</>, 'every morning: project manager, field and client'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
               <div className="text-[32px] min-[360px]:text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 tabular-nums leading-none">{value}</div>
-              <div className="text-[13.5px] text-warm-600 mt-3 leading-snug max-w-[200px] mx-auto">{label}</div>
+              <div className="text-[15px] text-warm-700 mt-3 leading-snug max-w-[220px] mx-auto">{label}</div>
             </Reveal>
           ))}
         </div>
-        <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[14px] text-accent-600 hover:underline">Where these numbers come from</a></div>
+        <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[15px] font-medium text-accent-700 underline underline-offset-4">Where these numbers come from</a></div>
       </section>
 
       {/* The Daily Brief, shown as product */}
       <DailyBrief />
 
       {/* Build. Check. Forecast. */}
-      <section id="features" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
+      <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
           <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
@@ -148,51 +148,30 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Who it is for */}
       <Audiences />
 
-      {/* The rest of the toolkit, without the noise */}
-      <section>
-        <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
-          <Reveal><h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight max-w-[640px]">Built by a scheduler, for everyone on the project.</h2></Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12 mt-16">
-            {[
-              { icon: FileText, title: 'Native P6 and MS Project files', desc: 'Import .xer and .xml with activities, logic, lags, constraints and calendars, and export the same formats. Excel and PDF imports read activities and dates; a PDF carries no logic.' },
-              { icon: Activity, title: 'Critical path and float', desc: 'Forward and backward CPM passes with calendars, holidays, lags and constraints. Total and free float for every activity.' },
-              { icon: CheckCircle, title: 'DCMA 14-Point Assessment', desc: 'All 14 checks, with the published thresholds by default or your organization’s own.' },
-              { icon: MessageSquare, title: 'An interview, not a blank page', desc: 'Questions are ranked by how far each answer can move your finish date.' },
-              { icon: BarChart3, title: 'Risk and recovery', desc: 'Monte Carlo analysis (200 to 1,000 iterations of the full network) gives P50 and P80 finish dates; recovery options are priced from your labor cost.' },
-              { icon: Shield, title: 'Ask AI, with limits', desc: 'Plain-English questions and narrative drafts with a version-pinned model (Anthropic Claude by default, OpenAI as an approved alternate) or one inside your own network. Calculated figures such as DCMA results come from the engine, not the model. AI can be switched off.' },
-            ].map(({ icon: Icon, title, desc }, i) => (
-              <Reveal key={title} delay={(i % 3) * 90}>
-                <Icon size={26} strokeWidth={1.6} className="text-accent-600" aria-hidden />
-                <h3 className="text-[18px] font-semibold text-navy-950 mt-4 tracking-[-0.01em]">{title}</h3>
-                <p className="text-[15px] text-warm-600 leading-relaxed mt-2">{desc}</p>
-              </Reveal>
-            ))}
-          </div>
+      {/* How it works: the four steps beside the F9 demo */}
+      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <Reveal>
+            <h2 className="text-[36px] md:text-[52px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Press F9. Get a finish date you can defend.</h2>
+            <ol className="mt-8 space-y-6">
+              {[
+                { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
+                { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
+                { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
+                { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
+              ].map(({ title, desc }, i) => (
+                <li key={title} className="flex gap-4">
+                  <span aria-hidden className="flex-shrink-0 w-9 h-9 rounded-full bg-accent-600 text-white font-semibold text-[15px] flex items-center justify-center">{i + 1}</span>
+                  <div>
+                    <div className="text-[18px] font-semibold text-navy-950 tracking-[-0.01em]">{title}</div>
+                    <p className="text-[16px] text-warm-700 leading-relaxed mt-1">{desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
+          <Reveal><F9Demo /></Reveal>
         </div>
-      </section>
-
-      {/* How it works: four steps on one line that draws itself */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
-        <Reveal className="text-center mb-16 md:mb-20">
-          <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Four steps. One finish date you can defend.</h2>
-        </Reveal>
-        <Reveal className="steps relative">
-          <div className="hidden md:block absolute left-[12.5%] right-[12.5%] top-[22px] h-[2px] bg-warm-200 overflow-hidden"><div className="steps-line h-full bg-accent-600" /></div>
-          <ol className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 relative">
-            {[
-              { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
-              { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
-              { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
-              { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
-            ].map(({ title, desc }, i) => (
-              <li key={title} className="text-center">
-                <div className="step-dot mx-auto w-11 h-11 rounded-full bg-white border-2 border-accent-600 text-accent-600 font-semibold text-[16px] flex items-center justify-center" style={{ transitionDelay: `${300 + i * 250}ms` }}>{i + 1}</div>
-                <div className="text-[19px] font-semibold text-navy-950 mt-5 tracking-[-0.01em]">{title}</div>
-                <p className="text-[15px] text-warm-600 leading-relaxed mt-2 max-w-[240px] mx-auto">{desc}</p>
-              </li>
-            ))}
-          </ol>
-        </Reveal>
       </section>
 
       {/* Reports */}
@@ -244,8 +223,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               <div className="mt-3 text-[44px] font-semibold tracking-[-0.04em] text-navy-950 leading-none">{p.price}<span className="text-[16px] font-medium tracking-normal text-warm-600">{p.per}</span></div>
               <p className="text-[15px] text-warm-600 mt-3 mb-6">{p.blurb}</p>
               <ul className="space-y-3 mb-8 flex-1">
-                {p.yes.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-700"><CheckCircle size={17} className="text-accent-600 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
-                {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[14.5px] text-warm-600"><span aria-hidden="true" className="w-[17px] text-center">—</span><span className="line-through decoration-warm-300">{f}</span><span className="sr-only">(not included)</span></li>)}
+                {p.yes.map(f => <li key={f} className="flex items-start gap-2.5 text-[15.5px] text-warm-700"><CheckCircle size={17} className="text-accent-600 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
+                {p.no.length > 0 && <li className="pt-3 text-[13px] font-semibold uppercase tracking-wider text-warm-600">Not included</li>}
+                {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[15.5px] text-warm-600"><X size={17} className="flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
               </ul>
               <Cta href={p.href} className={p.featured ? `${primaryBtn} px-4 py-3 text-[15px] text-center` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
             </Reveal>
@@ -257,9 +237,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Evidence: how each figure on this page can be checked */}
       <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32 scroll-mt-24">
-        <Reveal>
+        <Reveal className="text-center">
           <h2 className="text-[28px] md:text-[36px] font-semibold tracking-[-0.03em] text-navy-950">Where these numbers come from</h2>
-          <p className="text-[16px] text-warm-600 mt-3 mb-8">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
+          <p className="text-[16px] text-warm-700 mt-3 mb-8">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
         </Reveal>
         <div className="border-t border-warm-200">
           {[
@@ -267,7 +247,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
             ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
             inviteOnly
-              ? ['Private beta', 'RunF9 is in a private beta. New firms join with an invitation, and members join through their organization’s admin. Plan limits are listed in the pricing table and enforced by the server.']
+              ? ['3 briefs every morning', 'The Daily Brief is written three ways from the same calculation: for the project manager, for the field and for the client. The client version leaves out internal risk wording. An automated test checks all three on every code change.']
               : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
           ].map(([term, def]) => (
             <details key={term} className="group border-b border-warm-200">
@@ -275,7 +255,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                 {term}
                 <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
               </summary>
-              <p className="text-[15px] text-warm-600 leading-relaxed pb-6 -mt-1">{def}</p>
+              <p className="text-[16px] text-warm-700 leading-relaxed pb-6 -mt-1">{def}</p>
             </details>
           ))}
         </div>
