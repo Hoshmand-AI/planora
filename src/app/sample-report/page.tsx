@@ -26,7 +26,10 @@ export default function SampleReportPage() {
         <div className="mt-8 rounded-[20px] border border-warm-200 bg-white p-5 md:p-9 overflow-x-auto">
           <Markdown text={SAMPLE_REPORT_MD} />
         </div>
-        <p className="text-[15px] text-warm-700 mt-8">Want this for your own schedule? <Link href="/#pricing" className="font-medium text-accent-700 underline">See plans and request access</Link>.</p>
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-700">See plans and request access</Link>
+          <p className="text-[15px] text-warm-700">RunF9 writes this for your own schedule in seconds.</p>
+        </div>
       </main>
     </div>
   )

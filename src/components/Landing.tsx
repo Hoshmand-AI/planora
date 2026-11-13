@@ -17,9 +17,8 @@ function Cta({ href, className, children }: { href: string; className: string; c
 }
 
 const footLink = 'block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors'
-// Faint schedule bars beside the headline: [left %, top px, width px, on the critical path].
-const HERO_BARS: [number, number, number, boolean][] = [[4, 120, 150, false], [9, 168, 110, false], [2, 216, 190, true], [7, 264, 130, false], [78, 140, 170, false], [84, 188, 120, true], [74, 236, 200, false], [88, 284, 90, false]]
 const primaryBtn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors'
+const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-full text-accent-600 font-semibold hover:bg-accent-100 transition-colors'
 
 /**
  * Marketing page. While RunF9 is in private beta (RUNF9_SIGNUP not "open") the sign-up calls to
@@ -48,27 +47,25 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // The bar is dark while it sits over the dark first screen, and light once the page scrolls or the menu opens.
-  const light = scrolled || menuOpen
   const nav = [['#today', 'Daily Brief'], ['#features', 'Features'], ['#deployment', 'Your cloud'], ['#security', 'Security'], ['#pricing', 'Pricing'], ['#faq', 'FAQ']]
   const contactHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 security documents')}`
 
   return (
     <div className="min-h-screen bg-warm-50 text-warm-600">
       {/* Navbar: translucent, quiet, the logo carries it */}
-      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${light ? 'bg-white/85 backdrop-blur-xl border-warm-200' : 'bg-navy-950 border-transparent'}`}>
+      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white/80 backdrop-blur-xl border-warm-200' : 'bg-warm-50 border-transparent'}`}>
         <div className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
           <Link href="/" aria-label="RunF9 home" className="flex items-center">
-            <Logo variant={light ? 'dark' : 'light'} size="text-[26px]" />
+            <Logo variant="dark" size="text-[26px]" />
           </Link>
           <div className="hidden lg:flex items-center gap-7 xl:gap-9 whitespace-nowrap">
-            {nav.map(([href, label]) => <a key={href} href={href} className={`text-[14px] transition-colors ${light ? 'text-warm-700 hover:text-navy-950' : 'text-navy-200 hover:text-white'}`}>{label}</a>)}
+            {nav.map(([href, label]) => <a key={href} href={href} className="text-[14px] text-warm-700 hover:text-navy-950 transition-colors">{label}</a>)}
           </div>
           <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
-            <Link href="/auth" className={`pressable inline-flex items-center justify-center rounded-full font-semibold transition-colors px-4 py-2 text-[14px] ${light ? 'text-accent-600 hover:bg-accent-100' : 'text-white hover:bg-white/10'}`}>Sign in</Link>
+            <Link href="/auth" className={`${secondaryBtn} px-4 py-2 text-[14px]`}>Sign in</Link>
             <Cta href={primaryHref} className={`${primaryBtn} px-5 py-2 text-[14px]`}>{primaryLabel}</Cta>
           </div>
-          <button className={`lg:hidden p-2 -mr-2 ${light ? 'text-navy-950' : 'text-white'}`} onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
+          <button className="lg:hidden text-navy-950 p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -82,34 +79,27 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero */}
-      <header className="relative px-6 pt-8 md:pt-10 bg-navy-950 overflow-hidden">
-        {/* Light from above, and faint schedule bars at the edges; decorative */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,rgba(59,130,246,0.38),transparent_70%)]" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block opacity-60">
-          {HERO_BARS.map(([l, t, w, crit], i) => (
-            <span key={i} className={`absolute h-2.5 rounded-full ${crit ? 'bg-[#A64848]' : 'bg-navy-800'}`} style={{ left: `${l}%`, top: t, width: w }} />
-          ))}
-        </div>
+      <header className="relative px-6 pt-8 md:pt-10 pb-20 md:pb-28 overflow-hidden">
+        {/* A soft wash of the accent behind the headline; decorative */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.12),transparent_70%)]" />
         <div className="relative max-w-6xl mx-auto text-center">
-          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-navy-800 bg-navy-900 px-3.5 py-1.5 text-[13.5px] font-medium text-white hover:border-navy-400 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-400" aria-hidden />
+          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-600" aria-hidden />
             {inviteOnly ? 'Private beta · by invitation' : 'New: the Daily Brief'}
           </a>
-          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[68px] font-semibold tracking-[-0.045em] text-white max-w-[900px] mx-auto">
-            Construction schedules, <span className="text-accent-400">calculated</span> and explained.
+          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[66px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
+            Construction schedules, calculated and explained.
           </h1>
-          <p className="hero-rise [animation-delay:120ms] text-[18px] md:text-[21px] leading-snug text-navy-200 max-w-[820px] mx-auto mt-4 tracking-[-0.01em]">
+          <p className="hero-rise [animation-delay:120ms] text-[18px] md:text-[21px] leading-snug text-warm-700 max-w-[820px] mx-auto mt-4 tracking-[-0.01em]">
             Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
           </p>
           <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-6">
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
-            <a href="#today" className="pressable inline-flex items-center justify-center rounded-full text-white font-semibold hover:bg-white/10 transition-colors px-7 py-3.5 text-[16px]">See the Daily Brief</a>
+            <a href="#today" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See the Daily Brief</a>
           </div>
         </div>
-        {/* The product, standing on the edge of the first screen */}
         <div className="relative hero-rise [animation-delay:320ms] max-w-[1100px] mx-auto mt-9 md:mt-10">
-          <div aria-hidden className="absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(59,130,246,0.35),transparent_65%)] blur-2xl" />
-          <Shot eager height={830} name="overview" label="RunF9 · Overview" className="relative !rounded-b-none border-navy-800 border-b-0" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
+          <Shot eager height={830} name="overview" label="RunF9 · Overview" alt="The Overview page in RunF9 for a sample 60 MW data center: the finish is forecast 40 days after the required date, the project is 81% complete, 14 activities are critical and 10 of 14 quality checks pass." />
         </div>
       </header>
 
@@ -117,7 +107,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section aria-label="RunF9 in numbers" className="border-y border-warm-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
           {[
-            [<>14 of 14</>, 'DCMA 14-Point checks, run automatically'],
+            [<>14 of 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
             [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
             inviteOnly ? [<>3 briefs</>, 'every morning: project manager, field and client'] : [<>$0</>, 'to start. No credit card'],
@@ -137,13 +127,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <DailyBrief />
 
       {/* Build. Check. Forecast. */}
-      <section id="features" className="bg-white border-y border-warm-200 scroll-mt-12"><div className="max-w-6xl mx-auto px-6 py-24 md:py-36">
+      <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
           <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </Reveal>
         <Pillars />
-      </div></section>
+      </section>
 
       {/* After the baseline: monthly update comparison and Time Impact Analysis */}
       <UpdatesAndDelays />
