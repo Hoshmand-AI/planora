@@ -95,7 +95,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
   const btn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors px-7 py-3 text-[15px]'
 
   return (
-    <section id="deployment" aria-labelledby="deployment-h" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-20">
+    <section id="deployment" aria-labelledby="deployment-h" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
       <Reveal className="text-center mb-10 md:mb-12">
         <h2 id="deployment-h" className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Run it where your data lives.</h2>
         <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>

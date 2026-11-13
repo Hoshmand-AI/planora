@@ -9,12 +9,14 @@ import Pillars from '@/components/landing/Pillars'
 import Deployment from '@/components/landing/Deployment'
 import { UpdatesAndDelays } from '@/components/landing/UpdatesAndDelays'
 import { CountUp, Reveal } from '@/components/landing/motion'
+import { DailyBrief, Audiences, Integrations, Security, Faq } from '@/components/landing/Sections'
 
 /** A call to action: a mailto link (request access) or an in-app link. */
 function Cta({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
   return href.startsWith('mailto:') ? <a href={href} className={className}>{children}</a> : <Link href={href} className={className}>{children}</Link>
 }
 
+const footLink = 'block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors'
 const primaryBtn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors'
 const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-full text-accent-600 font-semibold hover:bg-accent-100 transition-colors'
 
@@ -47,7 +49,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const nav = [['#features', 'Features'], ['#updates', 'Updates & delays'], ['#deployment', 'Your cloud'], ['#how-it-works', 'How it works'], ['#pricing', 'Pricing']]
+  const nav = [['#today', 'Daily Brief'], ['#features', 'Features'], ['#deployment', 'Your cloud'], ['#security', 'Security'], ['#pricing', 'Pricing'], ['#faq', 'FAQ']]
+  const contactHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 security documents')}`
 
   return (
     <div className="min-h-screen bg-warm-50 text-warm-600">
@@ -78,19 +81,23 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero */}
-      <header className="px-6 pt-16 md:pt-24 pb-24 md:pb-32 overflow-hidden">
-        <div className="max-w-6xl mx-auto text-center">
+      <header className="relative px-6 pt-14 md:pt-20 pb-24 md:pb-32 overflow-hidden">
+        {/* A soft wash of the accent behind the headline; decorative */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.10),transparent_70%)]" />
+        <div className="relative max-w-6xl mx-auto text-center">
+          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-7">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-600" aria-hidden />
+            {inviteOnly ? 'Private beta · by invitation' : 'New: the Daily Brief'}
+          </a>
           <h1 className="hero-rise text-[44px] leading-[1.04] md:text-[80px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
             Construction schedules, calculated and explained.
           </h1>
           <p className="hero-rise [animation-delay:120ms] text-[19px] md:text-[23px] leading-snug text-warm-600 max-w-[660px] mx-auto mt-6 tracking-[-0.01em]">
-            Answer a few questions and RunF9 builds the schedule with you. Already have one? Upload it and RunF9 checks it, compares every update and models delays.
+            Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
           </p>
           <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-9">
             <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
-            {inviteOnly
-              ? <Link href="/auth" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>Sign in</Link>
-              : <a href="#how-it-works" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See how it works</a>}
+            <a href="#today" className={`${secondaryBtn} px-7 py-3.5 text-[16px]`}>See the Daily Brief</a>
           </div>
           {/* Where it runs, up front: each chip opens that option in "Run it where your data lives" */}
           <nav aria-label="Where RunF9 runs" className="hero-rise [animation-delay:280ms] mt-8 flex flex-wrap items-center justify-center gap-2">
@@ -100,7 +107,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             ))}
           </nav>
         </div>
-        <div className="hero-rise [animation-delay:340ms] max-w-[760px] mx-auto mt-16 md:mt-20 px-2 md:px-0">
+        <div className="relative hero-rise [animation-delay:340ms] max-w-[760px] mx-auto mt-16 md:mt-20 px-2 md:px-0">
           <F9Demo />
         </div>
       </header>
@@ -123,13 +130,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[14px] text-accent-600 hover:underline">Where these numbers come from</a></div>
       </section>
 
-      {/* Choose the cloud: RunF9 Cloud, the firm's own AWS / Azure / Google account, a different cloud per client, or air-gapped */}
-      <div className="pt-24 md:pt-36">
-        <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} />
-      </div>
+      {/* The Daily Brief, shown as product */}
+      <DailyBrief />
 
       {/* Build. Check. Forecast. */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36">
+      <section id="features" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
           <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
@@ -140,8 +145,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* After the baseline: monthly update comparison and Time Impact Analysis */}
       <UpdatesAndDelays />
 
+      {/* Who it is for */}
+      <Audiences />
+
       {/* The rest of the toolkit, without the noise */}
-      <section className="bg-white border-y border-warm-200">
+      <section>
         <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
           <Reveal><h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight max-w-[640px]">Built by a scheduler, for everyone on the project.</h2></Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12 mt-16">
@@ -164,7 +172,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </section>
 
       {/* How it works: four steps on one line that draws itself */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-36">
+      <section id="how-it-works" className="max-w-6xl mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
         <Reveal className="text-center mb-16 md:mb-20">
           <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Four steps. One finish date you can defend.</h2>
         </Reveal>
@@ -211,8 +219,16 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </div>
       </section>
 
+      {/* What it connects to */}
+      <Integrations />
+
+      {/* Choose the cloud: RunF9 Cloud, the firm's own AWS / Azure / Google account, a different cloud per client, or air-gapped */}
+      <Deployment primaryHref={primaryHref} primaryLabel={primaryLabel} />
+
+      <Security contactHref={contactHref} />
+
       {/* Pricing */}
-      <section id="pricing" className="max-w-6xl mx-auto px-6 py-24 md:py-36">
+      <section id="pricing" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
         <Reveal className="text-center mb-14 md:mb-16">
           <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Simple, transparent pricing.</h2>
           <p className="text-[17px] md:text-[19px] text-warm-600 mt-4">{inviteOnly ? 'RunF9 is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
@@ -237,10 +253,10 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         </div>
       </section>
 
-      {/* Where RunF9 runs: our cloud, the customer's cloud account, or their own servers */}
+      <Faq />
 
       {/* Evidence: how each figure on this page can be checked */}
-      <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32">
+      <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32 scroll-mt-24">
         <Reveal>
           <h2 className="text-[28px] md:text-[36px] font-semibold tracking-[-0.03em] text-navy-950">Where these numbers come from</h2>
           <p className="text-[16px] text-warm-600 mt-3 mb-8">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
@@ -287,17 +303,20 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           </div>
           <div>
             <div className="text-[13px] font-semibold text-navy-950 mb-3">Product</div>
-            {nav.map(([href, label]) => <a key={href} href={href} className="block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors">{label}</a>)}
+            {[['#today', 'Daily Brief'], ['#features', 'Features'], ['#updates', 'Updates & delays'], ['#how-it-works', 'How it works'], ['#reports', 'Reports'], ['#integrations', 'Integrations'], ['#pricing', 'Pricing']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
+          </div>
+          <div>
+            <div className="text-[13px] font-semibold text-navy-950 mb-3">Trust</div>
+            {[['#deployment', 'Your cloud'], ['#security', 'Security'], ['#evidence', 'Evidence'], ['#faq', 'FAQ']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
           </div>
           <div>
             <div className="text-[13px] font-semibold text-navy-950 mb-3">Company</div>
-            <a href="https://www.hoshmand.ai" className="block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors">Hoshmand AI</a>
-            <a href="mailto:support@hoshmand.ai" className="block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors">Contact</a>
-          </div>
-          <div>
-            <div className="text-[13px] font-semibold text-navy-950 mb-3">Legal</div>
-            <Link href="/privacy" className="block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors">Terms of Service</Link>
+            <a href="https://www.hoshmand.ai" className={footLink}>Hoshmand AI</a>
+            <a href="mailto:support@hoshmand.ai" className={footLink}>Contact</a>
+            <Link href="/auth" className={footLink}>Sign in</Link>
+            <div className="text-[13px] font-semibold text-navy-950 mb-3 mt-6">Legal</div>
+            <Link href="/privacy" className={footLink}>Privacy Policy</Link>
+            <Link href="/terms" className={footLink}>Terms of Service</Link>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 pb-8 text-[13px] text-warm-600">© 2026 RunF9. Built by Hoshmand AI. All rights reserved.</div>
