@@ -31,6 +31,8 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // When this build was made, for the public product card's release stamp (src/lib/product-card.ts).
+  env: { RUNF9_BUILT_AT: process.env.RUNF9_BUILT_AT || new Date().toISOString() },
   // On-prem container image (Dockerfile): a self-contained server in .next/standalone. Only when
   // RUNF9_STANDALONE=1 is set at build time, so Vercel builds are unchanged.
   ...(process.env.RUNF9_STANDALONE === '1' ? { output: 'standalone' } : {}),
