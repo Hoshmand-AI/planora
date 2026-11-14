@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
+import { Check, ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
 import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
 import { fmtDate, fmtDates } from '@/lib/format'
@@ -167,8 +167,9 @@ export default function TimelinePage() {
         <div role="group" aria-label="Show" className="flex gap-1.5 max-md:w-full max-md:overflow-x-auto max-md:whitespace-nowrap [&>button]:flex-shrink-0 md:flex-wrap max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
           {FILTERS.map(f => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
-              className={`pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
-              {f.label} <span className={`tabular-nums font-medium ${filter === f.id ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id] ?? 0}</span>
+              className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+              {/* A filter chip, not a tab: the one that is on carries a check. */}
+              {filter === f.id && <Check size={14} aria-hidden="true" />}{f.label} <span className={`tabular-nums font-medium ${filter === f.id ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id] ?? 0}</span>
             </button>
           ))}
         </div>

@@ -463,7 +463,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className={`flex-1 min-w-0 flex flex-col min-h-screen ${fillScreen ? '[@media(min-height:640px)]:min-h-0 [@media(min-height:640px)]:h-[100dvh]' : ''}`}>
           {/* ── Top bar (phones) ─────────────────────────────── */}
-          <header className="md:hidden glass-bar sticky top-0 z-40 h-14 flex items-center justify-between px-4 border-b border-white/5">
+          {/* Inside a project the project's own header is the app bar, so the page starts one bar higher: the name is the headline and the account is in its menu. */}
+          <header className={`md:hidden glass-bar sticky top-0 z-40 h-14 items-center justify-between px-4 border-b border-white/5 ${inProject && selectedSchedule ? 'hidden' : 'flex'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[21px]" /></Link>
             <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
               className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-bold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
@@ -485,6 +486,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </nav>
                       {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
                       <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
+                        <Link href="/dashboard" aria-label="All projects" className="md:hidden flex-shrink-0 -ml-2 inline-flex items-center justify-center w-9 h-11 text-navy-950"><ChevronDown size={20} className="rotate-90" aria-hidden="true" /></Link>
                         <h1 className="page-title min-w-0 max-md:text-[17px] max-md:leading-[1.2] max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
@@ -508,6 +510,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <div className={owns ? '' : 'md:hidden'}>
                             <MoreMenu label="More actions for this project" items={[
                               { label: 'Switch project', onSelect: () => setShowScheduleList(true), icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
+                              { label: 'Account and settings', onSelect: () => setShowSettings(true), className: 'md:hidden' },
                               ...(owns ? [
                                 { label: 'Upload update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
                                 { label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true },
