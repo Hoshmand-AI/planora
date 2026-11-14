@@ -10,7 +10,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X, Folder, TriangleAlert, ShieldAlert, Clock, TrendingUp, MessageCircleQuestion, GitBranch, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { Check, Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X, Folder, TriangleAlert, ShieldAlert, Clock, TrendingUp, MessageCircleQuestion, GitBranch, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useApp } from '@/app/dashboard/layout'
 import { fmtDate, fmtDay } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
@@ -221,6 +221,20 @@ export function ProjectsDashboard() {
       {header}
 
       {/* Summary strip: each number is a filter */}
+      {/* With a handful of projects the five big counters are mostly zeros, so the filters are a row of chips instead. */}
+      {counts.all < 6 ? (
+        <div role="group" aria-label="Filter projects by status" className="flex flex-wrap gap-1.5">
+          {FILTERS.filter(f => f.id === 'all' || counts[f.id] > 0).map(f => {
+            const on = filter === f.id
+            return (
+              <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
+                className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+                {on && <Check size={14} aria-hidden="true" />}{f.label} <span className={`tabular-nums font-medium ${on ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id]}</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
       <div role="group" aria-label="Filter projects by status" className="grid grid-cols-3 gap-2 md:grid-cols-5 md:gap-2.5">
         {FILTERS.map(f => {
           const on = filter === f.id
@@ -235,6 +249,7 @@ export function ProjectsDashboard() {
           )
         })}
       </div>
+      )}
       {counts.stale > 0 && <p className="-mt-3 text-[12px] text-warm-600">A project that needs an update can also be counted under its status, so the groups can add up to more than the total.</p>}
 
       {/* Toolbar */}
@@ -243,14 +258,14 @@ export function ProjectsDashboard() {
           <Search size={16} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-500" />
           <label htmlFor="project-search" className="sr-only">Search projects</label>
           <input id="project-search" ref={searchRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Search projects  ( / )"
-            className="w-full rounded-full border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-[14px] text-navy-950 placeholder:text-warm-500" />
+            className="w-full rounded-md border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-[14px] text-navy-950 placeholder:text-warm-500" />
           {q && <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-warm-600 hover:text-navy-950"><X size={15} /></button>}
         </div>
         <label className="sr-only" htmlFor="project-sort">Sort projects</label>
         <div className="relative">
           <ArrowUpDown size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500 pointer-events-none" />
           <select id="project-sort" value={sort} onChange={e => { setSort(e.target.value as Sort); setCol(null) }}
-            className="appearance-none rounded-full border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13.5px] font-medium text-navy-950">
+            className="appearance-none rounded-md border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13.5px] font-medium text-navy-950">
             <option value="attention">Most urgent first</option>
             <option value="recent">Recently updated</option>
             <option value="finish">Finish date</option>

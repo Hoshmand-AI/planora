@@ -33,7 +33,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   const hintId = `${id}-hint`
   return (
     <div>
-      <label htmlFor={id} className="block text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-[13px] font-medium text-warm-700 mb-1.5">{label}</label>
       {children({ id, 'aria-describedby': hint ? hintId : undefined })}
       {hint && <p id={hintId} className="text-[12px] text-warm-500 mt-1">{hint}</p>}
     </div>
