@@ -195,7 +195,7 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
           return (
             <g key={b.start} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />
-              {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : '#3b82f6'} />}
+              {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : b.remaining === 0 ? '#9BA8AB' : '#3b82f6'} />}
               {isOver && <text x={x + w / 2} y={y(b.demand) - 4} textAnchor="middle" fontSize="12" fontWeight="700" fill="#A64848">!</text>}
               {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#3F4E5A">{fmtDate(b.start).slice(0, 5)}</text>}
             </g>
@@ -212,9 +212,10 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         </div>
       )}
       <figcaption className="flex flex-wrap gap-4 text-[12px] text-warm-700 mt-1">
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ({unit})</span>
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>Over-allocated (hatched, marked “!”)</span>
-        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ahead ({unit} per {BUCKET_WORD[bucket]})</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#9BA8AB" /></svg>Already worked (before the data date, not counted as over-allocated)</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>At least one day over its daily limit (hatched, marked “!”), even where the {BUCKET_WORD[bucket]}’s total is under the line</span>
+        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available per {BUCKET_WORD[bucket]}</span>
       </figcaption>
     </figure>
   )
