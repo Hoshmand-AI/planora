@@ -152,7 +152,7 @@ export default function TimelinePage() {
   const matches = groups.reduce((s, g) => s + g.acts.length, 0)
 
   return (
-    <div className="px-4 md:px-6 py-5 md:py-6">
+    <div className="px-5 md:px-8 py-5 md:py-6">
       {impact && impact.changed.length > 0 && (
         <div role="status" className="mb-4 rounded-[14px] border border-accent-500 bg-accent-100 px-4 py-3 text-[13.5px] text-warm-700">
           <p><strong className="text-navy-950">{impact.changed.length} {impact.changed.length === 1 ? 'activity was' : 'activities were'} changed in RunF9 in the last {impact.windowDays} days.</strong>{' '}

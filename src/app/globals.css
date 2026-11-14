@@ -59,6 +59,28 @@ header :focus-visible, nav :focus-visible { outline-color: var(--accent-400); }
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea { font-size: max(16px, 1em) !important; }
 }
 
+/* Form controls drawn one way everywhere: the browser's own dropdown arrow, tick boxes and radio buttons differ by
+   system and looked unfinished beside the rest of the app. */
+select {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2356656F' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.6rem center; padding-right: 1.9rem !important;
+}
+input[type='checkbox'], input[type='radio'] {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0;
+  width: 18px; height: 18px; margin: 0; vertical-align: -3px;
+  border: 1.5px solid var(--warm-400); background: #fff; cursor: pointer;
+  display: inline-grid; place-content: center; transition: background-color 120ms, border-color 120ms;
+}
+input[type='checkbox'] { border-radius: 5px; }
+input[type='radio'] { border-radius: 50%; }
+input[type='checkbox']::before { content: ''; width: 10px; height: 10px; transform: scale(0); background: #fff; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%); }
+input[type='radio']::before { content: ''; width: 8px; height: 8px; border-radius: 50%; transform: scale(0); background: #fff; }
+input[type='checkbox']:checked, input[type='radio']:checked { background: var(--accent-600); border-color: var(--accent-600); }
+input[type='checkbox']:checked::before, input[type='radio']:checked::before { transform: scale(1); }
+input[type='checkbox']:disabled, input[type='radio']:disabled { opacity: 0.5; cursor: not-allowed; }
+input[type='date'] { accent-color: var(--accent-600); }
+
 /* Tap and click targets. With a mouse, nothing you can press is under 28px tall (WCAG 2.2 asks for 24).
    On touch screens the floor is 44px, the size Apple and Google both recommend for a finger.
    A control drawn inside a chart or a dense grid opts out with data-compact. */

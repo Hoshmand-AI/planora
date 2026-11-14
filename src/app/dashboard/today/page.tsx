@@ -131,7 +131,7 @@ export default function TodayPage() {
   const count = (n: number, one: string, many = one + 's') => (n === 0 ? 'None' : `${n} ${n === 1 ? one : many}`)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
@@ -281,12 +281,12 @@ export default function TodayPage() {
             ))}
           </div>
         </Card>
-          <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Today’s risks" sub="What could move the finish">
+          <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Risks the schedule shows" sub="Calculated from the schedule: what could move the finish">
           {b.risks.length === 0 ? <p className="text-[13px] text-warm-600">No schedule risk today.</p> : <ul className="space-y-2">{b.risks.map((r, i) => (
             <li key={i} className="text-[13.5px] text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-bold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>
           ))}</ul>}
         </Card>
-          <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Today’s issues" sub="What is already wrong">
+          <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Issues the schedule shows" sub="Calculated from the schedule: what is already wrong">
           {b.issues.length === 0 ? <p className="text-[13px] text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-[13.5px] text-warm-700">{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>)}</ul>}
         </Card>
         </div>
@@ -476,8 +476,8 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
     <section id="card-register" aria-labelledby="reg-h" className="rounded-[14px] border border-warm-200 bg-white p-5 space-y-3 scroll-mt-32">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="reg-h" className="text-[16px] font-semibold text-navy-950">Risks, issues and changes ({openCount} open)</h2>
-          <p className="text-[12.5px] text-warm-600">Risks, issues, PCOs, change requests, change orders and contract amendments. Give an item an activity and a number of days and it joins tomorrow’s what-if runs.</p>
+          <h2 id="reg-h" className="text-[16px] font-semibold text-navy-950">Your register: risks, issues and changes ({openCount} open)</h2>
+          <p className="text-[12.5px] text-warm-600">Entered by your team, separate from what RunF9 calculates above: risks, issues, PCOs, change requests, change orders and contract amendments. Give an item an activity and a number of days and it joins tomorrow’s what-if runs.</p>
         </div>
         {items.some(i => i.status === 'closed') && <label className="text-[12.5px] text-warm-700"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} /> Show closed</label>}
       </div>
