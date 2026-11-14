@@ -161,7 +161,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   })
   // The project's documents read against the schedule: contract clauses, drawings and specifications, field reports.
   const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
-    daysBehind: brief.headline.daysBehind, staleDays: brief.staleDays, projectType: s.projectType,
+    daysBehind: brief.headline.daysBehind, target: brief.headline.milestone, staleDays: brief.staleDays, projectType: s.projectType,
     // A delay that has been put in the register has been dealt with as far as the reminder goes.
     delaysReported: signals.filter(x => (x.kind === 'delay' || x.kind === 'change') && !register.some(r => r.sourceQuote === x.quote)).map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
     openChangeItems: brief.changeItems.filter(c => !register.find(r => r.id === c.id)?.sourceQuote).length,
@@ -184,7 +184,8 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   // The attention list shows one line per item: the fact and its number. The full sentence stays in `text`.
   const usd = (v: number) => '$' + Math.round(v).toLocaleString('en-US')
   const contractShort = (c: (typeof watch.contract)[number]): string | undefined =>
-    c.kind === 'damages' && c.perDay ? 'Damages of ' + usd(c.perDay) + ' per day' + (c.exposure ? ': about ' + usd(c.exposure) + ' if they run from the required finish' : '') + '.'
+    c.kind === 'damages' && c.perDay && c.appliesTo ? 'Damages of ' + usd(c.perDay) + ' per day if ' + c.appliesTo + ' is late.'
+      : c.kind === 'damages' && c.perDay ? 'Damages of ' + usd(c.perDay) + ' per day' + (c.exposure ? ': about ' + usd(c.exposure) + ' if they run from the required finish' : '') + '.'
       : c.kind === 'notice' && c.days ? 'Written notice is due within ' + c.days + ' days of a delay or change.'
         : undefined
   for (const c of watch.contract.filter(x => x.active)) alerts.push({ level: 'act', section: 'contract', text: c.text, short: contractShort(c) })

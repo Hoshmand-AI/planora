@@ -192,11 +192,11 @@ export default function ProjectPage() {
               {nearTerm.basis === 'data_date' ? 'Data date' : 'Today'} {fmtDate(nearTerm.windowStart)} to {fmtDate(nearTerm.windowEnd)} (14 days). Durations are remaining work days.
             </p>
             {nearTerm.inProgress.length > 0 && (
-              <NearTermList title={`In progress (${nearTerm.inProgressCount})`} rows={nearTerm.inProgress.slice(0, 5)} inProgress />
+              <NearTermList title={`In progress (${nearTerm.inProgressCount})`} rows={nearTerm.inProgress.slice(0, 6)} inProgress />
             )}
-            {nearTerm.inProgressCount > 5 && nearTerm.inProgress.length > 0 && <p className="-mt-1 mb-3 text-[12.5px] text-warm-600">and {nearTerm.inProgressCount - 5} more in progress; the Schedule tab lists them all.</p>}
+            {nearTerm.inProgressCount > 6 && nearTerm.inProgress.length > 0 && <p className="-mt-1 mb-3 text-[12.5px] text-warm-600">and {nearTerm.inProgressCount - 6} more in progress; the Schedule tab lists them all.</p>}
             {nearTerm.starting.length > 0 && (
-              <NearTermList title={`Scheduled to start by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
+              <NearTermList title={`Due to start by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
             )}
           </section>
         )}

@@ -69,6 +69,10 @@ for (const name of DEVICES) {
     await fits(tab)
     if (tab === 'Schedule') {
       if (desc.viewport.width >= 768) {
+        // The data-date line must sit under its own label: both are placed by date, in two different containers.
+        const lab = await page.getByText(/^Data date \d/).first().boundingBox().catch(() => null)
+        const line = await page.locator('span.absolute.inset-y-0.w-0\\.5').first().boundingBox().catch(() => null)
+        if (lab && line) { if (line.x < lab.x - 2 || line.x > lab.x + lab.width + 2) fail(name, `Schedule data-date line at ${Math.round(line.x)} is not under its label (${Math.round(lab.x)}–${Math.round(lab.x + lab.width)})`); else console.log('   ✓ Schedule data-date line is under its label') }
         await tap(page.getByRole('button', { name: 'Zoom in' })); await page.waitForTimeout(300)
         await fits('Schedule zoomed')
       } else {

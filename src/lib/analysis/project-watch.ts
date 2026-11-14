@@ -22,6 +22,8 @@ export interface ContractItem extends Source {
   /** Liquidated damages per calendar day, and the exposure at the current forecast */
   perDay?: number | null
   exposure?: number | null
+  /** The milestone the damages clause names, when it is not the one the forecast is measured against */
+  appliesTo?: string | null
 }
 export interface ScopeGap extends Source { label: string }
 export interface FieldMismatch extends Source { activity: { id: string; code: string; name: string }; reported: 'working' | 'finished'; schedule: 'not started' | 'in progress'; text: string }
@@ -88,6 +90,8 @@ export interface WatchContext {
   /** Days since the schedule's data date */
   staleDays: number | null
   projectType?: string | null
+  /** The milestone the days behind are measured against ("T8040 Substantial Completion"), or null for the project finish */
+  target?: string | null
 }
 
 export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], ctx: WatchContext): ProjectWatch {
@@ -116,9 +120,16 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
       const rate = s.replace(CAP, ' ')
       const perDay = amount(rate, AMOUNT_PER_DAY) ?? (PER_DAY.test(rate) ? amount(rate.slice(LD.exec(rate)?.index ?? 0)) ?? amount(rate) : null)
       const behind = Math.max(0, ctx.daysBehind ?? 0)
-      const exposure = perDay && behind ? perDay * behind : null
-      push(`ld:${perDay ?? 'x'}`, { ...src(c, s), kind: 'damages', perDay, exposure, active: behind > 0,
-        text: perDay ? (behind ? `Liquidated damages are ${money(perDay)} per day. If they run from the required finish, ${behind} day${behind === 1 ? '' : 's'} behind is about ${money(exposure!)}. Check the quoted clause for the milestone it names.` : `Liquidated damages are ${money(perDay)} per day. The forecast meets the required date today, so there is no exposure.`)
+      // "If Ready for Service of Data Hall 1 is not achieved by …": the clause names its own milestone. When that is not
+      // the milestone the forecast is measured against, the days behind are not the days of damages, so no amount is given.
+      const named = /\bif\s+(?:the\s+)?(.{3,80}?)\s+(?:is|are|has|have)\s+not\s+(?:been\s+)?(?:achieved|reached|completed|attained)\b/i.exec(s)?.[1]?.trim() ?? null
+      const words = (t: string) => new Set(t.toLowerCase().match(/[a-z0-9]{4,}/g) ?? [])
+      const sameAsTarget = !named || (ctx.target ? [...words(named)].filter(w => words(ctx.target!).has(w)).length >= 2 : /substantial completion|final completion|the work|the project/i.test(named))
+      const appliesTo = sameAsTarget ? null : named
+      const exposure = perDay && behind && !appliesTo ? perDay * behind : null
+      push(`ld:${perDay ?? 'x'}`, { ...src(c, s), kind: 'damages', perDay, exposure, appliesTo, active: behind > 0,
+        text: perDay && appliesTo ? `Liquidated damages are ${money(perDay)} per day if ${appliesTo} is late. The forecast here is measured against ${ctx.target ?? 'the project finish'}, so no amount is estimated: check that milestone's date.`
+          : perDay ? (behind ? `Liquidated damages are ${money(perDay)} per day. If they run from the required finish, ${behind} day${behind === 1 ? '' : 's'} behind is about ${money(exposure!)}. Check the quoted clause for the milestone it names.` : `Liquidated damages are ${money(perDay)} per day. The forecast meets the required date today, so there is no exposure.`)
           : `The contract carries liquidated damages${behind ? `; the forecast is ${behind} day${behind === 1 ? '' : 's'} behind the required date` : ''}. The daily amount could not be read from this sentence.` })
     }
     if (UPDATE.test(s) && PERIOD.test(s) && !/look[- ]?ahead/i.test(s)) {

@@ -567,7 +567,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
             ? `The longest path to the finish starts at ${pathStartPin.code}, held by a mandatory constraint on ${pinText([pathStartPin])} rather than by logic, so the finish is driven by a typed date and the critical path test fails (adding ${CP_TEST_DAYS} days to ${target.code} moved the finish by ${delta} work days). Replace the mandatory constraint with a Start/Finish On or After (or a deadline) so logic drives the path.`
             : ''
           result = {
-            id: 12, name: 'Critical path test', metric: `+${delta}d finish for +${CP_TEST_DAYS}d on ${target.code}`,
+            id: 12, name: 'Critical path test', metric: `Finish moves ${delta}d when ${target.code} slips ${CP_TEST_DAYS}d`,
             threshold: thr, result: ok ? 'pass' : 'fail',
             offenders: ok ? [] : cap([target.code, ...(pathStartPin ? [pathStartPin.code] : []), ...pinnedAny.map((a) => a.code), ...(stopAct && !pinnedAny.length && !pathStartPin ? [stopAct.code] : [])]),
             explanation: (pinWhy || (ok

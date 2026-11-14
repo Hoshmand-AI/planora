@@ -21,7 +21,7 @@ export const SAMPLE_BRIEF = {
     },
     {
       "level": "act",
-      "text": "Liquidated damages are $50,000 per day. If they run from the required finish, 40 days behind is about $2,000,000. Check the quoted clause for the milestone it names."
+      "text": "Liquidated damages are $50,000 per day if Ready for Service of Data Hall 1 is late. The forecast here is measured against T8040 Substantial Completion, so no amount is estimated: check that milestone's date."
     },
     {
       "level": "act",
