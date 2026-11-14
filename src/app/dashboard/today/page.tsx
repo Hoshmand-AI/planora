@@ -152,10 +152,14 @@ export default function TodayPage() {
           <h2 className="tab-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h2>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
         </div>
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        <div className="flex flex-wrap max-md:flex-nowrap max-md:w-full max-md:[&>*]:flex-1 max-md:[&>*]:min-w-0 items-end gap-x-3 gap-y-2">
           <div>
             <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5 max-md:sr-only">Show the day for</p>
-            <div role="tablist" aria-labelledby="aud-label" className="flex gap-1.5">
+            {/* On a phone the three readers are one dropdown beside the date, so the answer starts higher. */}
+            <select aria-label="Show the day for" value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} md:hidden min-h-[36px]`}>
+              {AUDIENCES.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+            </select>
+            <div role="tablist" aria-labelledby="aud-label" className="hidden md:flex gap-1.5">
               {AUDIENCES.map(a => (
                 <button key={a.id} role="tab" type="button" id={`aud-${a.id}`} aria-selected={audience === a.id} aria-controls="aud-panel" onClick={() => setAudience(a.id)}
                   className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${audience === a.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{a.label}</button>
