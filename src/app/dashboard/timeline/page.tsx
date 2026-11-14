@@ -188,6 +188,15 @@ export default function TimelinePage() {
         </label>
       </div>
 
+      {/* The key sits above the chart, where it is read before the bars, not below a long scroll. */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1 -mt-1 mb-3 text-[12.5px] text-warm-700">
+        <Legend className="bg-accent-500" label="Planned" />
+        <Legend className="bg-status-at-risk" label="Critical" />
+        <Legend className="bg-status-on-track" label="Complete" />
+        <Legend className="bg-navy-800" label="Done so far" />
+        {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
+      </div>
+
       {activities === null ? (
         <div className="space-y-2" aria-busy="true">{[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
       ) : loadError ? (
@@ -261,14 +270,6 @@ export default function TimelinePage() {
           {current && <Detail a={current} onClose={() => setSelected(null)} />}
         </div>
       )}
-
-      <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-[12px] text-warm-600">
-        <Legend className="bg-accent-500" label="Planned" />
-        <Legend className="bg-status-at-risk" label="Critical" />
-        <Legend className="bg-status-on-track" label="Complete" />
-        <Legend className="bg-navy-800" label="Done so far" />
-        {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
-      </div>
     </div>
   )
 }

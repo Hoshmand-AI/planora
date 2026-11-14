@@ -120,7 +120,7 @@ describe('document extraction', () => {
     expect(r.pageCount).toBe(2)
     const chunks = chunkDocument(r.pages)
     expect(chunks.find(c => /sequestered/.test(c.text))).toMatchObject({ page: 2, section: 'Section 01 32 16 1.4' })
-  })
+  }, 20_000) // the first PDF test loads the PDF writer and parser cold; on a busy CI runner that alone has passed 5s
 
   it('rejects scanned (image-only) PDFs with a helpful message', async () => {
     const doc = await PDFDocument.create()
