@@ -203,7 +203,7 @@ export default function ProjectPage() {
 
         {drivingTasks.length > 0 && (
           <section>
-            <h2 className="font-display text-[18px] text-navy-950 mb-3">Driving tasks</h2>
+            <h2 className="font-display text-[18px] text-navy-950 mb-3">Driving tasks{drivingTasks.length > 8 && <span className="ml-2 font-sans text-[13px] font-normal text-warm-600">first 8 of {drivingTasks.length}</span>}</h2>
             <div className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
               {drivingTasks.slice(0, 8).map((task, i) => (
                 <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < drivingTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>

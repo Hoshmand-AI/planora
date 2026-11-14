@@ -242,10 +242,9 @@ export default function QualityPage() {
         </section>
 
         {data.brief && (
-          <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1">About this project</div>
+          <Disclosure tone="card" title="About this project" meta="also on Overview">
             <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
-          </div>
+          </Disclosure>
         )}
 
         <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
@@ -399,13 +398,14 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
 
 /** A reviewer's disposition of one finding or data question: shown to everyone, editable by reviewers. */
 function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { itemId: string; label: string; disposition: ItemDisposition | null; reviewer: boolean; onDispose: Dispose }) {
-  const [choice, setChoice] = useState<FindingDisposition>(disposition?.disposition ?? 'accepted')
+  const [choice, setChoice] = useState<FindingDisposition | ''>(disposition?.disposition ?? '')
   const [text, setText] = useState(disposition?.justification ?? '')
   const [editing, setEditing] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   if (!reviewer && !disposition) return null
   const save = async () => {
+    if (!choice) return
     setBusy(true); setErr('')
     const e = await onDispose(itemId, choice, text)
     setBusy(false)
@@ -424,10 +424,11 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-[12px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
           <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-md px-2 py-1 text-[12.5px] text-navy-950">
+            <option value="" disabled>Choose…</option>
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
           <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1 text-[12.5px]" />
-          <button type="button" disabled={busy} onClick={save} className="px-3 py-1 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
+          <button type="button" disabled={busy || !choice} onClick={save} className="px-3 py-1 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
           {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
         </div>
       )}

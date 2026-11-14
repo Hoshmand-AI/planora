@@ -138,9 +138,9 @@ export default function TodayPage() {
           <h1 className="page-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h1>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
         </div>
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
           <div>
-            <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5">Show the day for</p>
+            <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5 max-md:sr-only">Show the day for</p>
             <div role="tablist" aria-labelledby="aud-label" className="flex gap-1 rounded-full bg-warm-100 border border-warm-200 p-1">
               {AUDIENCES.map(a => (
                 <button key={a.id} role="tab" type="button" id={`aud-${a.id}`} aria-selected={audience === a.id} aria-controls="aud-panel" onClick={() => setAudience(a.id)}
@@ -148,7 +148,7 @@ export default function TodayPage() {
               ))}
             </div>
           </div>
-          <label className="text-[12px] text-warm-600">Brief for
+          <label className="text-[12px] text-warm-600"><span className="max-md:sr-only">Brief for</span>
             <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px]`} />
           </label>
         </div>
