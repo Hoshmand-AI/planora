@@ -142,14 +142,14 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <div role="tablist" aria-label="Organization settings" className="flex gap-1.5 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={e => {
+      <div role="tablist" aria-label="Organization settings" className="flex gap-0 border-b border-warm-200 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={e => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         const at = tabs.findIndex(t => t.id === active), next = tabs[(at + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
         pickTab(next.id); document.getElementById(`org-tab-${next.id}`)?.focus()
       }}>
         {tabs.map(t => (
           <button key={t.id} id={`org-tab-${t.id}`} role="tab" type="button" aria-selected={active === t.id} aria-controls={`org-panel-${t.id}`} tabIndex={active === t.id ? 0 : -1} onClick={() => pickTab(t.id)}
-            className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${active === t.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>
+            className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${active === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
             {t.label}
           </button>
         ))}

@@ -275,7 +275,7 @@ export function ProjectsDashboard() {
         <div role="group" aria-label="View" className="hidden md:inline-flex rounded-full border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-navy-950 text-white' : 'text-warm-600 hover:text-navy-950'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-navy-950'}`}>
               <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
             </button>
           ))}

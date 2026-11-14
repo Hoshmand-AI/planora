@@ -258,7 +258,7 @@ function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t
     if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : window.location.pathname + window.location.search)
   }
   return (
-    <div role="tablist" aria-label="Schedule views" className="flex gap-1.5"
+    <div role="tablist" aria-label="Schedule views" className="flex gap-0 border-b border-warm-200"
       onKeyDown={e => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         const i = TABS.findIndex(x => x.id === tab)
@@ -269,7 +269,7 @@ function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t
       {TABS.map(t => (
         <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`tabpanel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => select(t.id)}
-          className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${tab === t.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>
+          className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${tab === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
           {t.label}
         </button>
       ))}
