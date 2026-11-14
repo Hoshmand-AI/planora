@@ -27,7 +27,7 @@ const AUDIENCES: { id: Audience; label: string; hint: string }[] = [
   { id: 'client', label: 'Client', hint: 'Status against the required date' },
 ]
 // The card behind each kind of attention item, and the cards only the project manager view shows.
-const ALERT_CARD: Record<string, string> = { overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field' }
+const ALERT_CARD: Record<string, string> = { deadline: 'driving', overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field' }
 // Today is five short parts, not one long page: what to act on now, then the detail behind it, each a tab.
 type Part = 'now' | 'finish' | 'docs' | 'changes' | 'brief'
 const PARTS: { id: Part; label: string; for: Audience[] }[] = [
@@ -174,7 +174,7 @@ export default function TodayPage() {
       <div role="tablist" aria-label="Parts of the brief" className="flex gap-1.5 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
         {parts.map(x => (
           <button key={x.id} role="tab" type="button" id={`part-${x.id}`} aria-selected={shownPart === x.id} onClick={() => setPart(x.id)}
-            className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border whitespace-nowrap ${shownPart === x.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{x.label}</button>
+            className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold whitespace-nowrap ${shownPart === x.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>{x.label}</button>
         ))}
       </div>
 
@@ -207,12 +207,14 @@ export default function TodayPage() {
       {data.alerts.length > 0 && (
         <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
           <h2 id="alerts-h" className="text-[16px] font-semibold text-navy-950">Needs attention today ({data.alerts.filter(a => a.level === 'act').length} to act on, {data.alerts.filter(a => a.level === 'watch').length} to watch)</h2>
-          <ul className="mt-3 space-y-2.5">
+          <ul className="mt-2 divide-y divide-warm-200 [&>li]:py-2 [&>li]:text-[13.5px]">
             {data.alerts.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
                 <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
-                <span className="flex-1 min-w-0" title={a.short ? fmtDates(a.text) : undefined}>{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.short ?? a.text)}</span>
-                {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 rounded-full border border-warm-300 px-3 min-h-[32px] text-[12.5px] font-medium text-navy-950 hover:bg-warm-100">Details</button>}
+                {/* The kind of item is its own column on a wide screen, so the list can be scanned down its left edge. */}
+                <span className="hidden md:block flex-shrink-0 w-[112px] font-semibold text-navy-950">{ALERT_SUBJECT[a.section] ?? ''}</span>
+                <span className="flex-1 min-w-0" title={a.short ? fmtDates(a.text) : undefined}>{ALERT_SUBJECT[a.section] && <span className="md:hidden font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.short ?? a.text)}</span>
+                {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 inline-flex items-center gap-0.5 text-[13px] font-semibold text-accent-600 hover:underline">Details<span aria-hidden="true">›</span></button>}
               </li>
             ))}
           </ul>

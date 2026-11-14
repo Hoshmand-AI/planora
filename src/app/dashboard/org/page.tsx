@@ -149,7 +149,7 @@ export default function OrgPage() {
       }}>
         {tabs.map(t => (
           <button key={t.id} id={`org-tab-${t.id}`} role="tab" type="button" aria-selected={active === t.id} aria-controls={`org-panel-${t.id}`} tabIndex={active === t.id ? 0 : -1} onClick={() => pickTab(t.id)}
-            className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${active === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+            className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${active === t.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>
             {t.label}
           </button>
         ))}
