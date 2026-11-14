@@ -27,7 +27,7 @@
 * { -webkit-font-smoothing: antialiased; }
 
 body {
-  font-family: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-digits, var(--font-dm-sans)), var(--font-dm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--warm-50);
   color: var(--warm-600);
 }
