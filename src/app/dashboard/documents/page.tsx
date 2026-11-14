@@ -27,7 +27,7 @@ interface Candidate {
 }
 
 const passages = (n: number) => `${n} passage${n === 1 ? '' : 's'}`
-const badge = 'inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-medium border'
+const badge = 'inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold'
 const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   ? <span className={`${badge} bg-status-on-track-bg border-status-on-track/40 text-status-on-track`}>Approved</span>
   : <span className={`${badge} bg-status-attention-bg border-status-attention/40 text-status-attention`}>Unreviewed</span>
@@ -111,14 +111,22 @@ export default function DocumentsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {can('plan.review') && (d.scope === 'project' || can('org.manage')) && (
-                      d.trust === 'approved'
-                        ? <Button variant="secondary" onClick={() => setTrust(d, 'unreviewed')} aria-label={`Mark ${d.title} unreviewed`}>Mark unreviewed</Button>
-                        : <Button variant="secondary" onClick={() => setTrust(d, 'approved')} aria-label={`Approve ${d.title}`}>Approve</Button>
-                    )}
-                    {can('schedule.write') && (d.scope === 'project' || can('org.manage')) && (
-                      <MoreMenu label={`More actions for ${d.title}`} items={[{ label: 'Delete this document', onSelect: () => remove(d), icon: <Trash2 size={15} aria-hidden="true" />, danger: true }]} />
-                    )}
+                    {/* Approving is the action a new document waits for, so it is the visible button. Withdrawing an approval
+                        and deleting are rare, so they sit in the menu. */}
+                    {(() => {
+                      const scoped = d.scope === 'project' || can('org.manage')
+                      const review = can('plan.review') && scoped, write = can('schedule.write') && scoped
+                      const items = [
+                        ...(review && d.trust === 'approved' ? [{ label: 'Mark unreviewed', onSelect: () => setTrust(d, 'unreviewed') }] : []),
+                        ...(write ? [{ label: 'Delete this document', onSelect: () => remove(d), icon: <Trash2 size={15} aria-hidden="true" />, danger: true }] : []),
+                      ]
+                      return (
+                        <>
+                          {review && d.trust !== 'approved' && <Button onClick={() => setTrust(d, 'approved')} aria-label={`Approve ${d.title}`}>Approve</Button>}
+                          {items.length > 0 && <MoreMenu label={`More actions for ${d.title}`} items={items} />}
+                        </>
+                      )
+                    })()}
                   </div>
                 </li>
               ))}
@@ -138,10 +146,9 @@ export default function DocumentsPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-        <h2 className="tab-title mb-1">Project documents</h2>
+        <h2 className="sr-only">Documents</h2>
         <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
-          Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
-          Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.
+          Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
         {hasDocs && can('schedule.write') && <a href="#upload-documents" className="inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13.5px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</a>}

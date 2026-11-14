@@ -124,8 +124,8 @@ export default function TimeImpactPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header>
-        <h2 className="tab-title">Delays: time impact analysis</h2>
-        <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}) · data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
+        <h2 className="sr-only">Delays</h2>
+        <p className="text-[13px] text-warm-700">Time impact analysis as of data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
       {/* One notice, not two stacked banners. */}
       {/* One line, with the full notice a click away: the page used to open on a five-line paragraph. */}

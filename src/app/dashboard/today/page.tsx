@@ -527,7 +527,7 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
           {(all ? shown : shown.slice(0, 3)).map(i => (
             <li key={i.id} className="py-2 flex items-start justify-between gap-3 text-[13px]">
               <span className="min-w-0">
-                <span className="mr-1.5 inline-block px-1.5 py-0.5 rounded bg-warm-100 text-[12px] font-bold text-navy-950">{KIND_LABEL[i.kind]}</span>
+                <span className="mr-1.5 inline-block px-2 py-0.5 rounded-full bg-warm-100 text-[12px] font-semibold text-navy-950">{KIND_LABEL[i.kind]}</span>
                 <span className={i.status === 'closed' ? 'text-warm-600 line-through' : 'text-warm-700'}>{i.title}</span>
                 <span className="block text-[12px] text-warm-600">{[i.owner && `owner ${i.owner}`, i.dueDate && `due ${fmtDate(i.dueDate)}${i.status === 'open' && i.dueDate < today ? ' (overdue)' : ''}`, i.impactDays != null && `${i.impactDays} work day${Math.abs(i.impactDays) === 1 ? '' : 's'}`, i.activityCodes?.length ? i.activityCodes.join(', ') : null, i.sourceDocumentId ? 'from a project document' : null, `added ${fmtDay(i.createdAt)}${i.createdByName ? ` by ${i.createdByName}` : ''}`].filter(Boolean).join(' · ')}</span>
               </span>
