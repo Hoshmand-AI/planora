@@ -345,9 +345,9 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
         <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
           {latest ? (
-            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
+            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-full bg-accent-600 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
           ) : canUpload ? (
-            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-md bg-navy-900 text-white text-[13.5px] font-medium">Upload a schedule</button>
+            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-full bg-accent-600 text-white text-[13.5px] font-medium">Upload a schedule</button>
           ) : (
             <p className="text-[12.5px] text-warm-600">Ask a scheduler on your team to upload one.</p>
           )}
@@ -387,7 +387,7 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
             <div className="flex flex-wrap gap-2 items-center">
               <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
               <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 disabled:opacity-40">Accept with justification</button>
-              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
+              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
             </div>
           )}
           <ReviewControl itemId={`dcma:${g.id}`} label={`DCMA #${g.id} ${check.name}`} disposition={disposition} reviewer={reviewer} onDispose={onDispose} />
@@ -427,7 +427,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
           <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1 text-[12.5px]" />
-          <button type="button" disabled={busy} onClick={save} className="px-3 py-1 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
+          <button type="button" disabled={busy} onClick={save} className="px-3 py-1 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
           {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
         </div>
       )}
@@ -438,7 +438,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
 /** The overall disposition of the submission (approved / approved as noted / revise and resubmit). */
 function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; reviewer: boolean; onSave: (d: SubmissionDisposition, comments: string) => Promise<string | null> }) {
   const s = review.submission
-  const [choice, setChoice] = useState<SubmissionDisposition>(s?.disposition ?? 'approved')
+  const [choice, setChoice] = useState<SubmissionDisposition | ''>(s?.disposition ?? '')
   const [comments, setComments] = useState(s?.comments ?? '')
   const [editing, setEditing] = useState(false)
   const [err, setErr] = useState('')
@@ -446,6 +446,7 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
   if (!reviewer && !s) return null
   const counts = FINDING_DISPOSITIONS.map(d => `${review.items.filter(x => x.disposition === d).length} ${FINDING_LABELS[d].toLowerCase()}`).join(' · ')
   const save = async () => {
+    if (!choice) return
     setBusy(true); setErr('')
     const e = await onSave(choice, comments)
     setBusy(false)
@@ -464,14 +465,16 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
-            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-warm-50 border border-warm-300 rounded-md px-2 py-1.5 text-[13px] text-navy-950">
+            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-white border border-warm-300 rounded-md px-2 py-1.5 text-[13px] text-navy-950">
+              {/* No decision is pre-selected: a reviewer picks one, so a default never reads as a recorded approval. */}
+              <option value="" disabled>Choose a disposition…</option>
               {SUBMISSION_DISPOSITIONS.map(d => <option key={d} value={d}>{SUBMISSION_LABELS[d]}</option>)}
             </select>
             <span className="text-[12px] text-warm-500">{counts}</span>
           </div>
-          <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
+          <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={!choice || choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
           <div className="flex items-center gap-2">
-            <button type="button" disabled={busy} onClick={save} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium disabled:opacity-60">Record disposition</button>
+            <button type="button" disabled={busy || !choice} onClick={save} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Record disposition</button>
             {editing && <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-md border border-warm-300 text-[12.5px] text-navy-950">Cancel</button>}
             {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
           </div>
@@ -499,7 +502,7 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
       {QUALITY_TABS.map(t => (
         <button key={t.id} id={`quality-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={tab === t.id ? `quality-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
-          className={`px-3 py-1.5 rounded-md text-[12.5px] font-medium border ${tab === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-warm-50 text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+          className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${tab === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
           {t.label}
         </button>
       ))}

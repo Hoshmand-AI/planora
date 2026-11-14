@@ -242,7 +242,7 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   // What each audience needs, in plain sentences.
   const pm: string[] = [headlineText]
   if (drivingToday) pm.push(`Driving the finish today: ${label(drivingToday)}${drivingToday.date ? `, forecast to finish ${us(drivingToday.date)}` : ''}. ${path.length > 1 ? `${plural(path.length, 'open activity', 'open activities')} on the driving path.` : ''}`.trim())
-  if (lateFinish.length || lateStart.length) pm.push(`Overdue: ${plural(lateFinish.length, 'finish', 'finishes')} and ${plural(lateStart.length, 'start')} have no actual dates. ${critLateFinish.length + critLateStart.length ? `${critLateFinish.length + critLateStart.length} of them are critical.` : 'None is critical yet.'}`)
+  if (lateFinish.length || lateStart.length) pm.push(`Overdue: ${plural(lateFinish.length, 'finish', 'finishes')} and ${plural(lateStart.length, 'start')} have no actual dates. ${critLateFinish.length + critLateStart.length ? `${critLateFinish.length + critLateStart.length} of them ${critLateFinish.length + critLateStart.length === 1 ? 'is' : 'are'} critical.` : 'None is critical yet.'}`)
   if (changeItems.length) pm.push(`${plural(changeItems.length, 'open change item')} (PCOs, change requests, change orders, amendments)${changeImpactDays ? ` carrying up to ${plural(changeImpactDays, 'work day')} of schedule impact` : ''}; decide or request time before the work is affected.`)
   if (i.whatIfs[0]) pm.push(`What-if: ${i.whatIfs[0].text}`)
   if (becomingCritical.length) pm.push(`Watch: ${label(becomingCritical[0])} has ${becomingCritical[0].note}.`)
