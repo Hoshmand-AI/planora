@@ -18,9 +18,9 @@ import { useEffect, useState } from 'react'
 export default function ProjectPage() {
   const { selectedSchedule, metrics, metricsError, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
   // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
-  const [tab, setTab] = useState<'overview' | 'evm'>('overview')
+  const [tab, setTab] = useState<ViewTab>('overview')
   useEffect(() => {
-    const sync = () => setTab(window.location.hash === '#earned-value' ? 'evm' : 'overview')
+    const sync = () => setTab(window.location.hash === '#earned-value' ? 'evm' : window.location.hash === '#tools' ? 'tools' : 'overview')
     sync()
     // Links to #earned-value from elsewhere on this page (or the browser's back button) switch the tab too.
     window.addEventListener('hashchange', sync)
@@ -120,8 +120,8 @@ export default function ProjectPage() {
             : <CounterTile mood="idle" value="—" label="complete" sub="Progress (by duration)" />}
           <CounterTile mood={varianceTone}
             value={!m ? '—' : varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
-            label="Schedule variance"
-            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days vs ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days vs baseline'} />
+            label="Variance vs baseline"
+            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days · baseline: ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
             value={!m || (criticalPath && !criticalPath.determined) ? '—' : String(criticalCount)} label="Critical activities"
             sub={!m ? (metricsError ? 'not available' : 'loading…') : criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
@@ -235,7 +235,11 @@ export default function ProjectPage() {
         )}
       </div>
 
+      </div>
+
+      {/* The analysis tools have their own tab: on the summary they were seven collapsed rows at the foot of a long page. */}
       {selectedSchedule.sourceType !== 'generated' && (
+        <div role="tabpanel" id="tabpanel-tools" aria-labelledby="tab-tools" hidden={tab !== 'tools'}>
         <ScheduleTools key={selectedSchedule.id} scheduleId={selectedSchedule.id}
           progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
           inHistory={selectedSchedule.inHistory ?? true}
@@ -243,19 +247,20 @@ export default function ProjectPage() {
           version={selectedSchedule.version} classification={selectedSchedule.classification ?? null}
           origin={selectedSchedule.uploadOrigin ?? null} historyOverride={selectedSchedule.historyOverride ?? false}
           onChanged={() => { refreshSchedules(); refreshMetrics() }} />
+        </div>
       )}
-      </div>
 
     </div>
   )
 }
 
 /* ─── Tabs ───────────────────────────────────────── */
-const TABS = [{ id: 'overview', label: 'Summary' }, { id: 'evm', label: 'Earned value' }] as const
-function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t: 'overview' | 'evm') => void }) {
-  const select = (t: 'overview' | 'evm') => {
+type ViewTab = 'overview' | 'evm' | 'tools'
+const TABS = [{ id: 'overview', label: 'Summary' }, { id: 'evm', label: 'Earned value' }, { id: 'tools', label: 'Analysis tools' }] as const
+function ScheduleTabs({ tab, onChange }: { tab: ViewTab; onChange: (t: ViewTab) => void }) {
+  const select = (t: ViewTab) => {
     onChange(t)
-    if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : window.location.pathname + window.location.search)
+    if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : t === 'tools' ? '#tools' : window.location.pathname + window.location.search)
   }
   return (
     <div role="tablist" aria-label="Schedule views" className="flex gap-0 border-b border-warm-200"
