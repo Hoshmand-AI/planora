@@ -196,7 +196,7 @@ export default function ProjectPage() {
             )}
             {nearTerm.inProgressCount > 5 && nearTerm.inProgress.length > 0 && <p className="-mt-1 mb-3 text-[12.5px] text-warm-600">and {nearTerm.inProgressCount - 5} more in progress; the Schedule tab lists them all.</p>}
             {nearTerm.starting.length > 0 && (
-              <NearTermList title={`Starting by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
+              <NearTermList title={`Scheduled to start by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
             )}
           </section>
         )}
@@ -325,7 +325,7 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
                 )}
               </div>
             </div>
-            <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0" title="Remaining duration (work days)">{task.remainingDuration}d left</div>
+            <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0" title="Remaining duration (work days)">{task.remainingDuration}d of work left</div>
           </li>
         ))}
       </ul>
