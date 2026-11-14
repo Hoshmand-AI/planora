@@ -136,7 +136,7 @@ export default function OrgPage() {
   const assignable = data.roles.filter(r => isOwner || !['owner', 'admin'].includes(r.id))
 
   return (
-    <div className="px-4 md:px-6 py-6 max-w-4xl space-y-5">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div>
         <h1 className="page-title">{data.org.name}</h1>
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>

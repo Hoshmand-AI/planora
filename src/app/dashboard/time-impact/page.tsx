@@ -121,7 +121,7 @@ export default function TimeImpactPage() {
   const event = data.events.find(e => e.id === selected) ?? null
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header>
         <p className="text-[12px] text-warm-600"><Link href="/dashboard/project" className="underline">Project overview</Link> / Time impact</p>
         <h1 className="page-title">Time impact analysis</h1>

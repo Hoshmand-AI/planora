@@ -89,7 +89,7 @@ function AccountPage() {
   const mfaNeeded = data.mfa.required && !data.mfa.enabled
 
   return (
-    <div className="px-4 md:px-6 py-6 max-w-3xl space-y-5">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div>
         <h1 className="page-title">Account &amp; security</h1>
         <p className="text-[13.5px] text-warm-500">{data.user.email} · {data.org.name} · <span className="capitalize">{data.user.role}</span></p>

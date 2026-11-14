@@ -89,7 +89,7 @@ export default function ProjectPage() {
   const varianceTone: RobotMood = varianceDays == null ? 'idle' : varianceDays > 14 ? 'worried' : varianceDays > 0 ? 'waiting' : 'done'
 
   return (
-    <div className="p-5 md:p-6 space-y-6">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-6">
 
       {selectedSchedule.sourceType !== 'generated' && <ScheduleTabs tab={tab} onChange={setTab} />}
       {selectedSchedule.sourceType !== 'generated' && (

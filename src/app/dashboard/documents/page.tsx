@@ -132,7 +132,7 @@ export default function DocumentsPage() {
   )
 
   return (
-    <div className="p-5 md:p-6 space-y-5">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
         <h1 className="page-title mb-1">Project documents</h1>

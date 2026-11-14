@@ -89,7 +89,7 @@ export default function ReportsPage() {
     const rt = REPORT_TYPES.find(r => r.id === report.type)
     const Icon = rt?.icon || FileText
     return (
-      <div className="p-5 md:p-6">
+      <div className="max-w-6xl mx-auto px-5 md:px-8 py-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
@@ -117,7 +117,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-5 md:p-6">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6">
       <h2 className="font-display text-[22px] text-navy-950 mb-1">Generate reports</h2>
       <p className="text-[13.5px] text-warm-500 mb-3">{reportMethod(llm)} for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
       <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-warm-700">
