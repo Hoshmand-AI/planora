@@ -42,6 +42,16 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 
 export const inputClass = 'w-full bg-white border border-warm-300 rounded-md px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400'
 
+/** A method note that is one press away instead of printed under every control: "How this works", then the text. */
+export function Hint({ label = 'How this works', children, className = '' }: { label?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <details className={`group text-[12.5px] text-warm-600 ${className}`}>
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-accent-600 hover:underline [&::-webkit-details-marker]:hidden">{label}<span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span></summary>
+      <div className="mt-1 max-w-[80ch]">{children}</div>
+    </details>
+  )
+}
+
 /** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
 export const buttonClass = {
   primary: 'px-4 py-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',

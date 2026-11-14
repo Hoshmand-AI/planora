@@ -343,7 +343,7 @@ function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; sh
     const n = fail + warn
     return { mood: 'waiting', short: `Good, with ${n} to fix`, title: `A few things to fix: ${n} of ${dcma.applicable} checks need${n === 1 ? 's' : ''} attention.`, sub: `Start with the first item under “What to fix”. ${questions}` }
   }
-  return { mood: 'worried', short: 'Needs work', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with the first item under “What to fix”; each says what it means and how to fix it. ${questions}` }
+  return { mood: 'worried', short: 'Needs work', title: `This schedule needs work: ${fail} of ${dcma.applicable} checks fail.`, sub: `Start with “What to fix”. ${questions}` }
 }
 
 /** No schedule yet: an idle status and one clear next step. */
