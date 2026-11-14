@@ -80,7 +80,8 @@ export const PROJECT_TABS = [
   { href: '/dashboard/resources',   label: 'Resources' },
   { href: '/dashboard/documents',   label: 'Documents' },
   { href: '/dashboard/reports',     label: 'Reports' },
-  { href: '/dashboard/ask',         label: 'Ask AI' },
+  // "Ask", not "Ask AI": with AI off the answers come from RunF9's rules, so the tab does not promise a model.
+  { href: '/dashboard/ask',         label: 'Ask' },
 ]
 /** Pages that work on one uploaded schedule: they show the project header and tabs. */
 const SCHEDULE_PAGES = PROJECT_TABS.map(t => t.href)
@@ -102,7 +103,7 @@ const STATUS_PILL: Record<string, { label: string; cls: string; dot: string }> =
 interface LlmStatus { mode: 'cloud' | 'local' | 'offline'; airgapped: boolean; provider?: ProviderName | null; model: string | null; certified?: boolean; host: string | null; error?: string }
 /** "claude-opus-5-5 (Anthropic (Claude))", plus a note when the model is an approved alternate rather than certified. */
 const modelLine = (l: LlmStatus) => `${l.model}${l.provider ? ` · ${PROVIDER_LABEL[l.provider]}` : ''}${l.certified === false ? ' · approved alternate (not certified; quality may differ)' : ''}`
-const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI offline'
+const aiLabel = (l: LlmStatus | null) => !l ? '' : l.mode === 'cloud' ? 'Cloud AI' : l.mode === 'local' ? 'On-prem AI' : 'AI off · rules only'
 
 /** Schedule id a deep link asks for: /dashboard/project?schedule=<id> (Home links) or ?id=<id>; old /dashboard?schedule= links too. */
 function deepLinkedScheduleId(pathname: string, params: { get(name: string): string | null }): string | null {
@@ -484,7 +485,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </nav>
                       {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
                       <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
-                        <h1 className="page-title min-w-0 max-md:truncate max-md:text-[20px]" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
+                        <h1 className="page-title min-w-0 max-md:text-[17px] max-md:leading-[1.2] max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
                           return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null

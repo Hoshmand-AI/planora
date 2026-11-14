@@ -97,7 +97,7 @@ function Summary({ data }: { data: Analysis }) {
   const t = data.totals
   const items = [
     ['Resources', n(t.resources)], ['Assignments', n(t.assignments)], ['Total units', n(t.units)],
-    ['Over-allocated', n(t.overAllocatedResources)], ['Days over-allocated', n(t.overAllocatedDays)],
+    ['Resources over-allocated', n(t.overAllocatedResources)], ['Days over-allocated ahead', n(t.overAllocatedDays)],
   ]
   return (
     <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -130,9 +130,9 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
                 <td className="pr-3 capitalize">{r.kind}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}<span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span></td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
-                <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}{r.availablePerDay !== null && r.peakPerDay > r.availablePerDay && !r.overAllocatedDays && <span className="block text-[12px] text-warm-600">already passed</span>}</td>
+                <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.totalUnits)}</td>
-                <td className={`pr-3 text-right tabular-nums ${r.overAllocatedDays ? 'text-status-at-risk font-semibold' : ''}`}>{r.overAllocatedDays ? `! ${r.overAllocatedDays}` : '0'}</td>
+                <td className={`pr-3 text-right tabular-nums ${r.overAllocatedDays ? 'text-status-at-risk font-semibold' : ''}`}>{r.overAllocatedDays ? `! ${r.overAllocatedDays}` : '0'}{r.availablePerDay !== null && r.peakPerDay > r.availablePerDay && !r.overAllocatedDays && <span className="block text-[12px] font-normal text-warm-600">the peak has passed</span>}</td>
                 <td><Button variant="ghost" aria-pressed={r.id === current} onClick={() => onSelect(r.id)}>Show histogram<span className="sr-only"> for {r.code}</span></Button></td>
               </tr>
             ))}
@@ -149,11 +149,11 @@ function HistogramSection({ r, bucket }: { r: ResourceSummary; bucket: Histogram
   const [asTable, setAsTable] = useState(false)
   const bars = r.histogram ?? []
   const over = bars.filter(b => b.overAllocatedDays > 0)
-  const summary = `${r.code} ${r.name}: demand by ${BUCKET_WORD[bucket]} from ${fmtDate(bars[0]?.start)} to ${fmtDate(bars[bars.length - 1]?.end)}. Peak ${n(r.peakPerDay)} ${r.unit} per day on ${fmtDate(r.peakDate)}; available ${n(r.availablePerDay)} ${r.unit} per day. ${over.length ? `${over.length} ${BUCKET_WORD[bucket]}${over.length === 1 ? '' : 's'} over-allocated.` : 'Never over-allocated.'}`
+  const summary = `${r.code} ${r.name}: demand by ${BUCKET_WORD[bucket]} from ${fmtDate(bars[0]?.start)} to ${fmtDate(bars[bars.length - 1]?.end)}. Peak ${n(r.peakPerDay)} ${r.unit} per day on ${fmtDate(r.peakDate)}; available ${n(r.availablePerDay)} ${r.unit} per day. ${over.length ? `Over-allocated on ${r.overAllocatedDays} day${r.overAllocatedDays === 1 ? '' : 's'} ahead${bucket === 'day' ? '' : `, in ${over.length} ${BUCKET_WORD[bucket]}${over.length === 1 ? '' : 's'}`}.` : 'Not over-allocated from the data date on.'}`
   return (
     <section aria-labelledby="res-hist">
       <div className="flex items-center justify-between mb-2">
-        <h3 id="res-hist" className="text-[14px] font-semibold text-navy-950">Histogram: {r.code} — {r.name}</h3>
+        <h3 id="res-hist" className="text-[14px] font-semibold text-navy-950">Histogram: {r.code} — {r.name} <span className="font-normal text-warm-600">({r.unit} per {BUCKET_WORD[bucket]})</span></h3>
         <Button variant="secondary" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}>{asTable ? 'Show chart' : 'Show as table'}</Button>
       </div>
       {!bars.length ? <p className="text-[13px] text-warm-600">No load in this view. Pick the resource with “Show histogram” to load its daily histogram.</p>
@@ -212,10 +212,10 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         </div>
       )}
       <figcaption className="flex flex-wrap gap-4 text-[12px] text-warm-700 mt-1">
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ahead ({unit} per {BUCKET_WORD[bucket]})</span>
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#9BA8AB" /></svg>Already worked (before the data date, not counted as over-allocated)</span>
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>At least one day over its daily limit (hatched, marked “!”), even where the {BUCKET_WORD[bucket]}’s total is under the line</span>
-        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available per {BUCKET_WORD[bucket]}</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ahead</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#9BA8AB" /></svg>Already worked</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>Has a day over the daily limit</span>
+        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
       </figcaption>
     </figure>
   )
@@ -264,7 +264,7 @@ function OverAllocations({ periods, title = 'Over-allocations' }: { periods: Ove
 
 function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSummary[]; staffing: Record<string, number>; setStaffing: (s: Record<string, number>) => void }) {
   const limited = resources.filter(r => r.kind !== 'material')
-  const [rid, setRid] = useState(limited[0]?.id ?? '')
+  const [rid, setRid] = useState((limited.find(r => r.overAllocatedDays > 0) ?? limited[0])?.id ?? '')
   const [val, setVal] = useState('')
   const r = limited.find(x => x.id === rid)
   if (!limited.length) return null

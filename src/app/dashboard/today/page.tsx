@@ -186,7 +186,9 @@ export default function TodayPage() {
         <p className={`mt-1 text-[20px] md:text-[24px] font-bold tracking-[-0.02em] ${tone}`}>
           {b.headline.status === 'behind' ? `No. ${b.headline.daysBehind} day${b.headline.daysBehind === 1 ? '' : 's'} behind.` : b.headline.status === 'ahead' ? `Yes. ${-b.headline.daysBehind!} day${b.headline.daysBehind === -1 ? '' : 's'} ahead.` : b.headline.status === 'on_track' ? 'Yes. On time.' : 'No required date is set.'}
         </p>
-        <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
+        {/* The headline and the tiles carry the number and the dates; this line says what is measured and where the date comes from. */}
+        <p className="mt-1 text-[14px] text-warm-700">{b.headline.status === 'unknown' || !b.headline.required ? fmtDates(b.headline.text)
+          : <>{b.headline.milestone ?? 'Project finish'}{b.headline.requiredSource ? <> · required date from {b.headline.requiredSource === 'Must Finish By' ? 'the schedule’s Must Finish By date' : b.headline.requiredSource}</> : null}</>}</p>
         <dl className={`mt-4 grid grid-cols-2 gap-3 ${data.alerts.length > 0 ? 'md:grid-cols-4 xl:grid-cols-2' : 'md:grid-cols-4'}`}>
           {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue activities', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
             <div key={k} className="rounded-xl bg-white border border-warm-200 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className={`${String(v).length > 12 ? 'text-[14px]' : 'text-[18px]'} font-semibold text-navy-950 tabular-nums`}>{v}</dd></div>
@@ -195,7 +197,7 @@ export default function TodayPage() {
         {data.alerts.length > 0 && b.audiences[audience].length > 1 && (
           <div className="hidden xl:block mt-4 border-t border-warm-200 pt-3">
             <ul className="space-y-1.5">
-              {b.audiences[audience].slice(1, 4).map((l, k) => <li key={k} className="flex gap-2 text-[13px] text-warm-700"><span aria-hidden className="mt-[7px] w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
+              {b.audiences[audience].slice(1).filter(l => !/^Overdue:|^\d+ open change items?\b/.test(l)).slice(0, 3).map((l, k) => <li key={k} className="flex gap-2 text-[13px] text-warm-700"><span aria-hidden className="mt-[7px] w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
             </ul>
             <button type="button" onClick={() => setPart('brief')} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">Read the full brief</button>
           </div>

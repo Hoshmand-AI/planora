@@ -170,9 +170,17 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   // What needs someone's attention today, most pressing first.
   const alerts: BriefAlert[] = []
   const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
-  if (brief.headline.status === 'behind') alerts.push({ level: 'act', section: 'deadline', text: `The forecast is ${n(brief.headline.daysBehind!, 'day')} behind the required date.` })
-  if (brief.overdue.finishCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.` })
-  if (brief.overdue.startCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.` })
+  // The short line names the milestone or the activity, so the list does not repeat the count shown beside it.
+  const late = (rows: typeof brief.overdue.shouldHaveFinished, count: number, verb: string): string | undefined => {
+    const r = rows[0]
+    if (!r) return undefined
+    const first = `${r.code} ${r.name} should have ${verb}${r.date ? ` ${r.date}` : ''}${r.daysLate ? `, ${n(r.daysLate, 'day')} late` : ''}`
+    return count > 1 ? `${first}; ${n(count - 1, 'more activity', 'more activities')} also late.` : `${first}.`
+  }
+  if (brief.headline.status === 'behind') alerts.push({ level: 'act', section: 'deadline', text: `The forecast is ${n(brief.headline.daysBehind!, 'day')} behind the required date.`,
+    short: brief.headline.forecast && brief.headline.required ? `${brief.headline.milestone ?? 'The project finish'} is forecast ${brief.headline.forecast}, required ${brief.headline.required}.` : undefined })
+  if (brief.overdue.finishCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.`, short: late(brief.overdue.shouldHaveFinished, brief.overdue.finishCount, 'finished') })
+  if (brief.overdue.startCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.`, short: late(brief.overdue.shouldHaveStarted, brief.overdue.startCount, 'started') })
   // The attention list shows one line per item: the fact and its number. The full sentence stays in `text`.
   const usd = (v: number) => '$' + Math.round(v).toLocaleString('en-US')
   const contractShort = (c: (typeof watch.contract)[number]): string | undefined =>
