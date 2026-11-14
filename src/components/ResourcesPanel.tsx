@@ -128,7 +128,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
               <tr key={r.id} className={`border-b border-warm-200 ${r.id === current ? 'bg-accent-100' : ''}`}>
                 <th scope="row" className="py-1.5 pr-3 text-left font-medium text-navy-950">{r.code}<span className="block text-[12px] font-normal text-warm-600">{r.name}</span></th>
                 <td className="pr-3 capitalize">{r.kind}</td>
-                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}<span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span></td>
+                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}{/* "from the file" is the normal case and is not repeated on every row; anything else is said. */}{r.availabilitySource !== 'file' && <span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span>}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
                 <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.totalUnits)}</td>
