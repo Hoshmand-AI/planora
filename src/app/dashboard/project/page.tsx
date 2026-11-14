@@ -157,11 +157,11 @@ export default function ProjectPage() {
       {/* About this project — what, where, when, what must be achieved */}
       {brief && (
         <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          <h2 className="text-[15px] font-semibold text-navy-950 mb-1.5">About this project</h2>
-          <p className="text-[14px] text-warm-700 leading-relaxed">{brief.summary}</p>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
+          {/* Facts, not a paragraph: the sentence that used to sit here restated the tiles above. */}
+          <h2 className="text-[15px] font-semibold text-navy-950 mb-1.5">Project facts</h2>
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
             {brief.facts.map(f => (
-              <div key={f.label} className="text-[12px]"><span className="text-warm-400">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
+              <div key={f.label} className="text-[12px]"><span className="text-warm-600">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
             ))}
           </div>
           {brief.nextMilestones.length > 0 && (

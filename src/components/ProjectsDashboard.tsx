@@ -156,7 +156,7 @@ export function ProjectsDashboard() {
         <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
-      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold shadow-sm">
+      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold shadow-sm">
         <Plus size={15} aria-hidden /> New project
       </Link>
     </div>

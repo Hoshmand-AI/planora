@@ -411,7 +411,7 @@ export default function OrgPage() {
                 else setVerify(d)
               } catch { setVerifyErr('The check could not run (network error). This says nothing about the records.') } finally { setBusy(null) }
             }}>{busy === 'verify' ? 'Verifying…' : 'Verify integrity'}</Button>
-            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
+            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-full text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
           </div>
           {verifyErr && <div className="mb-3"><Alert tone="warning">{verifyErr}</Alert></div>}
           {verify && (

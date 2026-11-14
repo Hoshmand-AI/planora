@@ -59,7 +59,7 @@ export function DataCenterSampleButton({ className = '' }: { className?: string 
 
   return (
     <div className={className}>
-      <button type="button" onClick={open} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-4 py-2 text-[13.5px] font-semibold text-navy-950 hover:bg-warm-100 disabled:opacity-70">
+      <button type="button" onClick={open} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-4 py-2 text-[13px] font-semibold text-navy-950 hover:bg-warm-100">
         {busy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Server size={14} aria-hidden />}
         {busy || 'Open the sample data center (60 MW)'}
       </button>

@@ -157,7 +157,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
 
       {data.suggestions.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <button type="button" onClick={download} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12.5px] text-navy-950">
+          <button type="button" onClick={download} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950">
             <Download size={13} aria-hidden /> Download all as CSV
           </button>
           <span className="text-[12px] text-warm-600">
@@ -208,7 +208,7 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
           <p className="text-[12.5px] text-warm-700 mt-0.5">{s.reason} <span className="text-warm-600">· {level(s.confidence)} ({Math.round(s.confidence * 100)}%)</span></p>
         </div>
         {canApply && !confirming && (
-          <button type="button" onClick={() => setConfirming(true)} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium flex-shrink-0">Add this link</button>
+          <button type="button" onClick={() => setConfirming(true)} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold flex-shrink-0">Add this link</button>
         )}
       </div>
       {confirming && (
@@ -218,8 +218,8 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
           </label>
           <p className="text-[12px] text-warm-600">Adds a {LINK_TYPE_NAME[s.type] ?? s.type} link{s.lag ? ` with a ${Math.abs(s.lag)}-day ${s.lag > 0 ? 'lag' : 'lead'}` : ''} to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
-            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3 py-1.5 rounded-md border border-warm-300 text-[12.5px] text-navy-950">Cancel</button>
+            <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
+            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3.5 py-1.5 rounded-full border border-warm-300 text-[13px] text-navy-950">Cancel</button>
           </div>
           {err && <p role="alert" className="text-[12px] text-status-at-risk">{err}</p>}
         </div>

@@ -147,7 +147,7 @@ export function SmartInterview(p: SmartInterviewProps) {
             <li>Every question was ranked by re-scheduling the project {ad.simulations} times against its possible answers.</li>
           </ul>
           {p.canWrite && (p.llm.mode !== 'offline' ? (
-            <button onClick={p.onSuggest} disabled={!!p.busy} className="pressable mt-3 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-navy-950 hover:border-navy-900 disabled:opacity-50">
+            <button onClick={p.onSuggest} disabled={!!p.busy} className="pressable mt-3 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-navy-950 hover:bg-warm-100">
               {p.busy === 'suggest' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Sparkles size={13} aria-hidden />} Ask AI for project-specific follow-ups
             </button>
           ) : <p className="text-[12.5px] text-warm-500 mt-3">AI follow-ups are off ({p.llm.error || 'offline mode'}). The rule-based interview covers the core schedule drivers.</p>)}
@@ -177,7 +177,7 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
           )}
         </div>
         {canWrite && (settled || hasSchedule) && (
-     <button onClick={onGenerate} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold hover:bg-accent-600 hover:bg-accent-700 disabled:opacity-50">
+     <button onClick={onGenerate} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold hover:bg-accent-600 hover:bg-accent-700">
             {busy === 'generate' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : null}
             {hasSchedule ? 'Rebuild with my answers' : 'Build my schedule'} <ArrowRight size={15} aria-hidden />
           </button>
@@ -265,7 +265,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
               <option value="">Choose…</option>
               {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-      <button disabled={busy || disabled || !value} onClick={() => submit(value)} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
+      <button disabled={busy || disabled || !value} onClick={() => submit(value)} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold">Continue</button>
             {q.allowOther && <div className="w-full"><TextAnswer kind="text" placeholder={q.id === 'project.state' ? 'Not in the US? e.g. Toronto, Ontario, Canada' : q.otherPrompt || 'Or type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} /></div>}
           </div>
         )}
@@ -310,7 +310,7 @@ function TextAnswer({ kind, unit, placeholder, busy, disabled, onSubmit, autoFoc
         placeholder={placeholder} aria-label={placeholder}
         className={`rounded-xl border border-warm-300 bg-warm-50 px-3 py-2.5 text-[15px] text-navy-950 placeholder:text-warm-400 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
       {unit && kind === 'number' && <span className="text-[13px] text-warm-500">{unit}</span>}
-   <button disabled={busy || disabled || !v.trim()} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
+   <button disabled={busy || disabled || !v.trim()} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold">Continue</button>
     </form>
   )
 }
@@ -365,7 +365,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
         })}
       </ul>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-    <button disabled={busy || disabled || !count} onClick={() => save('skip')} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold disabled:opacity-40">
+    <button disabled={busy || disabled || !count} onClick={() => save('skip')} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold">
           {busy ? <Loader2 size={14} className="animate-spin inline mr-1.5" aria-hidden /> : null}Save {count || ''} answer{count === 1 ? '' : 's'}
         </button>
         <button disabled={busy || disabled} onClick={() => save('unknown')} className="text-[13.5px] text-warm-600 hover:text-navy-950">{count ? 'Save, and I don’t know the rest' : 'I don’t know any of these yet'}</button>
@@ -385,7 +385,7 @@ function CompactQuestion({ q, reason, busy, disabled, onAnswer }: { q: Question;
       {reason && <div className="text-[12px] text-warm-500 mt-0.5">{reason}</div>}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         {choices ? choices.map(o => (
-          <button key={String(o.value)} disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'known', value: o.value as Answer['value'] })} className="pressable rounded-full border border-warm-300 bg-warm-50 hover:border-navy-900 px-3 py-1 text-[12.5px] text-navy-950 disabled:opacity-50">{o.label}</button>
+          <button key={String(o.value)} disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'known', value: o.value as Answer['value'] })} className="pressable rounded-full border border-warm-300 bg-white hover:bg-warm-100 px-3.5 py-1.5 text-[13px] text-navy-950">{o.label}</button>
         )) : <TextAnswer kind={q.kind === 'number' || q.kind === 'date' ? q.kind : 'text'} unit={q.unit} placeholder={q.unit || 'Your answer'} busy={busy} disabled={disabled} onSubmit={v => onAnswer(q.id, { status: 'known', value: q.kind === 'number' ? Number(v) : v })} />}
         <button disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'unknown' })} className="text-[12.5px] text-warm-500 hover:text-navy-950 ml-1">Don&apos;t know</button>
       </div>
@@ -415,7 +415,7 @@ function AddNote({ busy, onAddNote }: { busy: boolean; onAddNote: (t: string) =>
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} aria-label="Information to add"
         placeholder="e.g. The utility will only energize the substation after the owner's commissioning agent signs off"
         className="w-full rounded-xl border border-warm-300 bg-warm-50 px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400" />
-   <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold disabled:opacity-40">Add to brief</button>
+   <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold">Add to brief</button>
     </Disclosure>
   )
 }

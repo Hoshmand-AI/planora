@@ -12,7 +12,7 @@ import { AlertTriangle, FileText, HardHat, CalendarCheck, CalendarClock, CheckCi
 import { EmptyState } from '@/components/EmptyState'
 import { Disclosure } from '@/components/Disclosure'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
-import { Alert, postJson } from '@/components/ui'
+import { Alert, postJson, buttonClass } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
@@ -43,8 +43,8 @@ const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: '
 const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif', 'risks', 'issues', 'changed', 'missing', 'logic'])
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
-const btn = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
-const btnPrimary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
+const btn = buttonClass.secondary
+const btnPrimary = buttonClass.primary
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 export default function TodayPage() {
@@ -157,14 +157,14 @@ export default function TodayPage() {
         </div>
         <div className="flex flex-wrap max-md:flex-nowrap max-md:w-full max-md:[&>*]:flex-1 max-md:[&>*]:min-w-0 items-end gap-x-3 gap-y-2">
           <div>
-            <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5 max-md:sr-only">Show the day for</p>
+            <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5">Show the day for</p>
             {/* The reader is one dropdown on every screen. It was a row of pills on wide screens, identical to the
                 section tabs under it, so two rows of the same control meant two different things. */}
             <select aria-label="Show the day for" value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} block min-h-[36px]`}>
               {AUDIENCES.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
             </select>
           </div>
-          <label className="text-[12px] text-warm-600"><span className="max-md:sr-only">Brief for</span>
+          <label className="text-[12px] text-warm-600"><span>Brief for</span>
             <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px] max-md:w-full max-md:min-w-0`} />
           </label>
         </div>
@@ -179,7 +179,7 @@ export default function TodayPage() {
       </div>
 
       {/* On a wide screen the answer and what needs action sit side by side, so both are on the first screen. */}
-      <div hidden={shownPart !== 'now'} className={data.alerts.length > 0 ? 'grid gap-5 items-stretch xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
+      <div hidden={shownPart !== 'now'} className={data.alerts.length > 0 ? 'grid gap-5 items-start xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
       {/* The answer first: are we meeting the deadline, and by how much. */}
       <section aria-labelledby="deadline-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
         <h2 id="deadline-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</h2>
@@ -463,7 +463,7 @@ function Card({ id, icon, title, sub, meta, open, onToggle, children }: { id: st
 
 function RowBtn({ label, onClick, busy, disabled }: { label: string; onClick: () => void; busy: boolean; disabled?: boolean }) {
   // One save at a time: every row waits while another row's progress is being recorded.
-  return <button type="button" onClick={onClick} disabled={busy || disabled} className="flex-shrink-0 rounded-full border border-warm-300 bg-white px-3 min-h-[32px] text-[12.5px] font-medium text-navy-950 hover:bg-warm-100 disabled:opacity-60">{busy ? 'Saving…' : label}</button>
+  return <button type="button" onClick={onClick} disabled={busy || disabled} className="flex-shrink-0 px-1 min-h-[32px] text-[13px] font-semibold text-accent-600 hover:underline disabled:text-warm-600 disabled:no-underline">{busy ? 'Saving…' : label}</button>
 }
 
 function List({ title, rows, empty, late, showNote, dateLabel, plain, action }: { title: string; rows: BriefRow[]; empty: string; late?: boolean; showNote?: boolean; dateLabel?: string; /** Dates only: no float (work that is already done) */ plain?: boolean; action?: (r: BriefRow) => React.ReactNode }) {

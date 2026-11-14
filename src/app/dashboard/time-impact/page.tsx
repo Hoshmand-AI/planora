@@ -11,7 +11,7 @@ import { Disclosure } from '@/components/Disclosure'
 import { Loader2 } from 'lucide-react'
 import { useApp } from '../layout'
 import { fmtDate, fmtDateTime } from '@/lib/format'
-import { Alert, postJson } from '@/components/ui'
+import { Alert, postJson, buttonClass } from '@/components/ui'
 import { EmptyState } from '@/components/EmptyState'
 import type { DelayEvent, Fragnet, FragnetActivity, FragnetLink, Responsibility, TiaResult, TiaRun } from '@/lib/analysis/tia'
 import type { FragnetDraft } from '@/lib/analysis/tia-draft'
@@ -31,8 +31,8 @@ const STATUS: Record<string, string> = { draft: 'Draft', analyzed: 'Analysed', a
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
 const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
-const primary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
-const secondary = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
+const primary = buttonClass.primary
+const secondary = buttonClass.secondary
 const signed = (n: number | null | undefined) => (n == null ? '—' : n > 0 ? `+${n}` : String(n))
 
 export default function TimeImpactPage() {

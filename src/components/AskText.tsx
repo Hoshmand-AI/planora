@@ -67,7 +67,7 @@ export function AskTextHost() {
           className="w-full border border-warm-300 rounded-md px-3 py-2 text-[16px] md:text-[14px] text-navy-950 placeholder:text-warm-500 focus:outline-none focus:ring-2 focus:ring-accent-500" />
         <div className="flex justify-end gap-2 mt-4">
           <button type="button" onClick={() => finish(null)} className="px-4 py-2 rounded-full text-[14px] font-medium text-warm-700 hover:bg-warm-100">Cancel</button>
-          <button type="submit" disabled={!!pending.required && !text} className="px-4 py-2 rounded-full text-[14px] font-semibold bg-accent-600 hover:bg-accent-700 text-white disabled:opacity-50">{pending.confirmLabel ?? 'Save'}</button>
+          <button type="submit" disabled={!!pending.required && !text} className="px-4 py-2 rounded-full text-[13px] font-semibold bg-accent-600 hover:bg-accent-700 text-white">{pending.confirmLabel ?? 'Save'}</button>
         </div>
       </form>
     </dialog>

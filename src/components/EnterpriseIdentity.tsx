@@ -138,8 +138,8 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
                 <CopyLine label="Entity ID (Audience)" value={sp.entityId} />
                 <CopyLine label="Assertion consumer service (Reply) URL, HTTP-POST" value={sp.acsUrl} />
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <a href={`${sp.metadataUrl}?download=1`} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download SP metadata</a>
-                  {saml.saml.certs.length > 0 && saml.saml.ssoUrl && <a href={`${sp.loginUrl}?test=1`} className="px-3.5 py-2 rounded-md text-[13px] border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium">Test sign-in</a>}
+                  <a href={`${sp.metadataUrl}?download=1`} className="px-3.5 py-2 rounded-full text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download SP metadata</a>
+                  {saml.saml.certs.length > 0 && saml.saml.ssoUrl && <a href={`${sp.loginUrl}?test=1`} className="px-3.5 py-2 rounded-full text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium">Test sign-in</a>}
                 </div>
                 <p className="text-[12px] text-warm-600">Test sign-in checks the whole response from your identity provider and reports the result here. It does not sign you in or add anyone.</p>
               </div>
