@@ -68,8 +68,15 @@ for (const name of DEVICES) {
     if (current?.trim() !== tab) fail(name, `tab ${tab} not current (${current})`)
     await fits(tab)
     if (tab === 'Schedule') {
-      await tap(page.getByRole('button', { name: 'Zoom in' })); await page.waitForTimeout(300)
-      await fits('Schedule zoomed')
+      if (desc.viewport.width >= 768) {
+        await tap(page.getByRole('button', { name: 'Zoom in' })); await page.waitForTimeout(300)
+        await fits('Schedule zoomed')
+      } else {
+        // Phones get a list in place of the chart: every activity row must show its dates in words, and no zoom control.
+        const row = await page.locator('button[aria-pressed]').filter({ hasText: /\d{2}\/\d{2}\/\d{4}/ }).first().textContent().catch(() => null)
+        if (!row) fail(name, 'Schedule list shows no activity dates on a phone'); else console.log('   ✓ Schedule is a list with dates on a phone')
+        if (await page.getByRole('button', { name: 'Zoom in' }).isVisible().catch(() => false)) fail(name, 'zoom control shown on a phone, where there is no chart')
+      }
       if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-schedule.png` })
     }
   }
