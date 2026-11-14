@@ -177,10 +177,13 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     const first = `${r.code} ${r.name} should have ${verb}${r.date ? ` ${r.date}` : ''}${r.daysLate ? `, ${n(r.daysLate, 'day')} late` : ''}`
     return count > 1 ? `${first}; ${n(count - 1, 'more activity', 'more activities')} also late.` : `${first}.`
   }
+  // Late work with float to spare is worth watching, not acting on today: only late work that is critical, or has used
+  // up its float, is an "Act". This is what ranks the list.
+  const urgent = (rows: typeof brief.overdue.shouldHaveFinished): 'act' | 'watch' => rows.some(r => r.critical || (r.float ?? 0) <= (r.daysLate ?? 0)) ? 'act' : 'watch'
   if (brief.headline.status === 'behind') alerts.push({ level: 'act', section: 'deadline', text: `The forecast is ${n(brief.headline.daysBehind!, 'day')} behind the required date.`,
     short: brief.headline.forecast && brief.headline.required ? `${brief.headline.milestone ?? 'The project finish'} is forecast ${brief.headline.forecast}, required ${brief.headline.required}.` : undefined })
-  if (brief.overdue.finishCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.`, short: late(brief.overdue.shouldHaveFinished, brief.overdue.finishCount, 'finished') })
-  if (brief.overdue.startCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.`, short: late(brief.overdue.shouldHaveStarted, brief.overdue.startCount, 'started') })
+  if (brief.overdue.finishCount) alerts.push({ level: urgent(brief.overdue.shouldHaveFinished), section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.`, short: late(brief.overdue.shouldHaveFinished, brief.overdue.finishCount, 'finished') })
+  if (brief.overdue.startCount) alerts.push({ level: urgent(brief.overdue.shouldHaveStarted), section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.`, short: late(brief.overdue.shouldHaveStarted, brief.overdue.startCount, 'started') })
   // The attention list shows one line per item: the fact and its number. The full sentence stays in `text`.
   const usd = (v: number) => '$' + Math.round(v).toLocaleString('en-US')
   const contractShort = (c: (typeof watch.contract)[number]): string | undefined =>
@@ -198,6 +201,9 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   if (brief.lookahead.becomingCritical.length) alerts.push({ level: 'watch', section: 'lookahead', text: `${n(brief.lookahead.becomingCritical.length, 'activity is', 'activities are')} within ${10} work days of becoming critical.` })
   if (watch.notInSchedule.length) alerts.push({ level: 'watch', section: 'documents', text: `The project documents name ${n(watch.notInSchedule.length, 'kind')} of work that no activity covers: ${watch.notInSchedule.slice(0, 3).map(x => x.label).join('; ')}.` })
   if (brief.staleDays != null && brief.staleDays > 10) alerts.push({ level: 'watch', section: 'deadline', text: `Progress is ${brief.staleDays} days old. Record progress or upload an update.` })
+
+  // What to act on comes first; within each level the order above (deadline, late work, contract, field) stands.
+  alerts.sort((a, b) => (a.level === 'act' ? 0 : 1) - (b.level === 'act' ? 0 : 1))
 
   return {
     brief, watch, alerts,
