@@ -193,7 +193,7 @@ export default function TimelinePage() {
           <span className="sr-only">Find an activity</span>
           <Search size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an activity"
-            className="w-full rounded-full border border-warm-300 bg-white pl-9 pr-3 py-1.5 text-[13.5px] text-warm-700 placeholder:text-warm-500" />
+            className="w-full rounded-md border border-warm-300 bg-white pl-9 pr-3 py-1.5 text-[13.5px] text-warm-700 placeholder:text-warm-500" />
         </label>
       </div>
 
