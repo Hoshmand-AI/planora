@@ -147,7 +147,8 @@ export default function TodayPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        {/* On a phone the date field and the reader dropdown say the same thing as this title block, so it is dropped to bring the answer up. */}
+        <div className="max-md:hidden">
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
           <h2 className="tab-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h2>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
@@ -173,7 +174,7 @@ export default function TodayPage() {
       </header>
       {err && <Alert tone="error">{err}</Alert>}
 
-      <div role="tablist" aria-label="Parts of the brief" className="flex gap-1.5 overflow-x-auto [&>button]:flex-shrink-0">
+      <div role="tablist" aria-label="Parts of the brief" className="flex gap-1.5 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
         {parts.map(x => (
           <button key={x.id} role="tab" type="button" id={`part-${x.id}`} aria-selected={shownPart === x.id} onClick={() => setPart(x.id)}
             className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border whitespace-nowrap ${shownPart === x.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{x.label}</button>
