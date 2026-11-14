@@ -284,7 +284,7 @@ export default function PlanPage() {
   const canPublish = !!g && can('plan.publish')
   const primary: 'generate' | 'publish' | 'export' | null = !g ? (can('plan.write') ? 'generate' : null) : canPublish && !plan.scheduleId ? 'publish' : 'export'
   const quiet = 'pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-navy-950 hover:bg-warm-200/70 disabled:opacity-50'
-  const loud = 'pressable inline-flex items-center gap-1.5 rounded-full bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 text-[13px] font-semibold disabled:opacity-50'
+ const loud = 'pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold disabled:opacity-50'
 
   return (
     <div className="px-4 md:px-6 pb-8">
@@ -582,7 +582,7 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
         <div className="md:col-span-2 flex gap-2">
           <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
             if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); setOpen(false) }
-          }} className="flex-1 bg-navy-900 text-white rounded-md text-[13px] font-medium py-1.5 disabled:opacity-40">Add</button>
+     }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-full text-[13px] font-medium py-1.5 disabled:opacity-40">Add</button>
           <button onClick={() => setOpen(false)} className="px-3 border border-warm-300 rounded-md text-[13px] text-warm-600">Cancel</button>
         </div>
       </div>
@@ -659,7 +659,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                     <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label={`Duration of ${a.code} in work days`} className="w-24 bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
                     <span className="text-[12px] text-warm-500">work days</span>
                     <button disabled={!!busy || !reason.trim() || Number(dur) === a.duration} onClick={async () => { if (await onEdit({ kind: 'duration', activityId: a.id, value: Number(dur), reason })) setReason('') }}
-                      className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Set duration</button>
+           className="bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 rounded-full text-[12.5px] font-medium disabled:opacity-40">Set duration</button>
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 items-center">
@@ -673,7 +673,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                   </select>
                   <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[12.5px]" />
                   <button disabled={!!busy || !reason.trim() || !linkTarget} onClick={async () => { if (await onEdit({ kind: 'add_link', from: a.id, to: linkTarget, type: linkType, lag: Number(linkLag) || 0, reason })) { setReason(''); setLinkTarget('') } }}
-                    className="bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Link</button>
+          className="bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 rounded-full text-[12.5px] font-medium disabled:opacity-40">Link</button>
                 </div>
                 {!['ntp', 'substantial_completion', 'final_completion'].includes(a.category) && (
                   <button disabled={!!busy || !reason.trim()} onClick={async () => { if (confirm(`Remove ${a.code}? Its predecessors will be linked to its successors.`)) await onEdit({ kind: 'remove_activity', activityId: a.id, reason }) }}
@@ -856,7 +856,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
           </select>
           <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
-          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-navy-950 hover:bg-navy-900 text-white rounded-full text-[13px] font-semibold py-2 disabled:opacity-50">Record review</button>
+     <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-accent-600 hover:bg-accent-700 text-white rounded-full text-[13px] font-semibold py-2 disabled:opacity-50">Record review</button>
           <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
         </div>
         )}
@@ -907,7 +907,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
             {g.actions.map((a, i) => a.kind === 'filter'
               ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
               : a.kind === 'recovery'
-                ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-full bg-navy-950 text-white text-[12.5px] font-medium">{a.label}</button>
+        ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[12.5px] font-medium">{a.label}</button>
                 : a.kind === 'interview'
                   ? <button key={i} onClick={onInterview} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}</button>
                   : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-full border border-warm-300 bg-white text-[12.5px] text-navy-950 hover:border-navy-900">{a.label}…</button>)}

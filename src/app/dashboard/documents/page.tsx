@@ -138,7 +138,7 @@ export default function DocumentsPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-        <h1 className="page-title mb-1">Project documents</h1>
+        <h2 className="tab-title mb-1">Project documents</h2>
         <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
           Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
           Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.

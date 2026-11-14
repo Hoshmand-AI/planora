@@ -30,7 +30,7 @@ const STATUS: Record<string, string> = { draft: 'Draft', analyzed: 'Analysed', a
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
 const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
-const primary = 'px-3 py-1.5 rounded-full bg-navy-950 text-white text-[13px] font-medium disabled:opacity-60'
+const primary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
 const secondary = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
 const signed = (n: number | null | undefined) => (n == null ? '—' : n > 0 ? `+${n}` : String(n))
 
@@ -124,7 +124,7 @@ export default function TimeImpactPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header>
         <p className="text-[12px] text-warm-600"><Link href="/dashboard/project" className="underline">Project overview</Link> / Time impact</p>
-        <h1 className="page-title">Time impact analysis</h1>
+        <h2 className="tab-title">Time impact analysis</h2>
         <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}) · data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
       <Alert tone="info"><strong>Calculation, not conclusion.</strong> {data.disclaimer}</Alert>

@@ -67,7 +67,7 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
               <input key={inputKey} type="file" accept=".pdf,.docx,.txt,.md" onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(null); setErr('') }} className="text-[13px]" />
             </label>
             <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={drawing} onChange={e => setDrawing(e.target.checked)} /> It is a drawing set</label>
-            <button type="button" onClick={read} disabled={!file || busy} className="pressable rounded-full bg-navy-950 text-white px-4 py-1.5 text-[13px] font-semibold disabled:opacity-50">
+      <button type="button" onClick={read} disabled={!file || busy} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-1.5 text-[13px] font-semibold disabled:opacity-50">
               {busy && !result ? <><Loader2 size={13} className="inline animate-spin mr-1" aria-hidden />Reading…</> : 'Read document'}
             </button>
           </div>

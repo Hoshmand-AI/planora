@@ -40,8 +40,8 @@ function OptionCard({ o, best, busy, onRecover, onInterview }: { o: RecoveryOpti
       <div className="flex items-center justify-between gap-3 mt-3">
         <span className="text-[12.5px] text-warm-500">New finish <span className="font-semibold text-navy-950 tabular-nums">{fmtDate(o.newFinish)}</span></span>
         {o.apply.type === 'navigate'
-          ? <button onClick={onInterview} className="pressable bg-navy-900 hover:bg-navy-950 text-white px-3.5 py-1.5 rounded-full text-[12.5px] font-medium">Answer questions</button>
-          : <button disabled={!!busy} onClick={() => { if (confirm(`Apply “${o.title}”? You can override or undo any change afterwards.`)) onRecover(o.id) }} className="pressable bg-navy-900 hover:bg-navy-950 text-white px-4 py-1.5 rounded-full text-[12.5px] font-medium disabled:opacity-40">{busy === 'recover' ? <Loader2 size={12} className="animate-spin" aria-label="Applying" /> : 'Apply'}</button>}
+     ? <button onClick={onInterview} className="pressable bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-full text-[12.5px] font-medium">Answer questions</button>
+     : <button disabled={!!busy} onClick={() => { if (confirm(`Apply “${o.title}”? You can override or undo any change afterwards.`)) onRecover(o.id) }} className="pressable bg-accent-600 hover:bg-accent-700 text-white px-4 py-1.5 rounded-full text-[12.5px] font-medium disabled:opacity-40">{busy === 'recover' ? <Loader2 size={12} className="animate-spin" aria-label="Applying" /> : 'Apply'}</button>}
       </div>
       <div className="mt-3">
         <Disclosure title="Details" meta={o.impact?.cost ? (o.impact.cost.high === 0 ? '$0 added' : `${usd(o.impact.cost.low)}–${usd(o.impact.cost.high)}`) : undefined}>
