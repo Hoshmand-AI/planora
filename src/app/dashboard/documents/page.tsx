@@ -172,7 +172,7 @@ export default function DocumentsPage() {
               <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-1.5">
                 {ADD_WAYS.map(w => (
                   <button key={w.id} role="tab" type="button" aria-selected={addWay === w.id} onClick={() => setAddWay(w.id)}
-                    className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${addWay === w.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{w.label}</button>
+                    className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${addWay === w.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>{w.label}</button>
                 ))}
               </div>
             </div>

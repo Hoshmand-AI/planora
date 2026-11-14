@@ -60,7 +60,7 @@ for (const name of DEVICES) {
   await fits('Overview')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-overview.png` })
   // Every project tab
-  for (const tab of ['Today', 'Schedule', 'Quality', 'Delays', 'Resources', 'Documents', 'Reports', 'Ask AI', 'Overview']) {
+  for (const tab of ['Today', 'Schedule', 'Quality', 'Delays', 'Resources', 'Documents', 'Reports', 'Ask', 'Overview']) {
     const link = page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: tab, exact: true })
     await link.scrollIntoViewIfNeeded(); await tap(link)
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)

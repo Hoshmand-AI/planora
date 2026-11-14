@@ -149,7 +149,7 @@ export default function OrgPage() {
       }}>
         {tabs.map(t => (
           <button key={t.id} id={`org-tab-${t.id}`} role="tab" type="button" aria-selected={active === t.id} aria-controls={`org-panel-${t.id}`} tabIndex={active === t.id ? 0 : -1} onClick={() => pickTab(t.id)}
-            className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${active === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+            className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${active === t.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>
             {t.label}
           </button>
         ))}
@@ -222,13 +222,13 @@ export default function OrgPage() {
             <caption className="sr-only">Organization members</caption>
             <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
               <th scope="col" className="py-2 pr-3 font-semibold">Member</th><th scope="col" className="py-2 pr-3 font-semibold">Role</th>
-              {manage && <th scope="col" className="py-2 pr-3 font-semibold">2-step</th>}
+              {manage && <th scope="col" className="py-2 pr-3 font-semibold whitespace-nowrap">2-step</th>}
               {manage && <th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>}
             </tr></thead>
             <tbody>
               {data.members.map(m => (
                 <tr key={m.id} className="border-b border-warm-100 align-middle">
-                  <td className="py-2.5 pr-3"><div className="font-medium text-navy-950">{m.name}{m.id === data.you.id && <span className="text-warm-400 font-normal"> (you)</span>}</div><div className="text-warm-500 text-[12px]">{m.email}</div></td>
+                  <td className="py-2.5 pr-3 max-w-[180px] md:max-w-none"><div className="font-medium text-navy-950">{m.name}{m.id === data.you.id && <span className="text-warm-600 font-normal"> (you)</span>}</div><div className="text-warm-600 text-[12px] truncate" title={m.email}>{m.email}</div></td>
                   <td className="py-2.5 pr-3">
                     {manage && m.id !== data.you.id && (isOwner || !['owner', 'admin'].includes(m.role)) ? (
                       <select aria-label={`Role for ${m.name}`} value={m.role} className="bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px]"

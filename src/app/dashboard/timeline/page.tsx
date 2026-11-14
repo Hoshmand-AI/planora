@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
+import { Check, ChevronRight, Minus, Plus, Search, X } from 'lucide-react'
 import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
 import { fmtDate, fmtDates } from '@/lib/format'
@@ -167,8 +167,9 @@ export default function TimelinePage() {
         <div role="group" aria-label="Show" className="flex gap-1.5 max-md:w-full max-md:overflow-x-auto max-md:whitespace-nowrap [&>button]:flex-shrink-0 md:flex-wrap max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
           {FILTERS.map(f => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
-              className={`pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
-              {f.label} <span className={`tabular-nums font-medium ${filter === f.id ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id] ?? 0}</span>
+              className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+              {/* A filter chip, not a tab: the one that is on carries a check. */}
+              {filter === f.id && <Check size={14} aria-hidden="true" />}{f.label} <span className={`tabular-nums font-medium ${filter === f.id ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -195,7 +196,7 @@ export default function TimelinePage() {
         <Legend className="bg-status-on-track" label="Complete" />
         {/* The chart-only entries are dropped on a phone, where the schedule is a list. */}
         <span className="hidden md:contents">
-        <Legend className="bg-navy-800" label="Done so far" />
+        <Legend className="bg-navy-800" label="Progress on open work" />
         {activities?.some(a => a.baselineStart && a.baselineFinish) && <span className="flex items-center gap-1.5"><span className="w-3 h-[3px] rounded-full bg-warm-400 inline-block" /> Baseline</span>}
         {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
         </span>
@@ -211,7 +212,7 @@ export default function TimelinePage() {
             <div className="md:min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
               {/* Time ruler: calendar-aligned periods, then the data date */}
               <div className="flex h-14 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
-                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 max-md:flex-1 md:w-[260px] xl:w-[600px] flex-shrink-0 px-4"><span className="hidden xl:block flex-shrink-0 w-[64px]">ID</span><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span></div>
+                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 max-md:flex-1 md:w-[260px] xl:w-[660px] flex-shrink-0 px-4"><span className="hidden xl:block flex-shrink-0 w-[64px]">ID</span><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span></div>
                 <div className="max-md:hidden flex-1 relative tabular-nums">
                   {span && ruler.map((x, i) => (
                     <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{/^Q\d \d{4}$/.test(x.label) ? (i > 0 && !x.label.startsWith('Q1') ? x.label.slice(0, 2) : x.label.replace(/ 20(\d\d)$/, ' ’$1')) : x.label}</span>
@@ -237,7 +238,7 @@ export default function TimelinePage() {
                   <div key={g.name} className="border-b border-warm-200 last:border-0">
                     <button type="button" aria-expanded={expanded} onClick={() => setOpen(o => ({ ...o, [g.name]: !expanded }))}
                       className="group w-full flex items-center h-12 text-left hover:bg-warm-50 transition-colors focus-visible:outline-offset-[-2px]">
-                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors max-md:flex-1 md:w-[260px] xl:w-[600px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
+                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors max-md:flex-1 md:w-[260px] xl:w-[660px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold text-navy-950">{g.name}</span>
@@ -293,7 +294,7 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
   return (
     <button type="button" onClick={onSelect} aria-pressed={active}
       className={`group w-full flex items-center h-[48px] md:h-[42px] xl:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
-      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] xl:w-[600px] flex-shrink-0 pl-4 md:pl-10 xl:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
+      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] xl:w-[660px] flex-shrink-0 pl-4 md:pl-10 xl:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
         <span className="hidden xl:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
         <span className="flex-1 min-w-0">
         <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>

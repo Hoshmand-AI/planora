@@ -146,7 +146,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         )}
       </Disclosure>
 
-      <Disclosure tone="card" id="delays" title="Time impact analysis (delay events)">
+      <Disclosure tone="card" id="delays" title="Delays (time impact analysis)">
         <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
         <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
       </Disclosure>
