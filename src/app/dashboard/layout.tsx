@@ -470,26 +470,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ── Project header: one project's name, status and tabs ── */}
           {inProject && (
             <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
-              <div className="max-w-6xl mx-auto px-5 md:px-8 pt-4 md:pt-5">
+              <div className="max-w-6xl mx-auto px-5 md:px-8 pt-2 md:pt-5">
                 {selectedSchedule ? (
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600">
                         <Link href="/dashboard" className="hover:text-navy-950">Projects</Link>
                         <span aria-hidden="true"> / </span>
-                        <button type="button" onClick={() => setShowScheduleList(true)} className="inline-flex items-center gap-1 hover:text-navy-950" aria-label={`Switch project (current: ${selectedSchedule.name})`}>
+                        <button type="button" data-compact onClick={() => setShowScheduleList(true)} className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[28px] hover:text-navy-950" aria-label={`Switch project (current: ${selectedSchedule.name})`}>
                           Switch project <ChevronDown size={12} aria-hidden="true" />
                         </button>
                       </nav>
                       {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
-                      <div className="flex items-center gap-x-3 gap-y-1.5 mt-1 md:flex-wrap">
+                      <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
                         <h1 className="page-title min-w-0 max-md:truncate max-md:text-[20px]" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
                           return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
                         })()}
                       </div>
-                      <p className="text-[13px] text-warm-600 mt-1 max-md:truncate">
+                      <p className="text-[13px] text-warm-600 mt-1 max-md:hidden">
                         {selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}
                       </p>
                     </div>

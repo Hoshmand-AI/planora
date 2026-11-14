@@ -21,7 +21,7 @@ export const SAMPLE_BRIEF = {
     },
     {
       "level": "act",
-      "text": "Liquidated damages are $50,000 per day. At 40 days behind, the exposure is about $2,000,000."
+      "text": "Liquidated damages are $50,000 per day. If they run from the required finish, 40 days behind is about $2,000,000. Check the quoted clause for the milestone it names."
     },
     {
       "level": "act",

@@ -110,13 +110,15 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
           : `Written notice is due within ${n} days of a delay or change. Nothing new on the project triggers it today.` })
     }
     if (LD.test(s)) {
+      // The exposure multiplies the daily amount by the days behind the required finish. A clause can tie damages to
+      // another milestone ("Ready for Service of Data Hall 1"), so the sentence says what it assumed and points at the quote.
       // The daily amount is the figure tied to "per day"; failing that, the first figure after the words "liquidated damages".
       const rate = s.replace(CAP, ' ')
       const perDay = amount(rate, AMOUNT_PER_DAY) ?? (PER_DAY.test(rate) ? amount(rate.slice(LD.exec(rate)?.index ?? 0)) ?? amount(rate) : null)
       const behind = Math.max(0, ctx.daysBehind ?? 0)
       const exposure = perDay && behind ? perDay * behind : null
       push(`ld:${perDay ?? 'x'}`, { ...src(c, s), kind: 'damages', perDay, exposure, active: behind > 0,
-        text: perDay ? (behind ? `Liquidated damages are ${money(perDay)} per day. At ${behind} day${behind === 1 ? '' : 's'} behind, the exposure is about ${money(exposure!)}.` : `Liquidated damages are ${money(perDay)} per day. The forecast meets the required date today, so there is no exposure.`)
+        text: perDay ? (behind ? `Liquidated damages are ${money(perDay)} per day. If they run from the required finish, ${behind} day${behind === 1 ? '' : 's'} behind is about ${money(exposure!)}. Check the quoted clause for the milestone it names.` : `Liquidated damages are ${money(perDay)} per day. The forecast meets the required date today, so there is no exposure.`)
           : `The contract carries liquidated damages${behind ? `; the forecast is ${behind} day${behind === 1 ? '' : 's'} behind the required date` : ''}. The daily amount could not be read from this sentence.` })
     }
     if (UPDATE.test(s) && PERIOD.test(s) && !/look[- ]?ahead/i.test(s)) {
