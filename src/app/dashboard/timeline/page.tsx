@@ -193,9 +193,12 @@ export default function TimelinePage() {
         <Legend className="bg-accent-500" label="Planned" />
         <Legend className="bg-status-at-risk" label="Critical" />
         <Legend className="bg-status-on-track" label="Complete" />
+        {/* The chart-only entries are dropped on a phone, where the schedule is a list. */}
+        <span className="hidden md:contents">
         <Legend className="bg-navy-800" label="Done so far" />
         {activities?.some(a => a.baselineStart && a.baselineFinish) && <span className="flex items-center gap-1.5"><span className="w-3 h-[3px] rounded-full bg-warm-400 inline-block" /> Baseline</span>}
         {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
+        </span>
       </div>
 
       {activities === null ? (

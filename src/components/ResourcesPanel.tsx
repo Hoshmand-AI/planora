@@ -103,7 +103,7 @@ function Summary({ data }: { data: Analysis }) {
     <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {items.map(([k, v]) => (
         <div key={k} className="bg-white border border-warm-200 rounded-xl px-3 py-2">
-          <dt className="text-[12px] uppercase tracking-wider text-warm-600 truncate">{k}</dt>
+          <dt className="text-[12px] text-warm-600 truncate">{k}</dt>
           <dd className="text-[18px] font-semibold text-navy-950 tabular-nums">{v}</dd>
         </div>
       ))}

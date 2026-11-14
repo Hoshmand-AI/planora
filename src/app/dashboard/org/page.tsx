@@ -142,7 +142,7 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <div role="tablist" aria-label="Organization settings" className="flex flex-wrap gap-1.5" onKeyDown={e => {
+      <div role="tablist" aria-label="Organization settings" className="flex gap-1.5 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0" onKeyDown={e => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         const at = tabs.findIndex(t => t.id === active), next = tabs[(at + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
         pickTab(next.id); document.getElementById(`org-tab-${next.id}`)?.focus()
