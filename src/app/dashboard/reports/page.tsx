@@ -18,10 +18,10 @@ type AiMode = 'cloud' | 'local' | 'offline'
 
 /** What actually writes the report, from the deployment's AI mode and the organization's AI setting (/api/system). */
 function reportMethod(llm: { mode: AiMode; error?: string } | null): string {
-  if (!llm) return 'Select a report type to generate a report'
-  if (llm.mode === 'cloud') return 'Select a report type to generate a narrative written by the cloud AI model from the computed schedule facts'
-  if (llm.mode === 'local') return 'Select a report type to generate a narrative written by your on-prem AI model from the computed schedule facts'
-  return `AI is offline${llm.error ? ` (${llm.error.replace(/\.$/, '')})` : ''}, so reports are built by RunF9's rules directly from the schedule data, with no AI model. Select a report type`
+  if (!llm) return 'Choose a report to generate'
+  if (llm.mode === 'cloud') return 'The narrative is written by the cloud AI model from the computed schedule facts'
+  if (llm.mode === 'local') return 'The narrative is written by your on-prem AI model from the computed schedule facts'
+  return 'Reports are built by RunF9’s rules from the schedule data, with no AI model'
 }
 
 export default function ReportsPage() {
@@ -119,7 +119,7 @@ export default function ReportsPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6">
       <h2 className="sr-only">Reports</h2>
-      <p className="text-[13.5px] text-warm-500 mb-3">{reportMethod(llm)} for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>.</p>
+      <p className="text-[13.5px] text-warm-600 mb-3">{reportMethod(llm)}.</p>
       <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-warm-700">
         <label htmlFor={docsId} className="flex items-center gap-1.5">
           <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
@@ -140,7 +140,7 @@ export default function ReportsPage() {
             key={rt.id}
             onClick={() => handleGenerate(rt.id)}
             disabled={generating !== null || !canGenerate}
-            className="bg-warm-100 border border-warm-200 rounded-lg p-5 flex gap-4 items-start text-left hover:border-warm-300 transition-colors disabled:opacity-50"
+            className="group bg-white border border-warm-200 rounded-[14px] p-5 flex gap-4 items-start text-left hover:border-accent-500 transition-colors disabled:opacity-50"
           >
             <div className="w-9 h-9 bg-navy-900 rounded-md flex items-center justify-center flex-shrink-0">
               {generating === rt.id
@@ -148,10 +148,11 @@ export default function ReportsPage() {
                 : <rt.icon size={15} className="text-accent-400" aria-hidden />
               }
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="text-[14px] font-semibold text-navy-950 mb-1">{rt.title}</div>
-              <div className="text-[13px] text-warm-500 leading-relaxed">{rt.desc}</div>
+              <div className="text-[13px] text-warm-600 leading-relaxed">{rt.desc}</div>
             </div>
+            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-full bg-accent-600 group-hover:bg-accent-700 text-white text-[13px] font-semibold px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
           </button>
         ))}
       </div>

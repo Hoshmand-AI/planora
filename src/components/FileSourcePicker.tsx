@@ -148,7 +148,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
 function SourceChip({ active, onClick, icon, label, title }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; title?: string }) {
   return (
     <button type="button" aria-pressed={active} onClick={onClick} title={title}
-      className={`pressable inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold border ${active ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+      className={`pressable inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold border ${active ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
       {icon}{label}
     </button>
   )
