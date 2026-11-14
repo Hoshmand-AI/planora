@@ -164,7 +164,7 @@ export default function TimelinePage() {
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div role="group" aria-label="Show" className="flex gap-1.5 max-md:w-full max-md:overflow-x-auto max-md:whitespace-nowrap [&>button]:flex-shrink-0 md:flex-wrap">
+        <div role="group" aria-label="Show" className="flex gap-1.5 max-md:w-full max-md:overflow-x-auto max-md:whitespace-nowrap [&>button]:flex-shrink-0 md:flex-wrap max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
           {FILTERS.map(f => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
               className={`pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
