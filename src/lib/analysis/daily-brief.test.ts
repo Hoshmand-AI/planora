@@ -236,6 +236,11 @@ describe('ordinary sentences are not misread', () => {
     const ctx = { daysBehind: 12, delaysReported: [], openChangeItems: 0, staleDays: 1, projectType: null }
     const w = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'Under this $42,000,000 contract the Contractor shall pay liquidated damages of $10,000 per calendar day of delay.' }], acts, ctx)
     expect(w.contract.find(c => c.kind === 'damages')).toMatchObject({ perDay: 10000, exposure: 120000 })
+    // A clause that names another milestone gives the rate but no amount: the days behind are not that milestone's.
+    const named = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'If Ready for Service of Data Hall 1 is not achieved by the required date, the Contractor shall pay liquidated damages of $50,000 per day for each calendar day of delay.' }], acts, { ...ctx, target: 'T8040 Substantial Completion' })
+    expect(named.contract.find(c => c.kind === 'damages')).toMatchObject({ perDay: 50000, exposure: null, appliesTo: 'Ready for Service of Data Hall 1' })
+    const same = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'If Substantial Completion is not achieved by the required date, the Contractor shall pay liquidated damages of $50,000 per day.' }], acts, { ...ctx, target: 'T8040 Substantial Completion' })
+    expect(same.contract.find(c => c.kind === 'damages')).toMatchObject({ perDay: 50000, exposure: 600000, appliesTo: null })
     const pay = projectWatch([{ documentId: 'c', title: 'Contract', docType: 'contract', citation: '', text: 'The Contractor shall submit each payment claim within 10 days of the end of the month.' }], acts, ctx)
     expect(pay.contract.filter(c => c.kind === 'notice')).toEqual([])
   })

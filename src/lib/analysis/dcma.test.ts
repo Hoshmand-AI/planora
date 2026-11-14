@@ -54,7 +54,7 @@ describe('runDcma: clean schedule', () => {
     expect(Number(check(r, 13).metric)).toBeGreaterThan(1)
     expect(check(r, 13).explanation).toMatch(/^F Milestone F .*baseline finish 12\/31\/2026.*Standard 5-Day calendar/)
     expect(check(r, 14).metric).toBe('1.00')
-    expect(check(r, 12).metric).toMatch(/\+600d/)
+    expect(check(r, 12).metric).toMatch(/moves 600d/)
   })
 })
 
@@ -311,7 +311,7 @@ describe('runDcma: pilot findings', () => {
     const s = goodSchedule()
     const r = runDcma(s)
     expect(check(r, 12).result).toBe('pass')
-    expect(check(r, 12).metric).toMatch(/\+600d finish/)
+    expect(check(r, 12).metric).toMatch(/Finish moves 600d/)
   })
 })
 

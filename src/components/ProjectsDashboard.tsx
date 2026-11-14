@@ -359,7 +359,7 @@ function ProjectCard({ r, i, onOpen, pins, onPin }: { r: PortfolioRow; i: number
             </div>
           )}
           <div className="flex items-center justify-between text-[12px] text-warm-600 border-t border-warm-200 pt-3">
-            <span>{r.dataDate ? <>Data date <span className="tabular-nums text-warm-700 font-medium">{fmtDate(r.dataDate)}</span></> : <>Updated <span className="tabular-nums text-warm-700 font-medium">{fmtDay(r.updatedAt)}</span></>}</span>
+            <span>{r.dataDate ? <>Data date <span className="tabular-nums text-warm-700 font-medium">{fmtDate(r.dataDate)}</span></> : <>No data date · saved <span className="tabular-nums text-warm-700 font-medium">{fmtDay(r.updatedAt)}</span></>}</span>
             {isStale(r) && <span className="font-semibold text-status-attention">Needs an update</span>}
           </div>
         </div>
