@@ -8,7 +8,7 @@
 import { askText } from '@/components/AskText'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { fmtDate } from '@/lib/format'
-import { Alert, Button, inputClass, postJson } from './ui'
+import { Hint, Alert, Button, inputClass, postJson } from './ui'
 import type { HistogramBar, HistogramBucket, OverAllocationPeriod, ResourceAnalysis, ResourceSummary } from '@/lib/analysis/resources'
 import type { LevelingResult } from '@/lib/planning/leveling'
 
@@ -115,7 +115,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
   return (
     <section aria-labelledby="res-list">
       <h3 id="res-list" className="text-[14px] font-semibold text-navy-950">Resources: peak demand vs available</h3>
-      <p className="text-[12.5px] text-warm-600 mb-2">Over-allocated days are counted from the data date on. A peak above the limit that has already passed is shown, not counted.</p>
+      <Hint label="How days are counted" className="mb-2">Over-allocated days are counted from the data date on. A peak above the limit that has already passed is shown, not counted.</Hint>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] text-warm-700">
           <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
@@ -273,7 +273,7 @@ function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSum
   return (
     <section aria-labelledby="res-staff" className="border border-warm-200 rounded-md p-3 bg-warm-50">
       <h3 id="res-staff" className="text-[14px] font-semibold text-navy-950 mb-1">Staffing what-if</h3>
-      <p className="text-[12px] text-warm-600 mb-2">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact. Nothing is saved.</p>
+      <Hint className="mb-2">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact. Nothing is saved.</Hint>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[12px] text-warm-700">Resource
           <select value={rid} onChange={e => setRid(e.target.value)} className="block bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[13px]">
@@ -339,7 +339,7 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
       <h3 id="res-level" className="text-[14px] font-semibold text-navy-950 mb-1">Resource leveling</h3>
       {!hasLogic ? <p className="text-[13px] text-warm-600">This schedule has no activity relationships, so it cannot be recalculated to level resources.</p> : (
         <>
-          <p className="text-[12px] text-warm-600 mb-2">Delays not-started work so no resource is over its limit. Priority: least total float keeps the resource, then the earliest late start, then the activity ID. Work in progress, actuals, the data date and constraints are never moved. Delays become Start On or After dates in a scenario labelled “Leveled scenario”; the schedule as submitted is unchanged.</p>
+          <Hint label="How leveling works" className="mb-2">Delays not-started work so no resource is over its limit. Priority: least total float keeps the resource, then the earliest late start, then the activity ID. Work in progress, actuals, the data date and constraints are never moved. Delays become Start On or After dates in a scenario labelled “Leveled scenario”; the schedule as submitted is unchanged.</Hint>
           <fieldset className="flex flex-wrap items-center gap-4 text-[13px] text-warm-700">
             <legend className="sr-only">Leveling mode</legend>
             <label><input type="radio" name="lv-mode" checked={mode === 'level'} onChange={() => setMode('level')} /> Level (within float first)</label>
