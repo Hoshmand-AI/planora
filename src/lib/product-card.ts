@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-14', title: 'Schedule: start, finish and float columns beside the bars, with the baseline drawn under each' },
   { date: '2026-11-14', title: 'One look for buttons, tabs and form fields across the app' },
   { date: '2026-11-14', title: 'Organization settings in five short tabs; project documents open on the library' },
   { date: '2026-11-14', title: 'Easier on phones: larger text and buttons, and a shorter project header' },
