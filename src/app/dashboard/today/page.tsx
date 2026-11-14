@@ -158,16 +158,11 @@ export default function TodayPage() {
         <div className="flex flex-wrap max-md:flex-nowrap max-md:w-full max-md:[&>*]:flex-1 max-md:[&>*]:min-w-0 items-end gap-x-3 gap-y-2">
           <div>
             <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5 max-md:sr-only">Show the day for</p>
-            {/* On a phone the three readers are one dropdown beside the date, so the answer starts higher. */}
-            <select aria-label="Show the day for" value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} md:hidden min-h-[36px]`}>
+            {/* The reader is one dropdown on every screen. It was a row of pills on wide screens, identical to the
+                section tabs under it, so two rows of the same control meant two different things. */}
+            <select aria-label="Show the day for" value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} block min-h-[36px]`}>
               {AUDIENCES.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
             </select>
-            <div role="tablist" aria-labelledby="aud-label" className="hidden md:flex gap-1.5">
-              {AUDIENCES.map(a => (
-                <button key={a.id} role="tab" type="button" id={`aud-${a.id}`} aria-selected={audience === a.id} aria-controls="aud-panel" onClick={() => setAudience(a.id)}
-                  className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${audience === a.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{a.label}</button>
-              ))}
-            </div>
           </div>
           <label className="text-[12px] text-warm-600"><span className="max-md:sr-only">Brief for</span>
             <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px] max-md:w-full max-md:min-w-0`} />
@@ -214,7 +209,7 @@ export default function TodayPage() {
             {data.alerts.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
                 <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
-                <span className="flex-1 min-w-0">{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.text)}</span>
+                <span className="flex-1 min-w-0 line-clamp-2" title={fmtDates(a.text)}>{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.text)}</span>
                 {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 rounded-full border border-warm-300 px-3 min-h-[32px] text-[12.5px] font-medium text-navy-950 hover:bg-warm-100">Details</button>}
               </li>
             ))}
@@ -250,7 +245,7 @@ export default function TodayPage() {
             <span>Email me this brief every working morning{data.email.everyMorning ? ` (${AUDIENCES.find(a => a.id === data.email!.everyMorning)!.label} version)` : ` (${AUDIENCES.find(a => a.id === audience)!.label} version)`}</span>
           </label>
         )}
-        <div id="aud-panel" role="tabpanel" aria-labelledby={`aud-${audience}`} className="mt-3">
+        <div className="mt-3">
           <p className="text-[12.5px] text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
           <ul className="space-y-2">
             {b.audiences[audience].map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
