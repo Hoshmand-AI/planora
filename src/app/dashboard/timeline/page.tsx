@@ -303,7 +303,7 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
         </span>
         {/* On wide screens the dates and float are columns, as in P6, so they are read without opening the activity. */}
         <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px] text-warm-700">{s ? fmtDate(s) : ''}</span>
-        <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px] text-warm-700">{f && !milestone ? fmtDate(f) : ''}</span>
+        <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px] text-warm-700">{f ? fmtDate(f) : ''}</span>
         <span aria-hidden="true" className={`hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right ${a.totalFloat != null && a.totalFloat < 0 && prog !== 'complete' ? 'font-semibold text-status-at-risk' : 'text-warm-700'}`}>{a.totalFloat != null && prog !== 'complete' ? `${a.totalFloat}d` : ''}</span>
       </div>
       <div className="max-md:hidden flex-1 relative h-full pr-4" aria-hidden="true">
