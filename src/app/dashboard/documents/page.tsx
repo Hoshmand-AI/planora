@@ -32,12 +32,15 @@ const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   ? <span className={`${badge} bg-status-on-track-bg border-status-on-track/40 text-status-on-track`}>Approved</span>
   : <span className={`${badge} bg-status-attention-bg border-status-attention/40 text-status-attention`}>Unreviewed</span>
 
+const ADD_WAYS = [{ id: 'file', label: 'Upload a file' }, { id: 'paste', label: 'Paste text' }, { id: 'inbox', label: 'Connect an inbox' }] as const
+
 export default function DocumentsPage() {
   const { selectedSchedule, can, openUpload } = useApp()
   const [data, setData] = useState<Listing | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null)
   const [requirements, setRequirements] = useState<Candidate[] | null>(null)
+  const [addWay, setAddWay] = useState<'file' | 'paste' | 'inbox'>('file')
   const base = selectedSchedule ? `/api/schedules/${encodeURIComponent(selectedSchedule.id)}/documents` : ''
 
   // Only the newest request may land: a slow answer for one project must never be listed under another.
@@ -155,10 +158,25 @@ export default function DocumentsPage() {
       {hasDocs && libraryBlock}
       {can('schedule.write') && data && (
         <div id="upload-documents" className="space-y-5 scroll-mt-4">
-          {hasDocs && <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950 pt-3">Add to this project</h2>}
-          <UploadForm base={base} data={data} canOrg={can('org.manage')} onDone={(n) => { setNotice(n); load() }} />
-          <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />
-          <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />
+          {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
+          {hasDocs && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3">
+              <h2 id="add-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950">Add to this project</h2>
+              <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-1.5">
+                {ADD_WAYS.map(w => (
+                  <button key={w.id} role="tab" type="button" aria-selected={addWay === w.id} onClick={() => setAddWay(w.id)}
+                    className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${addWay === w.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{w.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div hidden={hasDocs && addWay === 'inbox'} className="space-y-5">
+            <UploadForm base={base} data={data} canOrg={can('org.manage')} show={hasDocs ? (addWay === 'paste' ? 'paste' : 'file') : 'both'} onDone={(n) => { setNotice(n); load() }} />
+          </div>
+          <div hidden={hasDocs && addWay !== 'inbox'} className="space-y-5">
+            <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />
+            <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />
+          </div>
         </div>
       )}
       {!hasDocs && libraryBlock}
@@ -166,7 +184,7 @@ export default function DocumentsPage() {
   )
 }
 
-function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listing; canOrg: boolean; onDone: (n: { tone: 'success' | 'warning' | 'error'; text: string }) => void }) {
+function UploadForm({ base, data, canOrg, onDone, show = 'both' }: { base: string; data: Listing; canOrg: boolean; show?: 'both' | 'file' | 'paste'; onDone: (n: { tone: 'success' | 'warning' | 'error'; text: string }) => void }) {
   const [title, setTitle] = useState('')
   const [docType, setDocType] = useState('scheduling_spec')
   const [orgStandard, setOrgStandard] = useState(false)
@@ -219,6 +237,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
   return (
     <>
     {pasteTypes.length > 0 && (
+      <div hidden={show === 'file'}>
       <Section title="Paste an email, meeting notes or a field report" description="RunF9 reads it for delays, changes, risks and commitments, ties them to activities, and shows them on the Today tab with the sentence quoted. Nothing is sent to an AI model for this.">
         <form onSubmit={submitPaste} className="grid md:grid-cols-2 gap-3">
           <Field label="Title" hint="Defaults to the type and today’s date.">{p => <input {...p} value={pasteTitle} maxLength={150} onChange={e => setPasteTitle(e.target.value)} className={inputClass} placeholder="e.g. OAC meeting 11/10 minutes" />}</Field>
@@ -233,7 +252,9 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
           <div className="md:col-span-2"><Button type="submit" disabled={busy || pasted.trim().length < 20}>{busy ? 'Reading…' : 'Add to this project'}</Button></div>
         </form>
       </Section>
+      </div>
     )}
+    <div hidden={show === 'paste'}>
     <Section title="Add a document" description={`PDF with selectable text, Word (.docx), text or Markdown, a saved email (.eml) or a meeting transcript from Teams, Zoom or Meet (.vtt, .srt), up to ${formatMb(data.limits.maxBytes)}. Scanned PDFs need OCR first.`}>
       <form key={formKey} onSubmit={submit} className="grid md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
@@ -258,6 +279,7 @@ function UploadForm({ base, data, canOrg, onDone }: { base: string; data: Listin
         </div>
       </form>
     </Section>
+    </div>
     </>
   )
 }
