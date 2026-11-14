@@ -100,8 +100,8 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
   const others = series.filter(s => s.id !== scheduleId)
 
   return (
-    <section aria-labelledby="tools-h" className="space-y-1">
-      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Updates, delays, edits, risk and exports</h2>
+    <section aria-labelledby="tools-h" className="space-y-2">
+      <h2 id="tools-h" className="font-display text-[18px] text-navy-950 mb-2">Analysis tools for this schedule</h2>
       {editsCount > 0 && (
         <fieldset className="text-[13px] text-warm-700 mb-2">
           <legend className="font-semibold text-navy-950 mb-1">Basis for recovery, comparison, risk and exports</legend>
@@ -111,7 +111,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         </fieldset>
       )}
 
-      <Disclosure id="compare" title="What changed since the last update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
+      <Disclosure tone="card" id="compare" title="What changed since the last update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
           <label className="block text-[13px] text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>
@@ -146,24 +146,24 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         )}
       </Disclosure>
 
-      <Disclosure id="delays" title="Time impact analysis (delay events)">
+      <Disclosure tone="card" id="delays" title="Time impact analysis (delay events)">
         <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
         <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
       </Disclosure>
 
-      <Disclosure title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
+      <Disclosure tone="card" title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
         <EditsPanel scheduleId={scheduleId} canEdit={canEdit} onChanged={edited} refreshKey={rev} />
       </Disclosure>
 
-      <Disclosure id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with RunF9 edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
+      <Disclosure tone="card" id="recovery" title="What-if and recovery options" meta={basis === 'scenario' ? `with RunF9 edits (${editsCount})` : 'as submitted'} defaultOpen={openRecovery}>
         <RecoveryPanel scheduleId={scheduleId} canEdit={canEdit} onApplied={edited} refreshKey={rev} basis={basis} />
       </Disclosure>
 
-      <Disclosure title="Schedule risk analysis (Monte Carlo)" meta={sra ? `P80 ${fmtDate(sra.percentiles.p80)}` : undefined}>
+      <Disclosure tone="card" title="Schedule risk analysis (Monte Carlo)" meta={sra ? `P80 ${fmtDate(sra.percentiles.p80)}` : undefined}>
         {!sra ? (
           <div className="text-[13px] text-warm-700 space-y-2">
             <p>Simulates this schedule&apos;s own network with three-point duration ranges and reports one labeled P50/P80.</p>
-            <button type="button" onClick={runRisk} disabled={busy} className="px-3 py-1.5 rounded-full bg-navy-950 text-white text-[13px] font-medium disabled:opacity-60">{busy ? 'Running…' : 'Run risk analysis'}</button>
+            <button type="button" onClick={runRisk} disabled={busy} className="px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60">{busy ? 'Running…' : 'Run risk analysis'}</button>
             {sraErr && <p className="text-status-at-risk">{sraErr}</p>}
           </div>
         ) : (
@@ -190,7 +190,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         )}
       </Disclosure>
 
-      <Disclosure title="Export and original file">
+      <Disclosure tone="card" title="Export and original file">
         <div className="flex flex-wrap gap-2 text-[13px]">
           {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV'], ['ipmdar', 'IPMDAR schedule dataset (.zip)']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
             <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
@@ -201,7 +201,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 
-      <Disclosure title="How RunF9 schedules this file">
+      <Disclosure tone="card" title="How RunF9 schedules this file">
         <div className="text-[13px] text-warm-700 space-y-3">
           <fieldset>
             <legend className="font-semibold text-navy-950 mb-1">Out-of-sequence progress</legend>

@@ -82,7 +82,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
       {from === 'computer' ? (
         <div>
           <input type="file" name="file" accept={accept} required aria-label="File"
-            className={`${fieldClass} file:mr-3 file:bg-navy-900 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:text-[12px] file:font-medium`} />
+            className={`${fieldClass} file:mr-3 file:bg-accent-600 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1.5 file:text-[13px] file:font-semibold file:cursor-pointer`} />
           {hint && <p className="text-[12px] text-warm-600 mt-1.5">{hint}</p>}
         </div>
       ) : (

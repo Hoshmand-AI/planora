@@ -38,6 +38,8 @@ const PARTS: { id: Part; label: string; for: Audience[] }[] = [
   { id: 'brief', label: 'Brief to send', for: ['pm', 'field', 'client'] },
 ]
 const CARD_PART: Record<string, Part> = { today: 'now', overdue: 'now', since: 'now', lookahead: 'now', driving: 'finish', whatif: 'finish', risks: 'finish', issues: 'finish', signals: 'docs', contract: 'docs', field: 'docs', register: 'changes', changed: 'changes', missing: 'changes', logic: 'changes' }
+// A two-word subject in front of each attention item, so the list can be scanned before it is read.
+const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: 'Overdue', contract: 'Contract', field: 'Field report', register: 'Register', signals: 'Reported delays', documents: 'Scope', today: 'Today', lookahead: 'Coming up' }
 const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif', 'risks', 'issues', 'changed', 'missing', 'logic'])
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
@@ -211,8 +213,8 @@ export default function TodayPage() {
           <ul className="mt-3 space-y-2.5">
             {data.alerts.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
-                <span className={`mt-0.5 h-fit w-[52px] text-center flex-shrink-0 rounded px-1.5 py-0.5 text-[12px] font-bold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
-                <span className="flex-1 min-w-0">{fmtDates(a.text)}</span>
+                <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
+                <span className="flex-1 min-w-0">{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.text)}</span>
                 {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 rounded-full border border-warm-300 px-3 min-h-[32px] text-[12.5px] font-medium text-navy-950 hover:bg-warm-100">Details</button>}
               </li>
             ))}
