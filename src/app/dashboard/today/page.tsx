@@ -194,6 +194,14 @@ export default function TodayPage() {
             <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
         </dl>
+        {data.alerts.length > 0 && b.audiences[audience].length > 1 && (
+          <div className="hidden xl:block mt-4 border-t border-warm-200 pt-3">
+            <ul className="space-y-1.5">
+              {b.audiences[audience].slice(1, 4).map((l, k) => <li key={k} className="flex gap-2 text-[13px] text-warm-700"><span aria-hidden className="mt-[7px] w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span className="line-clamp-2">{fmtDates(l)}</span></li>)}
+            </ul>
+            <button type="button" onClick={() => setPart('brief')} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">Read the full brief</button>
+          </div>
+        )}
       </section>
 
       {data.alerts.length > 0 && (

@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { Disclosure } from '@/components/Disclosure'
 import { Loader2 } from 'lucide-react'
 import { useApp } from '../layout'
 import { fmtDate, fmtDateTime } from '@/lib/format'
@@ -127,7 +128,10 @@ export default function TimeImpactPage() {
         <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}) · data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
       {/* One notice, not two stacked banners. */}
-      <Alert tone="info"><strong>Calculation, not conclusion.</strong> {data.disclaimer}{data.acceptanceNote ? <> {data.acceptanceNote}</> : null}</Alert>
+      {/* One line, with the full notice a click away: the page used to open on a five-line paragraph. */}
+      <Disclosure tone="card" title="Calculation, not conclusion" meta="what this analysis is and is not">
+        <p className="text-[13px] text-warm-700">{data.disclaimer}{data.acceptanceNote ? <> {data.acceptanceNote}</> : null}</p>
+      </Disclosure>
       {err && <Alert tone="error">{err}</Alert>}
 
       <div className="grid md:grid-cols-[260px_1fr] gap-5 items-start">
