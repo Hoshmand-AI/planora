@@ -67,6 +67,14 @@ for (const name of DEVICES) {
     const current = await page.getByRole('navigation', { name: 'Project' }).locator('[aria-current="page"]').textContent()
     if (current?.trim() !== tab) fail(name, `tab ${tab} not current (${current})`)
     await fits(tab)
+    if (tab === 'Documents') {
+      // Loaded directly (a bookmark, a reload), the current tab must still be scrolled into view on a narrow screen.
+      await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(500)
+      const nav = page.getByRole('navigation', { name: 'Project' })
+      const nb = await nav.boundingBox(), cb = await nav.locator('[aria-current="page"]').boundingBox()
+      if (nb && cb && (cb.x < nb.x - 1 || cb.x + cb.width > nb.x + nb.width + 1)) fail(name, `current tab is out of view after a direct load (${Math.round(cb.x)}–${Math.round(cb.x + cb.width)} outside ${Math.round(nb.x)}–${Math.round(nb.x + nb.width)})`)
+      else console.log('   ✓ current tab is in view after a direct load')
+    }
     if (tab === 'Schedule') {
       if (desc.viewport.width >= 768) {
         // The data-date line must sit under its own label: both are placed by date, in two different containers.

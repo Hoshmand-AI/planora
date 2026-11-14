@@ -205,10 +205,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const tabsRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const nav = tabsRef.current, here = nav?.querySelector<HTMLElement>('[aria-current="page"]')
-    if (nav && here && (here.offsetLeft + here.offsetWidth > nav.scrollLeft + nav.clientWidth - 40 || here.offsetLeft < nav.scrollLeft)) {
+    if (nav && here && (here.offsetLeft + here.offsetWidth > nav.scrollLeft + nav.clientWidth - 56 || here.offsetLeft < nav.scrollLeft)) {
       nav.scrollTo({ left: Math.max(0, here.offsetLeft - 24) })
     }
-  }, [pathname])
+    // Also when the project arrives: on a first load the strip is not rendered yet when the path is first seen,
+    // so the current tab (Documents, Reports) stayed out of view on a phone.
+  }, [pathname, selectedSchedule?.id])
   const toggleSidebar = () => {
     const next = sidebarOpen ? 'closed' : 'open'
     setRailPref(next)
