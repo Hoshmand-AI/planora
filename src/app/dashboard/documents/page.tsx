@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Loader2, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
+import { MoreMenu } from '@/components/MoreMenu'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
 import { useApp } from '../layout'
 import { Alert, Button, Field, Section, inputClass, postJson } from '@/components/ui'
@@ -106,14 +107,14 @@ export default function DocumentsPage() {
                       <p className="mt-1 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> {d.flaggedCount} passage{d.flaggedCount === 1 ? '' : 's'} contain{d.flaggedCount === 1 ? 's' : ''} instruction-like text and {d.flaggedCount === 1 ? 'is' : 'are'} never sent to AI.</p>
                     )}
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {can('plan.review') && (d.scope === 'project' || can('org.manage')) && (
                       d.trust === 'approved'
                         ? <Button variant="secondary" onClick={() => setTrust(d, 'unreviewed')} aria-label={`Mark ${d.title} unreviewed`}>Mark unreviewed</Button>
                         : <Button variant="secondary" onClick={() => setTrust(d, 'approved')} aria-label={`Approve ${d.title}`}>Approve</Button>
                     )}
                     {can('schedule.write') && (d.scope === 'project' || can('org.manage')) && (
-                      <Button variant="secondary" onClick={() => remove(d)} aria-label={`Delete ${d.title}`}><Trash2 size={13} className="inline -mt-0.5" aria-hidden="true" /> Delete</Button>
+                      <MoreMenu label={`More actions for ${d.title}`} items={[{ label: 'Delete this document', onSelect: () => remove(d), icon: <Trash2 size={15} aria-hidden="true" />, danger: true }]} />
                     )}
                   </div>
                 </li>
@@ -135,7 +136,7 @@ export default function DocumentsPage() {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
         <h1 className="page-title mb-1">Project documents</h1>
-        <p className="text-[13.5px] text-warm-500 max-w-[720px]">
+        <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
           Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
           Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.
         </p>

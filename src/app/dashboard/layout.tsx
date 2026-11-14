@@ -560,7 +560,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* ── Bottom bar (phones) ──────────────────────────────── */}
-        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-bar border-t border-white/8 safe-area-bottom">
+        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-950 border-t border-navy-800 safe-area-bottom">
           <div className="flex">
             {NAV.map(n => {
               const active = navActive(pathname, n.href)

@@ -27,7 +27,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   )
 }
 
-export const inputClass = 'w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400'
+export const inputClass = 'w-full bg-white border border-warm-300 rounded-md px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400'
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
   const styles = {
@@ -36,7 +36,7 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]
-  return <button {...props} className={`${variant === 'ghost' ? '' : 'px-3.5 py-2 rounded-md'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
+  return <button {...props} className={`${variant === 'ghost' ? '' : 'px-4 py-2 rounded-full'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
 }
 
 export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' | 'warning'; children: React.ReactNode }) {

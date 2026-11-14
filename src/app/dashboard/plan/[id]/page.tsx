@@ -919,7 +919,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
           {accepting && !g.decision && canWrite && (
             <div className="flex flex-col gap-2">
               <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} aria-label={`Why check ${g.id} is acceptable for this project`} placeholder="Why this is acceptable for this project (goes into the Basis of Schedule)" className="bg-warm-50 border border-warm-300 rounded-md px-2.5 py-2 text-[13px]" />
-              <button disabled={!!busy || note.trim().length < 10} onClick={async () => { if (await onDecide(key, 'accept', note)) setAccepting(false) }} className="self-start bg-navy-900 text-white px-3 py-1.5 rounded-md text-[12.5px] font-medium disabled:opacity-40">Record decision</button>
+              <button disabled={!!busy || note.trim().length < 10} onClick={async () => { if (await onDecide(key, 'accept', note)) setAccepting(false) }} className="self-start bg-accent-600 text-white px-3 py-1.5 rounded-full text-[12.5px] font-medium disabled:opacity-40">Record decision</button>
             </div>
           )}
         </div>
