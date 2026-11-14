@@ -209,7 +209,7 @@ export default function TodayPage() {
             {data.alerts.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
                 <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
-                <span className="flex-1 min-w-0 line-clamp-2" title={fmtDates(a.text)}>{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.text)}</span>
+                <span className="flex-1 min-w-0" title={a.short ? fmtDates(a.text) : undefined}>{ALERT_SUBJECT[a.section] && <span className="font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.short ?? a.text)}</span>
                 {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 rounded-full border border-warm-300 px-3 min-h-[32px] text-[12.5px] font-medium text-navy-950 hover:bg-warm-100">Details</button>}
               </li>
             ))}
