@@ -179,7 +179,7 @@ export default function TodayPage() {
       </div>
 
       {/* On a wide screen the answer and what needs action sit side by side, so both are on the first screen. */}
-      <div hidden={shownPart !== 'now'} className={data.alerts.length > 0 ? 'grid gap-5 items-stretch xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
+      <div hidden={shownPart !== 'now'} className={data.alerts.length > 0 ? 'grid gap-5 items-start xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
       {/* The answer first: are we meeting the deadline, and by how much. */}
       <section aria-labelledby="deadline-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
         <h2 id="deadline-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</h2>

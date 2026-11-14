@@ -66,5 +66,7 @@ module.exports = {
   plugins: [
     // `cols:` applies on a wide screen only while an ancestor has data-cols="on": the Schedule's optional date columns.
     ({ addVariant }) => addVariant('cols', '@media (min-width: 1280px) { [data-cols="on"] & }'),
+    // `wide:` is the other half: a wide screen with those columns hidden, where the name column can be roomier.
+    ({ addVariant }) => addVariant('wide', '@media (min-width: 1280px) { [data-cols="off"] & }'),
   ],
 }
