@@ -513,11 +513,11 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
     requestAnimationFrame(() => document.getElementById(`quality-tab-${next.id}`)?.focus())
   }
   return (
-    <div role="tablist" aria-label="Quality views" className="flex gap-1.5 mt-2 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={onKey}>
+    <div role="tablist" aria-label="Quality views" className="flex gap-0 border-b border-warm-200 mt-2 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={onKey}>
       {QUALITY_TABS.map(t => (
         <button key={t.id} id={`quality-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={tab === t.id ? `quality-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
-          className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${tab === t.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>
+          className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${tab === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
           {t.label}
         </button>
       ))}

@@ -184,10 +184,10 @@ export default function DocumentsPage() {
           {hasDocs && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">
               <h2 id="add-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950">Add to this project</h2>
-              <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-1.5">
+              <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-0 border-b border-warm-200">
                 {ADD_WAYS.map(w => (
                   <button key={w.id} role="tab" type="button" aria-selected={addWay === w.id} onClick={() => setAddWay(w.id)}
-                    className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold ${addWay === w.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>{w.label}</button>
+                    className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${addWay === w.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{w.label}</button>
                 ))}
               </div>
             </div>

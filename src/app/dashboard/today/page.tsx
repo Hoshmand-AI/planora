@@ -171,10 +171,10 @@ export default function TodayPage() {
       </header>
       {err && <Alert tone="error">{err}</Alert>}
 
-      <div role="tablist" aria-label="Parts of the brief" className="flex gap-1.5 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
+      <div role="tablist" aria-label="Parts of the brief" className="flex gap-0 border-b border-warm-200 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
         {parts.map(x => (
           <button key={x.id} role="tab" type="button" id={`part-${x.id}`} aria-selected={shownPart === x.id} onClick={() => setPart(x.id)}
-            className={`pressable px-3 py-1.5 rounded-lg text-[13.5px] font-semibold whitespace-nowrap ${shownPart === x.id ? 'bg-navy-900 text-white' : 'text-warm-700 hover:bg-warm-200 hover:text-navy-950'}`}>{x.label}</button>
+            className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 whitespace-nowrap ${shownPart === x.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{x.label}</button>
         ))}
       </div>
 

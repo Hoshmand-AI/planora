@@ -302,12 +302,12 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
   const width = s && f && span ? Math.max(0.5, pos(f) - left + (DAY / span.range) * 100) : 0
   return (
     <button type="button" onClick={onSelect} aria-pressed={active}
-      className={`group w-full flex items-center h-[48px] md:h-[42px] cols:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
-      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] wide:w-[360px] cols:w-[692px] flex-shrink-0 pl-4 md:pl-10 cols:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
-        <span className="hidden cols:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
+      className={`group w-full flex items-center h-[48px] md:h-[42px] wide:h-[32px] cols:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
+      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] wide:w-[360px] cols:w-[692px] flex-shrink-0 pl-4 md:pl-10 wide:pl-4 cols:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
+        <span className="hidden wide:block cols:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
         <span className="flex-1 min-w-0">
         <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
-        <span className="block cols:hidden text-[12px] text-warm-600 tabular-nums truncate"><span aria-hidden="true" className={`md:hidden inline-block w-2 h-2 rounded-full mr-1.5 ${color}`} />{a.activityId}<span className="md:hidden">{s ? ` · ${fmtDate(s)}${f && !milestone ? ` to ${fmtDate(f)}` : ''}` : ''}</span>{a.totalFloat != null && prog !== 'complete' ? <span className={`cols:hidden ${a.totalFloat < 0 ? 'max-md:text-status-at-risk max-md:font-semibold' : ''}`}>{` · float ${a.totalFloat}d`}</span> : null}</span>
+        <span className="block wide:hidden cols:hidden text-[12px] text-warm-600 tabular-nums truncate"><span aria-hidden="true" className={`md:hidden inline-block w-2 h-2 rounded-full mr-1.5 ${color}`} />{a.activityId}<span className="md:hidden">{s ? ` · ${fmtDate(s)}${f && !milestone ? ` to ${fmtDate(f)}` : ''}` : ''}</span>{a.totalFloat != null && prog !== 'complete' ? <span className={`cols:hidden ${a.totalFloat < 0 ? 'max-md:text-status-at-risk max-md:font-semibold' : ''}`}>{` · float ${a.totalFloat}d`}</span> : null}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>
         </span>
