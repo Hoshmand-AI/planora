@@ -221,7 +221,7 @@ export default function ProjectPage() {
                       </div>
                     )}
                   </div>
-                  <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0">{task.duration}d</div>
+                  <div className="text-[13px] text-warm-700 tabular-nums flex-shrink-0 text-right"><span className="font-semibold text-navy-950">{task.duration}d</span> <span className="text-[12px]">duration</span></div>
                 </div>
               ))}
             </div>

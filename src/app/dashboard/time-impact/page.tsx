@@ -123,18 +123,17 @@ export default function TimeImpactPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header>
-        <p className="text-[12px] text-warm-600"><Link href="/dashboard/project" className="underline">Project overview</Link> / Time impact</p>
-        <h2 className="tab-title">Time impact analysis</h2>
+        <h2 className="tab-title">Delays: time impact analysis</h2>
         <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}) · data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
-      <Alert tone="info"><strong>Calculation, not conclusion.</strong> {data.disclaimer}</Alert>
-      {data.acceptanceNote && <Alert tone="warning">{data.acceptanceNote}</Alert>}
+      {/* One notice, not two stacked banners. */}
+      <Alert tone="info"><strong>Calculation, not conclusion.</strong> {data.disclaimer}{data.acceptanceNote ? <> {data.acceptanceNote}</> : null}</Alert>
       {err && <Alert tone="error">{err}</Alert>}
 
       <div className="grid md:grid-cols-[260px_1fr] gap-5 items-start">
         <section aria-labelledby="events-h" className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-3">
           <h2 id="events-h" className="text-[15px] font-semibold text-navy-950">Delay events</h2>
-          {data.events.length === 0 ? <p className="text-[13px] text-warm-600">None yet.</p> : (
+          {data.events.length === 0 ? <p className="text-[13px] text-warm-600">No delay event has been entered here yet. Delays mentioned in emails, minutes and field reports are listed on Today; enter one here to measure its effect on the finish.</p> : (
             <ul className="space-y-1">
               {data.events.map(e => (
                 <li key={e.id}>
