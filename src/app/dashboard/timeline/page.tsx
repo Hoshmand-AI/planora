@@ -55,6 +55,10 @@ export default function TimelinePage() {
   const [full, setFull] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
+  // Date, float and percent columns are optional on a wide screen, so the chart can have most of the width.
+  const [cols, setCols] = useState(false)
+  useEffect(() => { try { const v = localStorage.getItem('runf9.schedule.cols'); setCols(v ? v === 'on' : window.innerWidth >= 1600) } catch { /* private window */ } }, [])
+  const toggleCols = () => setCols(c => { try { localStorage.setItem('runf9.schedule.cols', c ? 'off' : 'on') } catch { /* private window */ } return !c })
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
@@ -173,7 +177,11 @@ export default function TimelinePage() {
             </button>
           ))}
         </div>
-        <div role="group" aria-label="Zoom the timeline" className="ml-auto hidden md:flex items-center rounded-full border border-warm-300 bg-white">
+        <button type="button" aria-pressed={cols} onClick={toggleCols}
+          className={`pressable ml-auto hidden xl:inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${cols ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+          {cols && <Check size={14} aria-hidden="true" />}Dates and float
+        </button>
+        <div role="group" aria-label="Zoom the timeline" className="ml-auto xl:ml-0 hidden md:flex items-center rounded-full border border-warm-300 bg-white">
           <button type="button" onClick={() => setZoom(ZOOMS[zi - 1])} disabled={zi <= 0} aria-label="Zoom out"
             className="pressable grid place-items-center w-9 h-9 rounded-l-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Minus size={15} aria-hidden /></button>
           <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} title="Fit the whole schedule"
@@ -208,11 +216,11 @@ export default function TimelinePage() {
         <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13.5px] text-status-at-risk">The schedule could not be loaded. Check your connection and reload the page.</p>
       ) : (
         <div className="lg:flex lg:items-start lg:gap-4">
-          <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-warm-200 bg-white">
+          <div data-cols={cols ? 'on' : 'off'} className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-warm-200 bg-white">
             <div className="md:min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
               {/* Time ruler: calendar-aligned periods, then the data date */}
               <div className="flex h-14 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
-                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 max-md:flex-1 md:w-[260px] xl:w-[692px] flex-shrink-0 px-4"><span className="hidden xl:block flex-shrink-0 w-[64px]">ID</span><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span><span className="hidden xl:block flex-shrink-0 w-[52px] text-right">% done</span></div>
+                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 max-md:flex-1 md:w-[260px] cols:w-[692px] flex-shrink-0 px-4"><span className="hidden cols:block flex-shrink-0 w-[64px]">ID</span><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Start</span><span className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px]">Finish</span><span className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span><span className="hidden cols:block flex-shrink-0 w-[52px] text-right">% done</span></div>
                 <div className="max-md:hidden flex-1 relative tabular-nums">
                   {span && ruler.map((x, i) => (
                     <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{/^Q\d \d{4}$/.test(x.label) ? (i > 0 && !x.label.startsWith('Q1') ? x.label.slice(0, 2) : x.label.replace(/ 20(\d\d)$/, ' ’$1')) : x.label}</span>
@@ -226,8 +234,8 @@ export default function TimelinePage() {
 
               <div className="relative">
               {/* Period gridlines and the data date, drawn once behind the bars */}
-              {/* The left offsets must equal the width of the sticky name column (md:w-[260px] xl:w-[692px]) or the line is drawn at the wrong date. */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 max-md:hidden md:left-[260px] xl:left-[692px] right-0">
+              {/* The left offsets must equal the width of the sticky name column (md:w-[260px] cols:w-[692px], the `cols:` variant in tailwind.config.js) or the line is drawn at the wrong date. */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 max-md:hidden md:left-[260px] cols:left-[692px] right-0">
                 {span && ruler.filter(x => !x.lead).map(x => <span key={x.t} className="absolute inset-y-0 w-px bg-warm-200/70" style={{ left: `${pos(new Date(x.t).toISOString())}%` }} />)}
                 {ddLeft != null && <DataDateLine left={ddLeft} />}
               </div>
@@ -239,15 +247,15 @@ export default function TimelinePage() {
                   <div key={g.name} className="border-b border-warm-200 last:border-0">
                     <button type="button" aria-expanded={expanded} onClick={() => setOpen(o => ({ ...o, [g.name]: !expanded }))}
                       className="group w-full flex items-center h-12 text-left hover:bg-warm-50 transition-colors focus-visible:outline-offset-[-2px]">
-                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors max-md:flex-1 md:w-[260px] xl:w-[692px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
+                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors max-md:flex-1 md:w-[260px] cols:w-[692px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold text-navy-950">{g.name}</span>
                           <span className="block truncate text-[12px] text-warm-600">{g.acts.length} · {g.pct}% done{g.critical ? <span className="text-status-at-risk"> · {g.critical} critical</span> : null}</span>
                         </span>
-                        <span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] font-semibold text-navy-950">{g.start ? fmtDate(g.start) : ''}</span>
-                        <span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] font-semibold text-navy-950">{g.finish ? fmtDate(g.finish) : ''}</span>
-                        <span className="hidden xl:block flex-shrink-0 w-[60px]" /><span className="hidden xl:block flex-shrink-0 w-[52px]" />
+                        <span className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] font-semibold text-navy-950">{g.start ? fmtDate(g.start) : ''}</span>
+                        <span className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] font-semibold text-navy-950">{g.finish ? fmtDate(g.finish) : ''}</span>
+                        <span className="hidden cols:block flex-shrink-0 w-[60px]" /><span className="hidden cols:block flex-shrink-0 w-[52px]" />
                       </div>
                       <div className="max-md:hidden flex-1 relative h-full pr-4">
                         {g.start && g.finish && span && (
@@ -294,20 +302,20 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
   const width = s && f && span ? Math.max(0.5, pos(f) - left + (DAY / span.range) * 100) : 0
   return (
     <button type="button" onClick={onSelect} aria-pressed={active}
-      className={`group w-full flex items-center h-[48px] md:h-[42px] xl:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
-      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] xl:w-[692px] flex-shrink-0 pl-4 md:pl-10 xl:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
-        <span className="hidden xl:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
+      className={`group w-full flex items-center h-[48px] md:h-[42px] cols:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
+      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] cols:w-[692px] flex-shrink-0 pl-4 md:pl-10 cols:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
+        <span className="hidden cols:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
         <span className="flex-1 min-w-0">
         <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
-        <span className="block xl:hidden text-[12px] text-warm-600 tabular-nums truncate"><span aria-hidden="true" className={`md:hidden inline-block w-2 h-2 rounded-full mr-1.5 ${color}`} />{a.activityId}<span className="md:hidden">{s ? ` · ${fmtDate(s)}${f && !milestone ? ` to ${fmtDate(f)}` : ''}` : ''}</span>{a.totalFloat != null && prog !== 'complete' ? <span className={`xl:hidden ${a.totalFloat < 0 ? 'max-md:text-status-at-risk max-md:font-semibold' : ''}`}>{` · float ${a.totalFloat}d`}</span> : null}</span>
+        <span className="block cols:hidden text-[12px] text-warm-600 tabular-nums truncate"><span aria-hidden="true" className={`md:hidden inline-block w-2 h-2 rounded-full mr-1.5 ${color}`} />{a.activityId}<span className="md:hidden">{s ? ` · ${fmtDate(s)}${f && !milestone ? ` to ${fmtDate(f)}` : ''}` : ''}</span>{a.totalFloat != null && prog !== 'complete' ? <span className={`cols:hidden ${a.totalFloat < 0 ? 'max-md:text-status-at-risk max-md:font-semibold' : ''}`}>{` · float ${a.totalFloat}d`}</span> : null}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>
         </span>
         {/* On wide screens the dates and float are columns, as in P6, so they are read without opening the activity. */}
-        <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] text-warm-700">{s ? fmtDate(s) : ''}</span>
-        <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] text-warm-700">{f ? fmtDate(f) : ''}</span>
-        <span aria-hidden="true" className={`hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right ${a.totalFloat != null && a.totalFloat < 0 && prog !== 'complete' ? 'font-semibold text-status-at-risk' : 'text-warm-700'}`}>{a.totalFloat != null && prog !== 'complete' ? `${a.totalFloat}d` : ''}</span>
-        <span aria-hidden="true" className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[52px] text-right text-warm-700">{a.activityType === 'milestone' ? '' : `${prog === 'complete' ? 100 : Math.round(a.percentComplete)}%`}</span>
+        <span aria-hidden="true" className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] text-warm-700">{s ? fmtDate(s) : ''}</span>
+        <span aria-hidden="true" className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[84px] text-warm-700">{f ? fmtDate(f) : ''}</span>
+        <span aria-hidden="true" className={`hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right ${a.totalFloat != null && a.totalFloat < 0 && prog !== 'complete' ? 'font-semibold text-status-at-risk' : 'text-warm-700'}`}>{a.totalFloat != null && prog !== 'complete' ? `${a.totalFloat}d` : ''}</span>
+        <span aria-hidden="true" className="hidden cols:block flex-shrink-0 tabular-nums text-[12.5px] w-[52px] text-right text-warm-700">{a.activityType === 'milestone' ? '' : `${prog === 'complete' ? 100 : Math.round(a.percentComplete)}%`}</span>
       </div>
       <div className="max-md:hidden flex-1 relative h-full pr-4" aria-hidden="true">
         {!milestone && a.baselineStart && a.baselineFinish && span && (
