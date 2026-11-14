@@ -81,6 +81,9 @@ input[type='checkbox']:checked::before, input[type='radio']:checked::before { tr
 input[type='checkbox']:disabled, input[type='radio']:disabled { opacity: 0.5; cursor: not-allowed; }
 input[type='date'] { accent-color: var(--accent-600); }
 
+/* A primary button that cannot be pressed yet is grey, not pale blue: pale blue read as a washed-out live button. */
+button:disabled[class*='bg-accent-600'] { background-color: var(--warm-300); color: var(--warm-600); opacity: 1; box-shadow: none; cursor: not-allowed; }
+
 /* Tap and click targets. With a mouse, nothing you can press is under 28px tall (WCAG 2.2 asks for 24).
    On touch screens the floor is 44px, the size Apple and Google both recommend for a finger.
    A control drawn inside a chart or a dense grid opts out with data-compact. */
