@@ -28,6 +28,16 @@ const AUDIENCES: { id: Audience; label: string; hint: string }[] = [
 ]
 // The card behind each kind of attention item, and the cards only the project manager view shows.
 const ALERT_CARD: Record<string, string> = { overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field' }
+// Today is five short parts, not one long page: what to act on now, then the detail behind it, each a tab.
+type Part = 'now' | 'finish' | 'docs' | 'changes' | 'brief'
+const PARTS: { id: Part; label: string; for: Audience[] }[] = [
+  { id: 'now', label: 'Now', for: ['pm', 'field', 'client'] },
+  { id: 'finish', label: 'What moves the finish', for: ['pm'] },
+  { id: 'docs', label: 'From your documents', for: ['pm', 'field'] },
+  { id: 'changes', label: 'Changes and register', for: ['pm'] },
+  { id: 'brief', label: 'Brief to send', for: ['pm', 'field', 'client'] },
+]
+const CARD_PART: Record<string, Part> = { today: 'now', overdue: 'now', since: 'now', lookahead: 'now', driving: 'finish', whatif: 'finish', risks: 'finish', issues: 'finish', signals: 'docs', contract: 'docs', field: 'docs', register: 'changes', changed: 'changes', missing: 'changes', logic: 'changes' }
 const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif', 'risks', 'issues', 'changed', 'missing', 'logic'])
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
@@ -40,7 +50,7 @@ export default function TodayPage() {
   const sid = selectedSchedule?.id
   const [data, setData] = useState<BriefData | null>(null)
   const [items, setItems] = useState<RegisterItem[]>([])
-  const [fullBrief, setFullBrief] = useState(false)
+  const [part, setPart] = useState<Part>('now')
   const [impact, setImpact] = useState<{ moved: { id: string; code: string; name: string; startDays: number; finishDays: number }[]; movedCount: number } | null>(null)
   const [err, setErr] = useState('')
   const [asOf, setAsOf] = useState(todayIso)
@@ -126,9 +136,12 @@ export default function TodayPage() {
   // From the attention list: open the card behind an item and bring it into view (in the view that shows it).
   const show = (id: string) => {
     if (PM_ONLY.has(id)) setAudience('pm')
+    if (CARD_PART[id]) setPart(CARD_PART[id])
     setOpenCards(o => ({ ...o, [id]: true }))
     requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`card-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })))
   }
+  const parts = PARTS.filter(x => x.for.includes(audience))
+  const shownPart: Part = parts.some(x => x.id === part) ? part : 'now'
   const count = (n: number, one: string, many = one + 's') => (n === 0 ? 'None' : `${n} ${n === 1 ? one : many}`)
 
   return (
@@ -156,8 +169,15 @@ export default function TodayPage() {
       </header>
       {err && <Alert tone="error">{err}</Alert>}
 
+      <div role="tablist" aria-label="Parts of the brief" className="flex gap-1.5 overflow-x-auto [&>button]:flex-shrink-0">
+        {parts.map(x => (
+          <button key={x.id} role="tab" type="button" id={`part-${x.id}`} aria-selected={shownPart === x.id} onClick={() => setPart(x.id)}
+            className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border whitespace-nowrap ${shownPart === x.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{x.label}</button>
+        ))}
+      </div>
+
       {/* On a wide screen the answer and what needs action sit side by side, so both are on the first screen. */}
-      <div className={data.alerts.length > 0 ? 'grid gap-5 items-stretch xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
+      <div hidden={shownPart !== 'now'} className={data.alerts.length > 0 ? 'grid gap-5 items-stretch xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
       {/* The answer first: are we meeting the deadline, and by how much. */}
       <section aria-labelledby="deadline-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
         <h2 id="deadline-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</h2>
@@ -189,7 +209,7 @@ export default function TodayPage() {
       </div>
 
       {/* One brief, three readers. */}
-      <section aria-labelledby="aud-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
+      <section aria-labelledby="aud-h" hidden={shownPart !== 'brief'} className="rounded-[14px] border border-warm-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="aud-h" className="text-[16px] font-semibold text-navy-950">What the {AUDIENCES.find(a => a.id === audience)!.label.toLowerCase()} should know today</h2>
           <div className="flex flex-wrap gap-2">
@@ -218,9 +238,8 @@ export default function TodayPage() {
         <div id="aud-panel" role="tabpanel" aria-labelledby={`aud-${audience}`} className="mt-3">
           <p className="text-[12.5px] text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
           <ul className="space-y-2">
-            {(fullBrief ? b.audiences[audience] : b.audiences[audience].slice(0, 3)).map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
+            {b.audiences[audience].map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
           </ul>
-          {b.audiences[audience].length > 3 && <button type="button" aria-expanded={fullBrief} onClick={() => setFullBrief(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{fullBrief ? 'Show less' : `Show all ${b.audiences[audience].length} points`}</button>}
         </div>
       </section>
 
@@ -232,7 +251,7 @@ export default function TodayPage() {
       )}
 
       {audience !== 'client' && (
-        <section aria-label="Today on site" className="space-y-3">
+        <section aria-label="Today on site" hidden={shownPart !== 'now'} className="space-y-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">Today on site</h2>
         <div className="grid md:grid-cols-2 gap-3 items-start">
           <Card id="today" open={isOpen('today')} onToggle={() => toggle('today')} meta={`${b.today.starting.length} to start · ${b.today.finishing.length} to finish · ${b.today.inProgressCount} under way`} icon={<CalendarCheck size={15} />} title="Today" sub="What the schedule says happens today">
@@ -261,7 +280,7 @@ export default function TodayPage() {
       )}
 
       {audience === 'pm' && (
-      <section aria-label="What moves the finish" className="space-y-3">
+      <section aria-label="What moves the finish" hidden={shownPart !== 'finish'} className="space-y-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">What moves the finish</h2>
         <div className="grid md:grid-cols-2 gap-3 items-start">
           <Card id="driving" open={isOpen('driving')} onToggle={() => toggle('driving')} meta={b.driving.today ? b.driving.today.code : 'No driving path'} icon={<Route size={15} />} title="What is driving the project" sub="The open activities that set the finish date, in order">
@@ -299,7 +318,7 @@ export default function TodayPage() {
       )}
 
       {audience !== 'client' && (
-      <section aria-label="From your documents" className="space-y-3">
+      <section aria-label="From your documents" hidden={shownPart !== 'docs'} className="space-y-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">From your documents</h2>
         <div className="grid md:grid-cols-2 gap-3 items-start">
           {audience === 'pm' && <>
@@ -363,8 +382,8 @@ export default function TodayPage() {
       )}
 
       {audience === 'pm' && <>
-      <Register sid={sid!} items={items} openCount={openItems.length} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
-      <section aria-label="Changes and schedule health" className="space-y-3">
+      <div hidden={shownPart !== 'changes'}><Register sid={sid!} items={items} openCount={openItems.length} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} /></div>
+      <section aria-label="Changes and schedule health" hidden={shownPart !== 'changes'} className="space-y-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">Changes and schedule health</h2>
         <div className="grid md:grid-cols-2 gap-3 items-start">
           <Card id="changed" open={isOpen('changed')} onToggle={() => toggle('changed')} meta={count(b.changed.edits.length, 'change')} icon={<GitBranch size={15} />} title="What changed" sub="Changes made in RunF9 in the last 7 days, and since the previous update">
