@@ -256,7 +256,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     else {
       const ok = offenders.length / pop.length <= R.maxPct / 100
       add({
-        id: 1, name: 'Logic', metric: pct(offenders.length, pop.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
+        id: 1, name: 'Logic', metric: pct(offenders.length, pop.length), basis: `${offenders.length} of ${pop.length} open activities`, threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
         offenders: cap(offenders.map((a) => a.code)),
         explanation: offenders.length === 0
           ? 'Every open activity has both a predecessor and a successor, so delays will flow through the network.'
@@ -312,7 +312,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
     else {
       const ok = hard.length / pop.length <= R.maxPct / 100
       add({
-        id: 5, name: 'Hard constraints', metric: pct(hard.length, pop.length), threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
+        id: 5, name: 'Hard constraints', metric: pct(hard.length, pop.length), basis: `${hard.length} of ${pop.length} open activities`, threshold: `≤ ${R.maxPct}%`, result: ok ? 'pass' : 'fail',
         offenders: cap(hard.map((a) => a.code)),
         explanation: ok
           ? 'Few activities are pinned by hard constraints, so dates are driven by logic rather than typed in.'
@@ -331,7 +331,7 @@ export function runDcma(s: AnalyzableSchedule, rules: Partial<DcmaRules> = {}): 
       const high = withTf.filter((x) => x.tf > R.highFloatDays)
       const okH = high.length / withTf.length <= R.maxPct / 100
       add({
-        id: 6, name: 'High float', metric: pct(high.length, withTf.length), threshold: `≤ ${R.maxPct}% with TF > ${R.highFloatDays}d`, result: okH ? 'pass' : 'fail',
+        id: 6, name: 'High float', metric: pct(high.length, withTf.length), basis: `${high.length} of ${withTf.length} open activities`, threshold: `≤ ${R.maxPct}% with TF > ${R.highFloatDays}d`, result: okH ? 'pass' : 'fail',
         offenders: cap(high.map((x) => x.a.code)),
         explanation: okH
           ? `Few activities have more than ${R.highFloatDays} days of float, which suggests the logic is reasonably complete.`

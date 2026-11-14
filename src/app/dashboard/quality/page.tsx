@@ -226,7 +226,7 @@ export default function QualityPage() {
                 <span className="text-[12px] font-bold text-warm-500 tabular-nums">{c.id}</span>
                 <span className="text-[13.5px] font-semibold text-navy-950 leading-tight">{c.name}</span>
                 <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[19px] tracking-[-0.02em]'} font-bold tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
-                <span className="text-[12px] text-warm-600">target {c.threshold}</span>
+                <span className="text-[12px] text-warm-600">{c.basis && c.result !== 'n/a' ? <>{c.basis} · </> : null}target {c.threshold}</span>
               </button>
             ))}
           </div>

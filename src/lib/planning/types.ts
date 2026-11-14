@@ -659,6 +659,8 @@ export interface DcmaCheck {
   id: number          // 1..14
   name: string
   metric: string      // e.g. "3.2%"
+  /** What the percentage is of, where the population is not every activity: "1 of 24 open activities" */
+  basis?: string
   threshold: string   // e.g. "≤ 5%"
   result: CheckResult
   offenders: string[] // activity codes (every offender, de-duplicated)
