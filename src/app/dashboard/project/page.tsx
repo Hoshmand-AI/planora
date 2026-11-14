@@ -108,7 +108,7 @@ export default function ProjectPage() {
         <FinishHero status={status} forecastFinish={forecastFinish}
           mustFinishBy={(mx.mustFinishBy as string) || null} baselineFinish={(mx.baselineFinish as string) || null}
           projectStart={(mx.projectStart as string) || null} dataDate={selectedSchedule.dataDate ?? null}
-          reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more below)` : '')
+          reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more under “Why this status”)` : '')
             : status === 'no_baseline' ? (isBaselineUpload
               ? 'This upload is the baseline. Upload a status update of the same project and RunF9 measures variance against it.'
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')
@@ -125,8 +125,8 @@ export default function ProjectPage() {
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
             value={!m || (criticalPath && !criticalPath.determined) ? '—' : String(criticalCount)} label="Critical activities"
             sub={!m ? (metricsError ? 'not available' : 'loading…') : criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
-          <Link href={`/dashboard/quality?schedule=${selectedSchedule.id}`} className="block rounded-2xl card-lift">
-            <CounterTile mood={!quality ? 'idle' : quality.failing ? 'waiting' : 'done'}
+          <Link href={`/dashboard/quality?schedule=${selectedSchedule.id}`} className="block rounded-2xl card-lift h-full">
+            <CounterTile mood={!quality ? 'idle' : quality.failing ? 'worried' : 'done'}
               value={quality ? `${quality.passed}/${quality.applicable}` : '—'} label="Quality checks pass"
               sub={!quality ? 'DCMA 14-point' : quality.failing ? `${quality.failing} to fix · open Quality` : 'all applicable checks pass'} />
           </Link>

@@ -97,13 +97,13 @@ function Summary({ data }: { data: Analysis }) {
   const t = data.totals
   const items = [
     ['Resources', n(t.resources)], ['Assignments', n(t.assignments)], ['Total units', n(t.units)],
-    ['Over-allocated resources', n(t.overAllocatedResources)], ['Over-allocated resource-days', n(t.overAllocatedDays)],
+    ['Over-allocated', n(t.overAllocatedResources)], ['Days over ahead', n(t.overAllocatedDays)],
   ]
   return (
     <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {items.map(([k, v]) => (
-        <div key={k} className="bg-warm-50 border border-warm-200 rounded-md px-3 py-2">
-          <dt className="text-[12px] uppercase tracking-wider text-warm-600">{k}</dt>
+        <div key={k} className="bg-white border border-warm-200 rounded-xl px-3 py-2">
+          <dt className="text-[12px] uppercase tracking-wider text-warm-600 truncate">{k}</dt>
           <dd className="text-[18px] font-semibold text-navy-950 tabular-nums">{v}</dd>
         </div>
       ))}
