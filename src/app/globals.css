@@ -80,6 +80,9 @@ input[type='checkbox']:checked, input[type='radio']:checked { background: var(--
 input[type='checkbox']:checked::before, input[type='radio']:checked::before { transform: scale(1); }
 input[type='checkbox']:disabled, input[type='radio']:disabled { opacity: 0.5; cursor: not-allowed; }
 input[type='date'] { accent-color: var(--accent-600); }
+/* A radio or tick box and its label sit on one line, centred, wherever a label holds one (zero specificity, so a
+   label that lays itself out differently keeps its own classes). */
+:where(label:has(> input[type='radio']), label:has(> input[type='checkbox'])) { display: inline-flex; align-items: center; gap: 0.45rem; }
 
 /* A primary button that cannot be pressed yet is grey, not pale blue: pale blue read as a washed-out live button. */
 button:disabled[class*='bg-accent-600'] { background-color: var(--warm-300); color: var(--warm-600); opacity: 1; box-shadow: none; cursor: not-allowed; }

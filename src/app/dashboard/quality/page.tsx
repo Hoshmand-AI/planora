@@ -153,7 +153,9 @@ export default function QualityPage() {
         <div hidden={tab !== 'checks'} className="space-y-6">
         {/* The score, then the few things to fix first */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
-          <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6 flex items-center gap-5">
+          {/* The score, then the four facts about this file, in one column: the score card used to float in a tall empty box. */}
+          <div className="flex flex-col gap-3">
+          <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6 flex max-sm:flex-col items-center sm:items-center gap-5">
             <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} />
             <div className="min-w-0">
               <h2 className="text-[19px] font-bold tracking-[-0.02em] text-navy-950 leading-snug">{grade.short}</h2>
@@ -172,6 +174,13 @@ export default function QualityPage() {
               </dl>
             </div>
           </section>
+            <div className="grid grid-cols-2 gap-2">
+              <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
+              <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
+              <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
+              <Card label="Findings decided" value={`${guidance.filter(g => g.decision).length}/${guidance.length}`} sub="accepted or marked to fix" />
+            </div>
+          </div>
           <section aria-labelledby="fix-first-h" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6">
             <h2 id="fix-first-h" className="text-[17px] font-semibold text-navy-950">Fix these first</h2>
             {flagged.length === 0 ? (
@@ -203,13 +212,6 @@ export default function QualityPage() {
             <li>Unless you choose the “With RunF9 edits” scenario, the score is for the file as submitted; edits made in RunF9 don&apos;t change it.</li>
           </ul>
         </Disclosure>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Card label="Questions about the data" value={String(open.length)} sub={`${data.dataQuestions.length - open.length} answered`} />
-          <Card label="Calendars" value={String(data.schedule.calendars.length)} sub="imported and normalized" />
-          <Card label="Activities understood" value={`${data.classification.classifiedPct}%`} sub="mapped to standard work categories" />
-          <Card label="Findings decided" value={`${guidance.filter(g => g.decision).length}/${guidance.length}`} sub="accepted or marked to fix" />
-        </div>
-
         {/* All checks at a glance: failing ones outlined in red; select one for its detail */}
         <section aria-labelledby="dcma-h" className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-2.5">

@@ -180,7 +180,24 @@ export default function TimeImpactPage() {
 
         {draft ? <DraftReview draft={draft} busy={busy} onCreate={createFromDraft} onDiscard={() => setDraft(null)} />
           : event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use') && !aiOff} onChanged={load} />
-          : <p className="text-[13px] text-warm-600 py-6">Select a delay event{canWrite ? ' or add one' : ''} to model its fragnet and run the analysis.</p>}
+          : (
+            /* The empty pane says what happens here, in three steps, and what a fragnet is. */
+            <div className="rounded-[14px] border border-warm-200 bg-white p-5">
+              <h3 className="text-[15px] font-semibold text-navy-950">Measure what a delay does to the finish</h3>
+              <ol className="mt-3 grid gap-3 sm:grid-cols-3 text-[13px] text-warm-700">
+                {[['1', 'Name the event', 'A late delivery, a change order, a stop-work: give it a name and the date it began.'],
+                  ['2', 'Describe the added work', 'The few activities and links the event adds to the schedule. Schedulers call this a fragnet.'],
+                  ['3', 'Run the analysis', 'RunF9 inserts it at the data date, recalculates, and shows each milestone before and after.']].map(([n, t, d]) => (
+                  <li key={n} className="rounded-xl bg-warm-100 px-3 py-2.5">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-navy-900 text-white text-[12px] font-semibold">{n}</span>
+                    <span className="block mt-1.5 font-semibold text-navy-950">{t}</span>
+                    <span className="block text-warm-700">{d}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-[13px] text-warm-600">{canWrite ? 'Add an event on the left to start.' : 'Select an event on the left to see its analysis.'}</p>
+            </div>
+          )}
       </div>
     </div>
   )
