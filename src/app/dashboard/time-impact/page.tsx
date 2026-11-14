@@ -168,7 +168,7 @@ export default function TimeImpactPage() {
                   <button type="button" className={secondary} disabled={!docId || drafting} onClick={runDraft}>
                     {drafting ? <><Loader2 size={13} className="inline animate-spin mr-1" aria-hidden />Reading…</> : 'Draft fragnet'}
                   </button>
-                  <p className="text-[11.5px] text-warm-600">RunF9 proposes the new activities and ties, each with the sentence it relies on. Nothing is saved until you create the event.</p>
+                  <p className="text-[12px] text-warm-600">RunF9 proposes the new activities and ties, each with the sentence it relies on. Nothing is saved until you create the event.</p>
                 </>
               )}
             </div>
@@ -268,7 +268,7 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
             <select className={`${input} w-full mt-0.5`} value={form.responsibility} onChange={e => setForm({ ...form, responsibility: e.target.value as Responsibility })}>
               {RESP.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <span className="block text-[11.5px] text-warm-600 mt-0.5">A label you enter. RunF9 does not assess responsibility.</span>
+            <span className="block text-[12px] text-warm-600 mt-0.5">A label you enter. RunF9 does not assess responsibility.</span>
           </label>
           <label>Notice date<input type="date" className={`${input} w-full mt-0.5`} value={form.notifiedOn} onChange={e => setForm({ ...form, notifiedOn: e.target.value })} /></label>
           <label>Event start<input type="date" className={`${input} w-full mt-0.5`} value={form.eventStart} onChange={e => setForm({ ...form, eventStart: e.target.value })} /></label>
@@ -476,7 +476,7 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
 function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-warm-50 border border-warm-200 rounded-lg p-3">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">{label}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-600">{label}</div>
       <div className="text-[20px] font-bold text-navy-950 tabular-nums">{value}</div>
       <div className="text-[12px] text-warm-700">{sub}</div>
     </div>

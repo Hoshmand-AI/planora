@@ -138,7 +138,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
-              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[11px] font-semibold uppercase text-accent-600">plain English</span>}{e.status === 'skipped' && <span className="block text-[11.5px] text-status-attention">Not applied: {e.note}</span>}</td>
+              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[12px] font-semibold uppercase text-accent-600">recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[12px] font-semibold uppercase text-accent-600">plain English</span>}{e.status === 'skipped' && <span className="block text-[12px] text-status-attention">Not applied: {e.note}</span>}</td>
               <td className={td}>{fmtDates(e.before)}</td><td className={td}>{fmtDates(e.after)}</td><td className={td}>{e.reason}</td>
               <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDay(e.at)}</span></td>
               {canEdit && data.editable && <td className={td}><button type="button" disabled={busy} onClick={() => revert(e)} className="text-accent-600 hover:underline">Revert</button></td>}
@@ -272,7 +272,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Optimistic</th><th className={th}>Most likely</th><th className={th}>Pessimistic</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{ranges.map((r, i) => (
           <tr key={i}>
-            <td className={td}><input aria-label="Activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[11.5px]">{r.name}</span>}</td>
+            <td className={td}><input aria-label="Activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[12px]">{r.name}</span>}</td>
             {(['optimistic', 'mostLikely', 'pessimistic'] as const).map(k => <td key={k} className={td}><input aria-label={k} type="number" min={0} disabled={!canEdit} value={r[k]} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, [k]: e.target.value } : x))} className={cell} /></td>)}
             {canEdit && <td className={td}><button type="button" onClick={() => setRanges(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
@@ -292,7 +292,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Committed date</th><th className={th}>Note (e.g. supplier letter)</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{commitments.map((r, i) => (
           <tr key={i}>
-            <td className={td}><input aria-label="Committed activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[11.5px]">{r.name}</span>}</td>
+            <td className={td}><input aria-label="Committed activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[12px]">{r.name}</span>}</td>
             <td className={td}><input aria-label="Committed delivery date" type="date" disabled={!canEdit} value={r.date} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={input} /></td>
             <td className={td}><input aria-label="Commitment note" disabled={!canEdit} value={r.note ?? ''} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} className={`${input} w-48`} /></td>
             {canEdit && <td className={td}><button type="button" onClick={() => setCommitments(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}

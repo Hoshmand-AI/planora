@@ -152,7 +152,7 @@ export default function QualityPage() {
         {/* The score, then the few things to fix first */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
           <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6 flex items-center gap-5">
-            <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} tone={grade.mood} />
+            <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} />
             <div className="min-w-0">
               <h2 className="text-[19px] font-bold tracking-[-0.02em] text-navy-950 leading-snug">{grade.short}</h2>
               <p className="text-[13.5px] text-warm-600 mt-1 leading-relaxed">{grade.title} {grade.sub}</p>
@@ -218,10 +218,10 @@ export default function QualityPage() {
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
                 className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
-                <span className="text-[11.5px] font-bold text-warm-500 tabular-nums">{c.id}</span>
+                <span className="text-[12px] font-bold text-warm-500 tabular-nums">{c.id}</span>
                 <span className="text-[13.5px] font-semibold text-navy-950 leading-tight">{c.name}</span>
                 <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[19px] tracking-[-0.02em]'} font-bold tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
-                <span className="text-[11.5px] text-warm-600">target {c.threshold}</span>
+                <span className="text-[12px] text-warm-600">target {c.threshold}</span>
               </button>
             ))}
           </div>
@@ -243,7 +243,7 @@ export default function QualityPage() {
 
         {data.brief && (
           <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1">About this project</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1">About this project</div>
             <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
           </div>
         )}
@@ -364,10 +364,10 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
   return (
     <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
       <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <span className={`text-[10.5px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
+        <span className={`text-[12px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
-        {disposition && <span className="text-[11px] font-semibold uppercase text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition]}</span>}
+        {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
+        {disposition && <span className="text-[12px] font-semibold uppercase text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition]}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
@@ -422,7 +422,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
         </p>
       ) : (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
           <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-md px-2 py-1 text-[12.5px] text-navy-950">
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
@@ -453,7 +453,7 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
   }
   return (
     <section aria-labelledby="submission-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-      <h2 id="submission-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
+      <h2 id="submission-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
       {s && !editing ? (
         <div className="text-[13.5px] text-warm-700 space-y-1">
           <p><span className="font-semibold text-navy-950">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
@@ -507,16 +507,15 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
   )
 }
 
-const RING_TONE: Record<RobotMood, string> = { done: '#2F7358', waiting: '#1D4ED8', worried: '#A64848', working: '#2563eb', idle: '#56656F' }
-
-/** Checks passing as a ring that fills on load. */
-function ScoreRing({ passed, applicable, tone }: { passed: number; applicable: number; tone: RobotMood }) {
+/** Checks passing as a ring that fills on load. The passing share is always green and the failing share
+ *  red, so the colour says what the arc counts (it used to take the page's mood, which drew passes in red). */
+function ScoreRing({ passed, applicable }: { passed: number; applicable: number }) {
   const r = 48, c = 2 * Math.PI * r
   const share = applicable ? passed / applicable : 0
   return (
-    <svg width="112" height="112" viewBox="0 0 112 112" className="flex-shrink-0" role="img" aria-label={`${passed} of ${applicable} checks pass`}>
-      <circle cx="56" cy="56" r={r} fill="none" stroke="#EBEEEE" strokeWidth="10" />
-      <circle cx="56" cy="56" r={r} fill="none" stroke={RING_TONE[tone]} strokeWidth="10" strokeLinecap="round" transform="rotate(-90 56 56)"
+    <svg width="112" height="112" viewBox="0 0 112 112" className="flex-shrink-0" role="img" aria-label={`${passed} of ${applicable} checks pass (green), ${applicable - passed} fail (red)`}>
+      <circle cx="56" cy="56" r={r} fill="none" stroke={applicable && passed < applicable ? '#A64848' : '#EBEEEE'} strokeWidth="10" />
+      <circle cx="56" cy="56" r={r} fill="none" stroke="#2F7358" strokeWidth="10" strokeLinecap="round" transform="rotate(-90 56 56)"
         strokeDasharray={c} strokeDashoffset={c * (1 - share)} className="ring-draw" style={{ ['--ring-c' as string]: c }} />
       <text x="56" y="62" textAnchor="middle" fontSize="24" fontWeight="700" fill="#06141B">{passed}/{applicable}</text>
     </svg>
@@ -526,9 +525,9 @@ function ScoreRing({ passed, applicable, tone }: { passed: number; applicable: n
 function Card({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
       <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[20px]'} font-semibold text-navy-950 tabular-nums mt-1 break-words`}>{value}</div>
-      <div className="text-[11px] text-warm-400 mt-0.5">{sub}</div>
+      <div className="text-[12px] text-warm-400 mt-0.5">{sub}</div>
     </div>
   )
 }

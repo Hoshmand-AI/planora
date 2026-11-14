@@ -26,7 +26,7 @@ interface Candidate {
 }
 
 const passages = (n: number) => `${n} passage${n === 1 ? '' : 's'}`
-const badge = 'inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium border'
+const badge = 'inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-medium border'
 const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   ? <span className={`${badge} bg-status-on-track-bg border-status-on-track/40 text-status-on-track`}>Approved</span>
   : <span className={`${badge} bg-status-attention-bg border-status-attention/40 text-status-attention`}>Unreviewed</span>
@@ -286,7 +286,7 @@ function SearchPanel({ base, unreviewed }: { base: string; unreviewed: number })
               <li key={h.chunkId} className={`border rounded-md p-3 ${h.flagged ? 'border-status-attention bg-status-attention-bg' : 'border-warm-200 bg-warm-100'}`}>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="text-[13px] font-semibold text-navy-950">{h.citation}</span>
-                  <span className="text-[11px] text-warm-500">{h.tierLabel}</span>
+                  <span className="text-[12px] text-warm-500">{h.tierLabel}</span>
                   {h.trust !== 'approved' && <TrustBadge trust={h.trust} />}
                 </div>
                 {h.flagged && (
@@ -389,7 +389,7 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
                 <div><span className="text-warm-700">Send to (POST): </span><code className="font-mono text-navy-950 break-all">{data.address}</code> <button type="button" onClick={() => copy('address', data.address)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'address' ? 'Copied' : 'Copy'}</button></div>
                 <div><span className="text-warm-700">Token (Authorization: Bearer): </span><code className="font-mono text-navy-950 break-all">{fresh.token}</code> <button type="button" onClick={() => copy('token', fresh.token)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'token' ? 'Copied' : 'Copy'}</button></div>
               </div>
-              <pre className="bg-warm-100 rounded p-2 text-[11.5px] text-navy-950 overflow-x-auto"><code>{example}</code></pre>
+              <pre className="bg-warm-100 rounded p-2 text-[12px] text-navy-950 overflow-x-auto"><code>{example}</code></pre>
               <p className="text-[12px] text-warm-700">In Microsoft Power Automate, Zapier or n8n: on a new email in the project mailbox (or a finished meeting transcript), add an HTTP step that posts to the address with this token. Accepted: a raw email (message/rfc822), a transcript (text/vtt), plain text, or JSON with type, title and text.</p>
               <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-[12.5px] font-medium text-accent-600 hover:underline">I have copied it</button>
             </div>

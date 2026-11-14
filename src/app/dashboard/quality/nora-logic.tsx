@@ -104,7 +104,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
       <MoodTile mood={h.mood} className="flex items-start gap-3.5">
         <Robot mood={h.mood} size={56} className="flex-shrink-0 -mt-1" />
         <div className="min-w-0 flex-1">
-          <h2 id="nora-logic-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-600">Logic suggestions</h2>
+          <h2 id="nora-logic-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-600">Logic suggestions</h2>
           <p className="text-[15px] font-medium text-navy-950 mt-0.5">{h.title}</p>
           <p className="text-[12.5px] text-warm-600 mt-0.5">{h.sub}</p>
         </div>
@@ -134,7 +134,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
                 <ul className="divide-y divide-warm-200 text-[12.5px]">
                   {data.suggestions.filter(s => s.action !== 'add_link').map(s => (
                     <li key={s.id} className="py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-warm-600">{SUGGESTION_KIND_LABEL[s.kind]}</span>
+                      <span className="text-[12px] font-semibold uppercase tracking-wide text-warm-600">{SUGGESTION_KIND_LABEL[s.kind]}</span>
                       <p className="text-navy-950"><LinkText s={s} /></p>
                       <p className="text-warm-600">{s.reason}</p>
                     </li>
@@ -172,11 +172,11 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
 function LinkText({ s }: { s: LogicSuggestion }) {
   return (
     <>
-      <span className="font-mono text-[11.5px] text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
+      <span className="font-mono text-[12px] text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
       <ArrowRight size={12} className="inline mx-1 -mt-0.5 text-warm-500" aria-label="then" />
-      <span className="font-mono text-[11.5px] text-warm-600">{s.successor.code}</span> {s.successor.name}
-      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[11.5px] text-navy-950">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
-      {s.firm && <span className="ml-1.5 text-[11px] font-semibold uppercase text-accent-600">your firm&apos;s pattern</span>}
+      <span className="font-mono text-[12px] text-warm-600">{s.successor.code}</span> {s.successor.name}
+      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[12px] text-navy-950">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
+      {s.firm && <span className="ml-1.5 text-[12px] font-semibold uppercase text-accent-600">your firm&apos;s pattern</span>}
     </>
   )
 }

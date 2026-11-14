@@ -80,7 +80,7 @@ function ResetForm() {
           ) : token && !linkDead ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="new-password" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">New password</label>
+                <label htmlFor="new-password" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">New password</label>
                 <div className="relative">
                   <input
                     id="new-password" autoComplete="new-password" aria-describedby="password-hint" autoFocus
@@ -92,7 +92,7 @@ function ResetForm() {
                     {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                   </button>
                 </div>
-                <p id="password-hint" className="text-[11.5px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>
+                <p id="password-hint" className="text-[12px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>
               </div>
               <button type="submit" disabled={loading}
                 className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">

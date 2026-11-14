@@ -204,7 +204,7 @@ export default function TimelinePage() {
                     <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{x.label}</span>
                   ))}
                   {ddLeft != null && dataDate && (
-                    <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 px-2 py-px text-[11px] font-semibold text-white"
+                    <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 px-2 py-px text-[12px] font-semibold text-white"
                       style={{ left: `${ddLeft}%`, transform: `translateX(${ddLeft > 85 ? '-100%' : ddLeft < 12 ? '0' : '-50%'})` }}>Data date {fmtDate(dataDate)}</span>
                   )}
                 </div>
@@ -228,7 +228,7 @@ export default function TimelinePage() {
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0">
                           <span className="block truncate text-[13.5px] font-semibold text-navy-950">{g.name}</span>
-                          <span className="block text-[11.5px] text-warm-600">{g.acts.length} · {g.pct}% done{g.critical ? <span className="text-status-at-risk"> · {g.critical} critical</span> : null}</span>
+                          <span className="block text-[12px] text-warm-600">{g.acts.length} · {g.pct}% done{g.critical ? <span className="text-status-at-risk"> · {g.critical} critical</span> : null}</span>
                         </span>
                       </div>
                       <div className="flex-1 relative h-full pr-4">
@@ -286,8 +286,8 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
     <button type="button" onClick={onSelect} aria-pressed={active}
       className={`group w-full flex items-center h-[42px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
       <div className={`sticky left-0 z-10 self-stretch flex flex-col justify-center transition-colors w-[200px] md:w-[260px] flex-shrink-0 pl-10 pr-3 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
-        <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[10px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
-        <span className="block text-[11px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? ` · float ${a.totalFloat}d` : ''}</span>
+        <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
+        <span className="block text-[12px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? ` · float ${a.totalFloat}d` : ''}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>
       </div>

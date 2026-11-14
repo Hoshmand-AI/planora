@@ -67,13 +67,13 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
   return (
     <div className="space-y-4">
       <fieldset>
-        <legend className="block text-[11px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Upload from</legend>
+        <legend className="block text-[12px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Upload from</legend>
         <div className="flex flex-wrap gap-1.5">
           <SourceChip active={from === 'computer'} onClick={() => choose('computer')} icon={<Laptop size={14} aria-hidden />} label="This computer" />
           {readable.map(c => <SourceChip key={c.id} active={from === c.id} onClick={() => choose(c.id)} icon={<Cloud size={14} aria-hidden />} label={c.name} title={`${c.providerLabel} · ${c.location}`} />)}
         </div>
         {connections && readable.length === 0 && (
-          <p className="text-[11.5px] text-warm-600 mt-1.5">
+          <p className="text-[12px] text-warm-600 mt-1.5">
             {canManage ? <>To upload from AWS, Azure or Google Cloud, <Link href="/dashboard/org#cloud-storage" className="text-accent-600 underline">connect your cloud storage</Link>.</> : 'An admin can connect your AWS, Azure or Google Cloud storage in Organization settings.'}
           </p>
         )}
@@ -83,7 +83,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
         <div>
           <input type="file" name="file" accept={accept} required aria-label="File"
             className={`${fieldClass} file:mr-3 file:bg-navy-900 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:text-[12px] file:font-medium`} />
-          {hint && <p className="text-[11px] text-warm-600 mt-1.5">{hint}</p>}
+          {hint && <p className="text-[12px] text-warm-600 mt-1.5">{hint}</p>}
         </div>
       ) : (
         <div className="rounded-lg border border-warm-300 bg-white">
@@ -120,7 +120,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
                         className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] ${picked === f.key ? 'bg-accent-100 text-navy-950 font-semibold' : ok ? 'text-navy-950 hover:bg-warm-50' : 'text-warm-500 cursor-not-allowed'}`}>
                         <FileText size={14} aria-hidden className="text-warm-600 flex-shrink-0" />
                         <span className="truncate flex-1">{f.key.slice(listing.prefix.length)}</span>
-                        <span className="text-[11.5px] text-warm-600 tabular-nums">{fmtSize(f.size)}</span>
+                        <span className="text-[12px] text-warm-600 tabular-nums">{fmtSize(f.size)}</span>
                       </button>
                     </li>
                   )
@@ -129,17 +129,17 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
               </ul>
             )}
           </div>
-          <p className="px-3 py-2 border-t border-warm-200 text-[11.5px] text-warm-600">{picked ? <>Selected: <span className="font-semibold text-navy-950">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
+          <p className="px-3 py-2 border-t border-warm-200 text-[12px] text-warm-600">{picked ? <>Selected: <span className="font-semibold text-navy-950">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
         </div>
       )}
 
       <label className="block">
-        <span className="block text-[11px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Keep the original file in</span>
+        <span className="block text-[12px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Keep the original file in</span>
         <select name="keepIn" defaultValue={keepValue} className={fieldClass}>
           <option value={keepValue}>{keepLabel}</option>
           {writable.map(c => <option key={c.id} value={c.id}>{c.name} ({c.providerLabel})</option>)}
         </select>
-        <span className="block text-[11px] text-warm-600 mt-1.5">{writable.length ? 'Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.' : 'Connect your cloud storage to keep original files there instead.'}</span>
+        <span className="block text-[12px] text-warm-600 mt-1.5">{writable.length ? 'Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.' : 'Connect your cloud storage to keep original files there instead.'}</span>
       </label>
     </div>
   )

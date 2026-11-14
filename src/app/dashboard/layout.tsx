@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutGrid, Plus, BarChart3, Upload,
-  LogOut, X, ChevronDown, Lock, UserCog, Building2, KeyRound, MailCheck, PanelLeftClose, PanelLeftOpen,
+  LogOut, X, ChevronDown, Lock, UserCog, Building2, KeyRound, MailCheck, PanelLeftClose, PanelLeftOpen, Trash2,
 } from 'lucide-react'
 import { fmtDate } from '@/lib/format'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
@@ -16,6 +16,7 @@ import { Logo } from '@/components/Logo'
 import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 import { ImportExceptions } from '@/components/ImportExceptions'
+import { MoreMenu } from '@/components/MoreMenu'
 import { tooLargeMessage } from '@/lib/upload-limit'
 import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
@@ -471,8 +472,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
               <div className="max-w-6xl mx-auto px-5 md:px-8 pt-4 md:pt-5">
                 {selectedSchedule ? (
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600">
                         <Link href="/dashboard" className="hover:text-navy-950">Projects</Link>
                         <span aria-hidden="true"> / </span>
@@ -480,25 +481,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           Switch project <ChevronDown size={12} aria-hidden="true" />
                         </button>
                       </nav>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
-                        <h1 className="page-title">{selectedSchedule.name}</h1>
+                      {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
+                      <div className="flex items-center gap-x-3 gap-y-1.5 mt-1 md:flex-wrap">
+                        <h1 className="page-title min-w-0 max-md:truncate max-md:text-[20px]" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
-                          return st ? <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
+                          return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
                         })()}
                       </div>
-                      <p className="text-[13px] text-warm-600 mt-1">
+                      <p className="text-[13px] text-warm-600 mt-1 max-md:truncate">
                         {selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}
                       </p>
                     </div>
                     {can('schedule.write') && selectedSchedule.sourceType !== 'generated' && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={openUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 py-2 text-[13.5px] font-semibold hover:bg-warm-100">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13.5px] font-semibold hover:bg-warm-100">
                           <Upload size={14} aria-hidden="true" /> Upload update
                         </button>
-                        <button type="button" onClick={deleteUpload} className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-warm-700 px-3.5 py-2 text-[13px] font-medium hover:bg-warm-100">
-                          Delete this upload
-                        </button>
+                        {/* Deleting sits in a menu, not beside the main action; on a phone the upload joins it. */}
+                        <MoreMenu label="More actions for this upload" items={[
+                          { label: 'Upload update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
+                          { label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true },
+                        ]} />
                       </div>
                     )}
                   </div>
@@ -517,7 +521,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
                       </Link>
                       {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Today". */}
-                      {t.href === '/dashboard/today' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[11px] font-bold leading-[18px] text-white">{todayCount}</span>}
+                      {t.href === '/dashboard/today' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white">{todayCount}</span>}
                       </Fragment>
                     )
                   })}
@@ -564,7 +568,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
                   className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 transition-colors ${active ? 'text-white' : 'text-warm-200'}`}>
                   <n.icon size={19} strokeWidth={active ? 2.2 : 1.7} aria-hidden="true" />
-                  <span className={`text-[10.5px] ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
+                  <span className={`text-[12px] ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
                 </Link>
               )
             })}
@@ -618,7 +622,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
                 <div className="mb-4">
-                  <div id="upload-tag-h" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
+                  <div id="upload-tag-h" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
                   <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
                     <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
                       <option value="">Facility type…</option>
@@ -627,7 +631,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
                     <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
                   </div>
-                  <p className="text-[11px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
+                  <p className="text-[12px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
                 </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4 grid grid-cols-2 gap-2">
@@ -645,10 +649,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <option value="classified">Classified</option>
                     </select>
                   </label>
-                  <p className="col-span-2 text-[11px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
+                  <p className="col-span-2 text-[12px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 <div className="mb-5">
-                  <label htmlFor="upload-version" className="block text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
+                  <label htmlFor="upload-version" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
                   <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
@@ -712,12 +716,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="space-y-3">
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
                   <div className="text-[15px] font-semibold text-navy-950">{user.name}</div>
                   <div className="text-[13px] text-warm-500">{user.email}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {user.role && <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
-                    {org && <span className="inline-block text-[11px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
+                    {user.role && <span className="inline-block text-[12px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
+                    {org && <span className="inline-block text-[12px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -735,7 +739,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 {llm && (
                   <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
+                    <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
                     <div className="text-[13px] text-warm-700 font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
                     <div className="text-[12px] text-warm-500 mt-1">
                       {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
@@ -745,7 +749,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 )}
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">About</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">About</div>
                   <div className="text-[13px] text-warm-600">RunF9 · Version 1.0</div>
                   <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
                   <div className="flex gap-4 mt-2">

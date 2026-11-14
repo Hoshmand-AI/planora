@@ -164,7 +164,7 @@ export default function TodayPage() {
         <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
         <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue activities', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[11.5px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
+            <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
         </dl>
       </section>
@@ -283,11 +283,11 @@ export default function TodayPage() {
         </Card>
           <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Today’s risks" sub="What could move the finish">
           {b.risks.length === 0 ? <p className="text-[13px] text-warm-600">No schedule risk today.</p> : <ul className="space-y-2">{b.risks.map((r, i) => (
-            <li key={i} className="text-[13.5px] text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[11px] font-bold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-[11.5px] text-warm-600">({r.source})</span></li>
+            <li key={i} className="text-[13.5px] text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-bold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>
           ))}</ul>}
         </Card>
           <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Today’s issues" sub="What is already wrong">
-          {b.issues.length === 0 ? <p className="text-[13px] text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-[13.5px] text-warm-700">{fmtDates(r.text)} <span className="text-[11.5px] text-warm-600">({r.source})</span></li>)}</ul>}
+          {b.issues.length === 0 ? <p className="text-[13px] text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-[13.5px] text-warm-700">{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>)}</ul>}
         </Card>
         </div>
       </section>
@@ -304,7 +304,7 @@ export default function TodayPage() {
         ) : (
           <ul className="space-y-2">{b.signals.slice(0, 10).map((s, i) => (
             <li key={i} className="rounded-lg border border-warm-200 p-3 text-[13px]">
-              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[11px] font-bold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
+              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-bold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
               <q className="text-warm-700">{s.quote}</q>
               <span className="block text-[12px] text-warm-600 mt-1">{s.citation.includes(s.title) ? s.citation : `${s.title} ${s.citation}`}{s.activity ? ` · about ${s.activity.code} ${s.activity.name}` : ''}{s.days ? ` · ${s.days} work day${s.days === 1 ? '' : 's'}` : ''}</span>
               {canWrite && s.kind !== 'commitment' && (items.some(it => it.sourceQuote === s.quote) ? <span className="mt-1.5 block text-[12.5px] text-warm-600">In the register</span> : <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12.5px] font-medium text-accent-600 hover:underline" onClick={async () => {
@@ -375,7 +375,7 @@ export default function TodayPage() {
         {impact && impact.movedCount > 0 && b.changed.edits.length > 0 && (
           <div>
             <p className="text-[12.5px] font-semibold text-navy-950">What these changes move ({impact.movedCount} open {impact.movedCount === 1 ? 'activity' : 'activities'})</p>
-            <ul className="text-[13px] text-warm-700">{impact.moved.slice(0, 6).map(m => <li key={m.id}><span className="font-mono text-[11.5px] text-warm-600">{m.code}</span> {m.name}: finish {m.finishDays === 0 ? 'unchanged' : `${Math.abs(m.finishDays)} day${Math.abs(m.finishDays) === 1 ? '' : 's'} ${m.finishDays > 0 ? 'later' : 'earlier'}`}</li>)}</ul>
+            <ul className="text-[13px] text-warm-700">{impact.moved.slice(0, 6).map(m => <li key={m.id}><span className="font-mono text-[12px] text-warm-600">{m.code}</span> {m.name}: finish {m.finishDays === 0 ? 'unchanged' : `${Math.abs(m.finishDays)} day${Math.abs(m.finishDays) === 1 ? '' : 's'} ${m.finishDays > 0 ? 'later' : 'earlier'}`}</li>)}</ul>
             <Link href="/dashboard/timeline" className="text-[13px] font-medium text-accent-600 hover:underline">See them marked on the schedule</Link>
           </div>
         )}
@@ -436,8 +436,8 @@ function List({ title, rows, empty, late, showNote, dateLabel, plain, action }: 
         <ul className="divide-y divide-warm-200">
           {rows.map(r => (
             <li key={r.id} className="py-1.5 flex items-start justify-between gap-3 text-[13px]">
-              <span className="min-w-0"><span className="font-mono text-[11.5px] text-warm-600">{r.code}</span> <span className="text-warm-700">{r.name}</span>
-                {r.critical && <span className="ml-1.5 text-[11px] font-bold text-status-at-risk">CRITICAL</span>}
+              <span className="min-w-0"><span className="font-mono text-[12px] text-warm-600">{r.code}</span> <span className="text-warm-700">{r.name}</span>
+                {r.critical && <span className="ml-1.5 text-[12px] font-bold text-status-at-risk">CRITICAL</span>}
                 <span className="block text-[12px] text-warm-600">{r.date ? `${showNote && r.note && !/float/.test(r.note) ? `${r.note} ` : dateLabel ? `${dateLabel} ` : ''}${fmtDate(r.date)}` : ''}{late && r.daysLate ? ` · ${r.daysLate} day${r.daysLate === 1 ? '' : 's'} late` : ''}{showNote && r.note && /float/.test(r.note) ? ` · ${r.note}` : ''}{!plain && !r.critical && r.float != null && !showNote ? ` · float ${r.float}d` : ''}</span>
               </span>
               {action?.(r)}
@@ -487,7 +487,7 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
           {shown.map(i => (
             <li key={i.id} className="py-2 flex items-start justify-between gap-3 text-[13px]">
               <span className="min-w-0">
-                <span className="mr-1.5 inline-block px-1.5 py-0.5 rounded bg-warm-100 text-[11px] font-bold text-navy-950">{KIND_LABEL[i.kind]}</span>
+                <span className="mr-1.5 inline-block px-1.5 py-0.5 rounded bg-warm-100 text-[12px] font-bold text-navy-950">{KIND_LABEL[i.kind]}</span>
                 <span className={i.status === 'closed' ? 'text-warm-600 line-through' : 'text-warm-700'}>{i.title}</span>
                 <span className="block text-[12px] text-warm-600">{[i.owner && `owner ${i.owner}`, i.dueDate && `due ${fmtDate(i.dueDate)}${i.status === 'open' && i.dueDate < today ? ' (overdue)' : ''}`, i.impactDays != null && `${i.impactDays} work day${Math.abs(i.impactDays) === 1 ? '' : 's'}`, i.activityCodes?.length ? i.activityCodes.join(', ') : null, i.sourceDocumentId ? 'from a project document' : null, `added ${fmtDay(i.createdAt)}${i.createdByName ? ` by ${i.createdByName}` : ''}`].filter(Boolean).join(' · ')}</span>
               </span>
@@ -544,9 +544,9 @@ function ExplainClause({ scheduleId, title, quote, aiOff }: { scheduleId: string
         {state.error && <p className="mt-1 text-[12.5px] text-status-at-risk">{state.error}</p>}
         {state.answer && (
           <div className="mt-2 rounded-md border border-warm-200 bg-white p-3 text-[13px] text-warm-700">
-            <p className="mb-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-warm-600">What this means for the project (AI, from your documents)</p>
+            <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-warm-600">What this means for the project (AI, from your documents)</p>
             <Markdown text={state.answer} />
-            <p className="mt-2 text-[11.5px] text-warm-600">Written by an AI model from the cited passages. Read the clause itself before acting on it; this is not legal advice.</p>
+            <p className="mt-2 text-[12px] text-warm-600">Written by an AI model from the cited passages. Read the clause itself before acting on it; this is not legal advice.</p>
           </div>
         )}
       </div>
