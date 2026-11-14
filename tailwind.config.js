@@ -58,8 +58,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        sans:    ['var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['var(--font-digits, var(--font-dm-sans))', 'var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        sans:    ['var(--font-digits, var(--font-dm-sans))', 'var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
     },
   },

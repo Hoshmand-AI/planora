@@ -177,7 +177,7 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
           )}
         </div>
         {canWrite && (settled || hasSchedule) && (
-          <button onClick={onGenerate} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full bg-navy-950 text-white px-5 py-2.5 text-[14px] font-semibold hover:bg-navy-900 disabled:opacity-50">
+     <button onClick={onGenerate} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold hover:bg-accent-600 hover:bg-accent-700 disabled:opacity-50">
             {busy === 'generate' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : null}
             {hasSchedule ? 'Rebuild with my answers' : 'Build my schedule'} <ArrowRight size={15} aria-hidden />
           </button>
@@ -265,7 +265,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
               <option value="">Choose…</option>
               {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <button disabled={busy || disabled || !value} onClick={() => submit(value)} className="pressable rounded-xl bg-navy-950 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
+      <button disabled={busy || disabled || !value} onClick={() => submit(value)} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
             {q.allowOther && <div className="w-full"><TextAnswer kind="text" placeholder={q.id === 'project.state' ? 'Not in the US? e.g. Toronto, Ontario, Canada' : q.otherPrompt || 'Or type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} /></div>}
           </div>
         )}
@@ -310,7 +310,7 @@ function TextAnswer({ kind, unit, placeholder, busy, disabled, onSubmit, autoFoc
         placeholder={placeholder} aria-label={placeholder}
         className={`rounded-xl border border-warm-300 bg-warm-50 px-3 py-2.5 text-[15px] text-navy-950 placeholder:text-warm-400 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
       {unit && kind === 'number' && <span className="text-[13px] text-warm-500">{unit}</span>}
-      <button disabled={busy || disabled || !v.trim()} className="pressable rounded-xl bg-navy-950 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
+   <button disabled={busy || disabled || !v.trim()} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-40">Continue</button>
     </form>
   )
 }
@@ -365,7 +365,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
         })}
       </ul>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button disabled={busy || disabled || !count} onClick={() => save('skip')} className="pressable rounded-full bg-navy-950 text-white px-5 py-2.5 text-[14px] font-semibold disabled:opacity-40">
+    <button disabled={busy || disabled || !count} onClick={() => save('skip')} className="pressable rounded-full bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold disabled:opacity-40">
           {busy ? <Loader2 size={14} className="animate-spin inline mr-1.5" aria-hidden /> : null}Save {count || ''} answer{count === 1 ? '' : 's'}
         </button>
         <button disabled={busy || disabled} onClick={() => save('unknown')} className="text-[13.5px] text-warm-600 hover:text-navy-950">{count ? 'Save, and I don’t know the rest' : 'I don’t know any of these yet'}</button>
@@ -415,7 +415,7 @@ function AddNote({ busy, onAddNote }: { busy: boolean; onAddNote: (t: string) =>
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} aria-label="Information to add"
         placeholder="e.g. The utility will only energize the substation after the owner's commissioning agent signs off"
         className="w-full rounded-xl border border-warm-300 bg-warm-50 px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400" />
-      <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-full bg-navy-950 text-white px-4 py-2 text-[13.5px] font-semibold disabled:opacity-40">Add to brief</button>
+   <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13.5px] font-semibold disabled:opacity-40">Add to brief</button>
     </Disclosure>
   )
 }

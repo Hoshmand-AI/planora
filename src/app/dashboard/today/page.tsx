@@ -32,7 +32,7 @@ const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif',
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
 const btn = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
-const btnPrimary = 'px-3 py-1.5 rounded-full bg-navy-950 text-white text-[13px] font-medium disabled:opacity-60'
+const btnPrimary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 export default function TodayPage() {
@@ -135,16 +135,16 @@ export default function TodayPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
-          <h1 className="page-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h1>
+          <h2 className="tab-title">{b.asOf === todayIso() ? 'Today' : 'Brief for'}{b.asOf === todayIso() ? ', ' : ' '}{fmtDate(b.asOf)}</h2>
           <p className="text-[13px] text-warm-700">{data.schedule.name} ({data.schedule.version}){b.dataDate ? ` · progress as of ${fmtDate(b.dataDate)}` : ''}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} RunF9 edit${data.schedule.editsApplied === 1 ? '' : 's'}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
           <div>
             <p id="aud-label" className="text-[12px] text-warm-600 mb-0.5 max-md:sr-only">Show the day for</p>
-            <div role="tablist" aria-labelledby="aud-label" className="flex gap-1 rounded-full bg-warm-100 border border-warm-200 p-1">
+            <div role="tablist" aria-labelledby="aud-label" className="flex gap-1.5">
               {AUDIENCES.map(a => (
                 <button key={a.id} role="tab" type="button" id={`aud-${a.id}`} aria-selected={audience === a.id} aria-controls="aud-panel" onClick={() => setAudience(a.id)}
-                  className={`px-3 min-h-[36px] rounded-full text-[13px] font-medium ${audience === a.id ? 'bg-navy-950 text-white' : 'text-navy-950 hover:bg-white'}`}>{a.label}</button>
+                  className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${audience === a.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>{a.label}</button>
               ))}
             </div>
           </div>

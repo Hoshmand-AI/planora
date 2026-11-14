@@ -17,6 +17,7 @@ import { WorkspaceSelect } from '@/components/WorkspaceSelect'
 import { PROVIDER_LABEL, type ProviderName } from '@/lib/llm/gateway'
 import { ImportExceptions } from '@/components/ImportExceptions'
 import { MoreMenu } from '@/components/MoreMenu'
+import { digitsFont } from '../fonts/digits'
 import { tooLargeMessage } from '@/lib/upload-limit'
 import type { ExceptionReport } from '@/lib/parsers/exceptions'
 
@@ -396,7 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        *   - Content area is full-width scrollable
        * ─────────────────────────────────────────────────────────
        */}
-      <div className={`min-h-screen bg-warm-50 md:flex ${fillScreen ? '[@media(min-height:640px)]:min-h-0' : ''}`}>
+      <div className={`${digitsFont.variable} font-sans min-h-screen bg-warm-50 md:flex ${fillScreen ? '[@media(min-height:640px)]:min-h-0' : ''}`}>
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Sidebar (desktop) ─────────────────────────────── */}

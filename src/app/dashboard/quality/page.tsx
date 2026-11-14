@@ -339,7 +339,7 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
     <div className="px-4 md:px-6 py-12 flex justify-center">
       <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
         <Robot mood="idle" size={80} className="mx-auto" />
-        <h1 className="page-title mt-3">Schedule quality</h1>
+        <h2 className="tab-title mt-3">Schedule quality</h2>
         <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
         <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
@@ -376,7 +376,7 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
           {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
           {g.actions.some(a => a.kind === 'link') && (
             <div className="flex flex-wrap gap-2">
-              {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3 py-1.5 rounded-md bg-navy-900 text-white text-[12.5px] font-medium">{a.label}</Link> : null)}
+       {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[12.5px] font-medium">{a.label}</Link> : null)}
             </div>
           )}
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
