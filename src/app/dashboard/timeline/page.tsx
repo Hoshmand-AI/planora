@@ -205,7 +205,7 @@ export default function TimelinePage() {
       ) : (
         <div className="lg:flex lg:items-start lg:gap-4">
           <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-warm-200 bg-white">
-            <div className="min-w-[560px] md:min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
+            <div className="min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
               {/* Time ruler: calendar-aligned periods, then the data date */}
               <div className="flex h-14 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
                 <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 w-[150px] md:w-[260px] xl:w-[540px] flex-shrink-0 px-4"><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span></div>
