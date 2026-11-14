@@ -258,7 +258,7 @@ function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t
     if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : window.location.pathname + window.location.search)
   }
   return (
-    <div role="tablist" aria-label="Schedule views" className="flex gap-1 border-b border-warm-200"
+    <div role="tablist" aria-label="Schedule views" className="flex gap-1.5"
       onKeyDown={e => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         const i = TABS.findIndex(x => x.id === tab)
@@ -269,7 +269,7 @@ function ScheduleTabs({ tab, onChange }: { tab: 'overview' | 'evm'; onChange: (t
       {TABS.map(t => (
         <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`tabpanel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => select(t.id)}
-          className={`px-3 py-2 text-[13.5px] font-medium -mb-px border-b-2 ${tab === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
+          className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${tab === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
           {t.label}
         </button>
       ))}
@@ -319,7 +319,7 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
                     : `Starts ${fmtDate(task.earlyStart)}`}
                 </span>
                 {task.isCritical && (
-                  <span className="text-[12px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
+                  <span className="text-[12px] font-semibold text-status-at-risk bg-status-at-risk-bg px-2 py-0.5 rounded-full">
                     Critical
                   </span>
                 )}

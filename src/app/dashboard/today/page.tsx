@@ -191,7 +191,7 @@ export default function TodayPage() {
         <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
         <dl className={`mt-4 grid grid-cols-2 gap-3 ${data.alerts.length > 0 ? 'md:grid-cols-4 xl:grid-cols-2' : 'md:grid-cols-4'}`}>
           {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue activities', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
+            <div key={k} className="rounded-xl bg-white border border-warm-200 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className="text-[18px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
         </dl>
         {data.alerts.length > 0 && b.audiences[audience].length > 1 && (

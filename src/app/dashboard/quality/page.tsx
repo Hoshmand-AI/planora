@@ -540,10 +540,10 @@ function ScoreRing({ passed, applicable }: { passed: number; applicable: number 
 
 function Card({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
-      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
-      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[20px]'} font-semibold text-navy-950 tabular-nums mt-1 break-words`}>{value}</div>
-      <div className="text-[12px] text-warm-400 mt-0.5">{sub}</div>
+    <div className="bg-white border border-warm-200 rounded-xl px-3 py-2">
+      <div className="text-[12px] text-warm-600">{label}</div>
+      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[18px]'} font-semibold text-navy-950 tabular-nums break-words`}>{value}</div>
+      <div className="text-[12px] text-warm-600">{sub}</div>
     </div>
   )
 }
