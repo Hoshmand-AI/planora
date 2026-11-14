@@ -147,8 +147,9 @@ export default function TodayPage() {
   const count = (n: number, one: string, many = one + 's') => (n === 0 ? 'None' : `${n} ${n === 1 ? one : many}`)
 
   return (
-    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5 max-md:flex max-md:flex-col max-md:[&>*]:order-3">
+      {/* On a phone the section tabs come first and the reader and date pickers follow, so the answer is not pushed down by two form fields. */}
+      <header className="flex flex-wrap items-end justify-between gap-3 max-md:!order-4 max-md:mt-5">
         {/* On a phone the date field and the reader dropdown say the same thing as this title block, so it is dropped to bring the answer up. */}
         <div className="max-md:hidden">
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Daily brief</p>
@@ -171,7 +172,7 @@ export default function TodayPage() {
       </header>
       {err && <Alert tone="error">{err}</Alert>}
 
-      <div role="tablist" aria-label="Parts of the brief" className="flex gap-0 border-b border-warm-200 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
+      <div role="tablist" aria-label="Parts of the brief" className="max-md:!order-1 max-md:!mt-0 flex gap-0 border-b border-warm-200 overflow-x-auto [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
         {parts.map(x => (
           <button key={x.id} role="tab" type="button" id={`part-${x.id}`} aria-selected={shownPart === x.id} onClick={() => setPart(x.id)}
             className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 whitespace-nowrap ${shownPart === x.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{x.label}</button>
