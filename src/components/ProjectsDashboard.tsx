@@ -251,7 +251,7 @@ export function ProjectsDashboard() {
           <ArrowUpDown size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500 pointer-events-none" />
           <select id="project-sort" value={sort} onChange={e => { setSort(e.target.value as Sort); setCol(null) }}
             className="appearance-none rounded-full border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13.5px] font-medium text-navy-950">
-            <option value="attention">Needs attention first</option>
+            <option value="attention">Most urgent first</option>
             <option value="recent">Recently updated</option>
             <option value="finish">Finish date</option>
             <option value="name">Name</option>
