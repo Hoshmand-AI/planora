@@ -86,6 +86,8 @@ input[type='date'] { accent-color: var(--accent-600); }
 
 /* A primary button that cannot be pressed yet is grey, not pale blue: pale blue read as a washed-out live button. */
 button:disabled[class*='bg-accent-600'] { background-color: var(--warm-300); color: var(--warm-600); opacity: 1; box-shadow: none; cursor: not-allowed; }
+/* One disabled look for every pill button, filled or outlined, so a page never shows two kinds of "not yet". */
+button:disabled[class*='rounded-full'] { background-color: var(--warm-300); color: var(--warm-600); border-color: transparent; opacity: 1; box-shadow: none; cursor: not-allowed; }
 
 /* Tap and click targets. With a mouse, nothing you can press is under 28px tall (WCAG 2.2 asks for 24).
    On touch screens the floor is 44px, the size Apple and Google both recommend for a finger.

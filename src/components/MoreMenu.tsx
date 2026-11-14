@@ -45,7 +45,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
   return (
     <div ref={wrap} className="relative flex-shrink-0">
       <button ref={button} type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex items-center justify-center w-10 h-10 rounded-full border border-warm-300 bg-white text-navy-950 hover:bg-warm-100">
+        className="pressable inline-flex items-center justify-center w-9 h-9 rounded-full border border-warm-300 bg-white text-navy-950 hover:bg-warm-100">
         <MoreHorizontal size={18} aria-hidden="true" />
       </button>
       {open && (

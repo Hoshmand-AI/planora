@@ -42,10 +42,16 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 
 export const inputClass = 'w-full bg-white border border-warm-300 rounded-md px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400'
 
+/** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
+export const buttonClass = {
+  primary: 'px-4 py-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
+  secondary: 'px-4 py-2 rounded-full border border-warm-300 bg-white text-navy-950 text-[13px] font-medium hover:bg-warm-100 transition-colors',
+}
+
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
   const styles = {
     primary: 'bg-accent-600 text-white hover:bg-accent-700 font-semibold pressable shadow-sm',
-    secondary: 'border border-warm-300 bg-warm-50 text-navy-950 hover:bg-warm-100 font-medium',
+    secondary: 'border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium',
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]

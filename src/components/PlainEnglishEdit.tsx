@@ -4,6 +4,7 @@
 // edits it read (each clause, before → after, or why it could not be read) and the recalculated finish.
 // Nothing changes until the scheduler gives a reason and applies; the applied change can be undone.
 
+import { buttonClass } from '@/components/ui'
 import { useState } from 'react'
 import { MessageSquareText } from 'lucide-react'
 import { fmtDate, fmtDates } from '@/lib/format'
@@ -19,8 +20,8 @@ export interface EditPreview {
 }
 
 const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
-const primary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
-const secondary = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
+const primary = buttonClass.primary
+const secondary = buttonClass.secondary
 
 const shift = (d: number | null) => d == null ? '' : d === 0 ? 'no change' : `${Math.abs(d)} calendar day${Math.abs(d) === 1 ? '' : 's'} ${d > 0 ? 'later' : 'earlier'}`
 

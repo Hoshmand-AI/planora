@@ -12,7 +12,7 @@ import { AlertTriangle, FileText, HardHat, CalendarCheck, CalendarClock, CheckCi
 import { EmptyState } from '@/components/EmptyState'
 import { Disclosure } from '@/components/Disclosure'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
-import { Alert, postJson } from '@/components/ui'
+import { Alert, postJson, buttonClass } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
@@ -43,8 +43,8 @@ const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: '
 const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif', 'risks', 'issues', 'changed', 'missing', 'logic'])
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
-const btn = 'px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100 disabled:opacity-60'
-const btnPrimary = 'px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60'
+const btn = buttonClass.secondary
+const btnPrimary = buttonClass.primary
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 export default function TodayPage() {
