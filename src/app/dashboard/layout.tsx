@@ -366,7 +366,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div role="alert" className="max-w-sm text-center">
             <p className="text-[15px] text-navy-950 font-semibold">RunF9 could not load.</p>
             <p className="text-[14px] text-warm-600 mt-1">Check your connection and try again.</p>
-            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-full text-[14px] font-semibold hover:bg-accent-700">Try again</button>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-full text-[13px] font-semibold hover:bg-accent-700">Try again</button>
           </div>
         ) : (
           <div className="text-warm-600 text-[14px]">Loading…</div>
@@ -503,7 +503,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {owns && (
-                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13.5px] font-semibold hover:bg-warm-100">
+                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13px] font-semibold hover:bg-warm-100">
                               <Upload size={14} aria-hidden="true" /> Upload update
                             </button>
                           )}
@@ -625,9 +625,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
                   <div className="flex gap-2">
                     {uploadSummary.dataQuestions > 0 && (
-                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
+                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-full text-[13px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     )}
-                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-md text-[13.5px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-medium hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
+                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-full text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
                   </div>
                 </div>
               ) : (
@@ -672,7 +672,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 disabled:opacity-50 transition-colors pressable shadow-sm">
+                  className="w-full bg-accent-600 text-white py-3 rounded-full text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
                   {uploading ? 'Parsing schedule…' : 'Upload & Parse'}
                 </button>
               </form>
@@ -713,7 +713,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {can('schedule.write') && (
               <button
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
-                className="w-full mt-4 border border-warm-300 text-navy-950 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors"
+                className="w-full mt-4 border border-warm-300 text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors"
               >
                 + Upload a new project
               </button>
@@ -740,15 +740,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <UserCog size={14} aria-hidden="true" /> Account &amp; security
                   </Link>
-                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <Building2 size={14} aria-hidden="true" /> Organization
                   </Link>
                 </div>
                 {platformAdmin && (
-                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-warm-50 text-navy-950 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
                   </Link>
                 )}

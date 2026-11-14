@@ -163,7 +163,7 @@ export default function DocumentsPage() {
           Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {hasDocs && can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13.5px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</button>}
+        {hasDocs && can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}

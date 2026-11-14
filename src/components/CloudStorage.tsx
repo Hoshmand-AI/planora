@@ -189,7 +189,7 @@ export function CloudStorage({ manage }: { manage: boolean }) {
                 <div className="flex flex-wrap gap-2">
                   {(['azure', 'aws', 'gcp', 's3'] as Provider[]).filter(p => providers.some(x => x.id === p)).map(p => (
                     <button key={p} type="button" onClick={() => { setAdding(p); setUseKey(false); setNote(null) }}
-                      className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white px-4 py-2 text-[13.5px] font-semibold text-navy-950 hover:border-navy-900">
+                      className="pressable inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white px-4 py-2 text-[13px] font-semibold text-navy-950 hover:bg-warm-100">
                       <Plus size={14} aria-hidden /> {p === 'azure' ? 'Microsoft Azure' : p === 'aws' ? 'Amazon S3 (AWS)' : p === 'gcp' ? 'Google Cloud Storage' : 'S3-compatible'}
                     </button>
                   ))}

@@ -226,7 +226,7 @@ export default function TimelinePage() {
                     <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{/^Q\d \d{4}$/.test(x.label) ? (i > 0 && !x.label.startsWith('Q1') ? x.label.slice(0, 2) : x.label.replace(/ 20(\d\d)$/, ' ’$1')) : x.label}</span>
                   ))}
                   {ddLeft != null && dataDate && (
-                    <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 px-2 py-px text-[12px] font-semibold text-white"
+                    <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 hover:bg-accent-700 px-2 py-px text-[13px] font-semibold text-white"
                       style={{ left: `${ddLeft}%`, transform: `translateX(${ddLeft > 85 ? '-100%' : ddLeft < 12 ? '0' : '-50%'})` }}>Data date {fmtDate(dataDate)}</span>
                   )}
                 </div>

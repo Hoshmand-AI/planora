@@ -148,7 +148,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
       <Disclosure tone="card" id="delays" title="Delays (time impact analysis)">
         <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
-        <a href="/dashboard/time-impact" className="inline-block px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
+        <a href="/dashboard/time-impact" className="inline-block px-3.5 py-1.5 rounded-full border border-warm-300 text-navy-950 text-[13px] hover:bg-warm-100">Open time impact analysis</a>
       </Disclosure>
 
       <Disclosure tone="card" title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
@@ -163,7 +163,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         {!sra ? (
           <div className="text-[13px] text-warm-700 space-y-2">
             <p>Simulates this schedule&apos;s own network with three-point duration ranges and reports one labeled P50/P80.</p>
-            <button type="button" onClick={runRisk} disabled={busy} className="px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-medium disabled:opacity-60">{busy ? 'Running…' : 'Run risk analysis'}</button>
+            <button type="button" onClick={runRisk} disabled={busy} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{busy ? 'Running…' : 'Run risk analysis'}</button>
             {sraErr && <p className="text-status-at-risk">{sraErr}</p>}
           </div>
         ) : (
@@ -193,7 +193,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       <Disclosure tone="card" title="Export and original file">
         <div className="flex flex-wrap gap-2 text-[13px]">
           {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV'], ['ipmdar', 'IPMDAR schedule dataset (.zip)']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
-            <a key={f} href={exp(f)} className="px-3 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
+            <a key={f} href={exp(f)} className="px-3.5 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">{label}</a>
           ))}
         </div>
         <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
@@ -236,7 +236,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
           <form className="flex items-center gap-2" onSubmit={e => { e.preventDefault(); if (label.trim() && label.trim() !== version) patch({ version: label.trim() }) }}>
             <label htmlFor="ver-label">Version label</label>
             <input id="ver-label" className="border border-warm-300 rounded px-2 py-1 bg-white" maxLength={40} value={label} onChange={e => setLabel(e.target.value)} />
-            <button type="submit" className="px-3 py-1 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">Rename</button>
+            <button type="submit" className="px-3.5 py-1.5 rounded-full border border-warm-300 text-navy-950 hover:bg-warm-100">Rename</button>
           </form>
           {notes.length > 0 && <ul role="status" className="list-disc pl-5 text-warm-700">{notes.map(n => <li key={n}>{n}</li>)}</ul>}
         </div>

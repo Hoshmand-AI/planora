@@ -293,9 +293,9 @@ export default function QualityPage() {
                       <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
                     ) : !can('schedule.write') ? null : (
                       <div className="flex flex-wrap gap-2 mt-2.5">
-                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">Yes, intentional</button>
-                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">No — will fix in source</button>
-                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-md border border-warm-300 bg-warm-50 hover:border-navy-900 text-[12px] text-navy-950 transition-colors">Not an issue</button>
+                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-full border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">Yes, intentional</button>
+                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-full border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">No — will fix in source</button>
+                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-full border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">Not an issue</button>
                       </div>
                     )}
                     <ReviewControl itemId={q.id} label={q.question} disposition={dispositionOf(q.id)} reviewer={reviewer} onDispose={dispose} />
@@ -358,9 +358,9 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
         <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
           {latest ? (
-            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-full bg-accent-600 text-white text-[13.5px] font-medium">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
+            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
           ) : canUpload ? (
-            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-full bg-accent-600 text-white text-[13.5px] font-medium">Upload a schedule</button>
+            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Upload a schedule</button>
           ) : (
             <p className="text-[12.5px] text-warm-600">Ask a scheduler on your team to upload one.</p>
           )}
@@ -390,7 +390,7 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
           {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
           {g.actions.some(a => a.kind === 'link') && (
             <div className="flex flex-wrap gap-2">
-       {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[12.5px] font-medium">{a.label}</Link> : null)}
+       {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</Link> : null)}
             </div>
           )}
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
@@ -399,8 +399,8 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
           ) : !canDecide ? null : (
             <div className="flex flex-wrap gap-2 items-center">
               <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
-              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3 py-1.5 rounded-md border border-warm-300 bg-warm-50 text-[12.5px] text-navy-950 disabled:opacity-40">Accept with justification</button>
-              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium">I&apos;ll fix it in P6 / MSP</button>
+              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3.5 py-1.5 rounded-full border border-warm-300 bg-white text-[13px] text-navy-950">Accept with justification</button>
+              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">I&apos;ll fix it in P6 / MSP</button>
             </div>
           )}
           <ReviewControl itemId={`dcma:${g.id}`} label={`DCMA #${g.id} ${check.name}`} disposition={disposition} reviewer={reviewer} onDispose={onDispose} />
@@ -442,7 +442,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
           <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1 text-[12.5px]" />
-          <button type="button" disabled={busy || !choice} onClick={save} className="px-3 py-1 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Save</button>
+          <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Save</button>
           {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
         </div>
       )}
@@ -489,8 +489,8 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
           </div>
           <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={!choice || choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
           <div className="flex items-center gap-2">
-            <button type="button" disabled={busy || !choice} onClick={save} className="px-3 py-1.5 rounded-full bg-accent-600 text-white text-[12.5px] font-medium disabled:opacity-60">Record disposition</button>
-            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-md border border-warm-300 text-[12.5px] text-navy-950">Cancel</button>}
+            <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Record disposition</button>
+            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-full border border-warm-300 text-[13px] text-navy-950">Cancel</button>}
             {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
           </div>
         </div>

@@ -71,7 +71,7 @@ export default function PlansPage() {
               className="flex-1 min-w-0 bg-warm-50 border border-warm-200 rounded-xl px-3.5 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
             />
             <WorkspaceSelect labelClassName="sr-only" className="bg-warm-50 border border-warm-200 rounded-xl px-2 py-2.5 text-[14px] text-warm-700" />
-            <button disabled={creating} className="pressable flex items-center justify-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-full text-[14px] font-semibold transition-colors disabled:opacity-50">
+            <button disabled={creating} className="pressable flex items-center justify-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-full text-[14px] font-semibold transition-colors">
               {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Plus size={14} aria-hidden />} Start interview
             </button>
           </form>
@@ -81,7 +81,7 @@ export default function PlansPage() {
           <h2 id="upload-h" className="text-[17px] font-semibold text-navy-950 flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
           <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF. RunF9 checks it and opens it as a project.</p>
           {can('schedule.write') ? (
-            <button type="button" onClick={openUpload} className="pressable mt-4 lg:mt-auto self-start inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:border-navy-900 px-4 py-2 text-[14px] font-semibold">
+            <button type="button" onClick={openUpload} className="pressable mt-4 lg:mt-auto self-start inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 px-4 py-2 text-[13px] font-semibold">
               <Upload size={14} aria-hidden /> Choose a file
             </button>
           ) : (
@@ -100,7 +100,7 @@ export default function PlansPage() {
           {canBuild ? <>
           <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview, or upload a schedule.</p>
           <p className="text-[14px] text-warm-600 mt-4 max-w-md mx-auto">New to RunF9? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
-          <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:border-navy-900 px-4 py-2 text-[13.5px] font-medium disabled:opacity-50">
+          <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 px-4 py-2 text-[13px] font-medium">
             {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />} Open a sample project
           </button>
           </> : <p className="text-[14px] text-warm-600 mt-1">Plans built by your team will show here.</p>}

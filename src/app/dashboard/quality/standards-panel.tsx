@@ -140,7 +140,7 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
           </fieldset>
         )}
         <div className="flex flex-wrap items-center gap-3 mt-4">
-     {canRecord && <button type="button" onClick={record} disabled={loading || recording || !frameworks?.length} className="px-3 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[12.5px] font-medium disabled:opacity-60">Record this assessment</button>}
+     {canRecord && <button type="button" onClick={record} disabled={loading || recording || !frameworks?.length} className="px-3.5 py-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Record this assessment</button>}
           <span className="text-[12px] text-warm-600">Recording keeps the results, rules version and thresholds so this assessment can be reproduced later.</span>
         </div>
         <div aria-live="polite" className="text-[12.5px] mt-2">
