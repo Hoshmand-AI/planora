@@ -473,9 +473,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
               <div className="max-w-6xl mx-auto px-5 md:px-8 pt-2 md:pt-5">
                 {selectedSchedule ? (
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center md:items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600">
+                      <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600 max-md:hidden">
                         <Link href="/dashboard" className="hover:text-navy-950">Projects</Link>
                         <span aria-hidden="true"> / </span>
                         <button type="button" data-compact onClick={() => setShowScheduleList(true)} className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[28px] hover:text-navy-950" aria-label={`Switch project (current: ${selectedSchedule.name})`}>
@@ -494,18 +494,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}
                       </p>
                     </div>
-                    {can('schedule.write') && selectedSchedule.sourceType !== 'generated' && (
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13.5px] font-semibold hover:bg-warm-100">
-                          <Upload size={14} aria-hidden="true" /> Upload update
-                        </button>
-                        {/* Deleting sits in a menu, not beside the main action; on a phone the upload joins it. */}
-                        <MoreMenu label="More actions for this upload" items={[
-                          { label: 'Upload update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
-                          { label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true },
-                        ]} />
-                      </div>
-                    )}
+                    {/* On a phone the breadcrumb is dropped to save height: switching project, uploading and deleting are in this menu. */}
+                    {(() => {
+                      const owns = can('schedule.write') && selectedSchedule.sourceType !== 'generated'
+                      return (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {owns && (
+                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13.5px] font-semibold hover:bg-warm-100">
+                              <Upload size={14} aria-hidden="true" /> Upload update
+                            </button>
+                          )}
+                          <div className={owns ? '' : 'md:hidden'}>
+                            <MoreMenu label="More actions for this project" items={[
+                              { label: 'Switch project', onSelect: () => setShowScheduleList(true), icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
+                              ...(owns ? [
+                                { label: 'Upload update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
+                                { label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true },
+                              ] : []),
+                            ]} />
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 ) : (
                   <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-navy-950 font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>

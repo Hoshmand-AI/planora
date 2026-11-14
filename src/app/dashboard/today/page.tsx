@@ -155,6 +155,8 @@ export default function TodayPage() {
       </header>
       {err && <Alert tone="error">{err}</Alert>}
 
+      {/* On a wide screen the answer and what needs action sit side by side, so both are on the first screen. */}
+      <div className={data.alerts.length > 0 ? 'grid gap-5 items-start xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : ''}>
       {/* The answer first: are we meeting the deadline, and by how much. */}
       <section aria-labelledby="deadline-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
         <h2 id="deadline-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</h2>
@@ -162,7 +164,7 @@ export default function TodayPage() {
           {b.headline.status === 'behind' ? `No. ${b.headline.daysBehind} day${b.headline.daysBehind === 1 ? '' : 's'} behind.` : b.headline.status === 'ahead' ? `Yes. ${-b.headline.daysBehind!} day${b.headline.daysBehind === -1 ? '' : 's'} ahead.` : b.headline.status === 'on_track' ? 'Yes. On time.' : 'No required date is set.'}
         </p>
         <p className="mt-1 text-[14px] text-warm-700">{fmtDates(b.headline.text)}{b.headline.requiredSource ? ` Required date from: ${b.headline.requiredSource}.` : ''}</p>
-        <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <dl className={`mt-4 grid grid-cols-2 gap-3 ${data.alerts.length > 0 ? 'md:grid-cols-4 xl:grid-cols-2' : 'md:grid-cols-4'}`}>
           {([['Forecast', fmtDate(b.headline.forecast)], ['Required', b.headline.required ? fmtDate(b.headline.required) : 'Not set'], ['Overdue activities', `${b.overdue.finishCount + b.overdue.startCount}`], ['Open change items', `${b.changeItems.length}${b.changeImpactDays ? ` · up to ${b.changeImpactDays} work day${b.changeImpactDays === 1 ? '' : 's'}` : ''}`]] as const).map(([k, v]) => (
             <div key={k} className="rounded-xl bg-warm-100 px-3 py-2"><dt className="text-[12px] text-warm-600">{k}</dt><dd className="text-[16px] font-semibold text-navy-950 tabular-nums">{v}</dd></div>
           ))}
@@ -183,6 +185,7 @@ export default function TodayPage() {
           </ul>
         </section>
       )}
+      </div>
 
       {/* One brief, three readers. */}
       <section aria-labelledby="aud-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
