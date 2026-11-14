@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-14', title: 'Documents: adding a document opens in a dialog; the Schedule shows percent done per activity' },
   { date: '2026-11-14', title: 'Liquidated damages: no amount is estimated when the clause names a different milestone' },
   { date: '2026-11-14', title: 'Daily Brief names the late activity and its date on each line, instead of a count' },
   { date: '2026-11-14', title: 'On a phone, the schedule is a list with each activity’s dates and float' },
