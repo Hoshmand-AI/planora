@@ -149,6 +149,8 @@ export default function QualityPage() {
       {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
 
       <div className="space-y-6 mt-5">
+        {/* Three short tabs, not nine stacked sections: the checks, what to fix, then the review and the data questions. */}
+        <div hidden={tab !== 'checks'} className="space-y-6">
         {/* The score, then the few things to fix first */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
           <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6 flex items-center gap-5">
@@ -189,6 +191,7 @@ export default function QualityPage() {
               </ol>
             )}
             {flagged.length > 3 && <p className="text-[12.5px] text-warm-600 pt-1">+{flagged.length - 3} more in the checks below.</p>}
+            {guidance.length > 0 && <button type="button" onClick={() => setTab('fix')} className="pressable mt-1 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold">See how to fix {guidance.length === 1 ? 'it' : `all ${guidance.length}`}</button>}
           </section>
         </div>
         {/* Design system v2: say plainly what the number is and is not. */}
@@ -236,11 +239,13 @@ export default function QualityPage() {
               {selectedCheck.offenders.length > 0 && (
                 <p className="text-[12.5px] text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
               )}
-              {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" className="inline-block mt-2 text-[13px] font-semibold text-accent-600 hover:underline">How to fix it</a>}
+              {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" onClick={() => setTab('fix')} className="inline-block mt-2 text-[13px] font-semibold text-accent-600 hover:underline">How to fix it</a>}
             </div>
           )}
         </section>
+        </div>
 
+        <div hidden={tab !== 'review'} className="space-y-6">
         {data.brief && (
           <Disclosure tone="card" title="About this project" meta="also on Overview">
             <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
@@ -248,7 +253,10 @@ export default function QualityPage() {
         )}
 
         <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
+        </div>
 
+        <div hidden={tab !== 'fix'} className="space-y-6">
+        {guidance.length === 0 && <p className="text-[14px] text-warm-700">Nothing to fix: every applicable check passes.</p>}
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
             <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
@@ -260,6 +268,9 @@ export default function QualityPage() {
         )}
 
         <NoraLogicPanel key={data.schedule.id} scheduleId={data.schedule.id} canEdit={can('schedule.write')} />
+        </div>
+
+        <div hidden={tab !== 'review'} className="space-y-6">
 
         <section aria-labelledby="data-questions-h" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -314,6 +325,7 @@ export default function QualityPage() {
             </div>
           )}
         </Disclosure>
+        </div>
       </div>
     </div>
   )
@@ -485,8 +497,8 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
   )
 }
 
-type QualityTab = 'checks' | 'standards'
-const QUALITY_TABS: { id: QualityTab; label: string }[] = [{ id: 'checks', label: 'Checks & data questions' }, { id: 'standards', label: 'Standards' }]
+type QualityTab = 'checks' | 'fix' | 'review' | 'standards'
+const QUALITY_TABS: { id: QualityTab; label: string }[] = [{ id: 'checks', label: 'Checks' }, { id: 'fix', label: 'What to fix' }, { id: 'review', label: 'Review and data questions' }, { id: 'standards', label: 'Standards' }]
 
 /** Tabs between the DCMA / data-question view and the standards (framework) view; arrow keys move between them. */
 function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: QualityTab) => void }) {
