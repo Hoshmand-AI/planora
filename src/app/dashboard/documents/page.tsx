@@ -78,27 +78,9 @@ export default function DocumentsPage() {
     load()
   }
 
-  return (
-    <div className="p-5 md:p-6 space-y-5">
-      <div>
-        <h1 className="page-title mb-1">Project documents</h1>
-        <p className="text-[13.5px] text-warm-500 max-w-[720px]">
-          Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
-          Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.
-        </p>
-      </div>
-
-      {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
-      {(data?.classification === 'cui' || data?.classification === 'classified') && (
-        <Alert tone="warning">This project is marked {data.classification === 'cui' ? 'CUI' : 'classified'}. Its documents are never sent to a cloud AI model; you get the matching passages with citations instead.</Alert>
-      )}
-      {error && <Alert tone="error">{error}</Alert>}
-      <div aria-live="polite">{notice && <Alert tone={notice.tone}>{notice.text}</Alert>}</div>
-
-      {can('schedule.write') && data && <UploadForm base={base} data={data} canOrg={can('org.manage')} onDone={(n) => { setNotice(n); load() }} />}
-      {can('schedule.write') && data && <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />}
-      {can('schedule.write') && data && <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />}
-
+  const hasDocs = !!data?.documents.length
+  const libraryBlock = (
+    <>
       <Section title="Documents" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
           : !data.documents.length ? <p className="text-[13px] text-warm-500">No documents yet.{can('schedule.write') ? ' Upload the contract or the scheduling specification to get started.' : ''}</p>
@@ -145,6 +127,40 @@ export default function DocumentsPage() {
       {requirements && requirements.length > 0 && (
         <Requirements base={base} items={requirements} canDecide={can('schedule.write')} onChange={setRequirements} onError={t => setNotice({ tone: 'error', text: t })} />
       )}
+    </>
+  )
+
+  return (
+    <div className="p-5 md:p-6 space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+        <h1 className="page-title mb-1">Project documents</h1>
+        <p className="text-[13.5px] text-warm-500 max-w-[720px]">
+          Contracts, scheduling specifications and owner requirements for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>, shared with every update of this project.
+          Ask AI and reports can cite them when you choose &ldquo;Use project documents&rdquo;. RunF9 keeps the extracted text only, not the original file.
+        </p>
+        </div>
+        {hasDocs && can('schedule.write') && <a href="#upload-documents" className="inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13.5px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</a>}
+      </div>
+
+      {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
+      {(data?.classification === 'cui' || data?.classification === 'classified') && (
+        <Alert tone="warning">This project is marked {data.classification === 'cui' ? 'CUI' : 'classified'}. Its documents are never sent to a cloud AI model; you get the matching passages with citations instead.</Alert>
+      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      <div aria-live="polite">{notice && <Alert tone={notice.tone}>{notice.text}</Alert>}</div>
+
+      {/* A project that already has documents opens on them; the ways to add more follow. An empty one opens on adding. */}
+      {hasDocs && libraryBlock}
+      {can('schedule.write') && data && (
+        <div id="upload-documents" className="space-y-5 scroll-mt-4">
+          {hasDocs && <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950 pt-3">Add to this project</h2>}
+          <UploadForm base={base} data={data} canOrg={can('org.manage')} onDone={(n) => { setNotice(n); load() }} />
+          <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />
+          <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />
+        </div>
+      )}
+      {!hasDocs && libraryBlock}
     </div>
   )
 }

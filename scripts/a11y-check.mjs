@@ -44,7 +44,7 @@ const sample = (await (await post('/api/plans', { sample: true })).json()).plan
 const PAGES = [
   ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
-  ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'],
+  ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'], ['Organization: plan and data', '/dashboard/org?tab=plan'], ['Organization: security', '/dashboard/org?tab=security'], ['Organization: integrations', '/dashboard/org?tab=integrations'], ['Organization: audit log', '/dashboard/org?tab=audit'],
   ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm insights', '/dashboard/history'],
   ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
