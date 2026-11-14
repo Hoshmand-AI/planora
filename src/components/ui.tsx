@@ -2,14 +2,22 @@
 
 // Small accessible building blocks shared by the account and organization pages.
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
 
 export function Section({ title, description, children, tone = 'default', id }: { title: string; description?: React.ReactNode; children: React.ReactNode; tone?: 'default' | 'danger'; id?: string }) {
   const hid = useId()
+  // A long description shows its first line; the rest is one press away. Cards used to open on a paragraph.
+  const [more, setMore] = useState(false)
+  const long = typeof description === 'string' ? description.length > 110 : !!description
   return (
     <section id={id} aria-labelledby={hid} className={`border rounded-lg p-5 bg-warm-50 ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
       <h2 id={hid} className={`text-[15px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-navy-950'}`}>{title}</h2>
-      {description && <p className="text-[13px] text-warm-500 mb-4">{description}</p>}
+      {description && (
+        <div className="mb-4 flex items-start gap-2">
+          <p className={`flex-1 min-w-0 text-[13px] text-warm-500 ${long && !more ? 'line-clamp-1' : ''}`}>{description}</p>
+          {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
+        </div>
+      )}
       {children}
     </section>
   )
