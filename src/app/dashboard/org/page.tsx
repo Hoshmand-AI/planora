@@ -60,6 +60,12 @@ function summarize(e: AuditEvent): string {
   return fmtDates(bits.filter(Boolean).map(String).join(' · ').slice(0, 160))
 }
 
+type OrgTab = 'people' | 'plan' | 'security' | 'integrations' | 'audit'
+const ORG_TABS: { id: OrgTab; label: string }[] = [
+  { id: 'people', label: 'People' }, { id: 'plan', label: 'Plan and data' }, { id: 'security', label: 'Security' },
+  { id: 'integrations', label: 'Integrations' }, { id: 'audit', label: 'Audit log' },
+]
+
 const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
 
 export default function OrgPage() {
@@ -67,6 +73,19 @@ export default function OrgPage() {
   const [data, setData] = useState<OrgData | null>(null)
   const [msg, setMsg] = useState<{ tone: 'error' | 'success'; text: string; section: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // The page is five short tabs, not one long scroll. The tab is in the address (?tab=security) so a link can open one.
+  const [tab, setTab] = useState<OrgTab>('people')
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search), hash = window.location.hash
+    const asked = q.get('tab')
+    if (ORG_TABS.some(t => t.id === asked)) setTab(asked as OrgTab)
+    else if (hash === '#cloud-storage' || hash === '#data-location') setTab('plan')
+    else if (q.has('saml_test')) setTab('security')
+  }, [])
+  const pickTab = (id: OrgTab) => { setTab(id); window.history.replaceState(null, '', `?tab=${id}`) }
+  const loaded = !!data
+  // A link to a section (#cloud-storage) lands on it once the page has loaded.
+  useEffect(() => { if (loaded && window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView() }, [loaded])
   const [invite, setInvite] = useState({ email: '', role: 'scheduler' })
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -112,6 +131,8 @@ export default function OrgPage() {
 
   const manage = can('org.manage')
   const isOwner = data.you.role === 'owner'
+  const tabs = ORG_TABS.filter(t => t.id === 'people' || t.id === 'plan' || (t.id === 'audit' ? can('audit.read') : manage))
+  const active: OrgTab = tabs.some(t => t.id === tab) ? tab : 'people'
   const assignable = data.roles.filter(r => isOwner || !['owner', 'admin'].includes(r.id))
 
   return (
@@ -121,6 +142,20 @@ export default function OrgPage() {
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
+      <div role="tablist" aria-label="Organization settings" className="flex flex-wrap gap-1.5" onKeyDown={e => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+        const at = tabs.findIndex(t => t.id === active), next = tabs[(at + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
+        pickTab(next.id); document.getElementById(`org-tab-${next.id}`)?.focus()
+      }}>
+        {tabs.map(t => (
+          <button key={t.id} id={`org-tab-${t.id}`} role="tab" type="button" aria-selected={active === t.id} aria-controls={`org-panel-${t.id}`} tabIndex={active === t.id ? 0 : -1} onClick={() => pickTab(t.id)}
+            className={`px-3.5 py-1.5 rounded-md text-[13.5px] font-medium border ${active === t.id ? 'bg-navy-900 text-white border-navy-900' : 'bg-warm-50 text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id="org-panel-plan" aria-labelledby="org-tab-plan" hidden={active !== 'plan'} className="space-y-5">
       <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai; the change takes effect at once.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
@@ -135,6 +170,51 @@ export default function OrgPage() {
       {data.service?.dataLocation && <DataLocationSection loc={data.service.dataLocation} />}
       <CloudStorage manage={manage} />
 
+      {manage && (
+        <Section title="Your organization's data" description="Download everything stored for your organization (members, plans, schedules, answers, AI history and the audit log) as one JSON file.">
+          {note('data')}
+          <Button variant="secondary" disabled={busy === 'data'} onClick={async () => {
+            setBusy('data')
+            const res = await fetch('/api/org', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'export_data' }) })
+            setBusy(null)
+            if (!res.ok) { setMsg({ tone: 'error', text: 'Export failed.', section: 'data' }); return }
+            const url = URL.createObjectURL(await res.blob())
+            const a = document.createElement('a'); a.href = url; a.download = `runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+          }}><Download size={13} className="inline mr-1" aria-hidden="true" />{busy === 'data' ? 'Preparing…' : 'Export organization data'}</Button>
+        </Section>
+      )}
+
+      {isOwner && (
+        <Section title="Ownership and deletion" tone="danger" description="Confirm with your password (and authenticator code if you use one).">
+          {note('owner')}
+          <div className="grid sm:grid-cols-2 gap-3 mb-4">
+            <Field label="Password">{p => <input {...p} type="password" autoComplete="current-password" className={inputClass} value={owner.password} onChange={e => setOwner({ ...owner, password: e.target.value })} />}</Field>
+            <Field label="Authenticator code (if on)">{p => <input {...p} inputMode="numeric" className={inputClass} value={owner.code} onChange={e => setOwner({ ...owner, code: e.target.value })} />}</Field>
+          </div>
+          <div className="flex flex-wrap gap-2 items-end mb-5">
+            <Field label="Transfer ownership to">{p => (
+              <select {...p} className={inputClass} value={owner.userId} onChange={e => setOwner({ ...owner, userId: e.target.value })}>
+                <option value="">Choose a member…</option>
+                {data.members.filter(m => m.id !== data.you.id).map(m => <option key={m.id} value={m.id}>{m.name} ({m.email})</option>)}
+              </select>
+            )}</Field>
+            <Button variant="secondary" disabled={!owner.userId || busy === 'owner'} onClick={async () => {
+              if (!confirm('Transfer ownership? You will become an admin.')) return
+              if (await act('owner', { action: 'transfer_ownership', userId: owner.userId, password: owner.password, code: owner.code }, 'Ownership transferred.')) { setOwner({ userId: '', password: '', code: '', confirm: '' }); load() }
+            }}>Transfer</Button>
+          </div>
+          <div className="flex flex-wrap gap-2 items-end">
+            <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
+            <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
+              if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
+              if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'
+            }}>Delete organization</Button>
+          </div>
+        </Section>
+      )}
+      </div>
+
+      <div role="tabpanel" id="org-panel-people" aria-labelledby="org-tab-people" hidden={active !== 'people'} className="space-y-5">
       <Section title={`Members (${data.members.length})`} description={manage ? 'Removing someone signs them out immediately and disables their account; their projects stay with the organization.' : undefined}>
         {note('members')}
         <div tabIndex={0} role="region" aria-label="Organization members" className="relative overflow-x-auto">
@@ -205,7 +285,9 @@ export default function OrgPage() {
           )}
         </Section>
       )}
+      </div>
 
+      <div role="tabpanel" id="org-panel-security" aria-labelledby="org-tab-security" hidden={active !== 'security'} className="space-y-5">
       {manage && settings && (
         <Section title="Policies" description="Apply to everyone in the organization. Changes are recorded in the audit log.">
           {note('settings')}
@@ -304,9 +386,13 @@ export default function OrgPage() {
       )}
 
       {manage && <EnterpriseIdentity roles={data.roles} />}
+      </div>
 
+      <div role="tabpanel" id="org-panel-integrations" aria-labelledby="org-tab-integrations" hidden={active !== 'integrations'} className="space-y-5">
       {manage && <Integrations />}
+      </div>
 
+      <div role="tabpanel" id="org-panel-audit" aria-labelledby="org-tab-audit" hidden={active !== 'audit'} className="space-y-5">
       {can('audit.read') && (
         <Section title="Audit log" description="Every sign-in, change, review, export and AI request, with who, when and from where. Records are chained by hash and the database refuses edits or deletions, so tampering is both blocked and detectable.">
           {note('audit')}
@@ -356,49 +442,7 @@ export default function OrgPage() {
           {events && events.length >= 50 && events.length % 50 === 0 && <div className="mt-3"><Button variant="secondary" onClick={() => loadAudit(events[events.length - 1].seq)}>Load older</Button></div>}
         </Section>
       )}
-
-      {manage && (
-        <Section title="Your organization's data" description="Download everything stored for your organization (members, plans, schedules, answers, AI history and the audit log) as one JSON file.">
-          {note('data')}
-          <Button variant="secondary" disabled={busy === 'data'} onClick={async () => {
-            setBusy('data')
-            const res = await fetch('/api/org', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'export_data' }) })
-            setBusy(null)
-            if (!res.ok) { setMsg({ tone: 'error', text: 'Export failed.', section: 'data' }); return }
-            const url = URL.createObjectURL(await res.blob())
-            const a = document.createElement('a'); a.href = url; a.download = `runf9-organization-export-${new Date().toISOString().slice(0, 10)}.json`; a.click()
-          }}><Download size={13} className="inline mr-1" aria-hidden="true" />{busy === 'data' ? 'Preparing…' : 'Export organization data'}</Button>
-        </Section>
-      )}
-
-      {isOwner && (
-        <Section title="Ownership and deletion" tone="danger" description="Confirm with your password (and authenticator code if you use one).">
-          {note('owner')}
-          <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <Field label="Password">{p => <input {...p} type="password" autoComplete="current-password" className={inputClass} value={owner.password} onChange={e => setOwner({ ...owner, password: e.target.value })} />}</Field>
-            <Field label="Authenticator code (if on)">{p => <input {...p} inputMode="numeric" className={inputClass} value={owner.code} onChange={e => setOwner({ ...owner, code: e.target.value })} />}</Field>
-          </div>
-          <div className="flex flex-wrap gap-2 items-end mb-5">
-            <Field label="Transfer ownership to">{p => (
-              <select {...p} className={inputClass} value={owner.userId} onChange={e => setOwner({ ...owner, userId: e.target.value })}>
-                <option value="">Choose a member…</option>
-                {data.members.filter(m => m.id !== data.you.id).map(m => <option key={m.id} value={m.id}>{m.name} ({m.email})</option>)}
-              </select>
-            )}</Field>
-            <Button variant="secondary" disabled={!owner.userId || busy === 'owner'} onClick={async () => {
-              if (!confirm('Transfer ownership? You will become an admin.')) return
-              if (await act('owner', { action: 'transfer_ownership', userId: owner.userId, password: owner.password, code: owner.code }, 'Ownership transferred.')) { setOwner({ userId: '', password: '', code: '', confirm: '' }); load() }
-            }}>Transfer</Button>
-          </div>
-          <div className="flex flex-wrap gap-2 items-end">
-            <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
-            <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
-              if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
-              if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'
-            }}>Delete organization</Button>
-          </div>
-        </Section>
-      )}
+      </div>
     </div>
   )
 }

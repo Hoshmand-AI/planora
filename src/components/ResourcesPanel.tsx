@@ -114,13 +114,14 @@ function Summary({ data }: { data: Analysis }) {
 function ResourceTable({ resources, current, onSelect }: { resources: ResourceSummary[]; current: string | null; onSelect: (id: string) => void }) {
   return (
     <section aria-labelledby="res-list">
-      <h3 id="res-list" className="text-[14px] font-semibold text-navy-950 mb-2">Resources: peak demand vs available</h3>
+      <h3 id="res-list" className="text-[14px] font-semibold text-navy-950">Resources: peak demand vs available</h3>
+      <p className="text-[12.5px] text-warm-600 mb-2">Over-allocated days are counted from the data date on. A peak above the limit that has already passed is shown, not counted.</p>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] text-warm-700">
           <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
             <th scope="col" className="py-1.5 pr-3">Resource</th><th scope="col" className="pr-3">Type</th>
             <th scope="col" className="pr-3 text-right">Available / day</th><th scope="col" className="pr-3 text-right">Peak / day</th>
-            <th scope="col" className="pr-3">Peak on</th><th scope="col" className="pr-3 text-right">Total units</th><th scope="col" className="pr-3 text-right">Over-allocated days</th><th scope="col"><span className="sr-only">Chart</span></th>
+            <th scope="col" className="pr-3">Peak on</th><th scope="col" className="pr-3 text-right">Total units</th><th scope="col" className="pr-3 text-right">Over-allocated days ahead</th><th scope="col"><span className="sr-only">Chart</span></th>
           </tr></thead>
           <tbody>
             {resources.map(r => (
@@ -129,7 +130,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
                 <td className="pr-3 capitalize">{r.kind}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}<span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span></td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
-                <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}</td>
+                <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}{r.availablePerDay !== null && r.peakPerDay > r.availablePerDay && !r.overAllocatedDays && <span className="block text-[12px] text-warm-600">already passed</span>}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.totalUnits)}</td>
                 <td className={`pr-3 text-right tabular-nums ${r.overAllocatedDays ? 'text-status-at-risk font-semibold' : ''}`}>{r.overAllocatedDays ? `! ${r.overAllocatedDays}` : '0'}</td>
                 <td><Button variant="ghost" aria-pressed={r.id === current} onClick={() => onSelect(r.id)}>Show histogram<span className="sr-only"> for {r.code}</span></Button></td>

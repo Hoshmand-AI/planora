@@ -279,7 +279,7 @@ export function ProjectsDashboard() {
       ) : grouped ? (
         <div className="space-y-8">
           {pinned.length > 0 && <Group title="Pinned" rows={pinned} onOpen={open} pins={pins} onPin={togglePin} />}
-          {urgent.length > 0 && <Group title="Needs your attention" note={`${urgent.length} ${urgent.length === 1 ? 'project' : 'projects'}, most urgent first`} rows={urgent} onOpen={open} pins={pins} onPin={togglePin} />}
+          {urgent.length > 0 && <Group title="Act on these first" note={`${urgent.length} ${urgent.length === 1 ? 'project' : 'projects'}, most urgent first`} rows={urgent} onOpen={open} pins={pins} onPin={togglePin} />}
           {rest.length > 0 && <Group title={urgent.length || pinned.length ? 'Everything else' : 'All projects'} rows={rest} onOpen={open} pins={pins} onPin={togglePin} />}
         </div>
       ) : (
