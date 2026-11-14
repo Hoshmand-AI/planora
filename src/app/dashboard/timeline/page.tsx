@@ -226,7 +226,8 @@ export default function TimelinePage() {
 
               <div className="relative">
               {/* Period gridlines and the data date, drawn once behind the bars */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 max-md:hidden md:left-[260px] xl:left-[600px] right-0">
+              {/* The left offsets must equal the width of the sticky name column (md:w-[260px] xl:w-[692px]) or the line is drawn at the wrong date. */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 max-md:hidden md:left-[260px] xl:left-[692px] right-0">
                 {span && ruler.filter(x => !x.lead).map(x => <span key={x.t} className="absolute inset-y-0 w-px bg-warm-200/70" style={{ left: `${pos(new Date(x.t).toISOString())}%` }} />)}
                 {ddLeft != null && <DataDateLine left={ddLeft} />}
               </div>
