@@ -208,10 +208,10 @@ export default function TimelinePage() {
             <div className="min-w-[720px]" style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}>
               {/* Time ruler: calendar-aligned periods, then the data date */}
               <div className="flex h-14 border-b border-warm-200 bg-warm-100 text-[12px] font-semibold text-warm-600">
-                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 w-[150px] md:w-[260px] xl:w-[540px] flex-shrink-0 px-4"><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span></div>
+                <div className="sticky left-0 z-10 self-stretch flex items-center gap-2 bg-warm-100 w-[150px] md:w-[260px] xl:w-[620px] flex-shrink-0 px-4"><span className="hidden xl:block flex-shrink-0 w-[64px]">ID</span><span className="flex-1 min-w-0">{filtering ? `${matches} ${matches === 1 ? 'activity' : 'activities'}` : 'Phase / activity'}</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Start</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[88px]">Finish</span><span className="hidden xl:block flex-shrink-0 tabular-nums text-[12.5px] w-[60px] text-right">Float</span></div>
                 <div className="flex-1 relative tabular-nums">
-                  {span && ruler.map(x => (
-                    <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{x.label}</span>
+                  {span && ruler.map((x, i) => (
+                    <span key={x.t} className={`absolute top-2 pl-1.5 whitespace-nowrap leading-4 ${x.lead ? '' : 'border-l border-warm-300'}`} style={{ left: `${pos(new Date(x.t).toISOString())}%` }}>{/^Q\d \d{4}$/.test(x.label) ? (i > 0 && !x.label.startsWith('Q1') ? x.label.slice(0, 2) : x.label.replace(/ 20(\d\d)$/, ' ’$1')) : x.label}</span>
                   ))}
                   {ddLeft != null && dataDate && (
                     <span className="absolute bottom-1.5 whitespace-nowrap rounded-full bg-accent-600 px-2 py-px text-[12px] font-semibold text-white"
@@ -222,7 +222,7 @@ export default function TimelinePage() {
 
               <div className="relative">
               {/* Period gridlines and the data date, drawn once behind the bars */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[150px] md:left-[260px] xl:left-[540px] right-0">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[150px] md:left-[260px] xl:left-[620px] right-0">
                 {span && ruler.filter(x => !x.lead).map(x => <span key={x.t} className="absolute inset-y-0 w-px bg-warm-200/70" style={{ left: `${pos(new Date(x.t).toISOString())}%` }} />)}
                 {ddLeft != null && <DataDateLine left={ddLeft} />}
               </div>
@@ -234,7 +234,7 @@ export default function TimelinePage() {
                   <div key={g.name} className="border-b border-warm-200 last:border-0">
                     <button type="button" aria-expanded={expanded} onClick={() => setOpen(o => ({ ...o, [g.name]: !expanded }))}
                       className="group w-full flex items-center h-12 text-left hover:bg-warm-50 transition-colors focus-visible:outline-offset-[-2px]">
-                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors w-[150px] md:w-[260px] xl:w-[540px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
+                      <div className="sticky left-0 z-10 self-stretch bg-white group-hover:bg-warm-50 transition-colors w-[150px] md:w-[260px] xl:w-[620px] flex-shrink-0 px-4 flex items-center gap-2 min-w-0">
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold text-navy-950">{g.name}</span>
@@ -289,11 +289,12 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
   const width = s && f && span ? Math.max(0.5, pos(f) - left + (DAY / span.range) * 100) : 0
   return (
     <button type="button" onClick={onSelect} aria-pressed={active}
-      className={`group w-full flex items-center h-[42px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
-      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors w-[150px] md:w-[260px] xl:w-[540px] flex-shrink-0 pl-4 md:pl-10 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
+      className={`group w-full flex items-center h-[42px] xl:h-[32px] text-left focus-visible:outline-offset-[-2px] border-t border-warm-100 transition-colors ${active ? 'bg-accent-100' : 'hover:bg-warm-50'}`}>
+      <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors w-[150px] md:w-[260px] xl:w-[620px] flex-shrink-0 pl-4 md:pl-10 xl:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
+        <span className="hidden xl:block flex-shrink-0 w-[64px] tabular-nums text-[12.5px] text-warm-600">{a.activityId}</span>
         <span className="flex-1 min-w-0">
         <span className="block truncate text-[13px] text-navy-950">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-bold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
-        <span className="block text-[12px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? <span className="xl:hidden">{` · float ${a.totalFloat}d`}</span> : null}</span>
+        <span className="block xl:hidden text-[12px] text-warm-600 tabular-nums">{a.activityId}{a.totalFloat != null && prog !== 'complete' ? <span className="xl:hidden">{` · float ${a.totalFloat}d`}</span> : null}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>
         </span>
