@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-14', title: 'Daily Brief: what needs action comes first, with the detail one tap away' },
   { date: '2026-11-13', title: 'A new landing page with real product screens' },
   { date: '2026-11-12', title: 'Project mailbox: read one Microsoft 365 mail folder per project' },
   { date: '2026-11-11', title: 'Contract watch explains a clause right where you read it' },
