@@ -322,7 +322,7 @@ export default function PlanPage() {
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
               className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(6,20,27,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
-              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[11.5px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
+              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
         </div>
@@ -411,7 +411,7 @@ function Sources({ sources }: { sources: SourceRef[] }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       {sources.map((s, i) => (
-        <span key={i} title={s.detail} className="text-[11px] text-warm-600 bg-warm-50 border border-warm-200 rounded-md px-1.5 py-0.5">
+        <span key={i} title={s.detail} className="text-[12px] text-warm-600 bg-warm-50 border border-warm-200 rounded-md px-1.5 py-0.5">
           <span className="font-semibold">{SOURCE_LABEL[s.kind]}:</span> {s.label}
         </span>
       ))}
@@ -423,10 +423,10 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
   const [open, setOpen] = useState(false)
   const item = (format: string, label: string, sub: string) => (
     <a key={format} href={`/api/plans/${id}/export?format=${format}`} onClick={() => setOpen(false)} className="block px-3 py-2 hover:bg-warm-100">
-      <div className="text-navy-950">{label}</div><div className="text-[11.5px] text-warm-400">{sub}</div>
+      <div className="text-navy-950">{label}</div><div className="text-[12px] text-warm-400">{sub}</div>
     </a>
   )
-  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
+  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
@@ -565,7 +565,7 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
   const opt = (a: PlanActivity) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 mb-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Add an activity</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Add an activity</div>
       <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
         <input value={name} onChange={e => setName(e.target.value)} aria-label="Activity name" placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px]" />
         <div className="md:col-span-2 flex items-center gap-2">
@@ -612,19 +612,19 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
             {open ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
           </button>
         </td>
-        <td className="px-2 py-2 font-mono text-[11.5px] text-warm-500">{a.code}</td>
+        <td className="px-2 py-2 font-mono text-[12px] text-warm-500">{a.code}</td>
         <td className="px-2 py-2 text-navy-950">
           <div className="flex items-center gap-1.5">
             {a.placeholder && <Lock size={11} className="text-warm-500 flex-shrink-0" />}
             <span className={tm?.critical ? 'font-semibold' : ''}>{a.name}</span>
-            {a.overrides?.length ? <span className="text-[10px] text-accent-600 font-semibold uppercase">edited</span> : null}
+            {a.overrides?.length ? <span className="text-[12px] text-accent-600 font-semibold uppercase">edited</span> : null}
           </div>
         </td>
         <td className="px-2 py-2 text-right tabular-nums">{a.type === 'milestone' ? '◆' : a.duration}{a.calendarId === 'cal-7d' && a.type !== 'milestone' ? <span className="text-warm-400">cd</span> : ''}</td>
         <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyStart)}</td>
         <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyFinish)}</td>
         <td className={`px-2 py-2 text-right tabular-nums ${tm && tm.totalFloat < 0 ? 'text-status-at-risk font-semibold' : tm?.critical ? 'text-status-attention font-semibold' : 'text-warm-600'}`}>{tm?.totalFloat}</td>
-        <td className="px-2 py-2"><span className={`text-[10.5px] font-semibold uppercase border-l-2 pl-1 ${CONF_STYLE[a.rationale.confidence]}`}>{a.rationale.confidence}</span></td>
+        <td className="px-2 py-2"><span className={`text-[12px] font-semibold uppercase border-l-2 pl-1 ${CONF_STYLE[a.rationale.confidence]}`}>{a.rationale.confidence}</span></td>
         <td className="px-3 py-2">
           <div className="relative h-2.5 bg-warm-200/60 rounded-sm">
             <div className={`absolute top-0 h-full rounded-sm ${tm?.critical ? 'bg-status-attention' : a.placeholder ? 'bg-warm-400' : 'bg-accent-500'}`} style={{ left: `${left}%`, width: `${width}%` }} />
@@ -637,13 +637,13 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           <td colSpan={8} className="px-2 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Why this duration</div>
+                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Why this duration</div>
                 <p className="text-[13px] text-warm-700">{fmtDates(a.rationale.summary)}</p>
                 <Sources sources={a.rationale.sources} />
                 {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-[12px] text-warm-500 mt-1.5">Assumes: {fmtDates(x)}</p>)}
                 {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
 
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
+                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
                 {preds.length === 0 && <p className="text-[12.5px] text-warm-500">No predecessors (project start).</p>}
                 {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
                 {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
@@ -651,7 +651,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
 
               <div className="space-y-3">
                 {canWrite && <>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400">Override (your call wins)</div>
+                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">Override (your call wins)</div>
                 <input value={reason} onChange={e => setReason(e.target.value)} aria-label={`Reason for changing ${a.code}`} placeholder="Reason (required, kept in the audit trail)"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700" />
                 {a.type !== 'milestone' && (
@@ -699,7 +699,7 @@ function LinkRow({ l, other, dir, onEdit, busy, canWrite }: { l: PlanLink; other
   }
   return (
     <div className="text-[12.5px] text-warm-600 py-1 flex gap-2 items-start">
-      <span className="font-mono text-[11px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
+      <span className="font-mono text-[12px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
       <span className="flex-1"><span className="font-medium text-navy-950">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
       {canWrite && <button disabled={!!busy} onClick={remove} title="Remove relationship" aria-label={`Remove the relationship with ${other?.code ?? 'this activity'}`} className="text-warm-600 hover:text-status-at-risk flex-shrink-0"><X size={12} aria-hidden="true" /></button>}
     </div>
@@ -801,7 +801,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
                   <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
                   <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
                   <td className="py-1.5 pr-2 text-warm-500">{c.threshold}</td>
-                  <td className={`py-1.5 font-semibold uppercase text-[11px] ${resultStyle(c.result)}`}>{c.result}</td>
+                  <td className={`py-1.5 font-semibold uppercase text-[12px] ${resultStyle(c.result)}`}>{c.result}</td>
                 </tr>
               ))}
             </tbody>
@@ -818,7 +818,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
                     <td className="py-1.5 text-navy-950">{r.code} {r.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
                     <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
-                    <td className={`py-1.5 pl-2 text-[11px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
+                    <td className={`py-1.5 pl-2 text-[12px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -830,7 +830,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <ul className="space-y-1">
             {ev.coverage.map((c, i) => (
               <li key={i} className="text-[12.5px] flex gap-2">
-                <span className={`font-semibold uppercase text-[10.5px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
+                <span className={`font-semibold uppercase text-[12px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
                 <span><span className="text-navy-950">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
               </li>
             ))}
@@ -846,7 +846,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         <p className="text-[12.5px] text-warm-500 mt-0.5 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
-            <span className="font-semibold text-navy-950">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[11px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
+            <span className="font-semibold text-navy-950">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[12px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
@@ -881,9 +881,9 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
   return (
     <div className={`border rounded-2xl ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-white border-status-attention/40'}`}>
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[11px] font-semibold uppercase text-status-on-track">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
+        {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
@@ -991,7 +991,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
                 <div key={i} title={`${fmtDate(h.from)}–${fmtDate(h.to)}: ${h.count} runs`} className={`flex-1 rounded-t ${r.required && h.to <= r.required.date ? 'bg-status-on-track/70' : 'bg-accent-500/70'}`} style={{ height: `${Math.max(2, (h.count / max) * 100)}%` }} />
               ))}
             </div>
-            <div className="flex justify-between text-[11px] text-warm-500 mt-1"><span>{fmtDate(r.histogram[0]?.from)}</span><span>{fmtDate(r.histogram[r.histogram.length - 1]?.to)}</span></div>
+            <div className="flex justify-between text-[12px] text-warm-500 mt-1"><span>{fmtDate(r.histogram[0]?.from)}</span><span>{fmtDate(r.histogram[r.histogram.length - 1]?.to)}</span></div>
           </div>
           <div>
           {r.sensitivity.length > 0 && (
@@ -1050,7 +1050,7 @@ function AuditTab({ plan, onDelete, fullLog }: { plan: Plan; onDelete?: () => vo
                 <span className="text-warm-500 tabular-nums sm:w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
                 <span className="text-navy-950 sm:w-44 flex-shrink-0 truncate" title={e.ip ? `from ${e.ip}` : undefined}>{e.actorEmail || 'system'}</span>
                 <span className="text-warm-600 min-w-0"><span className="font-medium">{e.action.replace(/^plan\./, '')}</span>{e.detail?.detail ? ` — ${fmtDates(String(e.detail.detail))}` : e.detail?.format ? ` — ${String(e.detail.format)}` : ''}</span>
-                <span className="sm:ml-auto font-mono text-[10.5px] text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
+                <span className="sm:ml-auto font-mono text-[12px] text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
               </div>
             ))}
           </div>

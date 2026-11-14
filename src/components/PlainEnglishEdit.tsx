@@ -79,7 +79,7 @@ export function PlainEnglishEdit({ id, examples, preview, apply, undo }: {
               <li key={i} className="rounded border border-warm-200 p-2 text-[12.5px]">
                 <span className="block text-warm-600">“{c.text}”</span>
                 {c.error ? <span className="block text-status-at-risk">Not applied: {c.error}</span>
-                  : <span className="block text-navy-950"><strong>{fmtDates(c.what ?? '')}</strong>{c.before != null && <> · {fmtDates(c.before)} → {fmtDates(c.after ?? '')}</>}{c.method === 'model' && <span className="ml-2 text-[11.5px] text-status-info">read by AI, check it</span>}</span>}
+                  : <span className="block text-navy-950"><strong>{fmtDates(c.what ?? '')}</strong>{c.before != null && <> · {fmtDates(c.before)} → {fmtDates(c.after ?? '')}</>}{c.method === 'model' && <span className="ml-2 text-[12px] text-status-info">read by AI, check it</span>}</span>}
               </li>
             ))}
           </ul>

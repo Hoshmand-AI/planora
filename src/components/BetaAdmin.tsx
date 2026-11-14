@@ -104,7 +104,7 @@ export function BetaAdmin() {
           <div tabIndex={0} role="region" aria-label="Beta invitations" className="relative overflow-x-auto">
             <table className="w-full text-[13px]">
               <caption className="sr-only">Beta invitations</caption>
-              <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">Invitee</th><th scope="col" className="py-2 pr-3 font-semibold">Status</th>
                 <th scope="col" className="py-2 pr-3 font-semibold">Sent</th><th scope="col" className="py-2 pr-3 font-semibold">Expires / accepted</th>
                 <th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>
@@ -113,7 +113,7 @@ export function BetaAdmin() {
                 {data.invites.map(i => (
                   <tr key={i.id} className="border-b border-warm-200 last:border-0 align-top">
                     <td className="py-2 pr-3"><div className="text-navy-950 font-medium">{i.email}</div><div className="text-warm-600 text-[12px]">{i.acceptedOrgName || i.company || '—'}</div></td>
-                    <td className="py-2 pr-3"><span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md ${STATUS[i.status].cls}`}>{STATUS[i.status].label}</span></td>
+                    <td className="py-2 pr-3"><span className={`inline-block text-[12px] font-semibold px-2 py-0.5 rounded-md ${STATUS[i.status].cls}`}>{STATUS[i.status].label}</span></td>
                     <td className="py-2 pr-3 text-warm-700">{fmtDay(i.createdAt)}<div className="text-warm-600 text-[12px]">{i.createdByEmail}</div></td>
                     <td className="py-2 pr-3 text-warm-700">{i.acceptedAt ? `Accepted ${fmtDay(i.acceptedAt)}` : i.revokedAt ? `Revoked ${fmtDay(i.revokedAt)}` : fmtDay(i.expiresAt)}</td>
                     <td className="py-2 text-right">
@@ -138,7 +138,7 @@ export function BetaAdmin() {
         <div tabIndex={0} role="region" aria-label="Accounts and their beta access" className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Accounts and their beta access</caption>
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+            <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
               <th scope="col" className="py-2 pr-3 font-semibold">Person</th><th scope="col" className="py-2 pr-3 font-semibold">Organization</th>
               <th scope="col" className="py-2 pr-3 font-semibold">Beta access</th><th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>
             </tr></thead>

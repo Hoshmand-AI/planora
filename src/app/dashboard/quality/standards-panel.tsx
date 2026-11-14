@@ -112,7 +112,7 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
   return (
     <div className="space-y-5">
       <section aria-labelledby="fw-picker-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-        <h2 id="fw-picker-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-3">Framework</h2>
+        <h2 id="fw-picker-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-3">Framework</h2>
         <fieldset>
           <legend className="sr-only">Framework to run</legend>
           <div className="grid sm:grid-cols-2 gap-2">
@@ -163,12 +163,12 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
             <Scale size={14} className="inline mr-1.5 -mt-0.5 text-warm-600" aria-hidden />{shown.disclaimer}
           </p>
           {shown.frameworks.map(f => <FrameworkView key={f.framework} f={f} />)}
-          <p className="text-[11.5px] text-warm-600">Engine {shown.engineVersion} · rules version {shown.rulesVersion}</p>
+          <p className="text-[12px] text-warm-600">Engine {shown.engineVersion} · rules version {shown.rulesVersion}</p>
         </>
       )}
 
       <section aria-labelledby="runs-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-        <h2 id="runs-h" className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Recorded assessments</h2>
+        <h2 id="runs-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Recorded assessments</h2>
         {runs.length === 0 ? <p className="text-[12.5px] text-warm-600">None recorded yet.</p> : (
           <ul className="divide-y divide-warm-200">
             {runs.map(r => (
@@ -241,8 +241,8 @@ function RuleRow({ r }: { r: RuleResult }) {
     <li>
       <details className="bg-warm-50 border border-warm-200 rounded-md">
         <summary className="cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase ${ui.cls}`}><ui.Icon size={13} aria-hidden />{ui.label}</span>
-          <span className="font-mono text-[11.5px] text-warm-600">{r.ruleId}</span>
+          <span className={`inline-flex items-center gap-1 text-[12px] font-semibold uppercase ${ui.cls}`}><ui.Icon size={13} aria-hidden />{ui.label}</span>
+          <span className="font-mono text-[12px] text-warm-600">{r.ruleId}</span>
           <span className="text-[13px] text-navy-950 flex-1 min-w-[180px]">{r.title}</span>
           <span className="text-[12px] text-warm-600">{r.metric}</span>
         </summary>
@@ -250,9 +250,9 @@ function RuleRow({ r }: { r: RuleResult }) {
           <p>{r.message}</p>
           {r.reason && <p><span className="font-semibold text-navy-950">{r.result === 'not_assessable' ? 'Why not assessable: ' : 'Detail: '}</span>{r.reason}</p>}
           {r.threshold && <p><span className="font-semibold text-navy-950">Threshold: </span>{r.threshold.display} ({SOURCE_LABEL[r.threshold.source]}){r.parameters.map(p => `; ${metricLabel(p.metricKey).toLowerCase()} ${p.display} (${SOURCE_LABEL[p.source]})`).join('')}</p>}
-          {r.evidence.length > 0 && <p><span className="font-semibold text-navy-950">Evidence: </span><span className="font-mono text-[11.5px]">{r.evidence.slice(0, 25).join(', ')}</span>{r.evidenceTotal > 25 ? ` and ${r.evidenceTotal - 25} more` : ''}</p>}
+          {r.evidence.length > 0 && <p><span className="font-semibold text-navy-950">Evidence: </span><span className="font-mono text-[12px]">{r.evidence.slice(0, 25).join(', ')}</span>{r.evidenceTotal > 25 ? ` and ${r.evidenceTotal - 25} more` : ''}</p>}
           {r.recommendation && r.result !== 'pass' && <p><span className="font-semibold text-navy-950">Recommendation: </span>{r.recommendation}</p>}
-          <p className="text-[11.5px] text-warm-600">Source: {r.sourceReference} · {RULE_KIND_LABELS[r.kind]} · {FRAMEWORK_LABELS[r.framework]} · rule v{r.version} · {r.calculation}</p>
+          <p className="text-[12px] text-warm-600">Source: {r.sourceReference} · {RULE_KIND_LABELS[r.kind]} · {FRAMEWORK_LABELS[r.framework]} · rule v{r.version} · {r.calculation}</p>
         </div>
       </details>
     </li>

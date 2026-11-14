@@ -25,13 +25,13 @@ export function bestOption(options: RecoveryOption[]): RecoveryOption | null {
 function Chip({ o }: { o: RecoveryOption }) {
   if (o.id === 'move_date') return null
   const [text, style] = o.meetsDate ? ['Meets date', 'bg-status-on-track-bg text-status-on-track'] : o.daysSaved > 0 ? [`Saves ${o.daysSaved}d`, 'bg-status-attention-bg text-status-attention'] : ['No gain', 'bg-warm-100 text-warm-500']
-  return <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap ${style}`}>{text}</span>
+  return <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${style}`}>{text}</span>
 }
 
 function OptionCard({ o, best, busy, onRecover, onInterview }: { o: RecoveryOption; best: boolean; busy: string | null; onRecover: (id: string) => void; onInterview: () => void }) {
   return (
     <li className={`rounded-2xl bg-white px-4 pt-4 flex flex-col ${best ? 'border-2 border-navy-900/70 shadow-[0_8px_24px_-14px_rgba(6,20,27,0.35)]' : 'border border-warm-200'}`}>
-      {best && <div className="text-[11.5px] font-semibold text-accent-600 mb-1">Suggested first step</div>}
+      {best && <div className="text-[12px] font-semibold text-accent-600 mb-1">Suggested first step</div>}
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-[14px] font-semibold text-navy-950 leading-snug">{o.title}</h4>
         <Chip o={o} />

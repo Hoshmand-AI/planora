@@ -124,7 +124,7 @@ export function Workspaces({ members }: { members: Member[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <caption className="sr-only">Workspace of each schedule and plan</caption>
-              <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">Item</th><th scope="col" className="py-2 font-semibold">Workspace</th>
               </tr></thead>
               <tbody>

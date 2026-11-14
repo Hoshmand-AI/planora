@@ -140,7 +140,7 @@ export default function OrgPage() {
         <div tabIndex={0} role="region" aria-label="Organization members" className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Organization members</caption>
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+            <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
               <th scope="col" className="py-2 pr-3 font-semibold">Member</th><th scope="col" className="py-2 pr-3 font-semibold">Role</th>
               {manage && <th scope="col" className="py-2 pr-3 font-semibold">2-step</th>}
               {manage && <th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>}
@@ -334,18 +334,18 @@ export default function OrgPage() {
               : <Alert tone="error"><XCircle size={14} className="inline mr-1" aria-hidden="true" />Integrity check failed at record #{verify.brokenAt?.seq}: {verify.brokenAt?.reason}</Alert>}
             </div>
           )}
-          <p className="sm:hidden text-[11.5px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
+          <p className="sm:hidden text-[12px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
           <div tabIndex={0} role="region" aria-label="Audit log, newest first" className="relative overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <caption className="sr-only">Audit log, newest first</caption>
-              <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">When</th><th scope="col" className="py-2 pr-3 font-semibold">Who</th><th scope="col" className="py-2 pr-3 font-semibold">What</th><th scope="col" className="py-2 font-semibold">Details</th>
               </tr></thead>
               <tbody>
                 {(events || []).map(e => (
                   <tr key={e.seq} className="border-b border-warm-100 align-top">
                     <td className="py-2 pr-3 whitespace-nowrap text-warm-600">{fmtDateTime(e.at)}</td>
-                    <td className="py-2 pr-3 text-warm-700">{e.actorEmail || 'system'}{e.ip && <div className="text-[11px] text-warm-400">{e.ip}</div>}</td>
+                    <td className="py-2 pr-3 text-warm-700">{e.actorEmail || 'system'}{e.ip && <div className="text-[12px] text-warm-400">{e.ip}</div>}</td>
                     <td className="py-2 pr-3 text-navy-950 font-medium">{actionLabel(e.action)}</td>
                     <td className="py-2 text-warm-600 break-words">{summarize(e)}</td>
                   </tr>

@@ -132,7 +132,7 @@ function AccountPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               <div className="w-44 h-44 bg-white border border-warm-200 rounded-md p-2" role="img" aria-label="QR code for your authenticator app" dangerouslySetInnerHTML={{ __html: enroll.qrSvg }} />
               <div className="space-y-2 flex-1 min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500">Setup key</div>
+                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500">Setup key</div>
                 <code className="block break-all font-mono text-[14px] text-navy-950 bg-warm-100 border border-warm-200 rounded px-2 py-1">{enroll.secret.match(/.{1,4}/g)?.join(' ')}</code>
                 <Field label="Code from the app">{p => <input {...p} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={`${inputClass} font-mono tracking-[0.2em] max-w-[160px]`} value={enrollCode} onChange={e => setEnrollCode(e.target.value)} />}</Field>
                 <div className="flex gap-2">
@@ -198,7 +198,7 @@ function AccountPage() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <Monitor size={16} className="text-warm-400 flex-shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
-                  <div className="text-[13.5px] text-navy-950 font-medium">{device(s.userAgent)}{s.current && <span className="ml-2 text-[11px] font-semibold text-status-on-track">This device</span>}</div>
+                  <div className="text-[13.5px] text-navy-950 font-medium">{device(s.userAgent)}{s.current && <span className="ml-2 text-[12px] font-semibold text-status-on-track">This device</span>}</div>
                   <div className="text-[12px] text-warm-500 truncate">{s.ip || 'unknown IP'} · signed in {fmtDateTime(s.createdAt)} · last active {fmtDateTime(s.lastSeenAt)}</div>
                 </div>
               </div>

@@ -249,7 +249,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
             {choices.map((o, i) => (
               <button key={String(o.value)} disabled={busy || disabled} onClick={() => submit(o.value)}
                 className="pressable group flex items-center gap-3 w-full text-left rounded-2xl border border-warm-300 bg-warm-50 hover:border-navy-900 hover:bg-white px-4 py-3 disabled:opacity-50">
-                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-[11.5px] text-warm-500 font-sans group-hover:border-navy-900 group-hover:text-navy-950">{i + 1}</kbd>}
+                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-[12px] text-warm-500 font-sans group-hover:border-navy-900 group-hover:text-navy-950">{i + 1}</kbd>}
                 <span className="text-[15px] text-navy-950">{o.label}</span>
               </button>
             ))}

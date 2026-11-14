@@ -120,7 +120,7 @@ export default function AskPage() {
               <p className="text-[13.5px] text-warm-500">Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</p>
               {aiOff && <p className="text-[13px] text-warm-600 mt-2 border-l-2 border-warm-300 pl-3">AI is turned off, so answers are a readout of the schedule facts (status, critical path, what starts next) rather than a written reply to your question.</p>}
             </div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
               {SUGGESTED.map(q => (
                 <button key={q} onClick={() => handleSend(q)} disabled={!canAsk || loading}
@@ -142,7 +142,7 @@ export default function AskPage() {
               }`}>
                 {msg.role === 'user' ? <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div> : <Markdown text={msg.content} />}
               </div>
-              <div className="text-[10px] text-warm-400 mt-1 px-1">
+              <div className="text-[12px] text-warm-400 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>

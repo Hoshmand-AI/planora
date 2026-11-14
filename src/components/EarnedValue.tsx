@@ -89,14 +89,14 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
       <ul className="grid grid-cols-2 md:grid-cols-4 gap-3" aria-label="Earned value indicators">
         {tiles.map(t => (
           <li key={t.label} className="bg-warm-50 border border-warm-200 rounded-lg p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{t.label}</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{t.label}</div>
             <div className={`text-[22px] font-bold tabular-nums leading-none ${t.tone === 'on-track' ? 'text-status-on-track' : t.tone === 'attention' ? 'text-status-attention' : 'text-navy-950'}`}>{t.value}</div>
             <p className="text-[12px] text-warm-600 mt-2 leading-snug">{t.meaning}</p>
           </li>
         ))}
         {es && (
           <li className="bg-warm-50 border border-warm-200 rounded-lg p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Earned schedule</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Earned schedule</div>
             <div className={`text-[22px] font-bold tabular-nums leading-none ${es.svT < 0 ? 'text-status-attention' : 'text-status-on-track'}`}>{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
             <p className="text-[12px] text-warm-600 mt-2 leading-snug">The work done was planned by {fmtDate(es.esDate)}: SV(t) {es.svT} calendar days, SPI(t) {idx(es.spiT)}.{es.forecastFinish ? ` At this rate the work finishes about ${fmtDate(es.forecastFinish)} (baseline ${fmtDate(es.baselineFinish)}).` : ''}</p>
           </li>
@@ -127,10 +127,10 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
           {evm.checks.map(c => (
             <li key={c.id} className={`border-l-2 pl-3 text-[13px] ${c.result === 'flag' ? 'border-status-attention' : c.result === 'pass' ? 'border-status-on-track' : 'border-warm-300'}`}>
               <span className="font-medium text-navy-950">{c.title}</span>{' '}
-              <span className={`text-[11px] font-bold uppercase tracking-wider ${c.result === 'flag' ? 'text-status-attention' : c.result === 'pass' ? 'text-status-on-track' : 'text-warm-600'}`}>{c.result === 'flag' ? 'Review' : c.result === 'pass' ? 'Pass' : 'n/a'}</span>
+              <span className={`text-[12px] font-bold uppercase tracking-wider ${c.result === 'flag' ? 'text-status-attention' : c.result === 'pass' ? 'text-status-on-track' : 'text-warm-600'}`}>{c.result === 'flag' ? 'Review' : c.result === 'pass' ? 'Pass' : 'n/a'}</span>
               <div className="text-warm-700">{c.detail}</div>
               {c.activityCodes.length > 0 && <div className="text-[12px] text-warm-600">Activities: {c.activityCodes.slice(0, 20).join(', ')}{c.activityCodes.length > 20 ? ` and ${c.activityCodes.length - 20} more` : ''}</div>}
-              <div className="text-[11.5px] text-warm-500">{c.principle}</div>
+              <div className="text-[12px] text-warm-500">{c.principle}</div>
             </li>
           ))}
         </ul>
@@ -197,12 +197,12 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
             {ticksY.map((v, i) => (
               <g key={i}>
                 <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="#CCD0CF" strokeWidth={1} />
-                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={10} fill="#3F4E5A">{$(v)}</text>
+                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={12} fill="#3F4E5A">{$(v)}</text>
               </g>
             ))}
-            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={10} fill="#3F4E5A">{fmtDate(d)}</text>)}
+            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={12} fill="#3F4E5A">{fmtDate(d)}</text>)}
             {dd && t(dd) >= x0 && t(dd) <= x1 && (
-              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#56656F" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={10} fill="#253745">Data date</text></g>
+              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#56656F" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={12} fill="#253745">Data date</text></g>
             )}
             <path d={path(pvPts)} fill="none" stroke="#11212D" strokeWidth={2.25} />
             <path d={path(evPts)} fill="none" stroke="#2563eb" strokeWidth={2.25} strokeDasharray="7 4" />
@@ -215,7 +215,7 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
             <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#2563eb" strokeWidth="2.25" strokeDasharray="7 4" /><circle cx="14" cy="5" r="3.5" fill="#2563eb" /></svg>EV, earned value (dashed, circles)</li>
             {acPts.length > 0 && <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#4A5C6A" strokeWidth="2.25" strokeDasharray="2 3" /><rect x="10.5" y="1.5" width="7" height="7" fill="#4A5C6A" /></svg>AC, actual cost (dotted, squares)</li>}
           </ul>
-          <p className="text-[11.5px] text-warm-600 mt-1">EV and AC are known at each update&apos;s data date{obs.length > 1 ? ` (${obs.length} updates)` : ''}; between updates the lines are straight.</p>
+          <p className="text-[12px] text-warm-600 mt-1">EV and AC are known at each update&apos;s data date{obs.length > 1 ? ` (${obs.length} updates)` : ''}; between updates the lines are straight.</p>
         </>
       ) : (
         <div className="overflow-x-auto max-h-[360px]">

@@ -103,7 +103,7 @@ function Summary({ data }: { data: Analysis }) {
     <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {items.map(([k, v]) => (
         <div key={k} className="bg-warm-50 border border-warm-200 rounded-md px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wider text-warm-600">{k}</dt>
+          <dt className="text-[12px] uppercase tracking-wider text-warm-600">{k}</dt>
           <dd className="text-[18px] font-semibold text-navy-950 tabular-nums">{v}</dd>
         </div>
       ))}
@@ -117,7 +117,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
       <h3 id="res-list" className="text-[14px] font-semibold text-navy-950 mb-2">Resources: peak demand vs available</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] text-warm-700">
-          <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
+          <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
             <th scope="col" className="py-1.5 pr-3">Resource</th><th scope="col" className="pr-3">Type</th>
             <th scope="col" className="pr-3 text-right">Available / day</th><th scope="col" className="pr-3 text-right">Peak / day</th>
             <th scope="col" className="pr-3">Peak on</th><th scope="col" className="pr-3 text-right">Total units</th><th scope="col" className="pr-3 text-right">Over-allocated days</th><th scope="col"><span className="sr-only">Chart</span></th>
@@ -127,7 +127,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
               <tr key={r.id} className={`border-b border-warm-200 ${r.id === current ? 'bg-accent-100' : ''}`}>
                 <th scope="row" className="py-1.5 pr-3 text-left font-medium text-navy-950">{r.code}<span className="block text-[12px] font-normal text-warm-600">{r.name}</span></th>
                 <td className="pr-3 capitalize">{r.kind}</td>
-                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}<span className="block text-[11px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span></td>
+                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}<span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span></td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
                 <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.totalUnits)}</td>
@@ -184,7 +184,7 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         {ticks.map(t => (
           <g key={t}>
             <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#CCD0CF" strokeWidth="1" />
-            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#3F4E5A">{t}</text>
+            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#3F4E5A">{t}</text>
           </g>
         ))}
         {bars.map((b, i) => {
@@ -195,8 +195,8 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
             <g key={b.start} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />
               {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : '#3b82f6'} />}
-              {isOver && <text x={x + w / 2} y={y(b.demand) - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#A64848">!</text>}
-              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="10" fill="#3F4E5A">{fmtDate(b.start).slice(0, 5)}</text>}
+              {isOver && <text x={x + w / 2} y={y(b.demand) - 4} textAnchor="middle" fontSize="12" fontWeight="700" fill="#A64848">!</text>}
+              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#3F4E5A">{fmtDate(b.start).slice(0, 5)}</text>}
             </g>
           )
         })}
@@ -224,7 +224,7 @@ function HistogramTable({ bars, unit }: { bars: HistogramBar[]; unit: string }) 
     <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
       <table className="w-full text-[12.5px] text-warm-700">
         <caption className="sr-only">Demand and availability by period ({unit})</caption>
-        <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
+        <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
           <th scope="col" className="py-1 pr-3">From</th><th scope="col" className="pr-3">To</th><th scope="col" className="pr-3 text-right">Demand</th>
           <th scope="col" className="pr-3 text-right">Actual</th><th scope="col" className="pr-3 text-right">Remaining</th><th scope="col" className="pr-3 text-right">Available</th><th scope="col" className="pr-3 text-right">Peak day</th><th scope="col">Over-allocated days</th>
         </tr></thead>
@@ -371,7 +371,7 @@ function LevelingResults({ p }: { p: Preview }) {
     <div className="mt-3 space-y-3 text-[13px] text-warm-700">
       <h4 className="font-semibold text-navy-950">{r.label} — {r.mode === 'smooth' ? 'smoothing (within float)' : r.allowFinishExtension ? 'leveling, finish may extend' : 'leveling within float'}</h4>
       <table className="text-[13px]">
-        <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-600"><th scope="col" className="pr-4">Measure</th><th scope="col" className="pr-4">Before</th><th scope="col">After</th></tr></thead>
+        <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600"><th scope="col" className="pr-4">Measure</th><th scope="col" className="pr-4">Before</th><th scope="col">After</th></tr></thead>
         <tbody>
           <tr><th scope="row" className="text-left pr-4 font-medium">Finish</th><td className="pr-4 tabular-nums">{fmtDate(r.before.finish)}</td><td className="tabular-nums">{fmtDate(r.after.finish)} ({fin(r.finishChangeDays)})</td></tr>
           {r.before.milestones.map((m, i) => (
@@ -384,7 +384,7 @@ function LevelingResults({ p }: { p: Preview }) {
         <h5 className="font-semibold text-navy-950 mb-1">Delays introduced ({r.delays.length})</h5>
         {!r.delays.length ? <p className="text-warm-600">No activity needs to wait.</p> : (
           <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
+            <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
               <th scope="col" className="py-1 pr-3">Activity</th><th scope="col" className="pr-3">Start before</th><th scope="col" className="pr-3">Start after</th><th scope="col" className="pr-3 text-right">Delay (work days)</th><th scope="col" className="pr-3">Within float</th><th scope="col">Resources</th>
             </tr></thead>
             <tbody>{r.delays.map(d => (

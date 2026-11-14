@@ -124,7 +124,7 @@ export function Integrations() {
       }}>
         <Field label="Endpoint URL (HTTPS)">{p => <input {...p} required type="url" className={inputClass} placeholder="https://hooks.example.com/runf9" value={hook.url} onChange={e => setHook({ ...hook, url: e.target.value })} />}</Field>
         <fieldset>
-          <legend className="block text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Events</legend>
+          <legend className="block text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Events</legend>
           <div className="grid sm:grid-cols-2 gap-1.5">
             {data.events.map(ev => (
               <label key={ev.id} className="flex items-start gap-2 text-[12.5px] text-warm-700">

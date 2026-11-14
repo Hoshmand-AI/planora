@@ -209,14 +209,14 @@ export default function ProjectPage() {
                 <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < drivingTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>
                   <div className="min-w-0 pr-3">
                     <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}{editedIds.has(task.id) && <EditedTag />}</div>
-                    <div className="text-[11px] text-warm-400 mt-0.5">
+                    <div className="text-[12px] text-warm-400 mt-0.5">
                       Float: {task.totalFloat}d
                       {task.earlyStart && ` · ${fmtDate(task.earlyStart)}`}
                       {task.earlyFinish && ` → ${fmtDate(task.earlyFinish)}`}
                       {task.dateBasis === 'logic' && ` (logic-driven; ${fmtDate(task.scheduledFinish)} as scheduled)`}
                     </div>
                     {task.drivingConstraint && (
-                      <div className="text-[11px] text-status-attention mt-0.5">
+                      <div className="text-[12px] text-status-attention mt-0.5">
                         {task.drivingConstraint.effect === 'start' ? 'Path starts at its' : 'Held by its'} {task.drivingConstraint.type} {fmtDate(task.drivingConstraint.date)} constraint{task.drivingConstraint.effect === 'later' ? ' (later than logic)' : task.drivingConstraint.effect === 'earlier' ? ' (earlier than logic)' : ''}
                       </div>
                     )}
@@ -297,21 +297,21 @@ interface ActivityRow {
 
 /* ─── Edited tag ─────────────────────────────────── */
 function EditedTag() {
-  return <span title="Changed by an edit made in RunF9 (see Edits made in RunF9 below)" className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
+  return <span title="Changed by an edit made in RunF9 (see Edits made in RunF9 below)" className="ml-2 align-middle text-[12px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
 }
 
 /* ─── Near-term list ─────────────────────────────── */
 function NearTermList({ title, rows, inProgress = false }: { title: string; rows: NearTermRow[]; inProgress?: boolean }) {
   return (
     <div className="mb-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{title}</h3>
+      <h3 className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{title}</h3>
       <ul className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
         {rows.map((task, i) => (
           <li key={task.activityId + i} className={`flex items-center justify-between px-4 py-3 ${i < rows.length - 1 ? 'border-b border-warm-200' : ''}`}>
             <div className="min-w-0 pr-3">
               <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] text-warm-500">
+                <span className="text-[12px] text-warm-500">
                   {inProgress
                     ? `Started ${fmtDate(task.actualStart || task.earlyStart)} · finishes ${fmtDate(task.earlyFinish)}`
                     : task.startOverdue
@@ -319,7 +319,7 @@ function NearTermList({ title, rows, inProgress = false }: { title: string; rows
                     : `Starts ${fmtDate(task.earlyStart)}`}
                 </span>
                 {task.isCritical && (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
+                  <span className="text-[12px] font-bold uppercase tracking-wider text-status-attention bg-status-attention-bg px-1.5 py-0.5 rounded border-l-2 border-status-attention">
                     Critical
                   </span>
                 )}
