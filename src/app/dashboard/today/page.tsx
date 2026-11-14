@@ -167,7 +167,7 @@ export default function TodayPage() {
             </div>
           </div>
           <label className="text-[12px] text-warm-600"><span className="max-md:sr-only">Brief for</span>
-            <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px]`} />
+            <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px] max-md:w-full max-md:min-w-0`} />
           </label>
         </div>
       </header>
