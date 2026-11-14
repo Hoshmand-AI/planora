@@ -40,6 +40,7 @@ export default function TodayPage() {
   const sid = selectedSchedule?.id
   const [data, setData] = useState<BriefData | null>(null)
   const [items, setItems] = useState<RegisterItem[]>([])
+  const [fullBrief, setFullBrief] = useState(false)
   const [impact, setImpact] = useState<{ moved: { id: string; code: string; name: string; startDays: number; finishDays: number }[]; movedCount: number } | null>(null)
   const [err, setErr] = useState('')
   const [asOf, setAsOf] = useState(todayIso)
@@ -217,8 +218,9 @@ export default function TodayPage() {
         <div id="aud-panel" role="tabpanel" aria-labelledby={`aud-${audience}`} className="mt-3">
           <p className="text-[12.5px] text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
           <ul className="space-y-2">
-            {b.audiences[audience].map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
+            {(fullBrief ? b.audiences[audience] : b.audiences[audience].slice(0, 3)).map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
           </ul>
+          {b.audiences[audience].length > 3 && <button type="button" aria-expanded={fullBrief} onClick={() => setFullBrief(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{fullBrief ? 'Show less' : `Show all ${b.audiences[audience].length} points`}</button>}
         </div>
       </section>
 
@@ -457,6 +459,7 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [showClosed, setShowClosed] = useState(false)
+  const [all, setAll] = useState(false)
   const add = async () => {
     setBusy(true); setErr('')
     const r = await postJson(`/api/schedules/${encodeURIComponent(sid)}/register`, { kind: f.kind, title: f.title, owner: f.owner || null, dueDate: f.dueDate || null, impactDays: f.impactDays === '' ? null : Number(f.impactDays), activityCodes: f.activity.trim() ? [f.activity.trim()] : [] })
@@ -487,7 +490,7 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
       {err && <Alert tone="error">{err}</Alert>}
       {shown.length === 0 ? <p className="text-[13px] text-warm-600">No items yet.</p> : (
         <ul className="divide-y divide-warm-200">
-          {shown.map(i => (
+          {(all ? shown : shown.slice(0, 3)).map(i => (
             <li key={i.id} className="py-2 flex items-start justify-between gap-3 text-[13px]">
               <span className="min-w-0">
                 <span className="mr-1.5 inline-block px-1.5 py-0.5 rounded bg-warm-100 text-[12px] font-bold text-navy-950">{KIND_LABEL[i.kind]}</span>
@@ -499,6 +502,7 @@ function Register({ sid, items, openCount, canWrite, activities, onChanged, toda
           ))}
         </ul>
       )}
+      {shown.length > 3 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="text-[13px] font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${shown.length} items`}</button>}
       {canWrite && (
         <Disclosure title="Add an item">
           <form className="flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); add() }}>
