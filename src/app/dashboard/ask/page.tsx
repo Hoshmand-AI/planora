@@ -117,8 +117,8 @@ export default function AskPage() {
           <div className="max-w-[560px] mx-auto">
             <div className="mb-6">
               <h2 className="font-display text-[22px] text-navy-950 mb-1">Ask about your schedule</h2>
-              <p className="text-[13.5px] text-warm-500">Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</p>
-              {aiOff && <p className="text-[13px] text-warm-600 mt-2 border-l-2 border-warm-300 pl-3">AI is turned off, so answers are a readout of the schedule facts (status, critical path, what starts next) rather than a written reply to your question.</p>}
+              <p className="text-[13.5px] text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
+              {aiOff && <p className="text-[13px] text-warm-600 mt-2">AI is off for this organization, so the reply is a readout, not a written answer.</p>}
             </div>
             <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
