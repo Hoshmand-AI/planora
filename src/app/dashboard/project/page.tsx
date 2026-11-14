@@ -158,14 +158,15 @@ export default function ProjectPage() {
       {brief && (
         <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
           {/* Facts, not a paragraph: the sentence that used to sit here restated the tiles above. */}
-          <h2 className="text-[15px] font-semibold text-navy-950 mb-1.5">Project facts</h2>
+          {/* Only what the hero and the tiles above do not already say: the project type, its length, and the next milestones. */}
+          <h2 className="sr-only">Next milestones</h2>
           <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {brief.facts.map(f => (
-              <div key={f.label} className="text-[12px]"><span className="text-warm-600">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
+            {brief.facts.filter(f => /^(type|duration)$/i.test(f.label)).map(f => (
+              <div key={f.label} className="text-[12.5px]"><span className="text-warm-600">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
             ))}
           </div>
           {brief.nextMilestones.length > 0 && (
-            <div className="mt-3 text-[12.5px] text-warm-600">
+            <div className="mt-2 text-[12.5px] text-warm-600">
               <span className="font-semibold text-navy-950">Next milestones: </span>
               {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.basis === 'logic' ? <span className="text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}> (logic-driven; {ms.scheduled} as scheduled)</span> : null}{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
             </div>

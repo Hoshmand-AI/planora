@@ -524,7 +524,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-navy-950 font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
                 )}
                 {/* Tabs scroll sideways on narrow screens: the right edge fades to show there are more, and the current tab is scrolled into view */}
-                <nav ref={tabsRef} aria-label="Project" className="relative flex gap-1 overflow-x-auto -mx-1 mt-3 [mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)] lg:[mask-image:none]">
+                {/* A chevron at the right edge on narrow screens says the strip scrolls; a fade alone was too faint to read as "more". */}
+                <div className="relative">
+                <span aria-hidden="true" className="lg:hidden pointer-events-none absolute -right-2 bottom-px top-3 z-10 flex items-center pl-8 pr-2 bg-[linear-gradient(to_left,#fff_55%,transparent)] text-warm-600"><ChevronDown size={16} className="-rotate-90" /></span>
+                <nav ref={tabsRef} aria-label="Project" className="relative flex gap-1 overflow-x-auto -mx-1 mt-3 pr-8 lg:pr-0">
                   {PROJECT_TABS.map(t => {
                     const here = pathname.startsWith(t.href)
                     return (
@@ -540,6 +543,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     )
                   })}
                 </nav>
+                </div>
               </div>
             </div>
           )}

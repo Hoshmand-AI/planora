@@ -55,7 +55,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</span>
-        <span role="status" className={`text-[15px] md:text-[16px] font-semibold ${pill === PILL.no_baseline ? '' : 'rounded-full px-3 py-1'} ${pill}`}>{verdict}</span>
+        <span role="status" className={`text-[15px] md:text-[16px] font-semibold ${pill === PILL.no_baseline ? '' : 'rounded-lg md:rounded-full px-3 py-1 max-md:text-[14px] max-md:leading-snug'} ${pill}`}>{verdict}</span>
       </div>
       {reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
       {note && <p className="mt-2 text-[13px] text-warm-200 leading-relaxed max-w-3xl">{note}</p>}
