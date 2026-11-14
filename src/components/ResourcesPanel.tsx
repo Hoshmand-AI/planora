@@ -97,7 +97,7 @@ function Summary({ data }: { data: Analysis }) {
   const t = data.totals
   const items = [
     ['Resources', n(t.resources)], ['Assignments', n(t.assignments)], ['Total units', n(t.units)],
-    ['Over-allocated', n(t.overAllocatedResources)], ['Days over ahead', n(t.overAllocatedDays)],
+    ['Over-allocated', n(t.overAllocatedResources)], ['Days over-allocated', n(t.overAllocatedDays)],
   ]
   return (
     <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">

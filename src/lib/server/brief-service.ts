@@ -173,8 +173,14 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   if (brief.headline.status === 'behind') alerts.push({ level: 'act', section: 'deadline', text: `The forecast is ${n(brief.headline.daysBehind!, 'day')} behind the required date.` })
   if (brief.overdue.finishCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.finishCount, 'activity', 'activities')} should have finished by now with no actual finish.` })
   if (brief.overdue.startCount) alerts.push({ level: 'act', section: 'overdue', text: `${n(brief.overdue.startCount, 'activity', 'activities')} should have started by now with no actual start.` })
-  for (const c of watch.contract.filter(x => x.active)) alerts.push({ level: 'act', section: 'contract', text: c.text })
-  for (const f of watch.field) alerts.push({ level: 'act', section: 'field', text: f.text })
+  // The attention list shows one line per item: the fact and its number. The full sentence stays in `text`.
+  const usd = (v: number) => '$' + Math.round(v).toLocaleString('en-US')
+  const contractShort = (c: (typeof watch.contract)[number]): string | undefined =>
+    c.kind === 'damages' && c.perDay ? 'Damages of ' + usd(c.perDay) + ' per day' + (c.exposure ? ': about ' + usd(c.exposure) + ' if they run from the required finish' : '') + '.'
+      : c.kind === 'notice' && c.days ? 'Written notice is due within ' + c.days + ' days of a delay or change.'
+        : undefined
+  for (const c of watch.contract.filter(x => x.active)) alerts.push({ level: 'act', section: 'contract', text: c.text, short: contractShort(c) })
+  for (const f of watch.field) alerts.push({ level: 'act', section: 'field', text: f.text, short: f.activity.code + ' ' + f.activity.name + ': reported ' + f.reported + ' on site, ' + f.schedule + ' in the schedule.' })
   const overdueItems = register.filter(r => r.status === 'open' && r.dueDate && r.dueDate < today)
   if (overdueItems.length) alerts.push({ level: 'act', section: 'register', text: `${n(overdueItems.length, 'register item')} past due: ${overdueItems.slice(0, 2).map(r => r.title).join('; ')}.` })
   const newDelays = signals.filter(x => x.kind === 'delay')

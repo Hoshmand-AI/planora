@@ -178,4 +178,5 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
   return { contract: contract.slice(0, MAX), notInSchedule: notInSchedule.slice(0, MAX), field: field.slice(0, MAX), read: { contract: new Set(contractChunks.map(c => c.documentId)).size, design: new Set(designChunks.map(c => c.documentId)).size, field: new Set(fieldChunks.map(c => c.documentId)).size } }
 }
 
-export interface BriefAlert { level: 'act' | 'watch'; text: string; section: string }
+/** `short` is the one-line form for the attention list (the fact and the number); `text` is the full sentence. */
+export interface BriefAlert { level: 'act' | 'watch'; text: string; section: string; short?: string }
