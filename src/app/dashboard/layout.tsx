@@ -93,7 +93,7 @@ const navActive = (pathname: string, href: string) =>
 
 const STATUS_PILL: Record<string, { label: string; cls: string; dot: string }> = {
   at_risk: { label: 'At risk', cls: 'text-status-at-risk bg-status-at-risk-bg', dot: 'bg-status-at-risk' },
-  attention: { label: 'Needs attention', cls: 'text-status-attention bg-status-attention-bg', dot: 'bg-status-attention' },
+  attention: { label: 'Watch', cls: 'text-status-attention bg-status-attention-bg', dot: 'bg-status-attention' },
   on_track: { label: 'On track', cls: 'text-status-on-track bg-status-on-track-bg', dot: 'bg-status-on-track' },
   complete: { label: 'Complete', cls: 'text-status-on-track bg-status-on-track-bg', dot: 'bg-status-on-track' },
   no_baseline: { label: 'No baseline yet', cls: 'text-warm-700 bg-warm-100', dot: 'bg-warm-400' },

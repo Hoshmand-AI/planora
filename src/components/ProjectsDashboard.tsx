@@ -25,7 +25,7 @@ type Col = 'name' | 'status' | 'finish' | 'variance' | 'dataDate' | 'start' | 'p
 
 const STATUS: Record<PortfolioRow['status'], { label: string; cls: string; dot: string }> = {
   at_risk: { label: 'At risk', cls: 'text-status-at-risk bg-status-at-risk-bg', dot: 'bg-status-at-risk' },
-  attention: { label: 'Needs attention', cls: 'text-status-attention bg-status-attention-bg', dot: 'bg-status-attention' },
+  attention: { label: 'Watch', cls: 'text-status-attention bg-status-attention-bg', dot: 'bg-status-attention' },
   on_track: { label: 'On track', cls: 'text-status-on-track bg-status-on-track-bg', dot: 'bg-status-on-track' },
   no_baseline: { label: 'No baseline yet', cls: 'text-warm-700 bg-warm-100', dot: 'bg-warm-400' },
   not_started: { label: 'Draft', cls: 'text-warm-700 bg-warm-100', dot: 'bg-warm-400' },
@@ -207,7 +207,7 @@ export function ProjectsDashboard() {
   const FILTERS: { id: Filter; label: string; tone: string; icon: LucideIcon }[] = [
     { id: 'all', label: 'All projects', tone: 'text-navy-950', icon: Folder },
     { id: 'at_risk', label: 'At risk', tone: 'text-status-at-risk', icon: TriangleAlert },
-    { id: 'attention', label: 'Needs attention', tone: 'text-status-attention', icon: ShieldAlert },
+    { id: 'attention', label: 'Watch', tone: 'text-status-attention', icon: ShieldAlert },
     { id: 'stale', label: 'Needs an update', tone: 'text-status-attention', icon: Clock },
     { id: 'on_track', label: 'On track', tone: 'text-status-on-track', icon: TrendingUp },
   ]

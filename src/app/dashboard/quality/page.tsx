@@ -103,7 +103,7 @@ export default function QualityPage() {
   }
   if (tab === 'standards') {
     return (
-      <div className="px-4 md:px-6 pt-4 pb-8 space-y-5">
+      <div className="max-w-6xl mx-auto px-5 md:px-8 pt-4 pb-8 space-y-5">
         <QualityTabs tab={tab} onChange={setTab} />
         <div role="tabpanel" id="quality-panel-standards" aria-labelledby="quality-tab-standards">
           <StandardsPanel key={selectedSchedule.id} endpoint={`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/standards`} canRecord={can('schedule.write')} />
@@ -144,7 +144,7 @@ export default function QualityPage() {
   const grade = gradeOf(data.dcma, open.length)
   const importNotes = data.schedule.warnings.length + (data.schedule.importExceptions ? 1 : 0)
   return (
-    <div id="quality-panel-checks" className="px-4 md:px-6 pb-8">
+    <div id="quality-panel-checks" className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
       <div className="pt-4"><QualityTabs tab={tab} onChange={setTab} /></div>
       {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
 
@@ -348,7 +348,7 @@ function gradeOf(dcma: DcmaReport, openQuestions: number): { mood: RobotMood; sh
 function EmptyState<S extends { id: string; name: string }>({ schedules, onPick, canUpload, onUpload }: { schedules: S[]; onPick: (s: S) => void; canUpload: boolean; onUpload: () => void }) {
   const latest = schedules[0]
   return (
-    <div className="px-4 md:px-6 py-12 flex justify-center">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-12 flex justify-center">
       <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
         <Robot mood="idle" size={80} className="mx-auto" />
         <h2 className="tab-title mt-3">Schedule quality</h2>
