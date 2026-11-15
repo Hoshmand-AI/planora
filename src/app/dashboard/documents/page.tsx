@@ -163,7 +163,7 @@ export default function DocumentsPage() {
           Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {hasDocs && can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</button>}
+        {hasDocs && can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
@@ -179,7 +179,7 @@ export default function DocumentsPage() {
         <div className={hasDocs ? `${digitsFont.variable} font-sans fixed inset-0 z-50 overflow-y-auto bg-navy-950/45 p-3 md:p-8 flex justify-center items-start` : ''} onMouseDown={e => { if (hasDocs && e.target === e.currentTarget) setAdding(false) }}>
         <div id="upload-documents" role={hasDocs ? 'dialog' : undefined} aria-modal={hasDocs ? true : undefined} aria-labelledby={hasDocs ? 'add-h' : undefined}
           className={hasDocs ? 'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(6_20_27/0.45)]' : 'space-y-5 scroll-mt-4'}>
-          {hasDocs && <button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-full text-navy-950 hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
+          {hasDocs && <button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-navy-950 hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
           {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
           {hasDocs && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">

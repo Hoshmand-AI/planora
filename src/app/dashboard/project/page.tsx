@@ -6,7 +6,7 @@ import { FinishHero } from '@/components/FinishHero'
 import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates } from '@/lib/format'
-import type { NearTermOutlook, NearTermRow } from '@/lib/analysis/near-term'
+import type { NearTermOutlook } from '@/lib/analysis/near-term'
 import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
 import { EmptyState } from '@/components/EmptyState'
@@ -186,19 +186,15 @@ export default function ProjectPage() {
       {/* Two-column data section */}
       <div className="grid md:grid-cols-2 gap-5">
 
+        {/* What is under way and what starts next is Today's job; the Overview only points there, so the two pages do not repeat each other. */}
         {nearTerm && (nearTerm.inProgress.length > 0 || nearTerm.starting.length > 0) && (
-          <section aria-labelledby="near-term-h">
-            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-1">Near-term outlook</h2>
-            <p className="text-[12px] text-warm-500 mb-3">
-              {nearTerm.basis === 'data_date' ? 'Data date' : 'Today'} {fmtDate(nearTerm.windowStart)} to {fmtDate(nearTerm.windowEnd)} (14 days). Durations are remaining work days.
-            </p>
-            {nearTerm.inProgress.length > 0 && (
-              <NearTermList title={`In progress (${nearTerm.inProgressCount})`} rows={nearTerm.inProgress.slice(0, 6)} inProgress />
-            )}
-            {nearTerm.inProgressCount > 6 && nearTerm.inProgress.length > 0 && <p className="-mt-1 mb-3 text-[12.5px] text-warm-600">and {nearTerm.inProgressCount - 6} more in progress; the Schedule tab lists them all.</p>}
-            {nearTerm.starting.length > 0 && (
-              <NearTermList title={`Due to start by ${fmtDate(nearTerm.windowEnd)} (${nearTerm.startingCount})`} rows={nearTerm.starting.slice(0, 8)} />
-            )}
+          <section aria-labelledby="near-term-h" className="rounded-2xl border border-warm-200 bg-white p-5 h-fit">
+            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-2">Next 14 days</h2>
+            <dl className="grid grid-cols-2 gap-3">
+              <div><dt className="text-[12.5px] text-warm-600">In progress</dt><dd className="text-[22px] font-semibold tabular-nums text-navy-950">{nearTerm.inProgressCount}</dd></div>
+              <div><dt className="text-[12.5px] text-warm-600">Due to start by {fmtDate(nearTerm.windowEnd)}</dt><dd className="text-[22px] font-semibold tabular-nums text-navy-950">{nearTerm.startingCount}</dd></div>
+            </dl>
+            <Link href={`/dashboard/today?schedule=${selectedSchedule.id}`} className="mt-3 inline-flex items-center gap-0.5 text-[13px] font-semibold text-accent-600 hover:underline">See them on Today<span aria-hidden="true">›</span></Link>
           </section>
         )}
 
@@ -307,38 +303,6 @@ function EditedTag() {
 }
 
 /* ─── Near-term list ─────────────────────────────── */
-function NearTermList({ title, rows, inProgress = false }: { title: string; rows: NearTermRow[]; inProgress?: boolean }) {
-  return (
-    <div className="mb-3">
-      <h3 className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{title}</h3>
-      <ul className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
-        {rows.map((task, i) => (
-          <li key={task.activityId + i} className={`flex items-center justify-between px-4 py-3 ${i < rows.length - 1 ? 'border-b border-warm-200' : ''}`}>
-            <div className="min-w-0 pr-3">
-              <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}</div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[12px] text-warm-500">
-                  {inProgress
-                    ? `Started ${fmtDate(task.actualStart || task.earlyStart)} · finishes ${fmtDate(task.earlyFinish)}`
-                    : task.startOverdue
-                    ? `Should have started ${fmtDate(task.earlyStart)} (not started)`
-                    : `Starts ${fmtDate(task.earlyStart)}`}
-                </span>
-                {task.isCritical && (
-                  <span className="text-[12px] font-semibold text-status-at-risk bg-status-at-risk-bg px-2 py-0.5 rounded-full">
-                    Critical
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-[13px] font-semibold text-navy-950 tabular-nums flex-shrink-0" title="Remaining duration (work days)">{task.remainingDuration}d of work left</div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 /** The baseline header and the variance basis, without repeating the reason both carry or doubling a period. */
 function varianceNote(header: string, basis: string) {
   const h = header ? header.replace(/\.?$/, '.') : ''

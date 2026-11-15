@@ -64,7 +64,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
         <div className="mt-6">
           <div className="relative h-2.5 rounded-full bg-navy-800" aria-hidden="true">
             {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
-            {late && <div className="absolute inset-y-0 rounded-r-full" style={{ left: `${at(target!.date)}%`, right: `${100 - at(forecast!)}%`, background: '#A64848' }} />}
+            {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(forecast!)}%`, background: '#A64848' }} />}
             {dd && <Tick left={at(dd)} color="#FFFFFF" />}
             {target && <Tick left={at(target.date)} color={TARGET} />}
             {forecast && <Tick left={at(forecast)} color={FORECAST} />}

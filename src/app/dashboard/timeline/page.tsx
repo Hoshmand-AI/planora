@@ -164,7 +164,7 @@ export default function TimelinePage() {
             {impact.finishMovedDays ? `, and the finish is ${Math.abs(impact.finishMovedDays)} day${Math.abs(impact.finishMovedDays) === 1 ? '' : 's'} ${impact.finishMovedDays > 0 ? 'later' : 'earlier'}` : impact.finishMovedDays === 0 ? ', and the finish does not move' : ''}.
             {' '}{impact.changed.length + impact.movedCount === 1 ? 'It is marked below until the change is' : 'They are marked below until the changes are'} {impact.windowDays} days old. The bars show the schedule as submitted; a mark such as +5d is the move with the edits.</p>
           <ul className="mt-1.5 space-y-0.5 text-[12.5px]">{impact.changed.slice(0, 4).map(c => <li key={c.id}>{fmtDates(c.what)}: {fmtDates(c.before)} → {fmtDates(c.after)}</li>)}</ul>
-          <button type="button" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(v => !v)} className="mt-2 pressable rounded-full border border-navy-900 bg-white px-3 py-1 text-[12.5px] font-semibold text-navy-950">{onlyChanged ? 'Show all activities' : 'Show only changed and moved'}</button>
+          <button type="button" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(v => !v)} className="mt-2 pressable rounded-lg border border-navy-900 bg-white px-3 py-1 text-[12.5px] font-semibold text-navy-950">{onlyChanged ? 'Show all activities' : 'Show only changed and moved'}</button>
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -181,19 +181,19 @@ export default function TimelinePage() {
           className={`pressable ml-auto hidden xl:inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${cols ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
           {cols && <Check size={14} aria-hidden="true" />}Dates and float
         </button>
-        <div role="group" aria-label="Zoom the timeline" className="ml-auto xl:ml-0 hidden md:flex items-center rounded-full border border-warm-300 bg-white">
+        <div role="group" aria-label="Zoom the timeline" className="ml-auto xl:ml-0 hidden md:flex items-center rounded-lg border border-warm-300 bg-white">
           <button type="button" onClick={() => setZoom(ZOOMS[zi - 1])} disabled={zi <= 0} aria-label="Zoom out"
-            className="pressable grid place-items-center w-9 h-9 rounded-l-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Minus size={15} aria-hidden /></button>
+            className="pressable grid place-items-center w-9 h-9 rounded-l-lg text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Minus size={15} aria-hidden /></button>
           <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} title="Fit the whole schedule"
             className="px-2 h-9 text-[12.5px] font-semibold tabular-nums text-warm-700 hover:text-navy-950 disabled:hover:text-warm-700 border-x border-warm-200">{zoom === 1 ? <><span className="sr-only">Whole schedule shown, zoom </span>1×</> : <><span className="sr-only">Zoomed {zoom}×. </span>Fit</>}</button>
           <button type="button" onClick={() => setZoom(ZOOMS[zi + 1])} disabled={zi >= ZOOMS.length - 1} aria-label="Zoom in"
-            className="pressable grid place-items-center w-9 h-9 rounded-r-full text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Plus size={15} aria-hidden /></button>
+            className="pressable grid place-items-center w-9 h-9 rounded-r-lg text-navy-950 hover:bg-warm-100 disabled:text-warm-300 disabled:hover:bg-transparent"><Plus size={15} aria-hidden /></button>
         </div>
         <label className="relative w-full sm:w-64">
           <span className="sr-only">Find an activity</span>
           <Search size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an activity"
-            className="w-full rounded-md border border-warm-300 bg-white pl-9 pr-3 py-1.5 text-[13.5px] text-warm-700 placeholder:text-warm-500" />
+            className="w-full rounded-lg border border-warm-300 bg-white pl-9 pr-3 py-1.5 text-[13.5px] text-warm-700 placeholder:text-warm-500" />
         </label>
       </div>
 
