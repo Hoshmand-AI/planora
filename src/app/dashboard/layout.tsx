@@ -149,8 +149,8 @@ function Dialog({ labelledBy, onClose, className, children }: { labelledBy: stri
     else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus() }
   }
   return (
-    <div className="fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onKeyDown={onKeyDown} className={`${className} focus:outline-none`}>
+    <div className="scrim-in fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onKeyDown={onKeyDown} className={`${className} dialog-in focus:outline-none`}>
         {children}
       </div>
     </div>

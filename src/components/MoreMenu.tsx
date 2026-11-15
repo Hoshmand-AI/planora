@@ -50,7 +50,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
       </button>
       {open && (
         <div id={id} role="menu" aria-label={label} onKeyDown={move}
-          className="absolute right-0 top-full mt-2 z-30 min-w-[220px] rounded-xl border border-warm-200 bg-white p-1.5 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_18px_40px_-18px_rgb(6_20_27/0.35)]">
+          className="menu-in absolute right-0 top-full mt-2 z-30 min-w-[220px] rounded-xl border border-warm-200 bg-white p-1.5 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_18px_40px_-18px_rgb(6_20_27/0.35)]">
           {items.map(it => (
             <button key={it.label} type="button" role="menuitem" onClick={() => { setOpen(false); it.onSelect() }}
               className={`w-full flex items-center gap-2.5 rounded-lg px-3 min-h-[44px] text-left text-[14px] font-medium hover:bg-warm-100 ${it.danger ? 'text-status-at-risk' : 'text-navy-950'} ${it.className ?? ''}`}>
