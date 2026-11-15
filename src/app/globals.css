@@ -191,6 +191,20 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 
 /* Frosted app bar: the page scrolls softly beneath it */
 .glass-bar { background: rgb(17 33 45 / 0.86); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); }
+/* People who ask for less transparency or more contrast get a solid bar */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .glass-bar { background: var(--navy-950); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* A menu grows out of the button that opened it; a dialog arrives over a dimmed page (a sheet from the bottom edge on a phone) */
+@keyframes menu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.menu-in { transform-origin: top right; animation: menu-in 140ms var(--ease-out) both; }
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+.scrim-in { animation: scrim-in 180ms ease-out both; }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes dialog-in { from { transform: scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.dialog-in { animation: sheet-in 260ms var(--ease-out) both; }
+@media (min-width: 768px) { .dialog-in { animation: dialog-in 200ms var(--ease-out) both; } }
 
 /* Active tab marker slides in rather than snapping */
 .tab-mark { position: relative; }
