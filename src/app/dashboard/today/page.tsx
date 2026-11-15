@@ -42,7 +42,7 @@ const CARD_PART: Record<string, Part> = { today: 'now', overdue: 'now', since: '
 const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: 'Overdue', contract: 'Contract', field: 'Field report', register: 'Register', signals: 'Reported delays', documents: 'Scope', today: 'Today', lookahead: 'Coming up' }
 const PM_ONLY = new Set(['contract', 'signals', 'register', 'driving', 'whatif', 'risks', 'issues', 'changed', 'missing', 'logic'])
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
-const input = 'border border-warm-300 rounded-md px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
+const input = 'border border-warm-300 rounded-lg px-2.5 py-1.5 bg-white text-[13px] text-warm-700'
 const btn = buttonClass.secondary
 const btnPrimary = buttonClass.primary
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }

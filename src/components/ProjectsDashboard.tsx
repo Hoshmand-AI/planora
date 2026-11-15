@@ -156,7 +156,7 @@ export function ProjectsDashboard() {
         <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
-      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-full bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold shadow-sm">
+      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold shadow-sm">
         <Plus size={15} aria-hidden /> New project
       </Link>
     </div>
@@ -272,7 +272,7 @@ export function ProjectsDashboard() {
             <option value="name">Name</option>
           </select>
         </div>
-        <div role="group" aria-label="View" className="hidden md:inline-flex rounded-full border border-warm-300 bg-white p-0.5">
+        <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-navy-950'}`}>
@@ -461,7 +461,7 @@ function DataLocationPicker({ loc }: { loc: DataLocation }) {
               <div><dt className="font-semibold text-navy-950">Stored in</dt><dd className="text-warm-700">{loc.database}</dd></div>
               <div><dt className="font-semibold text-navy-950">Document search</dt><dd className="text-warm-700">{loc.documentSearch}</dd></div>
             </dl>
-            <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-accent-700">
+            <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-accent-700">
               Connect AWS, Azure or Google Cloud
             </Link>
             <p className="mt-2 text-[12px] text-warm-600">Keep schedule files and originals in your own cloud storage. Organization admins set this up.</p>

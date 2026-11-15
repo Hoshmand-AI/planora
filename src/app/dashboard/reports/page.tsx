@@ -152,7 +152,7 @@ export default function ReportsPage() {
               <div className="text-[14px] font-semibold text-navy-950 mb-1">{rt.title}</div>
               <div className="text-[13px] text-warm-600 leading-relaxed">{rt.desc}</div>
             </div>
-            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-full border border-warm-300 bg-white group-hover:bg-warm-100 text-navy-950 text-[13px] font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
+            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-lg border border-warm-300 bg-white group-hover:bg-warm-100 text-navy-950 text-[13px] font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
           </button>
         ))}
       </div>

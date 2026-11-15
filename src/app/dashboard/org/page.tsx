@@ -398,7 +398,7 @@ export default function OrgPage() {
           {note('audit')}
           <div className="flex flex-wrap gap-2 items-end mb-3">
             <Field label="Filter">{p => (
-              <select {...p} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
+              <select {...p} className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px]" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
                 <option value="">All activity</option><option value="auth.">Sign-ins</option><option value="plan.">Plans</option><option value="schedule.">Schedules</option>
                 <option value="member.">Members</option><option value="org.">Organization</option><option value="scim.">Provisioning (SCIM)</option><option value="workspace.">Workspaces</option><option value="ai.">AI requests</option><option value="privacy.">Privacy</option>
               </select>
@@ -411,7 +411,7 @@ export default function OrgPage() {
                 else setVerify(d)
               } catch { setVerifyErr('The check could not run (network error). This says nothing about the records.') } finally { setBusy(null) }
             }}>{busy === 'verify' ? 'Verifying…' : 'Verify integrity'}</Button>
-            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-full text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
+            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-lg text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
           </div>
           {verifyErr && <div className="mb-3"><Alert tone="warning">{verifyErr}</Alert></div>}
           {verify && (

@@ -54,7 +54,7 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
       {error && <div className="space-y-2"><Alert tone="error">{error} The figures below are the last ones that loaded.</Alert>{retry}</div>}
       <div className="flex flex-wrap items-center gap-4 text-[13px] text-warm-700">
         <label className="flex items-center gap-2">Period
-          <select value={bucket} onChange={e => setBucket(e.target.value as HistogramBucket)} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-1">
+          <select value={bucket} onChange={e => setBucket(e.target.value as HistogramBucket)} className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-1">
             <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
           </select>
         </label>
@@ -276,7 +276,7 @@ function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSum
       <Hint className="mb-2">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact. Nothing is saved.</Hint>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[12px] text-warm-700">Resource
-          <select value={rid} onChange={e => setRid(e.target.value)} className="block bg-warm-100 border border-warm-300 rounded-md px-2 py-1.5 text-[13px]">
+          <select value={rid} onChange={e => setRid(e.target.value)} className="block bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[13px]">
             {limited.map(x => <option key={x.id} value={x.id}>{x.code} — {x.name}</option>)}
           </select>
         </label>

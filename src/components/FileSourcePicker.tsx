@@ -62,7 +62,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
   const exts = accept.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
   const importable = (key: string) => !exts.length || exts.some(x => key.toLowerCase().endsWith(x))
   const crumbs = listing ? listing.prefix.slice(listing.base.length).split('/').filter(Boolean) : []
-  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-md px-3 py-2 text-[13.5px] text-warm-700'
+  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-lg px-3 py-2 text-[13.5px] text-warm-700'
 
   return (
     <div className="space-y-4">
@@ -82,7 +82,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
       {from === 'computer' ? (
         <div>
           <input type="file" name="file" accept={accept} required aria-label="File"
-            className={`${fieldClass} file:mr-3 file:bg-accent-600 hover:bg-accent-700 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1.5 file:text-[13px] file:font-semibold file:cursor-pointer`} />
+            className={`${fieldClass} file:mr-3 file:bg-accent-600 hover:bg-accent-700 file:text-white file:border-0 file:rounded-lg file:px-4 file:py-1.5 file:text-[13px] file:font-semibold file:cursor-pointer`} />
           {hint && <p className="text-[12px] text-warm-600 mt-1.5">{hint}</p>}
         </div>
       ) : (

@@ -44,7 +44,7 @@ export function Workspaces({ members }: { members: Member[] }) {
   }
 
   if (!data) return loadErr ? (
-    <Section title="Workspaces (ethical walls)">
+    <Section title="Workspaces">
       <div className="space-y-2"><Alert tone="error">Could not load workspaces. Check your connection and try again.</Alert><Button variant="secondary" onClick={load}>Try again</Button></div>
     </Section>
   ) : null
@@ -53,15 +53,15 @@ export function Workspaces({ members }: { members: Member[] }) {
   const selectClass = 'bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px] text-warm-700'
 
   return (
-    <Section title="Workspaces (ethical walls)" description="Group schedules and plans by client matter or engagement. A walled workspace is visible only to its members; a member limited to their workspaces sees nothing else. Owners and admins always see everything. Changes take effect on the member's next request and are recorded in the audit log.">
+    <Section title="Workspaces" description="Group schedules and plans by client, business unit or project. A restricted workspace is visible only to its members; a member limited to their workspaces sees nothing else. Owners and admins always see everything. Changes take effect on the member's next request and are recorded in the audit log.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
 
       <form className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end mb-4" onSubmit={async e => {
         e.preventDefault()
         if (await act('create', { action: 'create', ...draft }, `Workspace "${draft.name.trim()}" created.`)) setDraft({ name: '', walled: true })
       }}>
-        <Field label="New workspace name" hint="For example the client or matter number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
-        <label className="flex items-center gap-2 text-[13px] text-warm-700 pb-2"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Walled</label>
+        <Field label="New workspace name" hint="For example the client or the project number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
+        <label className="flex items-center gap-2 text-[13px] text-warm-700 pb-2"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
         <Button type="submit" disabled={busy === 'create'}>Create workspace</Button>
       </form>
 
@@ -73,10 +73,10 @@ export function Workspaces({ members }: { members: Member[] }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="font-medium text-navy-950 text-[14px]">{w.name}</span>
-                <span className="text-[12px] text-warm-600"> · {w.walled ? 'Walled: members only' : 'Open to the organization'} · {w.scheduleCount} schedule(s), {w.planCount} plan(s)</span>
+                <span className="text-[12px] text-warm-600"> · {w.walled ? 'Restricted: members only' : 'Open to the organization'} · {w.scheduleCount} schedule(s), {w.planCount} plan(s)</span>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" disabled={busy === w.id} onClick={() => act(w.id, { action: 'update', workspaceId: w.id, walled: !w.walled }, w.walled ? `${w.name} is now open to the organization.` : `${w.name} is now walled.`)}>{w.walled ? 'Open' : 'Wall off'}</Button>
+                <Button variant="ghost" disabled={busy === w.id} onClick={() => act(w.id, { action: 'update', workspaceId: w.id, walled: !w.walled }, w.walled ? `${w.name} is now open to the organization.` : `${w.name} is now restricted to its members.`)}>{w.walled ? 'Open' : 'Restrict'}</Button>
                 <Button variant="ghost" className="text-status-at-risk" disabled={busy === w.id} onClick={async () => {
                   if (!confirm(`Delete the workspace "${w.name}"? It must be empty.`)) return
                   await act(w.id, { action: 'delete', workspaceId: w.id }, `${w.name} deleted.`)

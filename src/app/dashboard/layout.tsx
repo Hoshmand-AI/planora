@@ -368,7 +368,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div role="alert" className="max-w-sm text-center">
             <p className="text-[15px] text-navy-950 font-semibold">RunF9 could not load.</p>
             <p className="text-[14px] text-warm-600 mt-1">Check your connection and try again.</p>
-            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-full text-[13px] font-semibold hover:bg-accent-700">Try again</button>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-lg text-[13px] font-semibold hover:bg-accent-700">Try again</button>
           </div>
         ) : (
           <div className="text-warm-600 text-[14px]">Loading…</div>
@@ -504,7 +504,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {owns && (
-                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-full border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13px] font-semibold hover:bg-warm-100">
+                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13px] font-semibold hover:bg-warm-100">
                               <Upload size={14} aria-hidden="true" /> Upload update
                             </button>
                           )}
@@ -630,9 +630,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
                   <div className="flex gap-2">
                     {uploadSummary.dataQuestions > 0 && (
-                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-full text-[13px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
+                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-lg text-[13px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     )}
-                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-full text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
+                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-lg text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
                   </div>
                 </div>
               ) : (
@@ -644,26 +644,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="mb-4">
                   <div id="upload-tag-h" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
                   <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
-                    <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                    <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
                       <option value="">Facility type…</option>
                       {PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                     </select>
-                    <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700 uppercase" />
-                    <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700" />
+                    <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 uppercase" />
+                    <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700" />
                   </div>
                   <p className="text-[12px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
                 </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4 grid grid-cols-2 gap-2">
                   <label className="block text-[12px] text-warm-600">Whose schedule
-                    <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                    <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
                       <option value="">Not stated</option>
                       <option value="own">Our own project</option>
                       <option value="third_party">Third-party (we review it)</option>
                     </select>
                   </label>
                   <label className="block text-[12px] text-warm-600">Classification
-                    <select name="classification" defaultValue="unclassified" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-md px-2 py-2 text-[13px] text-warm-700">
+                    <select name="classification" defaultValue="unclassified" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
                       <option value="unclassified">Unclassified</option>
                       <option value="cui">CUI</option>
                       <option value="classified">Classified</option>
@@ -745,15 +745,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <UserCog size={14} aria-hidden="true" /> Account &amp; security
                   </Link>
-                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <Building2 size={14} aria-hidden="true" /> Organization
                   </Link>
                 </div>
                 {platformAdmin && (
-                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
                   </Link>
                 )}
