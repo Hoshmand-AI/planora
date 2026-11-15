@@ -19,6 +19,13 @@ export interface MoreMenuItem {
 
 export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[] }) {
   const [open, setOpen] = useState(false)
+  // The list stays for a moment after closing so it can shrink back into the button.
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (open) { setShown(true); return }
+    const t = setTimeout(() => setShown(false), 110)
+    return () => clearTimeout(t)
+  }, [open])
   const wrap = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -48,9 +55,9 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         className="pressable inline-flex items-center justify-center w-9 h-9 rounded-lg border border-warm-300 bg-white text-navy-950 hover:bg-warm-100">
         <MoreHorizontal size={18} aria-hidden="true" />
       </button>
-      {open && (
+      {(open || shown) && (
         <div id={id} role="menu" aria-label={label} onKeyDown={move}
-          className="menu-in absolute right-0 top-full mt-2 z-30 min-w-[220px] rounded-xl border border-warm-200 bg-white p-1.5 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_18px_40px_-18px_rgb(6_20_27/0.35)]">
+          className={`${open ? 'menu-in' : 'menu-out'} absolute right-0 top-full mt-2 z-30 min-w-[220px] rounded-xl border border-warm-200 bg-white p-1.5 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_18px_40px_-18px_rgb(6_20_27/0.35)]`}>
           {items.map(it => (
             <button key={it.label} type="button" role="menuitem" onClick={() => { setOpen(false); it.onSelect() }}
               className={`w-full flex items-center gap-2.5 rounded-lg px-3 min-h-[44px] text-left text-[14px] font-medium hover:bg-warm-100 ${it.danger ? 'text-status-at-risk' : 'text-navy-950'} ${it.className ?? ''}`}>
