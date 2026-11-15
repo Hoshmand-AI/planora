@@ -131,9 +131,28 @@ function ScheduleDeepLink({ schedules, loaded, select, onMissing }: { schedules:
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/** A modal dialog: named by its heading, takes focus when it opens, keeps Tab inside, closes on Escape and gives focus back. */
-function Dialog({ labelledBy, onClose, className, children }: { labelledBy: string; onClose: () => void; className: string; children: React.ReactNode }) {
+/** Keeps something on screen for a moment after it closes, so it can leave the way it came. */
+function usePresence(open: boolean, ms = 200) {
+  const [mounted, setMounted] = useState(open)
+  useEffect(() => {
+    if (open) { setMounted(true); return }
+    const t = setTimeout(() => setMounted(false), ms)
+    return () => clearTimeout(t)
+  }, [open, ms])
+  return { mounted: open || mounted, closing: !open && mounted }
+}
+
+/** Where a flick would come to rest: the same decay a scroll view uses. */
+const projectFlick = (velocity: number, rate = 0.998) => (velocity / 1000) * rate / (1 - rate)
+
+/**
+ * A modal dialog: named by its heading, takes focus when it opens, keeps Tab inside, closes on Escape and gives focus back.
+ * It leaves the way it arrived. On a phone it is a sheet: drag the bar at its top down and it follows the finger,
+ * then closes or springs back depending on where the flick was heading.
+ */
+function Dialog({ labelledBy, onClose, className, closing = false, children }: { labelledBy: string; onClose: () => void; className: string; closing?: boolean; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ id: number; startY: number; samples: { y: number; t: number }[] } | null>(null)
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null
     ref.current?.focus()
@@ -148,9 +167,38 @@ function Dialog({ labelledBy, onClose, className, children }: { labelledBy: stri
     if (e.shiftKey && (at === first || at === ref.current)) { e.preventDefault(); last.focus() }
     else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus() }
   }
+  const onHandleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (closing || !ref.current) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { id: e.pointerId, startY: e.clientY, samples: [{ y: e.clientY, t: e.timeStamp }] }
+    ref.current.style.transition = 'none'
+  }
+  const onHandleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current, el = ref.current
+    if (!d || !el || e.pointerId !== d.id) return
+    d.samples.push({ y: e.clientY, t: e.timeStamp })
+    if (d.samples.length > 5) d.samples.shift()
+    const dy = e.clientY - d.startY
+    // Down follows the finger; up resists more the further it is pulled, since there is nothing above.
+    const y = dy >= 0 ? dy : -(Math.abs(dy) * 0.55 * 80) / (80 + 0.55 * Math.abs(dy))
+    el.style.transform = `translateY(${y}px)`
+  }
+  const onHandleUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current, el = ref.current
+    if (!d || !el || e.pointerId !== d.id) return
+    drag.current = null
+    const a = d.samples[0], b = d.samples[d.samples.length - 1]
+    const velocity = b.t > a.t ? ((b.y - a.y) / (b.t - a.t)) * 1000 : 0
+    const dy = e.clientY - d.startY
+    if (e.type === 'pointerup' && dy + projectFlick(velocity) > el.offsetHeight * 0.45) { onClose(); return }
+    el.style.transition = 'transform 320ms var(--ease-out)'
+    el.style.transform = ''
+  }
   return (
-    <div className="scrim-in fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onKeyDown={onKeyDown} className={`${className} dialog-in focus:outline-none`}>
+    <div className={`${closing ? 'scrim-out pointer-events-none' : 'scrim-in'} fixed inset-0 bg-black/55 z-50 flex items-end md:items-center justify-center p-0 md:p-4`}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onKeyDown={onKeyDown} className={`${className} ${closing ? 'dialog-out' : 'dialog-in'} relative focus:outline-none`}>
+        <div aria-hidden="true" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}
+          className="md:hidden absolute inset-x-0 top-0 h-11 touch-none cursor-grab" />
         {children}
       </div>
     </div>
@@ -175,6 +223,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showUpload,       setShowUpload]       = useState(false)
   const [showScheduleList, setShowScheduleList] = useState(false)
   const [showSettings,     setShowSettings]     = useState(false)
+  const uploadDialog = usePresence(showUpload), listDialog = usePresence(showScheduleList), settingsDialog = usePresence(showSettings)
   const [uploading,        setUploading]        = useState(false)
   const [uploadError,      setUploadError]      = useState('')
   const [uploadSummary,    setUploadSummary]    = useState<{ activitiesImported: number; relationshipsImported: number; calendarsImported: number; classifiedPct: number; dataQuestions: number; warnings: string[]; importExceptions?: ExceptionReport | null } | null>(null)
@@ -596,8 +645,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* ── Upload Modal ──────────────────────────────────────── */}
-        {showUpload && (
-          <Dialog labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+        {uploadDialog.mounted && (
+          <Dialog closing={uploadDialog.closing} labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
                 <h2 id="upload-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Upload a schedule</h2>
                 <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
@@ -686,8 +735,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* ── Schedule List Modal ───────────────────────────────── */}
-        {showScheduleList && (
-          <Dialog labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
+        {listDialog.mounted && (
+          <Dialog closing={listDialog.closing} labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
                 <h2 id="switch-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Switch project</h2>
@@ -727,8 +776,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* ── Settings Modal ────────────────────────────────────── */}
-        {showSettings && (
-          <Dialog labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+        {settingsDialog.mounted && (
+          <Dialog closing={settingsDialog.closing} labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
                 <h2 id="account-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Account</h2>

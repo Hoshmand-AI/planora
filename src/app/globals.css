@@ -203,8 +203,18 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 .scrim-in { animation: scrim-in 180ms ease-out both; }
 @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes dialog-in { from { transform: scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
-.dialog-in { animation: sheet-in 260ms var(--ease-out) both; }
-@media (min-width: 768px) { .dialog-in { animation: dialog-in 200ms var(--ease-out) both; } }
+/* Not held after it ends, so a drag can move the sheet afterwards */
+.dialog-in { animation: sheet-in 260ms var(--ease-out) backwards; }
+@media (min-width: 768px) { .dialog-in { animation: dialog-in 200ms var(--ease-out) backwards; } }
+/* They leave the way they came. With no `from`, the sheet leaves from wherever a drag left it. */
+@keyframes menu-out { to { opacity: 0; transform: scale(0.96); } }
+.menu-out { transform-origin: top right; animation: menu-out 110ms ease-in both; pointer-events: none; }
+@keyframes scrim-out { to { opacity: 0; } }
+.scrim-out { animation: scrim-out 200ms ease-in both; }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+@keyframes dialog-out { to { transform: scale(0.97); opacity: 0; } }
+.dialog-out { animation: sheet-out 200ms cubic-bezier(0.64, 0, 0.78, 0) both; }
+@media (min-width: 768px) { .dialog-out { animation: dialog-out 160ms ease-in both; } }
 
 /* Active tab marker slides in rather than snapping */
 .tab-mark { position: relative; }
