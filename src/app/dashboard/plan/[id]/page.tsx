@@ -509,7 +509,7 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         {(['all', 'critical', 'low', 'overridden'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${filter === f ? 'bg-navy-900 text-white' : 'bg-warm-100 border border-warm-200 text-warm-600'}`}>
+          <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors ${filter === f ? 'bg-navy-900 text-white' : 'bg-warm-100 border border-warm-200 text-warm-600'}`}>
             {f === 'all' ? 'All' : f === 'critical' ? 'Critical path' : f === 'low' ? 'Low confidence' : 'Overridden'}
           </button>
         ))}
@@ -583,7 +583,7 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
           <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
             if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); setOpen(false) }
      }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-full text-[13px] font-semibold py-1.5">Add</button>
-          <button onClick={() => setOpen(false)} className="px-3 border border-warm-300 rounded-md text-[13px] text-warm-600">Cancel</button>
+          <button onClick={() => setOpen(false)} className="px-3 border border-warm-300 rounded-lg text-[13px] text-warm-600">Cancel</button>
         </div>
       </div>
     </div>
@@ -852,12 +852,12 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         ))}
         {!canReview ? <p className="text-[12.5px] text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-          <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]">
+          <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]">
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
           </select>
-          <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
+          <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
      <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-[13px] font-semibold py-2">Record review</button>
-          <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-xl px-2.5 py-2 text-[13px]" />
+          <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
         </div>
         )}
       </section>

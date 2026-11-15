@@ -261,7 +261,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
         )}
         {q.kind === 'choice' && !choices && (
           <div className="flex flex-wrap gap-2">
-            <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-xl border border-warm-300 bg-warm-50 px-3 py-2.5 text-[15px] text-navy-950">
+            <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-lg border border-warm-300 bg-warm-50 px-3 py-2.5 text-[15px] text-navy-950">
               <option value="">Choose…</option>
               {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
