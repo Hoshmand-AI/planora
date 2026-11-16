@@ -72,7 +72,6 @@ const NAV = [
 ]
 /** Tabs inside one uploaded project, in the order a scheduler works. */
 export const PROJECT_TABS = [
-  { href: '/dashboard/today',       label: 'Today' },
   { href: '/dashboard/project',     label: 'Overview' },
   { href: '/dashboard/timeline',    label: 'Schedule' },
   { href: '/dashboard/quality',     label: 'Quality' },
@@ -339,14 +338,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [selectedSchedule])
 
-  // How many things on the open project need action today (the Today tab carries the count).
+  // How many things on the open project need action today (the Overview tab carries the count).
   const [todayCount, setTodayCount] = useState(0)
-  const onToday = pathname.startsWith('/dashboard/today')
+  const onToday = pathname.startsWith('/dashboard/project')
   useEffect(() => {
     setTodayCount(0)
     if (!selectedSchedule || !user || mfaSetupRequired) return
     let live = true
-    // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Today tab is entered or left.
+    // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Overview tab is entered or left.
     const d = new Date(), asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}`).then(r => (r.ok ? r.json() : null))
       .then(d => { if (live && d) setTodayCount((d.alerts as { level: string }[]).filter(a => a.level === 'act').length) }).catch(() => {})
@@ -588,8 +587,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {t.label}
                         <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
                       </Link>
-                      {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Today". */}
-                      {t.href === '/dashboard/today' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white">{todayCount}</span>}
+                      {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Overview". */}
+                      {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white">{todayCount}</span>}
                       </Fragment>
                     )
                   })}

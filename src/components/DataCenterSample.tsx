@@ -52,7 +52,7 @@ export function DataCenterSampleButton({ className = '' }: { className?: string 
       }
       await refreshSchedules().catch(() => {})
       setSelectedSchedule(data.schedule)
-      router.push(`/dashboard/today?schedule=${encodeURIComponent(id)}`)
+      router.push(`/dashboard/project?schedule=${encodeURIComponent(id)}`)
     } catch { setErr('Network error. Check your connection and try again.') }
     setBusy('')
   }

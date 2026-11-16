@@ -207,10 +207,10 @@ export default function PlanPage() {
       data = await call('publish', `/api/plans/${id}/publish`, { method: 'POST', body: JSON.stringify({ confirm: true }) })
     }
     if (data) {
-      // Make the published schedule the open project, so Today, Overview and the other tabs work at once.
+      // Make the published schedule the open project, so Overview and the other tabs work at once.
       await refreshSchedules().catch(() => {})
       if (data.schedule) { setSelectedSchedule(data.schedule as never); setPublishedId(String((data.schedule as { id: string }).id)) }
-      setNotice('Published. Today, Overview, Quality, Schedule and Ask AI now work on this schedule; it is also the baseline for progress updates.')
+      setNotice('Published. Overview, Quality, Schedule and Ask AI now work on this schedule; it is also the baseline for progress updates.')
     }
   }
   const suggest = async () => {
@@ -339,7 +339,7 @@ export default function PlanPage() {
           You have read-only access to plans{can('plan.review') ? ' (you can record expert reviews on the Evaluation tab)' : ''}. Ask an admin of your organization if you need to make changes.
         </Banner>
       )}
-      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}{publishedId && notice.startsWith('Published') ? <> <Link href={`/dashboard/today?schedule=${publishedId}`} className="font-semibold underline">Open today’s brief</Link></> : null}</Banner>}
+      {notice && <Banner kind="ok" onClose={() => setNotice('')}>{fmtDates(notice)}{publishedId && notice.startsWith('Published') ? <> <Link href={`/dashboard/project?schedule=${publishedId}`} className="font-semibold underline">Open today’s brief</Link></> : null}</Banner>}
       {error && <Banner kind="error" onClose={() => setError('')}>{error}</Banner>}
       {dateAlerts.length > 0 && (
         <Banner kind="warn" onClose={() => setDateAlerts([])}>

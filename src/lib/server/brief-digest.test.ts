@@ -14,13 +14,13 @@ describe('daily brief email', () => {
     expect(t).toContain('- Behind: forecast 08/12/2027.')
     expect(t).toContain('Needs attention today:\n- Written notice is due within 7 days.')
     expect(t).not.toContain('Today: 1 start.') // watch items stay on the page
-    expect(t).toContain('https://app.example/dashboard/today?schedule=s%201')
+    expect(t).toContain('https://app.example/dashboard/project?schedule=s%201')
   })
   it('the client version leaves out the internal action list', () => {
     const t = briefEmailText(out, 'client', '')
     expect(t).toContain('- Forecast 08/12/2027.')
     expect(t).not.toContain('Needs attention today')
-    expect(t).toContain('choose the Today tab')
+    expect(t).toContain('open the project Overview')
   })
   it('nothing is sent at weekends, before the morning hour, or without email set up', async () => {
     const sat = new Date(Date.UTC(2026, 10, 14, DIGEST_HOUR_UTC + 1)), early = new Date(Date.UTC(2026, 10, 10, DIGEST_HOUR_UTC - 1))
