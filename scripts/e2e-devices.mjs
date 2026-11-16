@@ -66,6 +66,8 @@ for (const name of DEVICES) {
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
     const current = await page.getByRole('navigation', { name: 'Project' }).locator('[aria-current="page"]').textContent()
     if (current?.trim() !== tab) fail(name, `tab ${tab} not current (${current})`)
+    // A tab that crashed still has a current tab and fits the screen: it must also show its page, not the error screen.
+    if (await page.getByText('Something went wrong.').isVisible().catch(() => false)) fail(name, `tab ${tab} shows the error screen`)
     await fits(tab)
     if (tab === 'Project records') {
       // Loaded directly (a bookmark, a reload), the current tab must still be scrolled into view on a narrow screen.
@@ -100,6 +102,7 @@ for (const name of DEVICES) {
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
     const current = await page.getByRole('navigation', { name: 'Project' }).locator('[aria-current="page"]').textContent()
     if (current?.trim() !== tab) fail(name, `view ${view} does not keep tab ${tab} current (${current})`)
+    if (await page.getByText('Something went wrong.').isVisible().catch(() => false)) fail(name, `view ${view} of ${tab} shows the error screen`)
     await fits(`${tab} / ${view}`)
   }
   console.log('   ✓ the second view of Gantt chart, Health and Reports opens and keeps its tab current')

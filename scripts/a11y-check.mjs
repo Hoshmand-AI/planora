@@ -68,7 +68,7 @@ const PAGES = [
   ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]'); await page.waitForSelector('text=What is driving the project') }],
   ['Old Today link (lands on Overview)', '/dashboard/today', async () => { await page.getByText('Will we finish on time?').waitFor() }],
   ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
-  ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
+  ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /Show all \d+ checks/ }).click(); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
 ]
 
 let failed = 0

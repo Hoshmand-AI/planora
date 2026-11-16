@@ -41,6 +41,8 @@ export default function QualityPage() {
   const [hideAnswered, setHideAnswered] = useState(true)
   const [tab, setTab] = useState<QualityTab>('checks')
   const [selected, setSelected] = useState<number | null>(null)
+  // The checks grid opens on the ones that need work; the passing and not-applicable ones are one click away.
+  const [allChecks, setAllChecks] = useState(false)
 
   const loadingFor = useRef<string | null>(null)
   const saving = useRef(false)
@@ -142,6 +144,8 @@ export default function QualityPage() {
     requestAnimationFrame(() => document.getElementById('dcma-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
   }
   const grade = gradeOf(data.dcma, open.length)
+  const needWork = data.dcma.checks.filter(c => c.result === 'fail' || c.result === 'warn')
+  const showAllChecks = allChecks || needWork.length === 0
   const importNotes = data.schedule.warnings.length + (data.schedule.importExceptions ? 1 : 0)
   return (
     <div id="quality-panel-checks" className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
@@ -215,11 +219,14 @@ export default function QualityPage() {
         {/* All checks at a glance: failing ones outlined in red; select one for its detail */}
         <section aria-labelledby="dcma-h" className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">All {data.dcma.checks.length} DCMA checks</h2>
+            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">{showAllChecks ? `All ${data.dcma.checks.length} DCMA checks` : `Checks that need work (${needWork.length} of ${data.dcma.checks.length})`}</h2>
             <span className="text-[13px] text-warm-600">select one to see what it found</span>
+            {needWork.length > 0 && needWork.length < data.dcma.checks.length && (
+              <button type="button" aria-expanded={allChecks} onClick={() => setAllChecks(v => !v)} className="ml-auto text-[13px] font-semibold text-accent-600 hover:underline">{allChecks ? 'Show only the ones that need work' : `Show all ${data.dcma.checks.length} checks`}</button>
+            )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-            {data.dcma.checks.map((c, i) => (
+            {data.dcma.checks.filter(c => showAllChecks || needWork.includes(c) || c.id === selected).map((c, i) => (
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
                 className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
