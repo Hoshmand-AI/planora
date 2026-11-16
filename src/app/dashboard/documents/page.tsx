@@ -99,9 +99,9 @@ export default function DocumentsPage() {
   const hasDocs = !!data?.documents.length
   const libraryBlock = (
     <>
-      <Section title="Documents" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
+      <Section title="Records in this project" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
-          : !data.documents.length ? <p className="text-[13px] text-warm-500">No documents yet.{can('schedule.write') ? ' Upload the contract or the scheduling specification to get started.' : ''}</p>
+          : !data.documents.length ? <p className="text-[13px] text-warm-500">No records yet.{can('schedule.write') ? ' Upload the contract or the scheduling specification to get started.' : ''}</p>
           : (
             <ul className="divide-y divide-warm-200">
               {data.documents.map(d => (
@@ -165,7 +165,7 @@ export default function DocumentsPage() {
           Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {hasDocs && can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a document</button>}
+        {can('schedule.write') && data && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
@@ -175,15 +175,14 @@ export default function DocumentsPage() {
       {error && <Alert tone="error">{error}</Alert>}
       <div aria-live="polite">{notice && <Alert tone={notice.tone}>{notice.text}</Alert>}</div>
 
-      {/* A project that already has documents opens on them; the ways to add more follow. An empty one opens on adding. */}
-      {hasDocs && libraryBlock}
-      {can('schedule.write') && data && (!hasDocs || adding) && ((block: React.ReactNode) => (hasDocs ? createPortal(block, document.body) : block))(
-        <div className={hasDocs ? `${digitsFont.variable} font-sans fixed inset-0 z-50 overflow-y-auto bg-navy-950/45 p-3 md:p-8 flex justify-center items-start` : ''} onMouseDown={e => { if (hasDocs && e.target === e.currentTarget) setAdding(false) }}>
-        <div id="upload-documents" role={hasDocs ? 'dialog' : undefined} aria-modal={hasDocs ? true : undefined} aria-labelledby={hasDocs ? 'add-h' : undefined}
-          className={hasDocs ? 'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(6_20_27/0.45)]' : 'space-y-5 scroll-mt-4'}>
-          {hasDocs && <button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-navy-950 hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
+      {/* The page is the list of records; adding one is a dialog over it, whether or not there are any yet. */}
+      {libraryBlock}
+      {can('schedule.write') && data && adding && createPortal(
+        <div className={`${digitsFont.variable} font-sans fixed inset-0 z-50 overflow-y-auto bg-navy-950/45 p-3 md:p-8 flex justify-center items-start`} onMouseDown={e => { if (e.target === e.currentTarget) setAdding(false) }}>
+        <div id="upload-documents" role="dialog" aria-modal="true" aria-labelledby="add-h"
+          className={'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(6_20_27/0.45)]'}>
+          {<button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-navy-950 hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
           {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
-          {hasDocs && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">
               <h2 id="add-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950">Add to this project</h2>
               <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-0 border-b border-warm-200">
@@ -193,18 +192,16 @@ export default function DocumentsPage() {
                 ))}
               </div>
             </div>
-          )}
-          <div hidden={hasDocs && addWay === 'inbox'} className="space-y-5">
-            <UploadForm base={base} data={data} canOrg={can('org.manage')} show={hasDocs ? (addWay === 'paste' ? 'paste' : 'file') : 'both'} onDone={(n) => { setNotice(n); if (n.tone !== 'error') setAdding(false); load() }} />
+          <div hidden={addWay === 'inbox'} className="space-y-5">
+            <UploadForm base={base} data={data} canOrg={can('org.manage')} show={(addWay === 'paste' ? 'paste' : 'file')} onDone={(n) => { setNotice(n); if (n.tone !== 'error') setAdding(false); load() }} />
           </div>
-          <div hidden={hasDocs && addWay !== 'inbox'} className="space-y-5">
+          <div hidden={addWay !== 'inbox'} className="space-y-5">
             <ProjectInbox base={base.replace(/\/documents$/, '')} onReceived={load} />
             <ProjectMailbox base={base.replace(/\/documents$/, '')} onReceived={load} />
           </div>
         </div>
         </div>
-      )}
-      {!hasDocs && libraryBlock}
+      , document.body)}
     </div>
   )
 }
