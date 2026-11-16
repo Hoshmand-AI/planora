@@ -636,7 +636,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* ── Main content ────────────────────────────────── */}
           {/* pb-20 on phones = space for the bottom bar */}
-          <main id="main" tabIndex={-1} className={`flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none ${fillScreen ? 'flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
+          <main id="main" tabIndex={-1} className={`app-canvas flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none ${fillScreen ? 'flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
             {emailUnconfirmed && pathname !== '/dashboard/account' && (
               <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-[13px] text-warm-700">
                 <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
