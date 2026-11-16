@@ -9,25 +9,27 @@ import { fmtDate, fmtDates } from '@/lib/format'
 import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
 import { EmptyState } from '@/components/EmptyState'
-import { ScheduleTools } from '@/components/ScheduleTools'
-import { EarnedValue } from '@/components/EarnedValue'
 import { ProjectBrief } from '@/components/ProjectBrief'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
 import type { DailyBrief } from '@/lib/analysis/daily-brief'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, metricsError, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
-  // Tabs: the overview, and earned value (uploaded schedules; #earned-value links to it).
-  const [tab, setTab] = useState<ViewTab>('overview')
+  const { selectedSchedule, metrics, metricsError, refreshMetrics, can, openUpload } = useApp()
+  // Earned value and the analysis tools used to be tabs of this page; links that still point at them move on.
+  const router = useRouter()
   useEffect(() => {
-    const sync = () => setTab(window.location.hash === '#earned-value' ? 'evm' : window.location.hash === '#tools' ? 'tools' : 'overview')
-    sync()
-    // Links to #earned-value from elsewhere on this page (or the browser's back button) switch the tab too.
-    window.addEventListener('hashchange', sync)
-    return () => window.removeEventListener('hashchange', sync)
-  }, [selectedSchedule?.id])
+    const go = () => {
+      const h = window.location.hash, q = window.location.search
+      if (h === '#earned-value') router.replace(`/dashboard/earned-value${q}`)
+      else if (h === '#tools' || h === '#compare' || h === '#recovery') router.replace(`/dashboard/tools${q}${h === '#tools' ? '' : h}`)
+    }
+    go()
+    window.addEventListener('hashchange', go)
+    return () => window.removeEventListener('hashchange', go)
+  }, [router])
   // The deadline position from the daily brief (the contract milestone and its required date), so the finish answer
   // and the attention list below it never disagree. undefined while it loads.
   const [headline, setHeadline] = useState<DailyBrief['headline'] | null | undefined>(undefined)
@@ -77,7 +79,6 @@ export default function ProjectPage() {
   const criticalPath = (mx.criticalPath as CriticalPathStatus | undefined) ?? null
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
-  const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
   const allWarnings = ((m as Record<string, unknown> | null)?.warnings as string[]) ?? []
   // A file built for import (no start, data date or activity dates) is scheduled from the day it was calculated:
@@ -94,12 +95,7 @@ export default function ProjectPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-6">
 
-      {selectedSchedule.sourceType !== 'generated' && <ScheduleTabs tab={tab} onChange={setTab} />}
-      {selectedSchedule.sourceType !== 'generated' && (
-        <div role="tabpanel" id="tabpanel-evm" aria-labelledby="tab-evm" hidden={tab !== 'evm'}>{tab === 'evm' && <EarnedValue scheduleId={selectedSchedule.id} />}</div>
-      )}
-      <div role={selectedSchedule.sourceType !== 'generated' ? 'tabpanel' : undefined} id="tabpanel-overview" aria-labelledby={selectedSchedule.sourceType !== 'generated' ? 'tab-overview' : undefined}
-        hidden={tab !== 'overview' && selectedSchedule.sourceType !== 'generated'} className="space-y-6">
+      <div className="space-y-6">
 
       {/* The first answer: will we finish on time? Then four numbers that explain it. */}
       <section aria-label="Schedule health" className="space-y-4">
@@ -190,47 +186,6 @@ export default function ProjectPage() {
 
       </div>
 
-      {/* The analysis tools have their own tab: on the summary they were seven collapsed rows at the foot of a long page. */}
-      {selectedSchedule.sourceType !== 'generated' && (
-        <div role="tabpanel" id="tabpanel-tools" aria-labelledby="tab-tools" hidden={tab !== 'tools'}>
-        <ScheduleTools key={selectedSchedule.id} scheduleId={selectedSchedule.id}
-          progressMode={(selectedSchedule.analysis?.progressMode as 'retained' | 'override') || 'retained'}
-          inHistory={selectedSchedule.inHistory ?? true}
-          canEdit={can('schedule.write')} editsCount={editsCount}
-          version={selectedSchedule.version} classification={selectedSchedule.classification ?? null}
-          origin={selectedSchedule.uploadOrigin ?? null} historyOverride={selectedSchedule.historyOverride ?? false}
-          onChanged={() => { refreshSchedules(); refreshMetrics() }} />
-        </div>
-      )}
-
-    </div>
-  )
-}
-
-/* ─── Tabs ───────────────────────────────────────── */
-type ViewTab = 'overview' | 'evm' | 'tools'
-const TABS = [{ id: 'overview', label: 'Summary' }, { id: 'evm', label: 'Earned value' }, { id: 'tools', label: 'Analysis tools' }] as const
-function ScheduleTabs({ tab, onChange }: { tab: ViewTab; onChange: (t: ViewTab) => void }) {
-  const select = (t: ViewTab) => {
-    onChange(t)
-    if (typeof window !== 'undefined') history.replaceState(null, '', t === 'evm' ? '#earned-value' : t === 'tools' ? '#tools' : window.location.pathname + window.location.search)
-  }
-  return (
-    <div role="tablist" aria-label="Schedule views" className="flex gap-0 border-b border-warm-200"
-      onKeyDown={e => {
-        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-        const i = TABS.findIndex(x => x.id === tab)
-        const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id
-        select(next)
-        document.getElementById(`tab-${next}`)?.focus()
-      }}>
-      {TABS.map(t => (
-        <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`tabpanel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
-          onClick={() => select(t.id)}
-          className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${tab === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
-          {t.label}
-        </button>
-      ))}
     </div>
   )
 }

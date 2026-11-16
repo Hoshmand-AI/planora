@@ -75,7 +75,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
       const rd = await r.json().catch(() => ({}))
       if (mine !== seq.current) return
       setItems(r.ok ? rd.items : [])
-      // What the recent changes moved (also marked on the Schedule tab).
+      // What the recent changes moved (also marked on the Gantt chart).
       fetch(`/api/schedules/${encodeURIComponent(sid)}/changes`).then(x => (x.ok ? x.json() : null)).then(d => { if (mine === seq.current) setImpact(d) }).catch(() => {})
     } catch { if (mine === seq.current) setErr('Network error. Check your connection and try again.') }
   }, [sid, asOf, ranWhatIf])
@@ -163,12 +163,12 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
           <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
           <List title={`Under way (${b.today.inProgressCount})`} rows={b.today.inProgress.slice(0, 6)} empty="Nothing is in progress." dateLabel="finish" action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
-          {b.today.inProgressCount > 6 && <p className="text-[12.5px] text-warm-600">and {b.today.inProgressCount - 6} more under way; the Schedule tab lists them all.</p>}
+          {b.today.inProgressCount > 6 && <p className="text-[12.5px] text-warm-600">and {b.today.inProgressCount - 6} more under way; the Gantt chart lists them all.</p>}
         </Card>}
           {has.overdue && <Card id="overdue" open={isOpen('overdue')} onToggle={() => toggle('overdue')} meta={b.overdue.finishCount + b.overdue.startCount ? `${b.overdue.finishCount + b.overdue.startCount} overdue` : 'None'} icon={<AlertTriangle size={15} />} title="Should have happened by now" sub={`${b.overdue.finishCount} finish${b.overdue.finishCount === 1 ? '' : 'es'} and ${b.overdue.startCount} start${b.overdue.startCount === 1 ? '' : 's'} without actual dates`}>
           <List title="Should have finished" rows={b.overdue.shouldHaveFinished} empty="Nothing is past its finish." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
           <List title="Should have started" rows={b.overdue.shouldHaveStarted} empty="Nothing is past its start." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
-          {canWrite && (b.overdue.finishCount + b.overdue.startCount > 0) && <p className="text-[12px] text-warm-600">“Mark started / finished” records the date above as the actual date, as a RunF9 edit with your name (Overview → Edits made in RunF9, where it can be reverted). Update P6 at the next update.</p>}
+          {canWrite && (b.overdue.finishCount + b.overdue.startCount > 0) && <p className="text-[12px] text-warm-600">“Mark started / finished” records the date above as the actual date, as a RunF9 edit with your name (More, Analysis tools, Edits made in RunF9, where it can be reverted). Update P6 at the next update.</p>}
         </Card>}
           {has.since && <Card id="since" open={isOpen('since')} onToggle={() => toggle('since')} meta={`${b.yesterday.completed.length} finished · ${b.yesterday.started.length} started`} icon={<CheckCircle2 size={15} />} title={`Since ${fmtDate(b.yesterday.date)}`} sub="Completed and started, from actual dates">
           <List title="Completed" rows={b.yesterday.completed} empty="No actual finishes recorded." plain />
@@ -196,7 +196,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
             <li key={i} className="text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
-          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12.5px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet on the Delays tab: the result can differ, because added work sits where the document ties it.</p>}
+          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12.5px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet under Health, Delays: the result can differ, because added work sits where the document ties it.</p>}
           <form className="flex flex-wrap items-end gap-2 pt-1" onSubmit={e => { e.preventDefault(); if (whatIf.activity.trim()) setRanWhatIf({ ...whatIf }) }}>
             <datalist id="wi-acts">{data.activities.slice(0, 2000).map(a => <option key={a.id} value={a.code}>{a.name}</option>)}</datalist>
             <label className="text-[12px] text-warm-600">If this activity<input list="wi-acts" value={whatIf.activity} onChange={e => setWhatIf(w => ({ ...w, activity: e.target.value }))} placeholder="Activity ID" className={`${input} block mt-0.5 w-36`} /></label>
@@ -226,7 +226,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         <div className="grid md:grid-cols-2 gap-3 items-start">
           {has.signals && <Card id="signals" open={isOpen('signals')} onToggle={() => toggle('signals')} meta={count(b.signals.length, 'sentence')} icon={<Mail size={15} />} title="From emails, meetings and field reports" sub="Sentences in this project’s correspondence that affect the schedule, quoted with their source">
         {b.signals.length === 0 ? (
-          <p className="text-[13px] text-warm-600">Nothing yet. Add emails, meeting minutes or transcripts and daily field reports under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link> (type “Email / letter”, “Meeting minutes / transcript” or “Daily field report”); RunF9 reads them for delays, changes, risks and commitments and ties them to activities.</p>
+          <p className="text-[13px] text-warm-600">Nothing yet. Add emails, meeting minutes or transcripts and daily field reports under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link> (type “Email / letter”, “Meeting minutes / transcript” or “Daily field report”); RunF9 reads them for delays, changes, risks and commitments and ties them to activities.</p>
         ) : (
           <ul className="space-y-2">{b.signals.slice(0, 10).map((s, i) => (
             <li key={i} className="rounded-lg border border-warm-200 p-3 text-[13px]">
@@ -245,7 +245,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
       </Card>}
           {has.contract && <Card id="contract" open={isOpen('contract')} onToggle={() => toggle('contract')} meta={data.watch.contract.length ? `${data.watch.contract.filter(c => c.active).length} active of ${data.watch.contract.length}` : 'None found'} icon={<FileText size={15} />} title="Contract watch" sub="Notice periods, damages and update duties, read from the contract and what they mean today">
           {data.watch.contract.length === 0 ? (
-            <p className="text-[13px] text-warm-600">{data.watch.read.contract ? 'No notice period, liquidated damages or update duty was found in the contract documents of this project.' : <>Add the contract and the scheduling specification under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link>. RunF9 will watch the notice periods, the liquidated damages and the update duties against the schedule every day.</>}</p>
+            <p className="text-[13px] text-warm-600">{data.watch.read.contract ? 'No notice period, liquidated damages or update duty was found in the contract documents of this project.' : <>Add the contract and the scheduling specification under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link>. RunF9 will watch the notice periods, the liquidated damages and the update duties against the schedule every day.</>}</p>
           ) : (
             <ul className="space-y-2.5">{data.watch.contract.map((c, i) => (
               <li key={i} className={`rounded-lg border p-3 text-[13px] ${c.active ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-warm-200'}`}>
@@ -263,7 +263,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {has.field && <Card id="field" open={isOpen('field')} onToggle={() => toggle('field')} meta={count(data.watch.field.length + data.watch.notInSchedule.length, 'mismatch', 'mismatches')} icon={<HardHat size={15} />} title="The field and the drawings against the schedule" sub="What the daily reports and the design documents say that the schedule does not">
           <div>
             <h4 className="text-[13px] font-semibold text-navy-950">In the ground, not in the schedule</h4>
-            {data.watch.field.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.field ? 'The daily reports agree with the schedule.' : 'Add daily field reports under Documents to compare the work on site with the schedule.'}</p> : (
+            {data.watch.field.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.field ? 'The daily reports agree with the schedule.' : 'Add daily field reports under Project records to compare the work on site with the schedule.'}</p> : (
               <ul className="space-y-2">{data.watch.field.map((f, i) => (
                 <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{f.text}</span><q className="block">{f.quote}</q><span className="block text-[12px] text-warm-600">{f.citation.includes(f.title) ? f.citation : `${f.title} ${f.citation}`}</span></li>
               ))}</ul>
@@ -271,7 +271,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </div>
           <div>
             <h4 className="text-[13px] font-semibold text-navy-950">In the drawings and specifications, not in the schedule</h4>
-            {data.watch.notInSchedule.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.design ? 'Every kind of work the design documents name has an activity.' : 'Add drawings and specifications under Documents to check that their scope is in the schedule.'}</p> : (
+            {data.watch.notInSchedule.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.design ? 'Every kind of work the design documents name has an activity.' : 'Add drawings and specifications under Project records to check that their scope is in the schedule.'}</p> : (
               <ul className="space-y-2">{data.watch.notInSchedule.map((g, i) => (
                 <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{g.label}: no activity covers it.</span><q className="block">{g.quote}</q><span className="block text-[12px] text-warm-600">{g.citation.includes(g.title) ? g.citation : `${g.title} ${g.citation}`}</span></li>
               ))}</ul>
@@ -281,7 +281,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         </div>
       </section>
       ) : (
-        <p className="text-[13px] text-warm-600">Nothing from the project records yet. Add emails, meeting minutes, daily field reports and the contract under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Documents</Link>; RunF9 reads them for delays, changes, notice periods and work on site that the schedule does not show.</p>
+        <p className="text-[13px] text-warm-600">Nothing from the project records yet. Add emails, meeting minutes, daily field reports and the contract under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link>; RunF9 reads them for delays, changes, notice periods and work on site that the schedule does not show.</p>
       )}
 
       <section aria-label="Register and changes" className="space-y-3">
@@ -308,7 +308,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </div>
         )}
         {b.changed.sinceLastUpdate && (
-          <p className="text-[13px] text-warm-700">Since {b.changed.sinceLastUpdate.version}: {b.changed.sinceLastUpdate.finishMovedDays == null ? 'finish not comparable' : b.changed.sinceLastUpdate.finishMovedDays === 0 ? 'finish unchanged' : `finish ${Math.abs(b.changed.sinceLastUpdate.finishMovedDays)} day${Math.abs(b.changed.sinceLastUpdate.finishMovedDays) === 1 ? '' : 's'} ${b.changed.sinceLastUpdate.finishMovedDays > 0 ? 'later' : 'earlier'}`}; {b.changed.sinceLastUpdate.added} activities added, {b.changed.sinceLastUpdate.deleted} deleted, {b.changed.sinceLastUpdate.durationChanges} durations changed, {b.changed.sinceLastUpdate.logicChanges} logic changes. <Link href="/dashboard/project#compare" className="font-medium text-accent-600 hover:underline">See the full comparison</Link></p>
+          <p className="text-[13px] text-warm-700">Since {b.changed.sinceLastUpdate.version}: {b.changed.sinceLastUpdate.finishMovedDays == null ? 'finish not comparable' : b.changed.sinceLastUpdate.finishMovedDays === 0 ? 'finish unchanged' : `finish ${Math.abs(b.changed.sinceLastUpdate.finishMovedDays)} day${Math.abs(b.changed.sinceLastUpdate.finishMovedDays) === 1 ? '' : 's'} ${b.changed.sinceLastUpdate.finishMovedDays > 0 ? 'later' : 'earlier'}`}; {b.changed.sinceLastUpdate.added} activities added, {b.changed.sinceLastUpdate.deleted} deleted, {b.changed.sinceLastUpdate.durationChanges} durations changed, {b.changed.sinceLastUpdate.logicChanges} logic changes. <Link href="/dashboard/tools#compare" className="font-medium text-accent-600 hover:underline">See the full comparison</Link></p>
         )}
       </Card>}
           {has.missing && <Card id="missing" open={isOpen('missing')} onToggle={() => toggle('missing')} meta={count(b.missing.scope.length + b.missing.proposals.length + (b.missing.looseEnds ? 1 : 0), 'item')} icon={<PlayCircle size={15} />} title="What is missing" sub="Scope and logic the schedule should probably have">

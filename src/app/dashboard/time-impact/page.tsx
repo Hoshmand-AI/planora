@@ -161,7 +161,7 @@ export default function TimeImpactPage() {
             <div className="space-y-2 pt-3 border-t border-warm-200">
               <label htmlFor="draft-doc" className="block text-[12px] font-semibold text-warm-700">Draft from a change document</label>
               {docs === null ? <p className="text-[12px] text-warm-600">Loading documents…</p> : docs.length === 0 ? (
-                <p className="text-[12px] text-warm-600">Add the change order or RFI on the <Link href="/dashboard/documents" className="underline">Documents</Link> page first.</p>
+                <p className="text-[12px] text-warm-600">Add the change order or RFI on the <Link href="/dashboard/documents" className="underline">Project records</Link> page first.</p>
               ) : (
                 <>
                   <select id="draft-doc" className={`${input} w-full`} value={docId} onChange={e => setDocId(e.target.value)}>

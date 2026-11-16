@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Device journeys: the same user path on iPhone, iPad and desktop profiles (screen size, pixel density, touch,
 // mobile mode). Sign in, open the data-location chip, tap search (16px text, so Safari doesn't zoom), check the
-// status tiles fit, open a project by tapping its card, tap through all eight project tabs, zoom the schedule,
+// status tiles fit, open a project by tapping its card, tap through all five project tabs and their views, zoom the schedule,
 // and use the bottom navigation (phones) or the sidebar collapse button (tablets, desktop). Every page must fit
 // the screen width. Needs a server with RUNF9_SIGNUP=open:   BASE_URL=http://localhost:3000 node scripts/e2e-devices.mjs
 // SCREENSHOTS=dir saves a few screenshots per device.
@@ -60,14 +60,14 @@ for (const name of DEVICES) {
   await fits('Overview')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-overview.png` })
   // Every project tab
-  for (const tab of ['Schedule', 'Quality', 'Delays', 'Resources', 'Documents', 'Reports', 'Ask', 'Overview']) {
+  for (const tab of ['Gantt chart', 'Health', 'Project records', 'Reports', 'Overview']) {
     const link = page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: tab, exact: true })
     await link.scrollIntoViewIfNeeded(); await tap(link)
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
     const current = await page.getByRole('navigation', { name: 'Project' }).locator('[aria-current="page"]').textContent()
     if (current?.trim() !== tab) fail(name, `tab ${tab} not current (${current})`)
     await fits(tab)
-    if (tab === 'Documents') {
+    if (tab === 'Project records') {
       // Loaded directly (a bookmark, a reload), the current tab must still be scrolled into view on a narrow screen.
       await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(500)
       const nav = page.getByRole('navigation', { name: 'Project' })
@@ -75,7 +75,7 @@ for (const name of DEVICES) {
       if (nb && cb && (cb.x < nb.x - 1 || cb.x + cb.width > nb.x + nb.width + 1)) fail(name, `current tab is out of view after a direct load (${Math.round(cb.x)}–${Math.round(cb.x + cb.width)} outside ${Math.round(nb.x)}–${Math.round(nb.x + nb.width)})`)
       else console.log('   ✓ current tab is in view after a direct load')
     }
-    if (tab === 'Schedule') {
+    if (tab === 'Gantt chart') {
       if (desc.viewport.width >= 768) {
         // The data-date line must sit under its own label: both are placed by date, in two different containers.
         const lab = await page.getByText(/^Data date \d/).first().boundingBox().catch(() => null)
@@ -92,7 +92,18 @@ for (const name of DEVICES) {
       if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-schedule.png` })
     }
   }
-  console.log('   ✓ all 8 project tabs open by tap and fit the screen')
+  // The second view of each tab that has one
+  for (const [tab, view] of [['Gantt chart', 'Resources'], ['Health', 'Delays'], ['Reports', 'Earned value']]) {
+    const link = page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: tab, exact: true })
+    await link.scrollIntoViewIfNeeded(); await tap(link); await page.waitForLoadState('networkidle')
+    await tap(page.getByRole('navigation', { name: `${tab} views` }).getByRole('link', { name: view, exact: true }))
+    await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
+    const current = await page.getByRole('navigation', { name: 'Project' }).locator('[aria-current="page"]').textContent()
+    if (current?.trim() !== tab) fail(name, `view ${view} does not keep tab ${tab} current (${current})`)
+    await fits(`${tab} / ${view}`)
+  }
+  console.log('   ✓ the second view of Gantt chart, Health and Reports opens and keeps its tab current')
+  console.log('   ✓ all 5 project tabs open by tap and fit the screen')
   // Sidebar collapse on tablets and desktops
   if (desc.viewport.width >= 768) {
     const w = () => page.evaluate(() => Math.round(document.querySelector('aside').getBoundingClientRect().width))

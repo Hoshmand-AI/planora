@@ -46,6 +46,8 @@ export default function DocumentsPage() {
   // With documents already here, adding one is a dialog over the library, so the page is the library and not a form.
   const [adding, setAdding] = useState(false)
   const addClose = useRef<HTMLButtonElement>(null)
+  // "Add to project → Project record" in the header lands here with ?add=1: open the dialog (with no records yet the page is already the form).
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('add') === '1') setAdding(true) }, [selectedSchedule?.id])
   useEffect(() => {
     if (!adding) return
     addClose.current?.focus()
@@ -158,7 +160,7 @@ export default function DocumentsPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-        <h2 className="sr-only">Documents</h2>
+        <h2 className="sr-only">Project records</h2>
         <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
           Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
