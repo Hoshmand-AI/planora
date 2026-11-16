@@ -6,12 +6,14 @@ import { FinishHero } from '@/components/FinishHero'
 import { RingTile, CounterTile } from '@/components/Glance'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates } from '@/lib/format'
-import type { NearTermOutlook } from '@/lib/analysis/near-term'
 import type { CriticalPathStatus } from '@/lib/analysis/critical-status'
 import Link from 'next/link'
 import { EmptyState } from '@/components/EmptyState'
 import { ScheduleTools } from '@/components/ScheduleTools'
 import { EarnedValue } from '@/components/EarnedValue'
+import { ProjectBrief } from '@/components/ProjectBrief'
+import { DataCenterSampleButton } from '@/components/DataCenterSample'
+import type { DailyBrief } from '@/lib/analysis/daily-brief'
 import { useEffect, useState } from 'react'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
@@ -26,6 +28,10 @@ export default function ProjectPage() {
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
   }, [selectedSchedule?.id])
+  // The deadline position from the daily brief (the contract milestone and its required date), so the finish answer
+  // and the attention list below it never disagree. undefined while it loads.
+  const [headline, setHeadline] = useState<DailyBrief['headline'] | null | undefined>(undefined)
+  useEffect(() => { setHeadline(undefined) }, [selectedSchedule?.id])
   // DCMA pass count for the Quality tile (the Quality tab has the detail).
   const [quality, setQuality] = useState<{ passed: number; applicable: number; failing: number } | null>(null)
   useEffect(() => {
@@ -39,13 +45,14 @@ export default function ProjectPage() {
   }, [selectedSchedule])
 
   if (!selectedSchedule) {
-    return (
+    return (<>
       <EmptyState title="No project open"
         action={can('schedule.write') ? { label: 'Upload a schedule', onClick: openUpload } : { label: 'Go to your projects', href: '/dashboard' }}
         secondary={can('schedule.write') ? { label: 'Or choose one from your projects', href: '/dashboard' } : undefined}>
         Open a project to see its finish date, critical path and what needs attention.
       </EmptyState>
-    )
+      <DataCenterSampleButton className="-mt-10 pb-12 text-center" />
+    </>    )
   }
 
   const m = metrics as Record<string, number | unknown[]> | null
@@ -70,10 +77,6 @@ export default function ProjectPage() {
   const criticalPath = (mx.criticalPath as CriticalPathStatus | undefined) ?? null
   const totalActivities = Number(m?.totalActivities ?? 0)
   const percentComplete = Number(m?.percentComplete ?? 0)
-  const nearTerm = (mx.nearTerm as NearTermOutlook | undefined) ?? null
-  const drivingTasks  = (m?.drivingTasks as ActivityRow[])  ?? []
-  // Activities changed by edits made in RunF9 (shown with an "Edited" tag)
-  const editedIds = new Set((mx.editedActivityIds as string[] | undefined) ?? [])
   const editsCount = Number(mx.editsCount ?? 0)
   const brief = ((m as Record<string, unknown> | null)?.brief as unknown as { summary: string; facts: { label: string; value: string }[]; nextMilestones: { name: string; date: string; critical: boolean; basis?: 'scheduled' | 'logic'; scheduled?: string }[] } | null) ?? null
   const allWarnings = ((m as Record<string, unknown> | null)?.warnings as string[]) ?? []
@@ -108,8 +111,9 @@ export default function ProjectPage() {
         <FinishHero status={status} forecastFinish={forecastFinish}
           mustFinishBy={(mx.mustFinishBy as string) || null} baselineFinish={(mx.baselineFinish as string) || null}
           projectStart={(mx.projectStart as string) || null} dataDate={selectedSchedule.dataDate ?? null}
+          deadline={headline?.required ? { required: headline.required, daysBehind: headline.daysBehind, text: headline.text } : null} pending={headline === undefined}
           reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more under “Why this status”)` : '')
-            : status === 'no_baseline' ? (isBaselineUpload
+            : status === 'no_baseline' && !headline?.required ? (isBaselineUpload
               ? 'This upload is the baseline. Upload a status update of the same project and RunF9 measures variance against it.'
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')
             : null}
@@ -154,6 +158,9 @@ export default function ProjectPage() {
         )}
       </section>
 
+      {/* What needs attention, then the detail behind it in folded cards (one page, where Today and Overview used to be two). */}
+      <ProjectBrief onHeadline={setHeadline} />
+
       {/* About this project — what, where, when, what must be achieved */}
       {brief && (
         <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
@@ -180,57 +187,6 @@ export default function ProjectPage() {
           )}
         </div>
       )}
-
-
-
-      {/* Two-column data section */}
-      <div className="grid md:grid-cols-2 gap-5">
-
-        {/* What is under way and what starts next is Today's job; the Overview only points there, so the two pages do not repeat each other. */}
-        {nearTerm && (nearTerm.inProgress.length > 0 || nearTerm.starting.length > 0) && (
-          <section aria-labelledby="near-term-h" className="rounded-2xl border border-warm-200 bg-white p-5 h-fit">
-            <h2 id="near-term-h" className="font-display text-[18px] text-navy-950 mb-2">Next 14 days</h2>
-            <dl className="grid grid-cols-2 gap-3">
-              <div><dt className="text-[12.5px] text-warm-600">In progress</dt><dd className="text-[22px] font-semibold tabular-nums text-navy-950">{nearTerm.inProgressCount}</dd></div>
-              <div><dt className="text-[12.5px] text-warm-600">Due to start by {fmtDate(nearTerm.windowEnd)}</dt><dd className="text-[22px] font-semibold tabular-nums text-navy-950">{nearTerm.startingCount}</dd></div>
-            </dl>
-            <Link href={`/dashboard/today?schedule=${selectedSchedule.id}`} className="mt-3 inline-flex items-center gap-0.5 text-[13px] font-semibold text-accent-600 hover:underline">See them on Today<span aria-hidden="true">›</span></Link>
-          </section>
-        )}
-
-        {drivingTasks.length > 0 && (
-          <section>
-            <h2 className="font-display text-[18px] text-navy-950 mb-3">Driving tasks{drivingTasks.length > 8 && <span className="ml-2 font-sans text-[13px] font-normal text-warm-600">first 8 of {drivingTasks.length}</span>}</h2>
-            <div className="bg-warm-50 border border-warm-200 rounded-lg overflow-hidden">
-              {drivingTasks.slice(0, 8).map((task, i) => (
-                <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < drivingTasks.slice(0, 8).length - 1 ? 'border-b border-warm-200' : ''}`}>
-                  <div className="min-w-0 pr-3">
-                    <div className="text-[13.5px] font-medium text-warm-700 truncate">{task.name}{editedIds.has(task.id) && <EditedTag />}</div>
-                    <div className="text-[12px] text-warm-400 mt-0.5">
-                      Float: {task.totalFloat}d
-                      {task.earlyStart && ` · ${fmtDate(task.earlyStart)}`}
-                      {task.earlyFinish && ` → ${fmtDate(task.earlyFinish)}`}
-                      {task.dateBasis === 'logic' && ` (logic-driven; ${fmtDate(task.scheduledFinish)} as scheduled)`}
-                    </div>
-                    {task.drivingConstraint && (
-                      <div className="text-[12px] text-status-attention mt-0.5">
-                        {task.drivingConstraint.effect === 'start' ? 'Path starts at its' : 'Held by its'} {task.drivingConstraint.type} {fmtDate(task.drivingConstraint.date)} constraint{task.drivingConstraint.effect === 'later' ? ' (later than logic)' : task.drivingConstraint.effect === 'earlier' ? ' (earlier than logic)' : ''}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-[13px] text-warm-700 tabular-nums flex-shrink-0 text-right"><span className="font-semibold text-navy-950">{task.duration}d</span> <span className="text-[12px]">duration</span></div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {!nearTerm?.inProgress.length && !nearTerm?.starting.length && drivingTasks.length === 0 && (
-          <div className="col-span-2 text-center py-12 text-warm-400 text-[14px]">
-            No task data available for this schedule.
-          </div>
-        )}
-      </div>
 
       </div>
 
@@ -279,30 +235,7 @@ function ScheduleTabs({ tab, onChange }: { tab: ViewTab; onChange: (t: ViewTab) 
   )
 }
 
-/* ─── Types ─────────────────────────────────────── */
-interface ActivityRow {
-  id: string
-  name: string
-  activityId: string
-  duration: number
-  totalFloat: number
-  earlyStart: string
-  earlyFinish?: string
-  isCritical: boolean
-  status: string
-  /** 'logic' when earlyStart/earlyFinish are logic-driven dates (an overruled mandatory constraint holds the scheduled ones) */
-  dateBasis?: 'logic'
-  scheduledFinish?: string
-  /** A constraint the driving path is traced through or starts at */
-  drivingConstraint?: { type: string; date: string; effect: 'later' | 'earlier' | 'start' }
-}
-
-/* ─── Edited tag ─────────────────────────────────── */
-function EditedTag() {
-  return <span title="Changed by an edit made in RunF9 (see Edits made in RunF9 below)" className="ml-2 align-middle text-[12px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-1.5 py-0.5 rounded border-l-2 border-accent-500">Edited</span>
-}
-
-/* ─── Near-term list ─────────────────────────────── */
+/* ─── Variance note ──────────────────────────────── */
 /** The baseline header and the variance basis, without repeating the reason both carry or doubling a period. */
 function varianceNote(header: string, basis: string) {
   const h = header ? header.replace(/\.?$/, '.') : ''

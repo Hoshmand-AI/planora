@@ -35,7 +35,7 @@ export function briefEmailText(out: Loaded, audience: BriefAudience, origin: str
     `${out.schedule.name}: daily brief for ${fmtDate(out.brief.asOf)} (${AUDIENCE_LABEL[audience]})`, '',
     ...out.brief.audiences[audience].map(l => `- ${fmtDates(l)}`),
     ...(audience === 'client' || !act.length ? [] : ['', 'Needs attention today:', ...act.map(a => `- ${fmtDates(a.text)}`)]),
-    ...(origin ? ['', `Open the full brief: ${origin}/dashboard/today?schedule=${encodeURIComponent(out.schedule.id)}`] : ['', 'Open RunF9 and choose the Today tab for the full brief.']),
+    ...(origin ? ['', `Open the full brief: ${origin}/dashboard/project?schedule=${encodeURIComponent(out.schedule.id)}`] : ['', 'Open RunF9 and open the project Overview for the full brief.']),
   ].join('\n')
 }
 export const briefEmailSubject = (out: Loaded) => `Daily brief: ${out.schedule.name}, ${fmtDate(out.brief.asOf)}`
@@ -92,7 +92,7 @@ export async function sendDueBriefs(now = new Date(), origin = (process.env.APP_
             const brief = await loadDailyBrief(scheduleId, orgId, { asOf: day })
             if (!brief) return false
             const audience = (BRIEF_AUDIENCES as readonly string[]).includes(s.audience) ? (s.audience as BriefAudience) : 'pm'
-            const r = await sendEmail({ to: s.email, subject: briefEmailSubject(brief), text: `${briefEmailText(brief, audience, origin)}\n\nYou get this every working morning because you turned it on for this project. Turn it off on the Today tab.` })
+            const r = await sendEmail({ to: s.email, subject: briefEmailSubject(brief), text: `${briefEmailText(brief, audience, origin)}\n\nYou get this every working morning because you turned it on for this project. Turn it off under "Daily brief to send" on the project Overview.` })
             if (r.sent) await audit({ orgId, action: 'brief.digest_sent', actor: { id: null, email: 'system' }, targetType: 'schedule', targetId: brief.schedule.id, detail: { schedule: brief.schedule.name, audience, to: s.user_id, asOf: day } })
             return r.sent
           })
