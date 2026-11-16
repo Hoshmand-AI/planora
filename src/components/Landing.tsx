@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CheckCircle, Menu, X, ChevronDown } from 'lucide-react'
+import { ArrowRight, CheckCircle, Menu, X, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import HeroSchedule from '@/components/landing/HeroSchedule'
@@ -54,16 +54,16 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     <div className="min-h-screen bg-warm-50 text-warm-600">
       {/* Navbar: translucent, quiet, the logo carries it */}
       <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white/80 backdrop-blur-xl border-warm-200' : 'bg-warm-50 border-transparent'}`}>
-        <div className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
+        <div className="max-w-[1240px] mx-auto px-6 h-[76px] md:h-[84px] flex items-center justify-between">
           <Link href="/" aria-label="RunF9 home" className="flex items-center">
             <Logo variant="dark" size="text-[26px]" />
           </Link>
           <div className="hidden lg:flex items-center gap-7 xl:gap-9 whitespace-nowrap">
-            {nav.map(([href, label]) => <a key={href} href={href} className="text-[14px] text-warm-700 hover:text-navy-950 transition-colors">{label}</a>)}
+            {nav.map(([href, label]) => <a key={href} href={href} className="text-[15.5px] font-medium text-navy-950 hover:text-accent-700 transition-colors">{label}</a>)}
           </div>
           <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
-            <Link href="/auth" className={`${secondaryBtn} px-4 py-2 text-[14px]`}>Sign in</Link>
-            <Cta href={primaryHref} className={`${primaryBtn} px-5 py-2 text-[14px]`}>{primaryLabel}</Cta>
+            <Link href="/auth" className={`${secondaryBtn} px-4 py-2.5 text-[15.5px]`}>Sign in</Link>
+            <Cta href={primaryHref} className={`${primaryBtn} gap-1.5 px-6 py-3 text-[15.5px]`}>{primaryLabel}<ArrowRight size={16} aria-hidden /></Cta>
           </div>
           <button className="lg:hidden text-navy-950 p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -78,28 +78,32 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         )}
       </nav>
 
-      {/* Hero */}
-      <header className="relative px-6 pt-7 md:pt-8 pb-20 md:pb-28 overflow-hidden">
+      {/* Hero: one large statement on the left, the reason and one action on the right, then the product itself */}
+      <header className="relative px-6 pt-10 md:pt-16 pb-20 md:pb-28 overflow-hidden">
         {/* A soft wash of the accent behind the headline; decorative */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(37,99,235,0.12),transparent_70%)]" />
-        <div className="relative max-w-6xl mx-auto text-center">
-          <a href={inviteOnly ? '#pricing' : '#today'} className="hero-rise pressable inline-flex items-center gap-2 rounded-full border border-warm-300 bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-navy-950 hover:border-navy-900 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-600" aria-hidden />
-            {inviteOnly ? 'Private beta · by invitation' : 'New: the Daily Brief'}
-          </a>
-          <h1 className="hero-rise text-[42px] leading-[1.05] md:text-[60px] font-semibold tracking-[-0.045em] text-navy-950 max-w-[900px] mx-auto">
-            Construction schedules, calculated and explained.
-          </h1>
-          <p className="hero-rise [animation-delay:120ms] text-[18px] md:text-[21px] leading-snug text-warm-700 max-w-[820px] mx-auto mt-4 tracking-[-0.01em]">
-            Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[720px] bg-[radial-gradient(ellipse_60%_55%_at_20%_0%,rgba(37,99,235,0.10),transparent_70%)]" />
+        <div className="relative max-w-[1240px] mx-auto">
+          <p className="hero-rise text-[15px] md:text-[17px] font-medium text-warm-700 tracking-[-0.01em] mb-3 md:mb-4">
+            {inviteOnly ? 'Construction schedule analysis · private beta, by invitation' : 'Construction schedule analysis'}
           </p>
-          <div className="hero-rise [animation-delay:220ms] flex gap-3 justify-center flex-wrap mt-6">
-            <Cta href={primaryHref} className={`${primaryBtn} px-7 py-3.5 text-[16px]`}>{primaryLabel}</Cta>
-            <a href="#today" className={`${secondaryBtn} px-5 py-3.5 text-[16px]`}>See the Daily Brief</a>
-            <Link href="/sample-report" className={`${secondaryBtn} px-5 py-3.5 text-[16px]`}>Read a sample report</Link>
+          <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-x-16 gap-y-8 lg:items-end">
+            <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[76px] xl:text-[92px] xl:leading-[0.98] font-bold tracking-[-0.05em] text-navy-950">
+              Construction schedules, calculated and explained.
+            </h1>
+            <div className="hero-rise [animation-delay:140ms] lg:pb-3">
+              <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-600 mb-5" />
+              <p className="text-[18px] md:text-[20px] leading-[1.45] text-warm-700 tracking-[-0.01em] max-w-[520px]">
+                Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
+              </p>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-7">
+                <Cta href={primaryHref} className={`${primaryBtn} gap-2 px-8 py-4 text-[17px] shadow-[0_14px_30px_-14px_rgba(37,99,235,0.7)]`}>{primaryLabel}<ArrowRight size={18} aria-hidden /></Cta>
+                <a href="#today" className="pressable text-[16px] font-semibold text-navy-950 underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
+              </div>
+              <Link href="/sample-report" className="pressable inline-block mt-4 text-[15px] font-medium text-accent-700 hover:underline underline-offset-4">Read a sample report</Link>
+            </div>
           </div>
         </div>
-        <div className="relative hero-rise [animation-delay:320ms] max-w-[1120px] mx-auto mt-7">
+        <div className="relative hero-rise [animation-delay:320ms] max-w-[1240px] mx-auto mt-12 md:mt-16">
           <HeroSchedule />
         </div>
       </header>
