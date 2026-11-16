@@ -9,6 +9,9 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutGrid, Plus, BarChart3, Upload,
   LogOut, X, ChevronDown, Lock, UserCog, Building2, KeyRound, MailCheck, PanelLeftClose, PanelLeftOpen, Trash2,
+  MessageSquare,
+  FileText,
+  Wrench,
 } from 'lucide-react'
 import { fmtDate } from '@/lib/format'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
@@ -70,20 +73,24 @@ const NAV = [
   { href: '/dashboard/history', icon: BarChart3,     label: 'Firm insights' },
   { href: '/dashboard/org',     icon: Building2,     label: 'Organization' },
 ]
-/** Tabs inside one uploaded project, in the order a scheduler works. */
-export const PROJECT_TABS = [
-  { href: '/dashboard/project',     label: 'Overview' },
-  { href: '/dashboard/timeline',    label: 'Schedule' },
-  { href: '/dashboard/quality',     label: 'Quality' },
-  { href: '/dashboard/time-impact', label: 'Delays' },
-  { href: '/dashboard/resources',   label: 'Resources' },
-  { href: '/dashboard/documents',   label: 'Documents' },
-  { href: '/dashboard/reports',     label: 'Reports' },
-  // "Ask", not "Ask AI": with AI off the answers come from RunF9's rules, so the tab does not promise a model.
-  { href: '/dashboard/ask',         label: 'Ask' },
+/**
+ * Tabs inside one project, in the order of the questions a person asks: will we finish on time, what is the plan,
+ * what is wrong with it, what do the records say, what do I send. Each is named for what it shows, and says so
+ * in one line. A tab with more than one view lists them; the view switch sits under the tabs.
+ */
+export const PROJECT_TABS: { href: string; label: string; hint: string; views?: { href: string; label: string }[] }[] = [
+  { href: '/dashboard/project',   label: 'Overview',        hint: 'Will we finish on time, and what needs attention today.' },
+  { href: '/dashboard/timeline',  label: 'Gantt chart',     hint: 'The plan, activity by activity.',
+    views: [{ href: '/dashboard/timeline', label: 'Gantt' }, { href: '/dashboard/resources', label: 'Resources' }] },
+  { href: '/dashboard/quality',   label: 'Health',          hint: 'What is wrong with the schedule, and what delayed it.',
+    views: [{ href: '/dashboard/quality', label: 'Schedule quality' }, { href: '/dashboard/time-impact', label: 'Delays' }] },
+  { href: '/dashboard/documents', label: 'Project records', hint: 'Emails, minutes, daily reports and contract documents. RunF9 reads them for anything that affects the schedule.' },
+  { href: '/dashboard/reports',   label: 'Reports',         hint: 'What you send to the owner.',
+    views: [{ href: '/dashboard/reports', label: 'Reports' }, { href: '/dashboard/earned-value', label: 'Earned value' }] },
 ]
-/** Pages that work on one uploaded schedule: they show the project header and tabs. */
-const SCHEDULE_PAGES = PROJECT_TABS.map(t => t.href)
+const tabPaths = (t: (typeof PROJECT_TABS)[number]) => [t.href, ...(t.views ?? []).map(v => v.href)]
+/** Pages that work on one project: they show the project header and tabs. Ask and the analysis tools are reached from the header. */
+const SCHEDULE_PAGES = [...PROJECT_TABS.flatMap(tabPaths), '/dashboard/ask', '/dashboard/tools']
 const isProjectPage = (pathname: string) => SCHEDULE_PAGES.some(p => pathname.startsWith(p))
 
 const navActive = (pathname: string, href: string) =>
@@ -549,23 +556,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {/* On a phone the breadcrumb is dropped to save height: switching project, uploading and deleting are in this menu. */}
                     {(() => {
                       const owns = can('schedule.write') && selectedSchedule.sourceType !== 'generated'
+                      const addRecord = () => router.push(`/dashboard/documents?schedule=${selectedSchedule.id}&add=1`)
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          <Link href={`/dashboard/ask?schedule=${selectedSchedule.id}`} aria-current={pathname.startsWith('/dashboard/ask') ? 'page' : undefined}
+                            className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 h-10 text-[13px] font-semibold hover:bg-warm-100">
+                            <MessageSquare size={14} aria-hidden="true" /> Ask
+                          </Link>
+                          {/* One place to bring anything into the project: no tab asks for an upload on its own. */}
                           {owns && (
-                            <button type="button" onClick={openUpload} className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 min-h-[40px] text-[13px] font-semibold hover:bg-warm-100">
-                              <Upload size={14} aria-hidden="true" /> Upload update
-                            </button>
+                            <div className="hidden md:block">
+                              <MoreMenu label="Add to project" trigger={<><Plus size={14} aria-hidden="true" /> Add to project</>} items={[
+                                { label: 'Schedule update (P6 or Microsoft Project file)', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" /> },
+                                { label: 'Project record (email, minutes, daily report, contract)', onSelect: addRecord, icon: <FileText size={15} aria-hidden="true" /> },
+                              ]} />
+                            </div>
                           )}
-                          <div className={owns ? '' : 'md:hidden'}>
-                            <MoreMenu label="More actions for this project" items={[
-                              { label: 'Switch project', onSelect: () => setShowScheduleList(true), icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
-                              { label: 'Account and settings', onSelect: () => setShowSettings(true), className: 'md:hidden' },
-                              ...(owns ? [
-                                { label: 'Upload update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
-                                { label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true },
-                              ] : []),
-                            ]} />
-                          </div>
+                          <MoreMenu label="More actions for this project" items={[
+                            { label: 'Switch project', onSelect: () => setShowScheduleList(true), icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
+                            { label: 'Ask about this project', onSelect: () => router.push(`/dashboard/ask?schedule=${selectedSchedule.id}`), icon: <MessageSquare size={15} aria-hidden="true" />, className: 'md:hidden' },
+                            ...(owns ? [
+                              { label: 'Add a schedule update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
+                              { label: 'Add a project record', onSelect: addRecord, icon: <FileText size={15} aria-hidden="true" />, className: 'md:hidden' },
+                            ] : []),
+                            ...(selectedSchedule.sourceType !== 'generated' ? [{ label: 'Analysis tools', onSelect: () => router.push(`/dashboard/tools?schedule=${selectedSchedule.id}`), icon: <Wrench size={15} aria-hidden="true" /> }] : []),
+                            { label: 'Account and settings', onSelect: () => setShowSettings(true), className: 'md:hidden' },
+                            ...(owns ? [{ label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true }] : []),
+                          ]} />
                         </div>
                       )
                     })()}
@@ -579,7 +596,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span aria-hidden="true" className="lg:hidden pointer-events-none absolute -right-2 bottom-px top-3 z-10 flex items-center pl-8 pr-2 bg-[linear-gradient(to_left,#fff_55%,transparent)] text-warm-600"><ChevronDown size={16} className="-rotate-90" /></span>
                 <nav ref={tabsRef} aria-label="Project" className="relative flex gap-1 overflow-x-auto -mx-1 mt-3 pr-8 lg:pr-0">
                   {PROJECT_TABS.map(t => {
-                    const here = pathname.startsWith(t.href)
+                    const here = tabPaths(t).some(h => pathname.startsWith(h))
                     return (
                       <Fragment key={t.href}>
                       <Link href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
@@ -594,6 +611,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   })}
                 </nav>
                 </div>
+                {/* What this tab is for, and its views when it has more than one. */}
+                {(() => {
+                  const t = PROJECT_TABS.find(x => tabPaths(x).some(h => pathname.startsWith(h)))
+                  if (!t || !selectedSchedule) return null
+                  return (
+                    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 py-2 border-t border-warm-200 ${t.views ? '' : 'max-md:hidden'}`}>
+                      {t.views && (
+                        <nav aria-label={`${t.label} views`} className="flex gap-1 rounded-lg bg-warm-100 p-0.5">
+                          {t.views.map(v => {
+                            const on = pathname.startsWith(v.href)
+                            return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
+                              className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-navy-950 shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-navy-950'}`}>{v.label}</Link>
+                          })}
+                        </nav>
+                      )}
+                      <p className="text-[13px] text-warm-600 max-md:hidden">{t.hint}</p>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )}

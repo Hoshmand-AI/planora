@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-16', title: 'Five project tabs named for what they show: Overview, Gantt chart, Health, Project records, Reports; Ask and Add to project are in the header' },
   { date: '2026-11-16', title: 'Today and Overview are one page: the finish answer, what needs attention, and the detail behind it in folded cards' },
   { date: '2026-11-15', title: 'Menus and dialogs close as smoothly as they open; on a phone, swipe a dialog down to dismiss it' },
   { date: '2026-11-15', title: 'Menus open from their button and dialogs ease in; the phone header is solid when you ask for less transparency' },
