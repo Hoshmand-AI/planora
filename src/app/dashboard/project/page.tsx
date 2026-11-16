@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation'
 
 /** One project: the selected schedule's overview. Home (/dashboard) lists every project. */
 export default function ProjectPage() {
-  const { selectedSchedule, metrics, metricsError, refreshMetrics, refreshSchedules, can, openUpload } = useApp()
+  const { selectedSchedule, metrics, metricsError, refreshMetrics, can, openUpload } = useApp()
   // Earned value and the analysis tools used to be tabs of this page; links that still point at them move on.
   const router = useRouter()
   useEffect(() => {
