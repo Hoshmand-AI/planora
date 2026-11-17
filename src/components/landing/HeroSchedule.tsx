@@ -74,7 +74,9 @@ export default function HeroSchedule() {
               <div className="text-fine text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
             </div>
             <div className="text-fine text-warm-700 flex items-center gap-4" aria-hidden="true">
-              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-accent-600 align-middle" /> critical</span>
+              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-done align-middle" /> completed</span>
+              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-todo align-middle" /> remaining</span>
+              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-critical align-middle" /> critical</span>
               <span><span className="inline-block w-0 h-3.5 border-l border-dashed border-navy-700 align-middle" /> data date</span>
               <span><span className="inline-block w-0 h-3.5 border-l-2 border-status-at-risk align-middle" /> required</span>
             </div>
@@ -92,15 +94,18 @@ export default function HeroSchedule() {
                 <div key={a.name} className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3">
                   <div className="text-fine text-warm-700 truncate">{a.name}</div>
                   <div className="relative h-[16px] md:h-[18px] rounded-full bg-warm-100">
+                    {/* What remains: green, turning red when the critical path is found. Over it, the part already done, in blue. */}
                     <div
-                      className="absolute top-0 h-full rounded-full"
+                      className="absolute top-0 h-full rounded-full overflow-hidden"
                       style={{
                         left: `${(a.es / SPAN) * 100}%`,
                         width: shown ? `${(a.dur / SPAN) * 100}%` : '0%',
-                        background: lit ? '#2B63C1' : '#A2A7AC',
+                        background: lit ? '#C81E1E' : '#12A37F',
                         transition: shown ? `width 700ms ${ease} ${i * 110}ms, background-color 500ms ease ${a.crit ? i * 70 : 0}ms` : 'none',
                       }}
-                    />
+                    >
+                      <div className="h-full bg-bar-done" style={{ width: `${Math.max(0, Math.min(1, (SCH.dataDay - a.es) / a.dur)) * 100}%` }} />
+                    </div>
                   </div>
                 </div>
               )

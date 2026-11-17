@@ -78,6 +78,11 @@ module.exports = {
           'info-bg':      '#EEF4FA',
           'complete-bg':  '#F0F7F2',
         },
+        // Schedule bars, the three colours a Primavera P6 user expects: blue for work done, green for work
+        // remaining, red for the critical path. Every timeline in the product and on the public page uses these
+        // three and no others (a baseline and the data date are lines, not bars). The green leans to teal so it
+        // stays apart from the red for people who do not see red and green well.
+        bar: { done: '#2B63C1', todo: '#12A37F', critical: '#C81E1E' },
       },
       fontFamily: {
         display: ['var(--font-digits, var(--font-dm-sans))', 'var(--font-dm-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],

@@ -17,7 +17,7 @@ export default function SampleReportPage() {
         <Link href="/" aria-label="RunF9 home"><Logo variant="dark" size="h-[30px]" /></Link>
         <div className="flex items-center gap-4">
           <Link href="/" className="hidden sm:inline text-small font-medium text-warm-700 hover:text-ink">Back to RunF9</Link>
-          <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-4 py-2 text-small font-semibold text-white hover:bg-accent-700">See plans</Link>
+          <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-4 py-2 text-small font-semibold text-white hover:bg-accent-700">Request a demo</Link>
         </div>
       </nav>
       <main className="max-w-[920px] mx-auto px-6 py-10 md:py-14">
@@ -28,10 +28,6 @@ export default function SampleReportPage() {
         </p>
         <div className="mt-8 rounded-[20px] border border-warm-200 bg-white p-5 md:p-9 overflow-x-auto">
           <Markdown text={SAMPLE_REPORT_MD} className="text-body text-warm-700 leading-relaxed" />
-        </div>
-        <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-6 py-3 text-small font-semibold text-white hover:bg-accent-700">See plans and request access</Link>
-          <p className="text-small text-warm-700">RunF9 writes this for your own schedule in seconds.</p>
         </div>
       </main>
     </div>

@@ -27,6 +27,9 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-17', title: 'Keep a baseline and a comparison schedule for each project: every new update is measured against both' },
+  { date: '2026-11-17', title: 'Upload a schedule kept in Word or PowerPoint, as well as P6, MS Project, Excel and PDF' },
+  { date: '2026-11-17', title: 'Timelines in the three colours of Primavera P6: blue completed, green remaining, red critical' },
   { date: '2026-11-17', title: 'A room code in the photo sets the place: post a code by each door and every picture says which room it shows' },
   { date: '2026-11-17', title: 'Site map: add a drawing of each level, print a code for each room, and see every capture where it was taken' },
   { date: '2026-11-17', title: 'Site captures: take a photo on your phone, say what it shows, and it is filed with the place, the time and the activity' },

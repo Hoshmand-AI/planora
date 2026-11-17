@@ -4,6 +4,7 @@ import type { ParsedSchedule } from './types'
 import { parseXER } from './xer-parser'
 import { parseMSProjectXML } from './xml-parser'
 import { parseP6Xml, isP6Xml } from './p6-xml-parser'
+import { parseOfficeDocument } from './office-parser'
 import { parsePDF } from './pdf-parser'
 import { parseSpreadsheet } from './excel-parser'
 import { decodeCp1252 } from './xer-codec'
@@ -15,8 +16,9 @@ export { parseP6Xml } from './p6-xml-parser'
 export type { ExceptionReport, ExceptionRecord } from './exceptions'
 export { parsePDF } from './pdf-parser'
 export { parseSpreadsheet } from './excel-parser'
+export { parseOfficeDocument } from './office-parser'
 
-export const SUPPORTED_EXTENSIONS = ['.xer', '.xml', '.pdf', '.xlsx', '.csv'] as const
+export const SUPPORTED_EXTENSIONS = ['.xer', '.xml', '.pmxml', '.pdf', '.xlsx', '.xlsm', '.csv', '.docx', '.pptx'] as const
 
 /** Decode text: honours UTF-8/UTF-16 BOMs; falls back to Windows-1252 for non-UTF-8 files (how P6 writes XER; see xer-codec.ts). */
 function decodeText(data: Buffer): string {
@@ -49,6 +51,13 @@ export async function parseScheduleFile(fileName: string, data: Buffer, schedule
     case '.xlsm':
     case '.csv':
       return parseSpreadsheet(data, fileName, scheduleId)
+    case '.docx':
+      return parseOfficeDocument(data, fileName, scheduleId, 'docx')
+    case '.pptx':
+      return parseOfficeDocument(data, fileName, scheduleId, 'pptx')
+    case '.doc':
+    case '.ppt':
+      throw new Error('Legacy .doc and .ppt files are not supported: save as .docx or .pptx and upload again')
     case '.mpp':
       throw new Error('Native .mpp files are binary — export from MS Project as XML (File › Save As › XML format) and upload the .xml')
     case '.xls':
@@ -62,6 +71,6 @@ export async function parseScheduleFile(fileName: string, data: Buffer, schedule
     case '.ppx':
       throw new Error('Asta Powerproject files are not supported — export to MS Project XML or .xlsx/.csv')
     default:
-      throw new Error(`Unsupported file type "${ext || fileName}". Upload a P6 .xer, MS Project .xml, .xlsx, .csv, or .pdf schedule`)
+      throw new Error(`Unsupported file type "${ext || fileName}". Upload a P6 .xer, MS Project .xml, Excel .xlsx, .csv, .pdf, Word .docx or PowerPoint .pptx schedule`)
   }
 }

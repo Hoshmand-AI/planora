@@ -563,7 +563,7 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
                     <td className="px-2 py-2.5 tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(to)}</td>
                     <td colSpan={2} />
                     <td className="px-3 py-2.5">
-                      <div className="relative h-1.5 bg-warm-200/60 rounded-sm"><div className="absolute top-0 h-full rounded-sm bg-warm-500" style={pos(from, to)} /></div>
+                      <div className="relative h-1.5 bg-warm-200/60 rounded-sm"><div className="absolute top-0 h-full rounded-sm bg-bar-todo/50" style={pos(from, to)} /></div>
                     </td>
                   </tr>
                   {shown && list.map(a => {
@@ -671,7 +671,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           : <span className="text-warm-600">{a.rationale.confidence === 'high' ? 'High' : 'Medium'}</span>}</td>
         <td className="px-3 py-2">
           <div className="relative h-2.5 bg-warm-200/60 rounded-sm">
-            <div className={`absolute top-0 h-full rounded-sm ${tm?.critical ? 'bg-accent-600' : 'bg-warm-400'}`} style={{ left: `${left}%`, width: `${width}%` }} />
+            <div className={`absolute top-0 h-full rounded-sm ${tm?.critical ? 'bg-bar-critical' : 'bg-bar-todo'}`} style={{ left: `${left}%`, width: `${width}%` }} />
           </div>
         </td>
       </tr>

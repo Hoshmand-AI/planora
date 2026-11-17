@@ -6,6 +6,8 @@ import { hit, LIMITS } from '@/lib/server/rate-limit'
 import { getScheduleById, getScheduleFileMeta, getScheduleSeries } from '@/lib/db'
 import { basisFrom, basisWarning, loadScheduleData } from '@/lib/planning/service'
 import { compareSchedules, orderSeries, pickDefaultBase, type CompareSide } from '@/lib/analysis/compare'
+import { getScheduleRoles } from '@/lib/server/schedule-roles'
+import { registerKey } from '@/lib/server/register'
 import { analyzeWindow, type WindowRow, type WindowUpdate } from '@/lib/analysis/windows'
 import { exportComparisonCsv } from '@/lib/export/csv'
 import { CSV_CUI_REFUSAL, exportMarking } from '@/lib/export/markings'
@@ -28,7 +30,7 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  */
 export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth }) => {
   const id = req.nextUrl.searchParams.get('id')
-  const baseId = req.nextUrl.searchParams.get('base')
+  let baseId = req.nextUrl.searchParams.get('base')
   const format = req.nextUrl.searchParams.get('format') || 'json'
   if (format !== 'json' && format !== 'csv' && format !== 'xlsx') return NextResponse.json({ error: 'Unknown format. Use json, csv or xlsx.' }, { status: 400 })
   // Look the schedule up first: another organization's id is "not found" whatever else the request says.
@@ -36,6 +38,18 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
   if (!after) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (baseId && id === baseId) return NextResponse.json({ error: 'A schedule cannot be compared with itself. Pick a different update to compare against.', code: 'same_schedule' }, { status: 400 })
   const series = orderSeries(after.projectKey ? await getScheduleSeries(auth.orgId, after.projectKey, after.workspaceId ?? null) : [after])
+  // What the project keeps to compare against: "baseline" names the stored baseline, and with no base given the
+  // stored comparison schedule is used when there is one (otherwise the previous update).
+  const roles = await getScheduleRoles(auth.orgId, registerKey(after))
+  const inSeries = (x: string | null) => (x && x !== after.id && series.some(s => s.id === x) ? x : null)
+  const storedBaseline = inSeries(roles.baselineScheduleId) ?? inSeries(after.baselineScheduleId ?? null)
+  if (baseId === 'baseline') {
+    if (!storedBaseline) return NextResponse.json({ error: 'This project has no stored baseline to compare with. Choose one under "Kept for this project".', code: 'no_baseline' }, { status: 404 })
+    baseId = storedBaseline
+  }
+  const usedStored = !baseId && !!inSeries(roles.comparisonScheduleId)
+  if (usedStored) baseId = inSeries(roles.comparisonScheduleId)
+  const kept = { baselineId: storedBaseline, comparisonId: inSeries(roles.comparisonScheduleId) }
   let before = baseId ? await getScheduleById(baseId, auth.orgId) : undefined
   if (baseId && !before) return NextResponse.json({ error: 'Base schedule not found' }, { status: 404 })
   if (before && before.id === after.id) return NextResponse.json({ error: 'A schedule cannot be compared with itself. Pick a different update to compare against.', code: 'same_schedule' }, { status: 400 })
@@ -51,7 +65,7 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
       ? 'No upload of this project has an earlier data date than this one. Pick an update to compare against.'
       : 'This is the first upload of this project. Upload the next update (same P6 project ID or MS Project title) to compare.'
     if (format !== 'json') return NextResponse.json({ error: message }, { status: 404 })
-    return NextResponse.json({ series: seriesOut, comparison: null, message })
+    return NextResponse.json({ series: seriesOut, comparison: null, message, kept })
   }
 
   if (format === 'xlsx') {
@@ -95,5 +109,5 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth 
     if (isRestrictedClassification(classification)) return NextResponse.json({ error: CSV_CUI_REFUSAL, code: 'cui_csv_excluded' }, { status: 409 })
     return new NextResponse(exportComparisonCsv(comparison), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.csv"` } })
   }
-  return NextResponse.json({ series: seriesOut, comparison, basis })
+  return NextResponse.json({ series: seriesOut, comparison, basis, kept })
 })

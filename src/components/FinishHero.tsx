@@ -81,8 +81,10 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
       {span != null && (
         <div className="mt-5">
           <div className="relative h-2.5 rounded-full bg-warm-200" aria-hidden="true">
-            {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
-            {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(today ?? forecast!)}%`, background: '#A64848' }} />}
+            {/* Blue to the data date (done), green from there to the finish (remaining), red past the required date. */}
+            {dd && (forecast || target) && <div className="absolute inset-y-0 rounded-r-full bg-bar-todo" style={{ left: `${at(dd)}%`, right: `${100 - at(late ? target!.date : (forecast ?? target!.date))}%` }} />}
+            {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-bar-done" style={{ width: `${at(dd)}%` }} />}
+            {late && <div className="absolute inset-y-0 rounded-r-lg bg-bar-critical" style={{ left: `${at(target!.date)}%`, right: `${100 - at(today ?? forecast!)}%` }} />}
             {dd && <Tick left={at(dd)} color="#1D2125" />}
             {target && <Tick left={at(target.date)} color={TARGET} />}
             {forecast && !today && <Tick left={at(forecast)} color={FORECAST} />}

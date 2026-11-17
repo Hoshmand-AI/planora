@@ -1,6 +1,8 @@
 import { alignMspIds } from '@/lib/parsers/msp-identity'
 import { NextResponse } from 'next/server'
 import { createHash, randomUUID as uuid } from 'crypto'
+import { registerKey } from '@/lib/server/register'
+import { getScheduleRoles } from '@/lib/server/schedule-roles'
 import { api, ApiError } from '@/lib/server/api'
 import { audit } from '@/lib/server/audit'
 import { entitlementsFor, requireFeature } from '@/lib/server/entitlements'
@@ -278,9 +280,11 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     // Label versions automatically when not given.
     const versionLabel = versionInput || (series.length ? `Update ${series.length}` : 'Baseline')
     // An update is measured against the series' upload marked Baseline (same activity codes).
-    const baseUpload = pickSeriesBaseline({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series)
+    // The project's stored baseline, when one was chosen, applies to this upload too.
+    const stored = (await getScheduleRoles(ctx.orgId, registerKey({ id: scheduleId, projectKey, workspaceId }))).baselineScheduleId
+    const baseUpload = pickSeriesBaseline({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate, baselineScheduleId: stored }, series)
     const baseActivities = baseUpload ? await getActivities(baseUpload.id) : []
-    const seriesBaseline = seriesBaselineFrom({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate }, series, () => baseActivities)
+    const seriesBaseline = seriesBaselineFrom({ id: scheduleId, version: versionLabel, dataDate: parsed.dataDate, baselineScheduleId: stored }, series, () => baseActivities)
     const baseline = resolveBaseline({ activities: parsed.activities, seriesBaseline, meta: baselineMeta })
 
     const analysis = analyzeSchedule({
@@ -349,6 +353,7 @@ export const POST = api({ permission: 'schedule.write' }, async (req, { auth: ct
     const meta = { classification: classificationInput, uploadOrigin: originInput, runf9Export, historyOverride: history.historyOverride }
     await updateScheduleMeta(schedule.id, ctx.orgId, meta)
     await setScheduleBaselineMeta(schedule.id, ctx.orgId, baselineMeta)
+    if (stored && baseUpload?.id === stored) { await setScheduleBaseline(schedule.id, ctx.orgId, stored); schedule.baselineScheduleId = stored }
     // What the parser saw but did not map, converted or defaulted (never dropped silently).
     const importExceptions = parsed.exceptions ?? emptyReport('import', parsed.sourceType)
     await setScheduleImportExceptions(schedule.id, ctx.orgId, importExceptions)

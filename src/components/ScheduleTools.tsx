@@ -47,6 +47,21 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
   const [cmp, setCmp] = useState<Comparison | null>(null)
   const [cmpMsg, setCmpMsg] = useState<string>('')
   const [base, setBase] = useState<string>('')
+  // The uploads the project keeps to compare against (its baseline, and one more such as last month's update).
+  const [kept, setKept] = useState<{ baselineId: string | null; comparisonId: string | null }>({ baselineId: null, comparisonId: null })
+  const [keptMsg, setKeptMsg] = useState('')
+  async function keep(change: { baselineScheduleId?: string | null; comparisonScheduleId?: string | null }) {
+    setKeptMsg('')
+    try {
+      const r = await fetch(`/api/schedules/${scheduleId}/roles`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(change) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setKeptMsg(d.error || 'The choice was not saved.'); return }
+      setKept({ baselineId: d.baseline?.id ?? null, comparisonId: d.comparison?.id ?? null })
+      setKeptMsg('baselineScheduleId' in change ? (d.baseline ? `${d.baseline.version} is now the baseline every update of this project is measured against.` : 'This project has no stored baseline now.') : (d.comparison ? `${d.comparison.version} is now what each update is compared with.` : 'Each update is compared with the one before it.'))
+      // The comparison below follows the stored choice again, and the headline is measured against the new baseline.
+      setBase(''); setRev(x => x + 1); onChanged()
+    } catch { setKeptMsg('The choice was not saved: could not reach RunF9.') }
+  }
   const [sra, setSra] = useState<Sra | null>(null)
   const [sraErr, setSraErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -71,9 +86,10 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       setSeries(d.series || [])
       setCmp(d.comparison || null)
       setCmpMsg(d.message || d.error || '')
+      if (d.kept) setKept(d.kept)
     }).catch(() => { if (live) setCmpMsg('Could not load the comparison. Check your connection and reload.') })
     return () => { live = false }
-  }, [scheduleId, base, basis])
+  }, [scheduleId, base, basis, rev])
   useEffect(() => { setSra(null) }, [basis])
 
   // The basis the page shows now: an answer for another basis (switched while it ran) is dropped.
@@ -114,10 +130,32 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       )}
 
       <Disclosure tone="card" id="compare" title="What changed since the last update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
+        {series.length > 1 && (
+          <fieldset className="mb-4 rounded-lg border border-warm-200 bg-warm-50 p-3 text-body text-warm-700">
+            <legend className="px-1 font-semibold text-ink">Kept for this project</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">Baseline
+                <select aria-describedby="kept-note" disabled={!canEdit} className="mt-1 block w-full rounded-lg border border-warm-300 bg-white px-2 h-9 text-body text-ink" value={kept.baselineId ?? ''} onChange={e => keep({ baselineScheduleId: e.target.value || null })}>
+                  <option value="">none stored (the upload labelled Baseline, if any)</option>
+                  {series.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
+                </select>
+              </label>
+              <label className="block">Comparison schedule
+                <select aria-describedby="kept-note" disabled={!canEdit} className="mt-1 block w-full rounded-lg border border-warm-300 bg-white px-2 h-9 text-body text-ink" value={kept.comparisonId ?? ''} onChange={e => keep({ comparisonScheduleId: e.target.value || null })}>
+                  <option value="">the update before each one</option>
+                  {series.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
+                </select>
+              </label>
+            </div>
+            <p id="kept-note" className="mt-2 text-caption text-warm-600">Every upload of this project, and each new one, is measured against the baseline. The comparison schedule (last month&rsquo;s update, for example) is what &ldquo;what changed&rdquo; compares with unless you pick another below.</p>
+            <p role="status" className="text-caption text-ink">{keptMsg}</p>
+          </fieldset>
+        )}
         {others.length > 0 && (
           <label className="block text-body text-warm-700 mb-3">Compare against{' '}
-            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>
-              <option value="">previous update (earlier data date)</option>
+            <select className="ml-1 rounded-lg border border-warm-300 px-2 h-9 bg-white text-body text-ink" value={base} onChange={e => setBase(e.target.value)}>
+              <option value="">{kept.comparisonId && kept.comparisonId !== scheduleId ? 'the stored comparison schedule' : 'previous update (earlier data date)'}</option>
+              {kept.baselineId && kept.baselineId !== scheduleId && <option value="baseline">the stored baseline</option>}
               {others.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
             </select>
           </label>
