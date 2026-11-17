@@ -186,8 +186,8 @@ export default function DocumentsPage() {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
         <h2 className="sr-only">Project records</h2>
-        <p className="text-[13px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
-          Records are shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
+        <p className="text-[13px] text-warm-600 max-w-[720px]">
+          Emails, minutes, daily reports and contract documents, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
         {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
@@ -448,19 +448,21 @@ function Requirements({ base, items, canDecide, onChange, onError }: { base: str
   }
   return (
     <Section title="Candidate scheduling requirements" description="Found by rules in the documents, each with its citation. Confirm the ones that apply to this project. Nothing is applied to the schedule or the quality checks automatically.">
-      <ul className="space-y-3">
+      <ul className="divide-y divide-warm-200">
         {items.map(c => (
-          <li key={`${c.documentId}:${c.key}`} className="border border-warm-200 rounded-md p-3 bg-warm-50">
+          <li key={`${c.documentId}:${c.key}`} className="py-3 first:pt-0 last:pb-0 flex flex-col md:flex-row md:items-start gap-2 md:gap-6">
+            <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[13px] font-semibold text-ink">{c.label}: {c.value}</span>
               {c.review && <span className={`${badge} ${c.review.status === 'confirmed' ? 'bg-status-on-track-bg border-status-on-track/40 text-status-on-track' : 'bg-warm-100 border-warm-300 text-warm-600'}`}>{c.review.status === 'confirmed' ? 'Confirmed' : 'Dismissed'} {fmtDay(c.review.createdAt)}</span>}
               {c.documentTrust !== 'approved' && <TrustBadge trust={c.documentTrust} />}
             </div>
             <blockquote className="mt-1 border-l-2 border-warm-300 pl-2 text-[13px] text-warm-700">{c.quote}</blockquote>
-            <div className="mt-1 text-[12px] text-warm-500">{c.citation}</div>
+            <div className="mt-1 text-[12px] text-warm-600">{c.citation}</div>
             {c.fromFlaggedPassage && <p className="mt-1 text-[12px] text-status-attention">From a passage flagged for instruction-like text — check the source before confirming.</p>}
+            </div>
             {canDecide && (
-              <div className="mt-2 flex gap-2">
+              <div className="flex gap-2 flex-shrink-0">
                 <Button variant="secondary" onClick={() => decide(c, 'confirmed')} disabled={c.review?.status === 'confirmed'} aria-label={`Confirm: ${c.label} ${c.value}`}>Confirm</Button>
                 <Button variant="ghost" onClick={() => decide(c, 'dismissed')} disabled={c.review?.status === 'dismissed'} aria-label={`Dismiss: ${c.label} ${c.value}`}>Dismiss</Button>
               </div>

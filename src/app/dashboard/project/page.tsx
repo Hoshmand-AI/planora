@@ -108,7 +108,7 @@ export default function ProjectPage() {
           mustFinishBy={(mx.mustFinishBy as string) || null} baselineFinish={(mx.baselineFinish as string) || null}
           projectStart={(mx.projectStart as string) || null} dataDate={selectedSchedule.dataDate ?? null}
           deadline={headline?.required ? { required: headline.required, daysBehind: headline.daysBehind, text: headline.text } : null} pending={headline === undefined}
-          reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? fmtDates(statusReasons[0]) + (statusReasons.length > 1 ? ` (+${statusReasons.length - 1} more under “Why this status”)` : '')
+          reason={!m ? (metricsError ? 'The numbers for this schedule could not be loaded.' : 'Reading this schedule…') : statusReasons[0] ? null
             : status === 'no_baseline' && !headline?.required ? (isBaselineUpload
               ? 'This upload is the baseline. Upload a status update of the same project and RunF9 measures variance against it.'
               : 'There is no baseline or required finish to measure this forecast against. Mark an upload of this project as Baseline to track variance.')

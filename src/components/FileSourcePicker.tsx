@@ -67,7 +67,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
   return (
     <div className="space-y-4">
       <fieldset>
-        <legend className="block text-[12px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Upload from</legend>
+        <legend className="block text-[12px] font-semibold text-warm-600 mb-1.5">Upload from</legend>
         <div className="flex flex-wrap gap-1.5">
           <SourceChip active={from === 'computer'} onClick={() => choose('computer')} icon={<Laptop size={14} aria-hidden />} label="This computer" />
           {readable.map(c => <SourceChip key={c.id} active={from === c.id} onClick={() => choose(c.id)} icon={<Cloud size={14} aria-hidden />} label={c.name} title={`${c.providerLabel} · ${c.location}`} />)}
@@ -134,7 +134,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
       )}
 
       <label className="block">
-        <span className="block text-[12px] font-semibold uppercase tracking-wider text-warm-600 mb-1.5">Keep the original file in</span>
+        <span className="block text-[12px] font-semibold text-warm-600 mb-1.5">Keep the original file in</span>
         <select name="keepIn" defaultValue={keepValue} className={fieldClass}>
           <option value={keepValue}>{keepLabel}</option>
           {writable.map(c => <option key={c.id} value={c.id}>{c.name} ({c.providerLabel})</option>)}

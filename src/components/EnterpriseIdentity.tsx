@@ -46,7 +46,7 @@ function CopyLine({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function EnterpriseIdentity({ roles }: { roles: { id: string; label: string }[] }) {
+export function EnterpriseIdentity({ roles, hideUnavailable = false }: { roles: { id: string; label: string }[]; /** The page already says these are part of the Enterprise plan: a section that is not available is not shown again. */ hideUnavailable?: boolean }) {
   const [saml, setSaml] = useState<SamlData | null>(null)
   const [scim, setScim] = useState<ScimData | null>(null)
   const [form, setForm] = useState<Form | null>(null)
@@ -128,7 +128,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
   const sp = saml.saml.sp
   return (
     <>
-      <Section id="saml" title="SAML single sign-on" description="Use SAML 2.0 with Microsoft Entra ID, Okta, Ping, ADFS, Google Workspace or any SAML identity provider (alongside, or instead of, OpenID Connect above). Responses must be signed with one of the certificates below; people with an allowed email domain are added on first sign-in.">
+      {!(hideUnavailable && !saml.available) && <Section id="saml" title="SAML single sign-on" description="Use SAML 2.0 with Microsoft Entra ID, Okta, Ping, ADFS, Google Workspace or any SAML identity provider (alongside, or instead of, OpenID Connect above). Responses must be signed with one of the certificates below; people with an allowed email domain are added on first sign-in.">
         {note('saml')}
         {!saml.available ? <p className="text-[13px] text-warm-600">SAML single sign-on is part of the Enterprise plan.</p> : (
           <form className="space-y-3" onSubmit={save}>
@@ -187,9 +187,9 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
             <Button type="submit" disabled={busy === 'saml'}>{busy === 'saml' ? 'Saving…' : 'Save SAML settings'}</Button>
           </form>
         )}
-      </Section>
+      </Section>}
 
-      <Section id="scim" title="SCIM provisioning" description="Let your identity provider add, update and remove members automatically (SCIM 2.0). Deactivating or deleting someone in your identity provider disables their RunF9 account and signs them out everywhere at once. Members are matched by email and must be in one of your verified single sign-on domains.">
+      {!(hideUnavailable && scim && !scim.available) && <Section id="scim" title="SCIM provisioning" description="Let your identity provider add, update and remove members automatically (SCIM 2.0). Deactivating or deleting someone in your identity provider disables their RunF9 account and signs them out everywhere at once. Members are matched by email and must be in one of your verified single sign-on domains.">
         {note('scim')}
         {scim && (!scim.available ? <p className="text-[13px] text-warm-600">SCIM provisioning is part of the Enterprise plan.</p> : (
           <div className="space-y-4">
@@ -254,7 +254,7 @@ export function EnterpriseIdentity({ roles }: { roles: { id: string; label: stri
             </div>
           </div>
         ))}
-      </Section>
+      </Section>}
     </>
   )
 }

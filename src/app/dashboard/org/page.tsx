@@ -9,6 +9,7 @@ import { Section, Field, Button, Alert, PageHeader, inputClass, postJson } from 
 import { Integrations } from '@/components/Integrations'
 import { EnterpriseIdentity } from '@/components/EnterpriseIdentity'
 import { Workspaces } from '@/components/Workspaces'
+import { Disclosure } from '@/components/Disclosure'
 import { fmtDay, fmtDates, fmtDateTime } from '@/lib/format'
 
 interface Member { id: string; name: string; email: string; role: string; createdAt: string; mfaEnabled?: boolean; lockedUntil?: string | null }
@@ -223,7 +224,7 @@ export default function OrgPage() {
         <div tabIndex={0} role="region" aria-label="Organization members" className="relative overflow-x-auto">
           <table className="w-full text-[13px]">
             <caption className="sr-only">Organization members</caption>
-            <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+            <thead><tr className="text-left text-[12px] text-warm-500 border-b border-warm-200">
               <th scope="col" className="py-2 pr-3 font-semibold">Member</th><th scope="col" className="py-2 pr-3 font-semibold">Role</th>
               {manage && <th scope="col" className="py-2 pr-3 font-semibold whitespace-nowrap">2-step</th>}
               {manage && <th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>}
@@ -318,9 +319,12 @@ export default function OrgPage() {
               <Field label="Keep Ask AI history (days)" hint="0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.chatRetentionDays} onChange={e => setSettings({ ...settings, chatRetentionDays: Number(e.target.value) })} />}</Field>
               <Field label="Delete inactive projects after (days)" hint="Plans and uploaded schedules unchanged this long are deleted. 0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.projectRetentionDays} onChange={e => setSettings({ ...settings, projectRetentionDays: Number(e.target.value) })} />}</Field>
             </div>
-            <fieldset className="pt-2">
-              <legend className="text-[13px] font-medium text-ink">Quality check thresholds (DCMA 14-point)</legend>
-              <p className="text-[12px] text-warm-500 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
+            {/* Two settings that few organizations change, folded; the security policies above stay open with their explanations. */}
+            <div>
+            <Disclosure title="Quality check thresholds (DCMA 14-point)" meta={settings.quality.maxPct === 5 && settings.quality.minFsPct === 90 && settings.quality.highFloatDays === 44 && settings.quality.highDurationDays === 44 && settings.quality.indexTarget === 0.95 ? 'published DCMA values' : 'changed from the DCMA values'}>
+            <fieldset>
+              <legend className="sr-only">Quality check thresholds (DCMA 14-point)</legend>
+              <p className="text-[12px] text-warm-600 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
               <div className="grid sm:grid-cols-3 gap-3">
                 <Field label="Max share of offenders (%)" hint="Logic, lags, hard constraints, high float, high duration, missed tasks. 1–25.">{p => <input {...p} type="number" min={1} max={25} className={inputClass} value={settings.quality.maxPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, maxPct: Number(e.target.value) } })} />}</Field>
                 <Field label="Min finish-to-start links (%)" hint="Relationship types. 50–100.">{p => <input {...p} type="number" min={50} max={100} className={inputClass} value={settings.quality.minFsPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, minFsPct: Number(e.target.value) } })} />}</Field>
@@ -329,9 +333,11 @@ export default function OrgPage() {
                 <Field label="Min CPLI and BEI" hint="0.80–1.00.">{p => <input {...p} type="number" min={0.8} max={1} step={0.01} className={inputClass} value={settings.quality.indexTarget} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, indexTarget: Number(e.target.value) } })} />}</Field>
               </div>
             </fieldset>
-            <fieldset className="pt-2">
-              <legend className="text-[13px] font-medium text-ink">Default standards framework</legend>
-              <p className="text-[12px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
+            </Disclosure>
+            <Disclosure title="Default standards framework" meta={(settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']).map(fw => STANDARD_FRAMEWORK_OPTIONS.find(([k]) => k === fw)?.[1] ?? fw).join(', ')}>
+            <fieldset>
+              <legend className="sr-only">Default standards framework</legend>
+              <p className="text-[12px] text-warm-600 mb-2">Which framework the Standards view on the Health page runs first. Anyone can still pick another framework for a single run.</p>
               <div className="space-y-1.5">
                 {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
                   const current = settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']
@@ -349,12 +355,17 @@ export default function OrgPage() {
                 })}
               </div>
             </fieldset>
+            </Disclosure>
+            </div>
             <Button disabled={busy === 'settings'} onClick={async () => { const d = await act('settings', { action: 'update_settings', settings }, 'Policies saved.'); if (d) load() }}>Save policies</Button>
           </div>
         </Section>
       )}
 
-      {manage && (
+      {manage && !data.plan.sso && (
+        <Section title="Single sign-on and provisioning" description="Sign-in with your identity provider (OpenID Connect or SAML 2.0) and automatic member provisioning (SCIM 2.0) are part of the Enterprise plan. To change plans, contact support@hoshmand.ai.">{null}</Section>
+      )}
+      {manage && data.plan.sso && (
         <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider; for SAML 2.0 see below). People with an allowed email domain are added on first sign-in with the default role.">
           {note('sso')}
           {!data.plan.sso ? <p className="text-[13px] text-warm-600">Single sign-on is part of the Enterprise plan.</p> : (
@@ -388,7 +399,7 @@ export default function OrgPage() {
         </Section>
       )}
 
-      {manage && <EnterpriseIdentity roles={data.roles} />}
+      {manage && <EnterpriseIdentity roles={data.roles} hideUnavailable={!data.plan.sso} />}
       </div>
 
       <div role="tabpanel" id="org-panel-integrations" aria-labelledby="org-tab-integrations" hidden={active !== 'integrations'} className="space-y-5">
@@ -427,7 +438,7 @@ export default function OrgPage() {
           <div tabIndex={0} role="region" aria-label="Audit log, newest first" className="relative overflow-x-auto">
             <table className="w-full text-[12px]">
               <caption className="sr-only">Audit log, newest first</caption>
-              <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-[12px] text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">When</th><th scope="col" className="py-2 pr-3 font-semibold">Who</th><th scope="col" className="py-2 pr-3 font-semibold">What</th><th scope="col" className="py-2 font-semibold">Details</th>
               </tr></thead>
               <tbody>

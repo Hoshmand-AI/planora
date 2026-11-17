@@ -174,7 +174,7 @@ function SequencingCard({ seq }: { seq: FirmSequencing }) {
                   <tr key={`${p.from}>${p.to}`} className="border-t border-warm-200">
                     <td className="py-1.5 text-ink">{cap(p.fromLabel)}</td>
                     <td className="py-1.5 text-ink">{cap(p.toLabel)}</td>
-                    <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-[12px] font-semibold uppercase text-accent-600">your habit</span>}</td>
+                    <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-[12px] text-warm-600">· your habit</span>}</td>
                     <td className="py-1.5 text-right tabular-nums">{p.projects} of {p.of}</td>
                   </tr>
                 ))}

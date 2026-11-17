@@ -528,7 +528,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* The open project's pages are a list in the sidebar, like the rest of the app's destinations (they were tabs across the top). */}
           {inProject && selectedSchedule && (
             <div className="mt-3 pt-3 border-t border-warm-200 min-h-0 overflow-y-auto">
-              {sidebarOpen && <p className="px-3 pb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-warm-600 truncate" title={selectedSchedule.name}>{selectedSchedule.name}</p>}
+              {sidebarOpen && <p className="px-3 pb-1.5 text-[12px] font-semibold text-warm-600 truncate" title={selectedSchedule.name}>{selectedSchedule.name}</p>}
               <nav aria-label="Project" className="flex flex-col gap-0.5">
                 {PROJECT_TABS.map(t => {
                   const here = tabPaths(t).some(h => pathname.startsWith(h))
@@ -694,11 +694,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   })}
                 </nav>
                 </div>
-                {/* A tab's views: on the tab row's right on a wide screen, a row of their own where the tabs need the width. Project records keeps one line saying what it holds. */}
+                {/* A tab's views: on the tab row's right on a wide screen, a row of their own where the tabs need the width. A page without views has nothing here: what it holds is said once, on the page. */}
                 {(() => {
                   const t = PROJECT_TABS.find(x => tabPaths(x).some(h => pathname.startsWith(h)))
                   if (!t || !selectedSchedule) return null
-                  if (!t.views) return t.href === '/dashboard/documents' ? <p className="py-2 border-t border-warm-200 text-[13px] text-warm-600 max-md:hidden">{t.hint}</p> : null
+                  if (!t.views) return null
                   return (
                     <div className={`py-2 border-t border-warm-200 ${sidebarOpen ? 'md:hidden' : ''}`}>
                       <nav aria-label={`${t.label} views`} className="inline-flex gap-1 rounded-lg bg-warm-100 p-0.5">
@@ -807,7 +807,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
                 <div className="mb-4">
-                  <div id="upload-tag-h" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
+                  <div id="upload-tag-h" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
                   <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
                     <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
                       <option value="">Facility type…</option>
@@ -837,7 +837,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p className="col-span-2 text-[12px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 <div className="mb-5">
-                  <label htmlFor="upload-version" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
+                  <label htmlFor="upload-version" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Version label</label>
                   <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
                     className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13px] text-warm-700" />
                 </div>
@@ -901,11 +901,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="space-y-3">
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
+                  <div className="text-[12px] font-semibold text-warm-400 mb-2">Profile</div>
                   <div className="text-[14px] font-semibold text-ink">{user.name}</div>
                   <div className="text-[13px] text-warm-500">{user.email}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {user.role && <span className="inline-block text-[12px] font-semibold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
+                    {user.role && <span className="inline-block text-[12px] font-semibold capitalize text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md">{user.role}</span>}
                     {org && <span className="inline-block text-[12px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
                 </div>
@@ -924,7 +924,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 {llm && (
                   <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                    <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">AI processing</div>
+                    <div className="text-[12px] font-semibold text-warm-400 mb-2">AI processing</div>
                     <div className="text-[13px] text-warm-700 font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
                     <div className="text-[12px] text-warm-500 mt-1">
                       {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
@@ -934,7 +934,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 )}
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">About</div>
+                  <div className="text-[12px] font-semibold text-warm-400 mb-2">About</div>
                   <div className="text-[13px] text-warm-600">RunF9 · Version 1.0</div>
                   <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
                   <div className="flex gap-4 mt-2">

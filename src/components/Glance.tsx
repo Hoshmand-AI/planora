@@ -1,13 +1,14 @@
 'use client'
 
 // Glanceable tiles in the spirit of home-screen widgets: a progress ring and a big counter on a plain
-// surface; the figure takes the status color. Every value is also written out as text.
+// surface. The figure is plain; its status is a small dot beside the caption, so a page of tiles is not
+// a page of colored numbers. Every value is also written out as text.
 
 import { MoodTile, type RobotMood } from '@/components/Robot'
 
 // Palette colors only: accent for work in progress, the status colors for attention / on track / at risk.
 const RING: Record<RobotMood, string> = { working: '#2B63C1', waiting: '#1F4E9E', done: '#2F7358', worried: '#A64848', idle: '#666C72' }
-const FIGURE: Record<RobotMood, string> = { working: 'text-ink', idle: 'text-ink', waiting: 'text-status-attention', done: 'text-status-on-track', worried: 'text-status-at-risk' }
+const DOT: Record<RobotMood, string | null> = { working: null, idle: null, waiting: 'bg-status-attention', done: 'bg-status-on-track', worried: 'bg-status-at-risk' }
 
 /** A share as a ring with the percentage in the middle; the label says what it is a share of. */
 export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; percent: number; label: string; sub?: React.ReactNode }) {
@@ -33,8 +34,8 @@ export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; perce
 export function CounterTile({ mood, value, label, sub }: { mood: RobotMood; value: React.ReactNode; label: string; sub?: React.ReactNode }) {
   return (
     <MoodTile mood={mood} className="flex flex-col justify-center h-full">
-      <div className={`text-[28px] font-semibold tabular-nums leading-none ${FIGURE[mood]}`}>{value}</div>
-      <div className="text-[13px] text-warm-700 mt-1.5">{label}</div>
+      <div className="text-[28px] font-semibold tabular-nums leading-none text-ink">{value}</div>
+      <div className="text-[13px] text-warm-700 mt-1.5 flex items-center gap-1.5">{DOT[mood] && <span aria-hidden="true" className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${DOT[mood]}`} />}{label}</div>
       {sub && <div className="text-[12px] text-warm-600 mt-0.5">{sub}</div>}
     </MoodTile>
   )
