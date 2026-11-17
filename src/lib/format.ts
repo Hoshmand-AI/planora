@@ -40,6 +40,21 @@ export function fmtDay(iso: string | null | undefined, order: DateOrder = DEFAUL
   return isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString(locale(order), { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 
+/**
+ * A number with its unit, as people write it: thousands separated, dollars with a dollar sign, a percentage
+ * closed up. (12000, "USD per calendar day") → "$12,000 per calendar day"; (90, "%") → "90%"; (3, "stories") → "3 stories".
+ * Anything that is not a number passes through with its unit.
+ */
+export function fmtAmount(value: unknown, unit?: string): string {
+  const n = typeof value === 'number' ? value : Number(value)
+  const text = Number.isFinite(n) && String(value ?? '').trim() !== '' ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(value ?? '')
+  if (!unit || text === '') return text
+  if (unit === '%') return `${text}%`
+  if (unit === 'USD millions') return `$${text} million`
+  if (unit.startsWith('USD ')) return `$${text} ${unit.slice(4)}`
+  return `${text} ${unit}`
+}
+
 /** Lower-case words for use mid-sentence while keeping acronyms and units intact ("UPS systems", "MEP", "kV"). */
 export function midSentence(text: string): string {
   return text.split(/(\s+|\/|\(|\))/).map(w => (/^[A-Z][a-z]+(-[a-z]+)*$/.test(w) ? w.toLowerCase() : w)).join('')

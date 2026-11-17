@@ -135,7 +135,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     <div className="space-y-4 text-[13px] text-warm-700">
       <p className="text-warm-600">Edits change RunF9&apos;s copy of this schedule only; the uploaded file is kept unchanged. Each edit is recalculated with the full network, recorded with its reason in the audit log, and included in exports and reports.</p>
       {applied.length === 0 ? <p>No edits yet.</p> : (
-        <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
+        <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Edits made in RunF9"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
@@ -266,8 +266,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
   }
   const cell = `${input} w-16`
   return (
-    <div className="space-y-3 text-[13px] text-warm-700 border-t border-warm-200 pt-3">
-      <p className="font-semibold text-ink">Your ranges and risk events</p>
+    <div className="space-y-3 text-[13px] text-warm-700">
       <p className="text-warm-600">Ranges are work days of remaining work (optimistic / most likely / pessimistic) and replace the rule-based range for that activity. By name, {inputs.defaults.procurement} fabrication / delivery / procurement activities use a supplier range and {inputs.defaults.cure} cure activities are held at fixed duration unless you give them a range.</p>
       <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Three-point ranges</caption>
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Optimistic</th><th className={th}>Most likely</th><th className={th}>Pessimistic</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>

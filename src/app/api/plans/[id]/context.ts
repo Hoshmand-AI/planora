@@ -12,6 +12,7 @@ import { historyForPlan } from '@/lib/planning/history'
 import { deploymentKind, llmStatus } from '@/lib/llm/provider'
 import { classifiedCloudRefusal, CLASSIFIED_CLOUD_CODE, planMarkedClassified } from '@/lib/server/classification'
 import type { ProjectType } from '@/lib/planning/types'
+import { fmtAmount } from '@/lib/format'
 
 /**
  * Loads a plan in the caller's organization. Another firm's plan id returns 404, not 403, so ids
@@ -59,7 +60,8 @@ export async function planView(plan: Plan, orgId: string) {
   const answered = Object.entries(plan.answers).map(([id, a]) => {
     const q = bank.get(id) ?? (id === 'history.use' ? HISTORY_USE_QUESTION : undefined)
     const label = a.status !== 'known' ? (a.status === 'withheld' ? 'Withheld' : "Don't know")
-      : q?.options?.find(o => o.value === a.value)?.label ?? (typeof a.value === 'boolean' ? (a.value ? 'Yes' : 'No') : `${a.value}${q?.unit && q.unit !== 'sf' ? ' ' + q.unit : q?.unit === 'sf' ? ' sf' : ''}`)
+      : q?.options?.find(o => o.value === a.value)?.label ?? (typeof a.value === 'boolean' ? (a.value ? 'Yes' : 'No')
+        : typeof a.value === 'number' || q?.kind === 'number' ? fmtAmount(a.value, q?.unit) : `${a.value}${q?.unit ? ' ' + q.unit : ''}`)
     return { id, prompt: q?.prompt ?? id, section: q?.section ?? 'project', label, status: a.status, value: a.value ?? null, note: a.note ?? null, custom: !!a.custom }
   })
   const rules = normalizeSettings((await getOrganization(orgId))?.settings).quality

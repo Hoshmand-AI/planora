@@ -4,6 +4,8 @@
 // from this computer or a connected cloud storage (Organization > Cloud storage); the original can
 // be kept in RunF9 or in a connected storage. Renders the form fields the upload APIs read:
 // file | sourceConnectionId + sourceKey, and keepIn (src/lib/storage/upload-source.ts).
+// A choice is only shown when there is one: without a connected storage the picker is the file field
+// and one line saying where cloud storage is connected.
 
 import { useCallback, useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
@@ -66,23 +68,20 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
 
   return (
     <div className="space-y-4">
+      {readable.length > 0 && (
       <fieldset>
         <legend className="block text-[12px] font-semibold text-warm-600 mb-1.5">Upload from</legend>
         <div className="flex flex-wrap gap-1.5">
           <SourceChip active={from === 'computer'} onClick={() => choose('computer')} icon={<Laptop size={14} aria-hidden />} label="This computer" />
           {readable.map(c => <SourceChip key={c.id} active={from === c.id} onClick={() => choose(c.id)} icon={<Cloud size={14} aria-hidden />} label={c.name} title={`${c.providerLabel} · ${c.location}`} />)}
         </div>
-        {connections && readable.length === 0 && (
-          <p className="text-[12px] text-warm-600 mt-1.5">
-            {canManage ? <>To upload from AWS, Azure or Google Cloud, <Link href="/dashboard/org#cloud-storage" className="text-accent-600 underline">connect your cloud storage</Link>.</> : 'An admin can connect your AWS, Azure or Google Cloud storage in Organization settings.'}
-          </p>
-        )}
       </fieldset>
+      )}
 
       {from === 'computer' ? (
         <div>
           <input type="file" name="file" accept={accept} required aria-label="File"
-            className={`${fieldClass} file:mr-3 file:bg-accent-600 hover:bg-accent-700 file:text-white file:border-0 file:rounded-lg file:px-4 file:py-1.5 file:text-[13px] file:font-semibold file:cursor-pointer`} />
+            className={`${fieldClass} file:mr-3 file:bg-white file:text-ink file:border file:border-solid file:border-warm-300 file:rounded-lg file:px-3.5 file:py-1.5 file:text-[13px] file:font-medium file:cursor-pointer hover:file:bg-warm-100`} />
           {hint && <p className="text-[12px] text-warm-600 mt-1.5">{hint}</p>}
         </div>
       ) : (
@@ -133,14 +132,22 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
         </div>
       )}
 
+      {writable.length > 0 ? (
       <label className="block">
         <span className="block text-[12px] font-semibold text-warm-600 mb-1.5">Keep the original file in</span>
         <select name="keepIn" defaultValue={keepValue} className={fieldClass}>
           <option value={keepValue}>{keepLabel}</option>
           {writable.map(c => <option key={c.id} value={c.id}>{c.name} ({c.providerLabel})</option>)}
         </select>
-        <span className="block text-[12px] text-warm-600 mt-1.5">{writable.length ? 'Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.' : 'Connect your cloud storage to keep original files there instead.'}</span>
+        <span className="block text-[12px] text-warm-600 mt-1.5">Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.</span>
       </label>
+      ) : <input type="hidden" name="keepIn" value={keepValue} />}
+      {/* No storage connected: one line says where to connect it, for uploading from it and for keeping originals in it. */}
+      {connections && readable.length === 0 && writable.length === 0 && (
+        <p className="text-[12px] text-warm-600">
+          {canManage ? <>To upload from, or keep originals in, AWS, Azure or Google Cloud, <Link href="/dashboard/org#cloud-storage" className="text-accent-600 underline">connect your cloud storage</Link>.</> : 'An admin can connect your AWS, Azure or Google Cloud storage in Organization settings.'}
+        </p>
+      )}
     </div>
   )
 }
