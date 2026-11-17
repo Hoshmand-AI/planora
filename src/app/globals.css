@@ -156,7 +156,7 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 /* Mood tiles: a soft tint and glow per status */
 /* Status tiles use the palette's plain surface for every state: white, divider border and the standard card shadow.
    Status is carried by the palette's status colors on the figure or label, never by a tinted or glowing tile. */
-.mood-tile { position: relative; isolation: isolate; background: #FFFFFF; border-color: var(--warm-200); box-shadow: 0 1px 2px rgb(29 33 37 / 0.06), 0 14px 32px -24px rgb(29 33 37 / 0.16); }
+.mood-tile { position: relative; isolation: isolate; background: #FFFFFF; border-color: var(--warm-200); box-shadow: none; }
 
 
 /* ── Marketing page motion (src/components/landing): fade up on first view, nothing loops ── */

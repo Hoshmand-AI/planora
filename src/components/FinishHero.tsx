@@ -8,13 +8,13 @@ import { fmtDate } from '@/lib/format'
 type Status = 'on_track' | 'attention' | 'at_risk' | 'complete' | 'no_baseline'
 
 // The verdict is a pill in the palette's status colors (status text on its tint, AA contrast);
-// with nothing to compare against it is plain light text on the navy panel.
+// with nothing to compare against it is plain muted text.
 const PILL: Record<Status, string> = {
   at_risk: 'bg-status-at-risk-bg text-status-at-risk', attention: 'bg-status-attention-bg text-status-attention',
-  on_track: 'bg-status-on-track-bg text-status-on-track', complete: 'bg-status-complete-bg text-status-complete', no_baseline: 'text-navy-200',
+  on_track: 'bg-status-on-track-bg text-status-on-track', complete: 'bg-status-complete-bg text-status-complete', no_baseline: 'text-warm-600',
 }
-// Ribbon marks (palette): progress to the data date in blue with a white tick, target light steel, forecast sky blue.
-const FORECAST = '#7FAAE8', TARGET = '#D3D6D9', DATA_DATE = '#2B63C1'
+// Ribbon marks (palette): progress to the data date in blue with a dark tick, target grey, forecast lighter blue.
+const FORECAST = '#4A82D6', TARGET = '#5A6066', DATA_DATE = '#2B63C1'
 
 const day = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000
 const plural = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
@@ -63,26 +63,26 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   const late = target && forecast && diff != null && diff > 0
 
   return (
-    <section aria-label="Finish forecast" className="rise-in rounded-[14px] bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
-      <p className="text-[14px] text-warm-200">Will we finish on time?</p>
+    <section aria-label="Finish forecast" className="rise-in rounded-[14px] border border-warm-200 bg-white text-ink p-6 md:p-8">
+      <p className="text-[14px] text-warm-600">Will we finish on time?</p>
       {/* The largest figure is the answer. A date that has already passed is not one, so then it is how late the work is. */}
-      <p className="mt-1 text-[36px] md:text-[48px] font-semibold tracking-[-0.02em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
+      <p className="mt-1 text-[28px] md:text-[36px] font-semibold tracking-[-0.02em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
       {/* The verdict sits on its own line under the date: beside it, it competed with the date and wrapped into a block on a phone. */}
       {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[14px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
       {/* One line of explanation; the rest is under "Why this status". */}
-      {overdue ? <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
-        : reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
-      {note && <p className="mt-2 text-[13px] text-warm-200 leading-relaxed max-w-3xl">{note}</p>}
+      {overdue ? <p className="mt-3 text-[14px] text-warm-600 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
+        : reason && <p className="mt-3 text-[14px] text-warm-600 leading-relaxed max-w-3xl">{reason}</p>}
+      {note && <p className="mt-2 text-[13px] text-warm-600 leading-relaxed max-w-3xl">{note}</p>}
 
       {span != null && (
         <div className="mt-6">
-          <div className="relative h-2.5 rounded-full bg-navy-800" aria-hidden="true">
+          <div className="relative h-2.5 rounded-full bg-warm-200" aria-hidden="true">
             {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
             {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(today ?? forecast!)}%`, background: '#A64848' }} />}
-            {dd && <Tick left={at(dd)} color="#FFFFFF" />}
+            {dd && <Tick left={at(dd)} color="#1D2125" />}
             {target && <Tick left={at(target.date)} color={TARGET} />}
             {forecast && !today && <Tick left={at(forecast)} color={FORECAST} />}
-            {today && <Tick left={at(today)} color="#FFFFFF" />}
+            {today && <Tick left={at(today)} color="#1D2125" />}
           </div>
           <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-2 text-[13px]">
             {start && <Item label="Start" date={start} dot="#A2A7AC" />}
@@ -106,7 +106,7 @@ function Item({ label, date, dot }: { label: string; date: string; dot: string }
   return (
     <div className="grid grid-cols-[8px_1fr] items-center gap-x-1.5 sm:flex">
       <span aria-hidden="true" className="h-2 w-2 rounded-full max-sm:row-span-2" style={{ background: dot }} />
-      <dt className="text-warm-200 whitespace-nowrap">{label}</dt>
+      <dt className="text-warm-600 whitespace-nowrap">{label}</dt>
       <dd className="font-semibold tabular-nums whitespace-nowrap max-sm:col-start-2">{fmtDate(date)}</dd>
     </div>
   )
