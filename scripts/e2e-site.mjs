@@ -30,6 +30,21 @@ function ok(cond, msg, extra) {
   console.log(`✓ ${msg}`)
 }
 
+// Inviting a member needs a confirmed email address: follow the link RunF9 wrote to the test outbox (as in ci.yml).
+const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
+async function confirmEmail(client, address) {
+  if (!OUTBOX) { console.error('✗ Set RUNF9_EMAIL_OUTBOX to the server\'s outbox folder for this suite (see ci.yml).'); process.exit(1) }
+  for (let i = 0; i < 50; i++) {
+    for (const f of fs.readdirSync(OUTBOX).filter(x => x.endsWith('.json')).sort().reverse()) {
+      const m = JSON.parse(fs.readFileSync(path.join(OUTBOX, f), 'utf8'))
+      const hit = m.to === address && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
+      if (hit) { const u = new URL(hit[0]); await client.raw('GET', u.pathname + u.search); return }
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  throw new Error(`no confirmation email to ${address}`)
+}
+
 class Client {
   constructor() { this.cookie = '' }
   async raw(method, url, body, headers = {}) {
@@ -100,6 +115,16 @@ ok(img.headers.get('x-content-type-options') === 'nosniff' && /sandbox/.test(img
 const part = await a.raw('GET', `${base}/${cap.id}/media/${audio.id}`, undefined, { range: 'bytes=0-99' })
 ok(part.status === 206 && part.headers.get('content-range') === `bytes 0-99/${WEBM.length}` && (await part.arrayBuffer()).byteLength === 100, 'a voice note answers a byte range (phone browsers play audio that way)')
 ok((await a.raw('GET', `${base}/${cap.id}/media/${audio.id}`, undefined, { range: `bytes=${WEBM.length + 5}-` })).status === 416, 'a range past the end is refused')
+
+// The browser keeps the bytes and asks before showing them again; a second send of the same capture is not a second capture.
+const etag = img.headers.get('etag')
+ok(/no-cache/.test(img.headers.get('cache-control') || '') && (await a.raw('GET', `${base}/${cap.id}/media/${photo.id}`, undefined, { 'if-none-match': etag })).status === 304, 'the browser asks RunF9 before it shows its own copy of a photo again')
+const clientId = `e2e-${stamp}-retry`
+const once = await a.post(base, capture({ status: 'progress', note: 'Sent, and the answer was lost on the way.', clientId }, { photos: [{ bytes: JPEG }] }))
+const twice = await a.post(base, capture({ status: 'progress', note: 'Sent, and the answer was lost on the way.', clientId }, { photos: [{ bytes: JPEG }] }))
+ok(once.status === 200 && twice.status === 200 && twice.data.capture.id === once.data.capture.id && twice.data.alreadySent === true, 'a capture the phone sends twice is stored once', twice.data)
+ok((await a.get(base)).data.captures.filter(c => /answer was lost/.test(c.note)).length === 1, 'and listed once')
+ok((await a.del(`${base}/${once.data.capture.id}`)).status === 200 && (await a.post(base, capture({ status: 'progress', note: 'Sent, and the answer was lost on the way.', clientId }))).status === 410, 'sending it again after it was deleted does not bring it back')
 
 // Refusals: each with a message a person can act on.
 const page = await a.post(base, capture({ status: 'progress' }, { photos: [{ bytes: Buffer.from('<!doctype html><html><script>alert(1)</script></html>'), type: 'image/jpeg', name: 'photo.jpg' }] }))
@@ -240,11 +265,65 @@ await context.setOffline(false)
 await pg.evaluate(() => window.dispatchEvent(new Event('online')))
 await pg.getByText(/waiting on this phone has been sent/).waitFor({ timeout: 20_000 })
 ok((await a.get(base)).data.captures.some(c => /Roof membrane/.test(c.note)), 'when the connection returns the waiting capture is sent')
+// The camera button in the project header works while the Site page is already open, more than once.
+for (const n of [1, 2]) {
+  await pg.getByRole('button', { name: 'New site capture' }).click()
+  await sheet.waitFor()
+  await sheet.getByRole('button', { name: 'Close' }).click()
+  await sheet.waitFor({ state: 'detached' })
+  ok(true, `the header's camera button opens a capture from the Site page (press ${n})`)
+}
+// Saving while the microphone is still recording keeps what was said.
+await pg.getByRole('button', { name: 'New capture' }).first().click()
+await sheet.waitFor()
+await sheet.getByRole('button', { name: 'In progress', exact: true }).click()
+await sheet.getByRole('button', { name: 'Record a voice note' }).click()
+await sheet.getByRole('button', { name: /^Stop/ }).waitFor()
+await pg.waitForTimeout(1500)
+await sheet.getByRole('button', { name: 'Save capture' }).click()
+await pg.getByText('Capture saved.').waitFor()
+const spoken = (await a.get(base)).data.captures[0]
+ok(spoken.note === '' && spoken.media.length === 1 && spoken.media[0].kind === 'audio', 'saving while still recording keeps the voice note', spoken)
+// Typing in the note is not interrupted when the page behind the sheet redraws.
+await pg.getByRole('button', { name: 'New capture' }).first().click()
+await sheet.waitFor()
+await sheet.getByRole('textbox', { name: 'Note' }).focus()
+await pg.evaluate(() => window.dispatchEvent(new Event('online')))
+await pg.waitForTimeout(500)
+ok(await sheet.getByRole('textbox', { name: 'Note' }).evaluate(el => el === document.activeElement), 'focus stays in the note while the page behind redraws')
+await sheet.getByRole('button', { name: 'Close' }).click()
+// A capture kept on the phone belongs to the person who took it: another member on the same phone neither sees nor sends it.
+await pg.getByRole('button', { name: 'New capture' }).first().click()
+await sheet.waitFor()
+await sheet.getByRole('button', { name: 'Problem', exact: true }).click()
+await sheet.getByRole('textbox', { name: 'Note' }).fill('Kept on the phone for its author only.')
+await context.setOffline(true)
+await sheet.getByRole('button', { name: 'Save capture' }).click()
+await pg.getByText(/1 capture is saved on this phone and not sent yet/).waitFor()
+await confirmEmail(a, `site-a-${stamp}@example.com`)
+const invite = await a.post('/api/org', { action: 'invite', email: `site-second-${stamp}@example.com`, role: 'scheduler' })
+const second = new Client()
+ok((await second.post('/api/auth', { action: 'signup', email: `site-second-${stamp}@example.com`, password: 'correct horse battery staple', name: 'Sam Second', invite: new URL(invite.data.link).searchParams.get('invite') })).status === 200, 'a second member joins firm A')
+const cookieName = a.cookie.split('=')[0]
+await context.clearCookies()
+await context.addCookies([{ name: cookieName, value: second.cookie.slice(cookieName.length + 1), url: BASE }])
+await context.setOffline(false)
+await pg.goto(`${BASE}/dashboard/site?schedule=${sid}`, { waitUntil: 'networkidle' })
+await pg.getByRole('heading', { name: /Site captures/ }).waitFor()
+await pg.waitForTimeout(1500)
+ok(await pg.getByText(/saved on this phone and not sent yet/).count() === 0 && !(await a.get(base)).data.captures.some(c => /for its author only/.test(c.note)), 'another member on the same phone is not shown the waiting capture and does not send it')
+await context.clearCookies()
+await context.addCookies([{ name: cookieName, value: a.cookie.slice(cookieName.length + 1), url: BASE }])
+await pg.goto(`${BASE}/dashboard/site?schedule=${sid}`, { waitUntil: 'networkidle' })
+await pg.getByText(/waiting on this phone has been sent/).waitFor({ timeout: 20_000 })
+const kept = (await a.get(base)).data.captures.find(c => /for its author only/.test(c.note))
+ok(kept && kept.createdByName === 'Fay Field', 'it is sent when its author is back, under the author\'s name', kept)
 ok(pageErrors.length === 0, 'no script error on the Site page', pageErrors)
 
 // A room code is a link: it opens the capture screen with the place already set.
 await pg.goto(`${BASE}/dashboard/site?schedule=${sid}&level=${encodeURIComponent('Level 3')}&room=${encodeURIComponent('Room 304')}`, { waitUntil: 'networkidle' })
 await sheet.waitFor()
+ok(!/level=|room=|new=/.test(pg.url()), 'the room code is used once and taken out of the address')
 ok(await sheet.getByLabel('Level', { exact: true }).inputValue() === 'Level 3' && await sheet.getByLabel('Room or area').inputValue() === 'Room 304', 'a room code\'s link opens the capture screen with the level and room set')
 await browser.close()
 

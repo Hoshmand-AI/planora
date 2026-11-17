@@ -104,26 +104,51 @@ export async function captureOverview(orgId: string, key: string): Promise<{ cou
   return { count: Number(count.rows[0]?.n ?? 0), levels, rooms }
 }
 
-/** Stores a capture with its photos and voice note in one transaction. Null when the project is full. */
+/**
+ * Stores a capture with its photos and voice note in one transaction. `full` when the project holds the most it
+ * can. A capture the phone already sent (same clientId) is returned as it was stored, never stored twice;
+ * `deleted` when that earlier one has since been deleted.
+ */
 export async function createCapture(orgId: string, key: string, scheduleId: string, f: CaptureFields, media: CheckedMedia[],
-  by: { userId: string; name: string }, classification: string | null): Promise<SiteCapture | null> {
+  by: { userId: string; name: string }, classification: string | null): Promise<{ capture: SiteCapture; duplicate: boolean } | 'full' | 'deleted'> {
+  await initSchema()
+  const earlier = async (): Promise<{ capture: SiteCapture; duplicate: boolean } | 'deleted' | null> => {
+    if (!f.clientId) return null
+    const res = await query('SELECT id, deleted_at FROM site_captures WHERE org_id=$1 AND project_key=$2 AND client_id=$3', [orgId, key, f.clientId])
+    if (!res.rows[0]) return null
+    if (res.rows[0].deleted_at) return 'deleted'
+    const capture = await getCapture(orgId, key, String(res.rows[0].id))
+    return capture ? { capture, duplicate: true } : 'deleted'
+  }
+  const sent = await earlier()
+  if (sent) return sent
   const id = randomUUID()
-  const created = await withTransaction(async q => {
-    const count = await q('SELECT COUNT(*)::int AS n FROM site_captures WHERE org_id=$1 AND project_key=$2 AND deleted_at IS NULL', [orgId, key])
-    if (Number(count.rows[0]?.n) >= MAX_CAPTURES_PER_PROJECT) return false
-    await q(`INSERT INTO site_captures (id, org_id, project_key, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, classification, created_by, created_by_name)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [id, orgId, key, scheduleId, f.status, f.note, JSON.stringify(f.activityCodes), f.level, f.room, f.placeSource,
-        f.position?.lat ?? null, f.position?.lng ?? null, f.position?.accuracyM ?? null, f.position?.altitudeM ?? null, f.position?.headingDeg ?? null,
-        f.takenAt, classification, by.userId, by.name])
-    for (const m of media) {
-      await q(`INSERT INTO site_capture_media (id, org_id, capture_id, kind, content_type, size_bytes, sha256, width, height, seconds, content)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [randomUUID(), orgId, id, m.kind, m.contentType, m.bytes.length, m.sha256, m.width, m.height, m.seconds, m.bytes])
-    }
-    return true
-  })
-  return created ? getCapture(orgId, key, id) : null
+  let created: boolean
+  try {
+    created = await withTransaction(async q => {
+      const count = await q('SELECT COUNT(*)::int AS n FROM site_captures WHERE org_id=$1 AND project_key=$2 AND deleted_at IS NULL', [orgId, key])
+      if (Number(count.rows[0]?.n) >= MAX_CAPTURES_PER_PROJECT) return false
+      await q(`INSERT INTO site_captures (id, org_id, project_key, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, classification, created_by, created_by_name, client_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+        [id, orgId, key, scheduleId, f.status, f.note, JSON.stringify(f.activityCodes), f.level, f.room, f.placeSource,
+          f.position?.lat ?? null, f.position?.lng ?? null, f.position?.accuracyM ?? null, f.position?.altitudeM ?? null, f.position?.headingDeg ?? null,
+          f.takenAt, classification, by.userId, by.name, f.clientId ?? null])
+      for (const m of media) {
+        await q(`INSERT INTO site_capture_media (id, org_id, capture_id, kind, content_type, size_bytes, sha256, width, height, seconds, content)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [randomUUID(), orgId, id, m.kind, m.contentType, m.bytes.length, m.sha256, m.width, m.height, m.seconds, m.bytes])
+      }
+      return true
+    })
+  } catch (err) {
+    // Two sends of the same capture at once: the second finds the first's row through the unique index.
+    if ((err as { code?: string }).code === '23505') { const again = await earlier(); if (again) return again }
+    throw err
+  }
+  if (!created) return 'full'
+  const capture = await getCapture(orgId, key, id)
+  if (!capture) throw new Error('The capture was stored and could not be read back.')
+  return { capture, duplicate: false }
 }
 
 /** One photo or voice note of a capture in this project, with its bytes. */

@@ -940,9 +940,12 @@ export const MIGRATIONS: Migration[] = [
       created_by_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ,
+      -- The id the phone gave the capture before sending it: a retry of the same capture is recognised by it.
+      client_id TEXT,
       UNIQUE (id, org_id)
     );
     CREATE INDEX IF NOT EXISTS site_captures_project_idx ON site_captures(org_id, project_key, taken_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS site_captures_client_idx ON site_captures(org_id, project_key, client_id) WHERE client_id IS NOT NULL;
     -- The photos and the voice note of a capture, kept as bytes (a photo is resized on the phone before
     -- it is sent). They belong to their capture: deleting it deletes them.
     CREATE TABLE IF NOT EXISTS site_capture_media (

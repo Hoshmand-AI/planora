@@ -24,8 +24,10 @@ const placeKey = (scheduleId: string) => `runf9.site.place.${scheduleId}`
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private browsing */ } }
 const recall = (k: string): string | null => { try { return localStorage.getItem(k) } catch { return null } }
 
-export function CaptureSheet({ scheduleId, projectName, levels, rooms, activities, preset, onClose, onSaved }: {
+export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, activities, preset, onClose, onSaved }: {
   scheduleId: string
+  /** The signed-in member: a capture kept on the phone waits for this person */
+  userId: string
   projectName: string
   /** Levels and rooms used on this project so far, most recent first */
   levels: string[]
@@ -68,18 +70,23 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
   // Position is stamped only once the person has chosen it; the choice is remembered on this phone.
   useEffect(() => { if (recall(POSITION_KEY) === '1') locate(true) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Focus moves into the sheet once, when it opens: never again while the person is typing in it.
+  const escape = useRef({ busy, onClose })
+  escape.current = { busy, onClose }
   useEffect(() => {
     closeBtn.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escape.current.busy) escape.current.onClose() }
     document.addEventListener('keydown', onKey)
     const scroll = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = scroll }
-  }, [busy, onClose])
+  }, [])
   // Recordings and previews hold memory and, while recording, the microphone: let go of both when the screen closes.
   const live = useRef<{ photos: Photo[]; voice: Voice | null; recording: Recording | null }>({ photos: [], voice: null, recording: null })
   live.current = { photos, voice, recording }
+  const alive = useRef(true), starting = useRef(false)
   useEffect(() => () => {
+    alive.current = false
     live.current.recording?.cancel()
     live.current.photos.forEach(p => URL.revokeObjectURL(p.url))
     if (live.current.voice) URL.revokeObjectURL(live.current.voice.url)
@@ -115,16 +122,32 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
   const removePhoto = (i: number) => setPhotos(p => { URL.revokeObjectURL(p[i].url); return p.filter((_, j) => j !== i) })
 
   async function record() {
+    // One microphone at a time: a second tap while the browser is still asking must not open a second one.
+    if (starting.current || live.current.recording) return
+    starting.current = true
     setError('')
-    try { setElapsed(0); setRecording(await startRecording()) }
-    catch { setError('The microphone could not be used. Allow the microphone for RunF9 in your browser, or type the note.') }
+    try {
+      const r = await startRecording()
+      // The sheet was closed while the browser was asking: let the microphone go at once.
+      if (!alive.current) { r.cancel(); return }
+      live.current.recording = r
+      setElapsed(0); setRecording(r)
+    } catch { if (alive.current) setError('The microphone could not be used. Allow the microphone for RunF9 in your browser, or type the note.') }
+    finally { starting.current = false }
   }
-  async function stopRecording() {
+  /** Stops the recording and gives the voice note it made (the one already held when nothing was recording). */
+  async function stopRecording(): Promise<Voice | null> {
     const r = live.current.recording
-    if (!r) return
+    if (!r) return live.current.voice
+    live.current.recording = null
     setRecording(null)
     const done = await r.stop()
-    if (done && done.seconds >= 0.5) setVoice({ blob: done.blob, url: URL.createObjectURL(done.blob), seconds: Math.min(done.seconds, MAX_AUDIO_SECONDS) })
+    if (!done || done.seconds < 0.5) return null
+    const v: Voice = { blob: done.blob, url: URL.createObjectURL(done.blob), seconds: Math.min(done.seconds, MAX_AUDIO_SECONDS) }
+    if (!alive.current) { URL.revokeObjectURL(v.url); return null }
+    live.current.voice = v
+    setVoice(v)
+    return v
   }
   const removeVoice = () => setVoice(v => { if (v) URL.revokeObjectURL(v.url); return null })
 
@@ -146,11 +169,11 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
   const roomsHere = useMemo(() => [...new Set(rooms.filter(r => !level || !r.level || r.level === level).map(r => r.room))], [rooms, level])
   const nameOf = (code: string) => activities.find(a => a.code === code)?.name ?? ''
 
-  const hasContent = photos.length > 0 || !!voice || note.trim().length >= 3
   async function save() {
-    if (recording) await stopRecording()
+    // Saving while the microphone is still on keeps what was said: the recording is stopped and used.
+    const spoken = recording ? await stopRecording() : voice
     if (!status) { setError('Say what you saw: in progress, done, not started or a problem.'); return }
-    if (!hasContent) { setError('Add a photo, a voice note or a few words.'); return }
+    if (!(photos.length > 0 || !!spoken || note.trim().length >= 3)) { setError('Add a photo, a voice note or a few words.'); return }
     setBusy(true); setError('')
     const fields: Record<string, string> = {
       status, note: note.trim(), activityCodes: JSON.stringify(codes), level: level.trim(), room: room.trim(),
@@ -164,8 +187,8 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
       if (position.headingDeg != null) fields.headingDeg = String(position.headingDeg)
     }
     const pending: PendingCapture = {
-      id: crypto.randomUUID(), scheduleId, fields, photos: photos.map(p => p.blob), audio: live.current.voice?.blob ?? null,
-      audioSeconds: live.current.voice?.seconds ?? null, savedAt: new Date().toISOString(),
+      id: crypto.randomUUID(), userId, scheduleId, fields, photos: photos.map(p => p.blob), audio: spoken?.blob ?? null,
+      audioSeconds: spoken?.seconds ?? null, savedAt: new Date().toISOString(),
     }
     const r = await sendCapture(pending)
     if (level.trim() || room.trim()) remember(placeKey(scheduleId), JSON.stringify({ level: level.trim(), room: room.trim() }))
@@ -193,7 +216,8 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
                   <li key={p.url} className="relative aspect-square overflow-hidden rounded-lg border border-warm-200 bg-warm-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.url} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
-                    <button type="button" data-compact onClick={() => removePhoto(i)} aria-label={`Remove photo ${i + 1}`} className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-navy-950 text-white"><X size={14} aria-hidden="true" /></button>
+                    {/* A full-size touch target; the mark inside it stays small so the photo shows. */}
+                    <button type="button" onClick={() => removePhoto(i)} aria-label={`Remove photo ${i + 1}`} className="absolute right-0 top-0 inline-flex h-11 w-11 items-start justify-end p-1"><span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-navy-950 text-white"><X size={14} aria-hidden="true" /></span></button>
                   </li>
                 ))}
               </ul>
@@ -280,7 +304,7 @@ export function CaptureSheet({ scheduleId, projectName, levels, rooms, activitie
                   {codes.map(c => (
                     <li key={c} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-100 pl-2.5 text-body text-accent-700">
                       <span className="truncate"><span className="font-semibold tabular-nums">{c}</span> {nameOf(c)}</span>
-                      <button type="button" data-compact onClick={() => setCodes(x => x.filter(y => y !== c))} aria-label={`Remove ${c}`} className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center"><X size={14} aria-hidden="true" /></button>
+                      <button type="button" onClick={() => setCodes(x => x.filter(y => y !== c))} aria-label={`Remove ${c}`} className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center"><X size={14} aria-hidden="true" /></button>
                     </li>
                   ))}
                 </ul>

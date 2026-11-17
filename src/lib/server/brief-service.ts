@@ -30,7 +30,7 @@ const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2
 /** Edits made in the last this-many days are "recent changes". */
 export const RECENT_CHANGE_DAYS = 7
 
-export interface BriefOptions { asOf?: string | null; whatIf?: { activity: string; days: number } | null }
+export interface BriefOptions { asOf?: string | null; whatIf?: { activity: string; days: number } | null; /** Minutes the reader's clock is behind UTC */ tzOffsetMinutes?: number }
 
 export async function loadDailyBrief(scheduleId: string, orgId: string, o: BriefOptions = {}): Promise<{ brief: DailyBrief; watch: ProjectWatch; alerts: BriefAlert[]; schedule: { id: string; name: string; version: string; editsApplied: number; sourceType: string }; activities: { id: string; code: string; name: string }[] } | null> {
   const data = await loadScheduleData(scheduleId, orgId, { basis: 'scenario' })
@@ -168,15 +168,15 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     milestoneForecast: base?.measured ?? data.analysis.forecastFinish,
     drivingPathIds: data.analysis.drivingPath?.ids?.length ? data.analysis.drivingPath.ids : base?.longestPath ?? [],
     register, signals, changes, submittedFinish: data.editsApplied ? data.submittedForecastFinish : null,
-    whatIfs, logic, missingScope: missingScope(data.activities, s.projectType), sinceLastUpdate, observations,
+    whatIfs, logic, missingScope: missingScope(data.activities, s.projectType), sinceLastUpdate, observations, tzOffsetMinutes: o.tzOffsetMinutes ?? 0,
   })
   // The project's documents read against the schedule: contract clauses, drawings and specifications, field reports.
-  const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
+  const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, actualStart: a.actualStart ?? null, actualFinish: a.actualFinish ?? null, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
     daysBehind: brief.headline.daysBehind, target: brief.headline.milestone, staleDays: brief.staleDays, projectType: s.projectType,
     // A delay that has been put in the register has been dealt with as far as the reminder goes.
     delaysReported: signals.filter(x => (x.kind === 'delay' || x.kind === 'change') && !register.some(r => r.sourceQuote === x.quote)).map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
     openChangeItems: brief.changeItems.filter(c => !register.find(r => r.id === c.id)?.sourceQuote).length,
-  }, observations)
+  }, observations, o.tzOffsetMinutes ?? 0)
 
   // What needs someone's attention today, most pressing first.
   const alerts: BriefAlert[] = []

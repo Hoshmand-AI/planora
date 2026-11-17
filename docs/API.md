@@ -90,8 +90,8 @@ A photo, a voice note and a few words taken on site, filed under the project (th
 | Method | Path | Permission | What it does |
 |---|---|---|---|
 | GET | `/api/schedules/{id}/captures` | read | Captures, newest first (`before`, `limit`); `activities=1` adds the activity pick list |
-| POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note) |
-| GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported) |
+| POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note). Send `clientId` (8 to 64 letters, digits or hyphens, made on the device) to make a retry safe: the same `clientId` again returns the stored capture with `alreadySent: true`, or 410 if it was deleted since. 409 `classified_on_commercial_cloud` on a project marked classified |
+| GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported; `ETag`, and the browser must ask before reusing its copy) |
 | DELETE | `/api/schedules/{id}/captures/{captureId}` | site.capture; your own capture, or any with scheduler rights | Erases the files and the words; audited as `site.capture_deleted` |
 
 `POST /api/ask` and `POST /api/reports` accept `useDocuments: true` (and `includeUnreviewed`) and

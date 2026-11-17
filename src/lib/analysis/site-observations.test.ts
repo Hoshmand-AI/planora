@@ -36,6 +36,21 @@ describe('site captures against the schedule', () => {
     expect(w.field[0].text).toBe('A site capture shows M5030 Install CRAH Units not started; the schedule shows it in progress. Check the actual start.')
   })
 
+  it('work that began after the capture was taken does not contradict it', () => {
+    const later = [{ ...acts[2], actualStart: '2026-11-20' }, { ...acts[3], actualStart: '2026-11-18', actualFinish: '2026-11-25' }]
+    const seen = obs({ status: 'not_started', activityCodes: ['M5030', 'S1010'], takenAt: '2026-11-17T14:00:00.000Z' })
+    expect(projectWatch([], later, ctx, [seen]).field).toEqual([])
+    // Started before the capture: the capture does contradict the schedule.
+    const earlier = [{ ...acts[2], actualStart: '2026-11-10' }]
+    expect(projectWatch([], earlier, ctx, [seen]).field.map(f => f.schedule)).toEqual(['in progress'])
+  })
+
+  it('the day of a capture is the reader\'s day, not the UTC day', () => {
+    // 4:30 pm on Tuesday 11/17 in Los Angeles is 00:30 on Wednesday in UTC.
+    const w = projectWatch([], acts, ctx, [obs({ activityCodes: ['D6010'], takenAt: '2026-11-18T00:30:00.000Z' })], 480)
+    expect(w.field[0].citation).toBe('2026-11-17')
+  })
+
   it('agreement is not a finding, and a problem is not a progress report', () => {
     const w = projectWatch([], acts, ctx, [obs({ activityCodes: ['M5030'] }), obs({ id: 'c2', status: 'issue', activityCodes: ['E4020'], text: 'Damaged bus duct.' })])
     expect(w.field).toEqual([])
@@ -84,6 +99,15 @@ describe('site captures in the daily brief', () => {
     expect(b.site.observations.map(o => o.id)).toEqual(['tue-pm', 'tue-am', 'mon'])
     expect(b.site.observations[1].activities).toEqual([{ id: 'a2', code: 'D6010', name: 'Data Hall 1 Containment and Cable Tray' }])
     expect(b.audiences.field).toContain('Recorded on site since 11/16/2026: 3 captures, 1 problem reported.')
+  })
+
+  it('a capture late in the afternoon west of UTC belongs to that day, and one early in the morning east of UTC too', () => {
+    const evening = obs({ id: 'la', status: 'issue', takenAt: '2026-11-18T00:30:00.000Z' }) // Tuesday 4:30 pm in Los Angeles
+    expect(buildDailyBrief(input([evening])).site.count).toBe(0) // by the UTC day it is tomorrow
+    expect(buildDailyBrief({ ...input([evening]), tzOffsetMinutes: 480 }).site).toMatchObject({ count: 1, problems: 1 })
+    const morning = obs({ id: 'syd', takenAt: '2026-11-15T21:00:00.000Z' }) // Monday 8:00 am in Sydney
+    expect(buildDailyBrief(input([morning])).site.count).toBe(0)
+    expect(buildDailyBrief({ ...input([morning]), tzOffsetMinutes: -660 }).site.count).toBe(1)
   })
 
   it('a Monday brief covers the weekend', () => {

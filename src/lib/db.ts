@@ -504,7 +504,22 @@ export async function deleteSchedule(id: string, orgId: string): Promise<boolean
   await initSchema()
   const ws = await workspaceScope('workspace_id', 3)
   const res = await query(`DELETE FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
-  return (res.rowCount ?? 0) > 0
+  if (!(res.rowCount ?? 0)) return false
+  await purgeOrphanSiteData(orgId)
+  return true
+}
+
+/**
+ * Site captures are filed under the project (see registerKey), not under one upload. When the project's last
+ * upload is gone nothing could list or delete them any more, so they go with it: their photos and voice notes too.
+ */
+export async function purgeOrphanSiteData(orgId: string): Promise<number> {
+  const res = await query(`DELETE FROM site_captures c WHERE c.org_id=$1 AND NOT EXISTS (
+    SELECT 1 FROM schedules s WHERE s.org_id=$1 AND c.project_key =
+      CASE WHEN s.project_key IS NULL OR s.project_key = '' THEN 'schedule:' || s.id
+           WHEN s.workspace_id IS NOT NULL THEN 'ws:' || s.workspace_id || '|' || s.project_key
+           ELSE s.project_key END)`, [orgId])
+  return res.rowCount ?? 0
 }
 
 /* ─── Activities & relationships ────────────────────── */

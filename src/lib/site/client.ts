@@ -13,7 +13,8 @@ export const PHOTO_MAX_SIDE = 1600
  * what a capture records about place and time is what the person sees on the capture screen.
  */
 export async function resizePhoto(file: Blob, maxSide = PHOTO_MAX_SIDE, quality = 0.82): Promise<{ blob: Blob; width: number; height: number }> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  // Older engines do not know the option that applies the phone's rotation; they apply it by default or not at all.
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(file))
   try {
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
     const width = Math.max(1, Math.round(bitmap.width * scale)), height = Math.max(1, Math.round(bitmap.height * scale))
@@ -99,7 +100,10 @@ export function accuracyLabel(accuracyM: number | null): string {
 
 /** A capture as the capture screen holds it before it is sent. */
 export interface PendingCapture {
+  /** Made on the phone and sent with the capture, so sending it twice stores it once */
   id: string
+  /** Who made it: a capture waits for, and is only ever sent by, the person who took it */
+  userId: string
   scheduleId: string
   /** The text fields of the form: status, note, activityCodes (JSON), level, room, placeSource, lat, lng, accuracyM, altitudeM, headingDeg, takenAt */
   fields: Record<string, string>
@@ -107,6 +111,8 @@ export interface PendingCapture {
   audio: Blob | null
   audioSeconds: number | null
   savedAt: string
+  /** Why RunF9 refused it for good (too large, the project is gone); it waits until the person sends it again or discards it */
+  refused?: string
 }
 
 export type SendResult = { ok: true; capture: SiteCapture } | { ok: false; offline: boolean; error: string }
@@ -115,6 +121,7 @@ export type SendResult = { ok: true; capture: SiteCapture } | { ok: false; offli
 export async function sendCapture(p: PendingCapture): Promise<SendResult> {
   const fd = new FormData()
   for (const [k, v] of Object.entries(p.fields)) fd.set(k, v)
+  fd.set('clientId', p.id)
   p.photos.forEach((b, i) => fd.append('photo', b, `photo-${i + 1}.jpg`))
   if (p.audio) { fd.append('audio', p.audio, 'voice-note'); if (p.audioSeconds) fd.set('audioSeconds', String(Math.round(p.audioSeconds * 10) / 10)) }
   let res: Response
@@ -142,17 +149,23 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
     return await new Promise<T>((resolve, reject) => {
       const t = db.transaction(STORE, mode)
       const req = run(t.objectStore(STORE))
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => reject(req.error ?? new Error('Storage failed.'))
+      // A write counts once the transaction has committed: a request can succeed and its transaction still
+      // abort (storage full, a browser that will not keep a photo).
+      t.oncomplete = () => resolve(req.result)
+      t.onabort = () => reject(t.error ?? req.error ?? new Error('Storage failed.'))
+      t.onerror = () => reject(t.error ?? req.error ?? new Error('Storage failed.'))
     })
   } finally { db.close() }
 }
 
-/** Captures waiting on this phone (private browsing and blocked storage give an empty list, never an error). */
-export async function outboxList(scheduleId?: string): Promise<PendingCapture[]> {
+/**
+ * This person's captures waiting on this phone, oldest first, across their projects (a capture taken before a
+ * schedule update still belongs to its project). Private browsing and blocked storage give an empty list.
+ */
+export async function outboxList(userId: string): Promise<PendingCapture[]> {
   try {
     const all = await tx<PendingCapture[]>('readonly', s => s.getAll() as IDBRequest<PendingCapture[]>)
-    return all.filter(p => !scheduleId || p.scheduleId === scheduleId).sort((a, b) => a.savedAt.localeCompare(b.savedAt))
+    return all.filter(p => p.userId === userId).sort((a, b) => a.savedAt.localeCompare(b.savedAt))
   } catch { return [] }
 }
 /** Keeps a capture on this phone. False when the browser will not store it (private browsing, storage full). */
@@ -163,15 +176,27 @@ export async function outboxRemove(id: string): Promise<void> {
   try { await tx('readwrite', s => s.delete(id)) } catch { /* nothing to remove */ }
 }
 
-/** Sends every waiting capture of a project, oldest first; stops at the first one that still cannot go. */
-export async function outboxFlush(scheduleId: string): Promise<{ sent: number; left: number; error: string | null }> {
-  const waiting = await outboxList(scheduleId)
-  let sent = 0
-  for (const p of waiting) {
-    const r = await sendCapture(p)
-    if (r.ok) { await outboxRemove(p.id); sent++; continue }
-    // One the server refuses for good (too large, not allowed) would block the queue forever: it stays, and is reported.
-    return { sent, left: waiting.length - sent, error: r.offline ? null : r.error }
-  }
-  return { sent, left: 0, error: null }
+export interface FlushResult { sent: number; waiting: number; refused: { id: string; error: string }[] }
+let flushing: Promise<FlushResult> | null = null
+
+/**
+ * Sends this person's waiting captures, oldest first. One that cannot go for lack of signal stops the run (the
+ * rest would fail the same way); one RunF9 refuses for good is marked and skipped, so it never blocks the others.
+ * `retryRefused` tries the marked ones again. Two calls at once share one run.
+ */
+export function outboxFlush(userId: string, retryRefused = false): Promise<FlushResult> {
+  if (flushing) return flushing
+  flushing = (async () => {
+    let sent = 0
+    for (const p of await outboxList(userId)) {
+      if (p.refused && !retryRefused) continue
+      const r = await sendCapture(p)
+      if (r.ok) { await outboxRemove(p.id); sent++; continue }
+      if (r.offline) break
+      await outboxAdd({ ...p, refused: r.error })
+    }
+    const left = await outboxList(userId)
+    return { sent, waiting: left.filter(p => !p.refused).length, refused: left.filter(p => p.refused).map(p => ({ id: p.id, error: p.refused! })) }
+  })().finally(() => { flushing = null })
+  return flushing
 }

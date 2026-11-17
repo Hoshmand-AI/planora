@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError } from '@/lib/server/api'
-import { projectScope } from '@/lib/rag/scope'
+import { projectClassification, projectScope } from '@/lib/rag/scope'
+import { CLASSIFIED_CLOUD_CODE, classifiedCloudRefusal } from '@/lib/server/classification'
+import { deploymentKind } from '@/lib/llm/provider'
 import { registerKey } from '@/lib/server/register'
 import { getCaptureMedia } from '@/lib/server/site-captures'
 
@@ -14,18 +16,23 @@ const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', '
  */
 export const GET = api<{ id: string; captureId: string; mediaId: string }>({ permission: 'read' }, async (req, { params, auth }) => {
   const { schedule } = await projectScope(auth.orgId, params.id)
+  const refusal = classifiedCloudRefusal(await projectClassification(schedule.id, auth.orgId), deploymentKind())
+  if (refusal) throw new ApiError(409, refusal, CLASSIFIED_CLOUD_CODE)
   const media = await getCaptureMedia(auth.orgId, registerKey(schedule), params.captureId, params.mediaId)
   if (!media) throw new ApiError(404, 'No such photo or voice note in this project.')
   const total = media.bytes.length
+  const etag = `"${media.sha256.slice(0, 32)}"`
   const headers: Record<string, string> = {
     'Content-Type': media.contentType,
     'Content-Disposition': `inline; filename="site-capture-${params.captureId.slice(0, 8)}.${EXT[media.contentType] ?? 'bin'}"`,
     'X-Content-Type-Options': 'nosniff',
-    // The bytes of a stored file never change; only a signed-in member's browser may keep them.
-    'Cache-Control': 'private, max-age=86400, immutable',
+    // A member's browser may keep the bytes, and asks each time whether it may still show them: a capture
+    // that was deleted, or a member who has lost access, gets nothing from the browser's own copy.
+    'Cache-Control': 'private, no-cache',
     'Accept-Ranges': 'bytes',
-    ETag: `"${media.sha256.slice(0, 32)}"`,
+    ETag: etag,
   }
+  if (req.headers.get('if-none-match') === etag && !req.headers.get('range')) return new NextResponse(null, { status: 304, headers })
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get('range') || '')
   if (range && (range[1] || range[2])) {
     const start = range[1] ? Number(range[1]) : Math.max(0, total - Number(range[2]))

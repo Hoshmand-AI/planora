@@ -131,6 +131,8 @@ export interface DailyBriefInput {
   sinceLastUpdate?: { version: string; finishMovedDays: number | null; added: number; deleted: number; logicChanges: number; durationChanges: number } | null
   /** Site captures of the project, any order (the brief keeps those since the previous working day) */
   observations?: SiteObservation[]
+  /** Minutes the reader's clock is behind UTC (as JavaScript's getTimezoneOffset gives it): a capture's day is the reader's day */
+  tzOffsetMinutes?: number
 }
 
 export interface DailyBrief {
@@ -159,6 +161,8 @@ export interface DailyBrief {
 }
 
 const day = (v: string | null | undefined) => (v ? v.slice(0, 10) : null)
+/** The calendar day of a moment on a clock `offsetMinutes` behind UTC (4:30 pm in Los Angeles is the same day, not the next). */
+export const localDay = (ts: string, offsetMinutes = 0): string | null => { const t = Date.parse(ts); return Number.isNaN(t) ? null : new Date(t - offsetMinutes * 60_000).toISOString().slice(0, 10) }
 const addDays = (d: string, n: number) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10)
 const diff = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86_400_000)
 const us = (d: string | null) => (d ? `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}` : '—')
@@ -280,7 +284,7 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
 
   // What was recorded on site since the previous working day (site captures), newest first.
   const byCode = new Map(acts.map(a => [a.activityId.toLowerCase(), a]))
-  const seenOnSite = (i.observations ?? []).filter(o => { const d = day(o.takenAt); return !!d && d >= yesterday && d <= today }).sort((x, y) => y.takenAt.localeCompare(x.takenAt))
+  const seenOnSite = (i.observations ?? []).filter(o => { const d = localDay(o.takenAt, i.tzOffsetMinutes); return !!d && d >= yesterday && d <= today }).sort((x, y) => y.takenAt.localeCompare(x.takenAt))
   const site: DailyBrief['site'] = {
     since: yesterday, count: seenOnSite.length, problems: seenOnSite.filter(o => o.status === 'issue').length,
     observations: top(seenOnSite).map(o => ({

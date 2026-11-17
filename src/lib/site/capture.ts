@@ -47,6 +47,8 @@ export interface CaptureFields {
   position: CapturePosition | null
   /** When the photo was taken, by the phone's clock (the server records when it arrived separately). */
   takenAt: string
+  /** The id the phone gave this capture before sending it; sending the same one again is not a second capture */
+  clientId?: string | null
 }
 
 export interface CaptureMediaInfo {
@@ -143,7 +145,8 @@ export function parseCaptureFields(b: Record<string, unknown>, now: Date = new D
     if (t < Date.UTC(2000, 0, 1)) return { error: 'The time the photo was taken is not a valid date.' }
     takenAt = new Date(t).toISOString()
   }
-  return { fields: { status: b.status as CaptureStatus, note, activityCodes, level, room, placeSource, position, takenAt } }
+  const clientId = typeof b.clientId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(b.clientId) ? b.clientId : null
+  return { fields: { status: b.status as CaptureStatus, note, activityCodes, level, room, placeSource, position, takenAt, clientId } }
 }
 
 /** A capture has to say something: a photo, a voice note or a few words. */

@@ -388,7 +388,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let live = true
     // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Overview tab is entered or left.
     const d = new Date(), asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}`).then(r => (r.ok ? r.json() : null))
+    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}&tz=${d.getTimezoneOffset()}`).then(r => (r.ok ? r.json() : null))
       .then(d => { if (live && d) setTodayCount((d.alerts as { level: string }[]).filter(a => a.level === 'act').length) }).catch(() => {})
     return () => { live = false }
   }, [selectedSchedule, user, mfaSetupRequired, onToday])
@@ -650,7 +650,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {(() => {
                       const owns = can('schedule.write') && selectedSchedule.sourceType !== 'generated'
                       const addRecord = () => router.push(`/dashboard/documents?schedule=${selectedSchedule.id}&add=1`)
-                      const addCapture = () => router.push(`/dashboard/site?schedule=${selectedSchedule.id}&new=1`)
+                      // Already on the Site page, the address would not change: ask the page itself to open a capture.
+                      const addCapture = () => (pathname === '/dashboard/site' ? window.dispatchEvent(new Event('runf9:new-capture')) : router.push(`/dashboard/site?schedule=${selectedSchedule.id}&new=1`))
                       const captureOn = siteCaptureEnabled() && can('site.capture')
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">

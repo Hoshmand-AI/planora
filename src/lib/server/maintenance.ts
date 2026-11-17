@@ -3,7 +3,7 @@
 // extra secret. Each organization's retention settings decide what is deleted; deletions are
 // recorded in that organization's audit log.
 
-import { initSchema, query } from '@/lib/db'
+import { initSchema, purgeOrphanSiteData, query } from '@/lib/db'
 import { normalizeSettings } from './settings'
 import { log, errorFields } from './log'
 import { runWithRequest } from './context'
@@ -36,9 +36,11 @@ export async function runRetention(): Promise<{ housekeeping: Record<string, num
       sum.schedules = (await query(`DELETE FROM schedules WHERE org_id=$1 AND uploaded_at < NOW() - make_interval(days => $2) AND (plan_id IS NULL OR plan_id NOT IN (SELECT id FROM plans WHERE org_id=$1))`, [o.id, s.projectRetentionDays])).rowCount ?? 0
     }
     if (s.projectRetentionDays > 0) {
-      // Site captures are filed under the project, not under one upload, so deleting old uploads does not remove
-      // them: they follow the same project retention by their own date. Their photos and voice notes go with them.
-      sum.siteCaptures = (await query(`DELETE FROM site_captures WHERE org_id=$1 AND taken_at < NOW() - make_interval(days => $2)`, [o.id, s.projectRetentionDays])).rowCount ?? 0
+      // Site captures are filed under the project, not under one upload: they follow the same project retention
+      // by the day RunF9 received them (never the phone's own clock), and go when their project's last upload has
+      // gone. Their photos and voice notes go with them.
+      sum.siteCaptures = (await query(`DELETE FROM site_captures WHERE org_id=$1 AND created_at < NOW() - make_interval(days => $2)`, [o.id, s.projectRetentionDays])).rowCount ?? 0
+      sum.siteCaptures += await purgeOrphanSiteData(o.id)
     }
     if (sum.chatMessages || sum.plans || sum.schedules || sum.siteCaptures) {
       orgs.push(sum)

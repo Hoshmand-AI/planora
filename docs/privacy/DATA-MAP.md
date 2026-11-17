@@ -27,7 +27,7 @@
 | Backups | full database | As above (highest class) | Recovery | Neon PITR; optional encrypted GitHub artifact | Hoshmand AI | Neon window; artifacts 35 days | Neon, GitHub (encrypted) |
 
 **Minimization:**
-- Original uploaded files are discarded after parsing (schedules and project documents alike). Site captures are the exception: their photos and voice notes are the record, so they are stored until the capture is deleted.
+- Original uploaded files are discarded after parsing (schedules and project documents alike). Site captures are the exception: their photos and voice notes are the record, so they are stored until the capture is deleted, the project's last schedule upload is deleted, or the organization's project retention period has passed since RunF9 received them. A capture taken with no signal is kept in the browser of the phone that took it, readable only by the member who took it, until it is sent or discarded.
 - The retrieval log keeps ids and a query hash, never query or document text.
 - "Can't share" answers are stored without a value and are never sent to a model.
 - AI calls are logged without their content.

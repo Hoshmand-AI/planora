@@ -65,7 +65,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     if (!sid) return
     const mine = ++seq.current
     setErr('')
-    const q = new URLSearchParams({ asOf })
+    const q = new URLSearchParams({ asOf, tz: String(new Date().getTimezoneOffset()) })
     if (ranWhatIf?.activity) { q.set('whatIfActivity', ranWhatIf.activity); q.set('whatIfDays', ranWhatIf.days) }
     try {
       const [b, r] = await Promise.all([fetch(`/api/schedules/${encodeURIComponent(sid)}/brief?${q}`), fetch(`/api/schedules/${encodeURIComponent(sid)}/register`)])
@@ -363,7 +363,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </button>
           <button type="button" className={btn} disabled={busy === 'mail'} onClick={async () => {
             setBusy('mail'); setMailed('')
-            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf })
+            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf, tz: new Date().getTimezoneOffset() })
             setBusy(''); setMailed(r.ok ? 'Sent to your email.' : r.data.error || 'The email could not be sent.')
           }}><Mail size={13} className="inline mr-1 -mt-0.5" aria-hidden />{busy === 'mail' ? 'Sending…' : 'Email it to me'}</button>
             </div>

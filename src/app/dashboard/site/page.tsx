@@ -14,7 +14,7 @@ import { CaptureSheet } from '@/components/site/CaptureSheet'
 import { useApp } from '../layout'
 import { fmtDate, fmtDateTime } from '@/lib/format'
 import { CAPTURE_STATUS_LABELS, placeLabel, type CaptureActivity, type CaptureStatus, type SiteCapture } from '@/lib/site/capture'
-import { accuracyLabel, outboxFlush, outboxList } from '@/lib/site/client'
+import { accuracyLabel, outboxFlush, outboxList, outboxRemove } from '@/lib/site/client'
 
 interface Listing {
   captures: SiteCapture[]
@@ -45,6 +45,7 @@ export default function SitePage() {
   const [adding, setAdding] = useState(false)
   const [preset, setPreset] = useState<{ level?: string; room?: string } | null>(null)
   const [waiting, setWaiting] = useState(0)
+  const [refused, setRefused] = useState<{ id: string; error: string }[]>([])
   const [sending, setSending] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [done, setDone] = useState(false)
@@ -67,32 +68,49 @@ export default function SitePage() {
   }, [base])
   useEffect(() => { setData(null); setFilter('all'); setPlace(''); setNotice(null); load() }, [load])
 
-  // A capture taken with no signal waits on this phone: count them, and send them when the connection returns.
-  const flush = useCallback(async () => {
-    if (!sid) return
+  // A capture taken with no signal waits on this phone for the person who took it, and is sent when the connection
+  // returns. One RunF9 refuses for good is shown with its reason, to send again or discard.
+  const uid = user?.id ?? null
+  const flush = useCallback(async (retryRefused = false) => {
+    if (!uid) return
     setSending(true)
-    const r = await outboxFlush(sid)
+    const r = await outboxFlush(uid, retryRefused)
     setSending(false)
-    setWaiting(r.left)
+    setWaiting(r.waiting); setRefused(r.refused)
     if (r.sent) { setNotice({ tone: 'success', text: `${r.sent} ${r.sent === 1 ? 'capture that was waiting on this phone has' : 'captures that were waiting on this phone have'} been sent.` }); load() }
-    if (r.error) setNotice({ tone: 'error', text: `A capture waiting on this phone could not be sent: ${r.error}` })
-  }, [sid, load])
+  }, [uid, load])
+  const recount = useCallback(async () => {
+    if (!uid) return
+    const l = await outboxList(uid)
+    setWaiting(l.filter(p => !p.refused).length); setRefused(l.filter(p => p.refused).map(p => ({ id: p.id, error: p.refused! })))
+    return l
+  }, [uid])
   useEffect(() => {
-    if (!sid) return
+    if (!uid) return
     let live = true
-    outboxList(sid).then(l => { if (live) { setWaiting(l.length); if (l.length && navigator.onLine) flush() } })
+    recount().then(l => { if (live && l?.some(p => !p.refused) && navigator.onLine) flush() })
     const online = () => flush()
     window.addEventListener('online', online)
     return () => { live = false; window.removeEventListener('online', online) }
-  }, [sid, flush])
+  }, [uid, flush, recount])
 
   // A posted room code opens this page with the place already set, and "Add to project" opens it ready to capture.
+  // The link is used once and taken out of the address, so switching project or coming back does not replay it.
   useEffect(() => {
+    if (!sid) return
     const q = new URLSearchParams(window.location.search)
     const level = q.get('level')?.slice(0, 80) || undefined, room = q.get('room')?.slice(0, 80) || undefined
+    if (!(q.get('new') === '1' || level || room)) return
     if (level || room) setPreset({ level, room })
-    if (q.get('new') === '1' || level || room) setAdding(true)
+    setAdding(true)
+    window.history.replaceState(window.history.state, '', `/dashboard/site?schedule=${encodeURIComponent(sid)}`)
   }, [sid])
+  // The camera button in the project header, pressed while this page is already open.
+  useEffect(() => {
+    const open = () => { setPreset(null); setAdding(true) }
+    window.addEventListener('runf9:new-capture', open)
+    return () => window.removeEventListener('runf9:new-capture', open)
+  }, [])
 
   async function more() {
     if (!data?.captures.length) return
@@ -156,7 +174,17 @@ export default function SitePage() {
       {waiting > 0 && (
         <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warm-200 bg-warm-50 px-3 py-2 text-body text-warm-700">
           <span className="min-w-0 flex-1">{waiting} {waiting === 1 ? 'capture is' : 'captures are'} saved on this phone and not sent yet.</span>
-          <button type="button" onClick={flush} disabled={sending} className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{sending && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}Send now</button>
+          <button type="button" onClick={() => flush()} disabled={sending} className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{sending && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}Send now</button>
+        </div>
+      )}
+      {refused.length > 0 && (
+        <div role="status" className="rounded-lg border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-body text-ink">
+          <p>{refused.length} {refused.length === 1 ? 'capture saved on this phone was' : 'captures saved on this phone were'} not accepted: {refused[0].error}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => flush(true)} disabled={sending} className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{sending && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}Try again</button>
+            <button type="button" disabled={sending} className="pressable inline-flex items-center rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-status-at-risk hover:bg-warm-100"
+              onClick={async () => { if (!window.confirm(`Discard ${refused.length === 1 ? 'this capture' : `these ${refused.length} captures`}? The photos and notes kept on this phone are erased.`)) return; for (const r of refused) await outboxRemove(r.id); recount() }}>Discard</button>
+          </div>
         </div>
       )}
 
@@ -254,12 +282,12 @@ export default function SitePage() {
         </>
       )}
 
-      {adding && data && canCapture && sid && (
-        <CaptureSheet scheduleId={sid} projectName={selectedSchedule.name} levels={data.overview.levels} rooms={data.overview.rooms} activities={activities} preset={preset}
+      {adding && data && canCapture && sid && uid && (
+        <CaptureSheet scheduleId={sid} userId={uid} projectName={selectedSchedule.name} levels={data.overview.levels} rooms={data.overview.rooms} activities={activities} preset={preset}
           onClose={() => setAdding(false)}
           onSaved={r => {
             setAdding(false); setPreset(null)
-            if (r.queued) { setNotice({ tone: 'warning', text: 'No connection: the capture is saved on this phone and will be sent when you are back online.' }); outboxList(sid).then(l => setWaiting(l.length)) }
+            if (r.queued) { setNotice({ tone: 'warning', text: 'No connection: the capture is saved on this phone and will be sent when you are back online.' }); recount() }
             else { setNotice({ tone: 'success', text: 'Capture saved.' }); load() }
           }} />
       )}
@@ -272,8 +300,9 @@ export default function SitePage() {
 function PhotoViewer({ capture, index, url, onIndex, onClose }: { capture: SiteCapture; index: number; url: (mediaId: string) => string; onIndex: (i: number) => void; onClose: () => void }) {
   const photos = capture.media.filter(m => m.kind === 'photo')
   const close = useRef<HTMLButtonElement>(null)
+  // Focus moves to the viewer once, when it opens.
+  useEffect(() => { close.current?.focus() }, [])
   useEffect(() => {
-    close.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowRight' && index < photos.length - 1) onIndex(index + 1)
