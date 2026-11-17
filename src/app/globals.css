@@ -239,12 +239,13 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 /* The app's working area: a quiet grey canvas with white cards lifted off it by a soft shadow instead of an outline,
    so a page reads as a few surfaces and not a grid of boxes. Only cards (white, the card border, rounded) are matched;
    inputs and buttons keep their own border. */
-.app-canvas { background: var(--warm-100); }
+.app-canvas { background: #fff; }
+/* Flat surfaces: panels sit on the white canvas, separated by a hairline and no shadow. */
 .app-canvas :where(section, div, li, a, button, ul, article)[class~='bg-white'][class*='border-warm-200'][class*='rounded-'],
 .app-canvas :where(section, div, li, a, button, ul, article)[class~='bg-white/70'][class*='border-warm-200'][class*='rounded-'] {
   background-color: #fff;
-  border-color: transparent;
-  box-shadow: 0 1px 2px rgb(29 33 37 / 0.05), 0 10px 28px -18px rgb(29 33 37 / 0.22);
+  border-color: var(--warm-200);
+  box-shadow: none;
 }
 @media (prefers-contrast: more) {
   .app-canvas :where(section, div, li, a, button, ul, article)[class~='bg-white'][class*='border-warm-200'][class*='rounded-'] { border-color: var(--warm-300); }
