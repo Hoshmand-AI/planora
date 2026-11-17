@@ -43,16 +43,19 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   const verdict = status === 'complete' ? 'The project is complete.'
     : pending ? ''
     : diff == null ? (forecast ? 'No required date or baseline to compare with yet.' : 'No forecast finish yet.')
-    : overdue ? `${plural(diff)} past ${what} ${fmtDate(target!.date)}, not finished`
+    : overdue ? `Required ${fmtDate(target!.date)}, not finished`
     : diff > 0 ? `${plural(diff)} after ${what} ${fmtDate(target!.date)}`
     : diff < 0 ? `${plural(-diff)} ahead of ${what} ${fmtDate(target!.date)}`
     : `On ${what} ${fmtDate(target!.date)}`
   const pill = diff == null && status !== 'complete' ? PILL.no_baseline : deadline && status !== 'complete' ? (diff! > 0 ? PILL.at_risk : PILL.on_track) : PILL[status]
 
-  // Ribbon: start to the latest of forecast, target and data date.
+  // A required date that has passed is measured to today, so today is on the ribbon too.
+  const now = new Date()
+  const today = overdue ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` : null
+  // Ribbon: start to the latest of forecast, target and data date (and today, when the required date has passed).
   const start = projectStart?.slice(0, 10) ?? null
   const dd = dataDate?.slice(0, 10) ?? null
-  const ends = [forecast, target?.date, dd].filter((d): d is string => !!d).map(day)
+  const ends = [forecast, target?.date, dd, today].filter((d): d is string => !!d).map(day)
   const lo = start ? day(start) : null
   const hi = ends.length ? Math.max(...ends) : null
   const span = lo != null && hi != null && hi > lo ? hi - lo : null
@@ -62,7 +65,8 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   return (
     <section aria-label="Finish forecast" className="rise-in rounded-[14px] bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
-      <p className="mt-1 text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</p>
+      {/* The largest figure is the answer. A date that has already passed is not one, so then it is how late the work is. */}
+      <p className="mt-1 text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
       {/* The verdict sits on its own line under the date: beside it, it competed with the date and wrapped into a block on a phone. */}
       {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[15px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
       {/* One line of explanation; the rest is under "Why this status". */}
@@ -74,16 +78,18 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
         <div className="mt-6">
           <div className="relative h-2.5 rounded-full bg-navy-800" aria-hidden="true">
             {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
-            {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(forecast!)}%`, background: '#A64848' }} />}
+            {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(today ?? forecast!)}%`, background: '#A64848' }} />}
             {dd && <Tick left={at(dd)} color="#FFFFFF" />}
             {target && <Tick left={at(target.date)} color={TARGET} />}
-            {forecast && <Tick left={at(forecast)} color={FORECAST} />}
+            {forecast && !today && <Tick left={at(forecast)} color={FORECAST} />}
+            {today && <Tick left={at(today)} color="#FFFFFF" />}
           </div>
-          <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-1.5 text-[13px]">
-            {start && <Item label="Start" date={start} />}
+          <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-2 text-[13px]">
+            {start && <Item label="Start" date={start} dot="#9BA8AB" />}
             {dd && <Item label="Data date" date={dd} dot={DATA_DATE} />}
             {target && <Item label={target.label} date={target.date} dot={TARGET} />}
-            {forecast && <Item label="Forecast" date={forecast} dot={FORECAST} />}
+            {forecast && !today && <Item label="Forecast" date={forecast} dot={FORECAST} />}
+            {today && <Item label="Today" date={today} dot="#A64848" />}
           </dl>
         </div>
       )}
@@ -95,12 +101,13 @@ function Tick({ left, color }: { left: number; color: string }) {
   return <span className="absolute -top-1 h-[18px] w-[3px] -translate-x-1/2 rounded-full" style={{ left: `${left}%`, background: color }} />
 }
 
-function Item({ label, date, dot }: { label: string; date: string; dot?: string }) {
+function Item({ label, date, dot }: { label: string; date: string; dot: string }) {
+  // On a phone the label sits above its date, so four items make an even two-by-two grid; on a wide screen they run in a line.
   return (
-    <div className="flex items-center gap-1.5">
-      {dot && <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: dot }} />}
-      <dt className="text-warm-200">{label}</dt>
-      <dd className="font-semibold tabular-nums">{fmtDate(date)}</dd>
+    <div className="grid grid-cols-[8px_1fr] items-center gap-x-1.5 sm:flex">
+      <span aria-hidden="true" className="h-2 w-2 rounded-full max-sm:row-span-2" style={{ background: dot }} />
+      <dt className="text-warm-200 whitespace-nowrap">{label}</dt>
+      <dd className="font-semibold tabular-nums whitespace-nowrap max-sm:col-start-2">{fmtDate(date)}</dd>
     </div>
   )
 }
