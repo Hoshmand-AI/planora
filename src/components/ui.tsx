@@ -18,10 +18,15 @@ export function Section({ title, description, children, tone = 'default', id }: 
     <section id={id} aria-labelledby={hid} className={`border rounded-[14px] p-5 md:p-6 bg-white ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
       <h2 id={hid} className={`text-[15px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-navy-950'}`}>{title}</h2>
       {description && (
-        <div className="mb-4 flex items-start gap-2">
-          <p className={`flex-1 min-w-0 text-[13px] text-warm-600 ${!text && long && !more ? 'line-clamp-1' : ''}`}>{text ? <>{first}{more && rest}</> : description}</p>
-          {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
-        </div>
+        text ? (
+          // "More" follows the sentence it continues, instead of sitting alone at the card's right edge.
+          <p className="mb-4 text-[13px] text-warm-600">{first}{more && rest}{long && <> <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button></>}</p>
+        ) : (
+          <div className="mb-4 flex items-start gap-2">
+            <p className={`flex-1 min-w-0 text-[13px] text-warm-600 ${long && !more ? 'line-clamp-1' : ''}`}>{description}</p>
+            {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
+          </div>
+        )
       )}
       {children}
     </section>

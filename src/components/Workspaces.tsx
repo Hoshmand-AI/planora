@@ -63,7 +63,7 @@ export function Workspaces({ members }: { members: Member[] }) {
         <Field label="New workspace name" hint="For example the client or the project number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
         <label className="flex items-center gap-2 text-[13px] text-warm-700 sm:mt-[26px] sm:min-h-[40px]"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
         {/* The checkbox and the button sit on the input's line, not under its hint. */}
-        <div className="sm:mt-[26px]"><Button type="submit" disabled={busy === 'create'}>Create workspace</Button></div>
+        <div className="sm:mt-[26px]"><Button type="submit" className="min-h-[38px]" disabled={busy === 'create'}>Create workspace</Button></div>
       </form>
 
       {!data.workspaces.length && <p className="text-[13px] text-warm-600 mb-4">No workspaces yet. Until you create one, every member sees every schedule and plan their role allows.</p>}
