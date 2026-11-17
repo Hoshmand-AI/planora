@@ -56,13 +56,14 @@ export function Workspaces({ members }: { members: Member[] }) {
     <Section title="Workspaces" description="Group schedules and plans by client, business unit or project. A restricted workspace is visible only to its members; a member limited to their workspaces sees nothing else. Owners and admins always see everything. Changes take effect on the member's next request and are recorded in the audit log.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
 
-      <form className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end mb-4" onSubmit={async e => {
+      <form className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-start mb-4" onSubmit={async e => {
         e.preventDefault()
         if (await act('create', { action: 'create', ...draft }, `Workspace "${draft.name.trim()}" created.`)) setDraft({ name: '', walled: true })
       }}>
         <Field label="New workspace name" hint="For example the client or the project number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
-        <label className="flex items-center gap-2 text-[13px] text-warm-700 pb-2"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
-        <Button type="submit" disabled={busy === 'create'}>Create workspace</Button>
+        <label className="flex items-center gap-2 text-[13px] text-warm-700 sm:mt-[26px] sm:min-h-[40px]"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
+        {/* The checkbox and the button sit on the input's line, not under its hint. */}
+        <div className="sm:mt-[26px]"><Button type="submit" disabled={busy === 'create'}>Create workspace</Button></div>
       </form>
 
       {!data.workspaces.length && <p className="text-[13px] text-warm-600 mb-4">No workspaces yet. Until you create one, every member sees every schedule and plan their role allows.</p>}

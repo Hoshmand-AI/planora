@@ -47,7 +47,8 @@ for (const name of DEVICES) {
   await tap(chip); await page.waitForTimeout(350)
   // Search field: 16px on touch screens so Safari doesn't zoom
   const search = page.getByLabel('Search projects')
-  await tap(search)
+  // With only a few projects the search field is not shown; its text size is still checked, since it appears as projects are added.
+  if (await search.isVisible()) await tap(search)
   const fs16 = await search.evaluate(e => parseFloat(getComputedStyle(e).fontSize))
   if (touch && fs16 < 16) fail(name, `search text ${fs16}px (Safari would zoom)`); else console.log(`   ✓ search text ${fs16}px`)
   // Status tiles all fully on screen

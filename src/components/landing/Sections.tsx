@@ -138,7 +138,7 @@ const BRIEF_POINTS = [
 export function DailyBrief() {
   return (
     <section id="today" aria-labelledby="today-h" className="bg-navy-950 scroll-mt-16">
-      <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
+      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="text-center max-w-[820px] mx-auto">
           <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">The Daily Brief</p>
           <h2 id="today-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Every morning, what changed and what to do about it.</h2>
@@ -189,7 +189,7 @@ export function Proof() {
   ]
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
-      <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
+      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-20">
         <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">Don’t take our word for it. Check the work.</h2>
         <ul className="mt-10 grid md:grid-cols-3 gap-5">
           {cards.map(({ icon: Icon, title, text, href, cta }) => (
@@ -224,7 +224,7 @@ export function Audiences() {
   const a = AUDIENCES[tabs.active]
   return (
     <section id="who" aria-labelledby="who-h" className="bg-white border-y border-warm-200">
-      <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
+      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="text-center">
           <h2 id="who-h" className={H2}>Built for the way you work.</h2>
         </Reveal>
@@ -268,7 +268,7 @@ const ALSO: [string, string][] = [
 
 export function Integrations() {
   return (
-    <section id="integrations" aria-labelledby="integrations-h" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-20">
+    <section id="integrations" aria-labelledby="integrations-h" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-20">
       <Reveal className="text-center max-w-[760px] mx-auto">
         <h2 id="integrations-h" className={H2}>Works with the tools you already use.</h2>
         <p className={LEAD}>RunF9 does not replace your scheduling tool or your project record. It reads them, does the analysis and hands the result back.</p>
@@ -313,7 +313,7 @@ const SECURITY = [
 export function Security({ contactHref }: { contactHref: string }) {
   return (
     <section id="security" aria-labelledby="security-h" className="bg-navy-950 scroll-mt-16">
-      <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
+      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="max-w-[720px]">
           <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400"><Lock size={15} aria-hidden />Security</p>
           <h2 id="security-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Security you can check for yourself.</h2>

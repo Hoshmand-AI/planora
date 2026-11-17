@@ -62,12 +62,12 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   return (
     <section aria-label="Finish forecast" className="rise-in rounded-[14px] bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</span>
-        {verdict && <span role="status" className={`text-[15px] md:text-[16px] font-semibold ${pill === PILL.no_baseline ? '' : 'rounded-lg md:rounded-full px-3 py-1 max-md:text-[14px] max-md:leading-snug'} ${pill}`}>{verdict}</span>}
-      </div>
-      {overdue && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>}
-      {reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
+      <p className="mt-1 text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{forecast ? fmtDate(forecast) : '—'}</p>
+      {/* The verdict sits on its own line under the date: beside it, it competed with the date and wrapped into a block on a phone. */}
+      {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[15px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
+      {/* One line of explanation; the rest is under "Why this status". */}
+      {overdue ? <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
+        : reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
       {note && <p className="mt-2 text-[13px] text-warm-200 leading-relaxed max-w-3xl">{note}</p>}
 
       {span != null && (

@@ -101,7 +101,13 @@ export default function DocumentsPage() {
     <>
       <Section title="Records in this project" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
-          : !data.documents.length ? <p className="text-[13px] text-warm-500">No records yet.{can('schedule.write') ? ' Upload the contract or the scheduling specification to get started.' : ''}</p>
+          : !data.documents.length ? (
+            <div className="py-10 text-center">
+              <p className="text-[16px] font-semibold text-navy-950">No records yet</p>
+              <p className="mt-1 text-[14px] text-warm-600">{can('schedule.write') ? 'Start with the contract or the scheduling specification.' : 'Nothing has been added to this project.'}</p>
+              {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+            </div>
+          )
           : (
             <ul className="divide-y divide-warm-200">
               {data.documents.map(d => (
@@ -162,10 +168,10 @@ export default function DocumentsPage() {
         <div className="min-w-0">
         <h2 className="sr-only">Project records</h2>
         <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
-          Contracts, specifications and owner requirements, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
+          Records are shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {can('schedule.write') && data && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+        {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
