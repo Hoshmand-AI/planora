@@ -28,7 +28,7 @@ const SHORT: Record<string, string> = {
 }
 
 /** The one filled button of a question: it goes grey until there is something to send. */
-const CONTINUE = 'pressable inline-flex items-center justify-center rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-11 text-[14px] font-semibold disabled:bg-warm-200 disabled:text-warm-600'
+const CONTINUE = 'pressable inline-flex items-center justify-center rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-11 text-body font-semibold disabled:bg-warm-200 disabled:text-warm-600'
 
 export interface AnsweredItem { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }
 
@@ -73,7 +73,7 @@ export function SmartInterview(p: SmartInterviewProps) {
       <StatusHeader ad={ad} progress={progress} hasSchedule={p.hasSchedule} changed={p.changedSinceBuild} canWrite={p.canWrite} busy={p.busy} onGenerate={p.onGenerate} />
 
       {el.conflicts.length > 0 && (
-        <div role="status" className="mt-4 rounded-lg border border-status-attention/50 bg-status-attention-bg px-5 py-4 text-[13px] text-warm-700">
+        <div role="status" className="mt-4 rounded-lg border border-status-attention/50 bg-status-attention-bg px-5 py-4 text-body text-warm-700">
           <div className="font-semibold text-ink mb-1">{el.conflicts.length === 1 ? 'Two answers don\u2019t fit together' : 'Some answers don\u2019t fit together'}</div>
           <ul className="space-y-1">{el.conflicts.map((c, i) => <li key={i}>{fmtDates(c)}</li>)}</ul>
           {!current && <p className="mt-2">Fix these first: the schedule is only as good as its dates. Open “Answered” below to change them.</p>}
@@ -93,23 +93,23 @@ export function SmartInterview(p: SmartInterviewProps) {
 
       {upNext.length > 0 && (
         <div className="mt-6">
-          <div className="text-[12px] font-medium text-warm-600 mb-2">Up next</div>
+          <div className="text-caption font-medium text-warm-600 mb-2">Up next</div>
           <ol className="space-y-1.5">
             {upNext.slice(0, 3).map(n => (
-              <li key={n.key} className="flex items-baseline gap-3 text-[13px]">
+              <li key={n.key} className="flex items-baseline gap-3 text-body">
                 <span className="text-warm-700 flex-1 min-w-0 truncate">{n.text}</span>
-                <span className="text-[12px] text-warm-500 tabular-nums whitespace-nowrap">{n.meta}</span>
+                <span className="text-caption text-warm-500 tabular-nums whitespace-nowrap">{n.meta}</span>
               </li>
             ))}
           </ol>
-          {upNext.length > 3 && <div className="text-[12px] text-warm-500 mt-1.5">and {upNext.length - 3} more</div>}
+          {upNext.length > 3 && <div className="text-caption text-warm-500 mt-1.5">and {upNext.length - 3} more</div>}
         </div>
       )}
 
       <div className="mt-8">
         {ad.optional.length > 0 && (
           <Disclosure title="Optional details" meta={`${ad.optional.length} · won't move your finish`}>
-            <p className="text-[13px] text-warm-500 mb-3">We tried every answer to these against your schedule. None moves the finish by {ad.thresholdDays} days or more, so they&apos;re here when you want to be precise.</p>
+            <p className="text-body text-warm-500 mb-3">We tried every answer to these against your schedule. None moves the finish by {ad.thresholdDays} days or more, so they&apos;re here when you want to be precise.</p>
             <div className="divide-y divide-warm-200 border-y border-warm-200">
               {ad.optional.slice(0, 40).map(q => <CompactQuestion key={q.id} q={q} reason={ad.insights[q.id]?.reason} busy={p.busy === `answer:${q.id}`} disabled={!p.canWrite} onAnswer={p.onAnswer} />)}
             </div>
@@ -118,7 +118,7 @@ export function SmartInterview(p: SmartInterviewProps) {
         {ad.deferred.length > 0 && (
           <Disclosure title="Waiting on an earlier answer" meta={ad.deferred.length}>
             <ul className="space-y-2">
-              {ad.deferred.map(d => <li key={d.id} className="text-[13px]"><div className="text-warm-700">{d.prompt}</div><div className="text-[12px] text-warm-500">{d.reason}</div></li>)}
+              {ad.deferred.map(d => <li key={d.id} className="text-body"><div className="text-warm-700">{d.prompt}</div><div className="text-caption text-warm-500">{d.reason}</div></li>)}
             </ul>
           </Disclosure>
         )}
@@ -134,23 +134,23 @@ export function SmartInterview(p: SmartInterviewProps) {
           <Disclosure title="Assumptions in your schedule" meta={el.assumptions.length}>
             <ul className="space-y-2">
               {el.assumptions.map((a: Assumption) => (
-                <li key={a.questionId} className="text-[13px] text-warm-600">{a.kind === 'withheld' && <Lock size={11} className="inline mr-1" aria-label="Withheld" />}{fmtDates(a.text)}{a.bufferDays ? <span className="text-warm-500"> (+{a.bufferDays} days contingency)</span> : null}</li>
+                <li key={a.questionId} className="text-body text-warm-600">{a.kind === 'withheld' && <Lock size={11} className="inline mr-1" aria-label="Withheld" />}{fmtDates(a.text)}{a.bufferDays ? <span className="text-warm-500"> (+{a.bufferDays} days contingency)</span> : null}</li>
               ))}
             </ul>
           </Disclosure>
         )}
         <Disclosure title="What the interview is based on">
-          <ul className="text-[13px] text-warm-600 space-y-1.5">
+          <ul className="text-body text-warm-600 space-y-1.5">
             <li>Permits and regulations for {el.profile.state || 'your location (not set yet)'}{el.profile.projectType ? `, ${el.profile.projectType.replace(/_/g, ' ')}` : ''}.</li>
             <li>Long-lead equipment lead times (2024–25 market ranges).</li>
             <li>{p.history ? `${p.history.projectCount} of your firm's schedules (${p.history.similarCount} similar), private to your firm.` : 'No firm history yet. Upload past schedules to ground durations in your own actuals.'}</li>
             <li>Every question was ranked by re-scheduling the project {ad.simulations} times against its possible answers.</li>
           </ul>
           {p.canWrite && (p.llm.mode !== 'offline' ? (
-            <button onClick={p.onSuggest} disabled={!!p.busy} className="pressable mt-3 inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-ink hover:bg-warm-100">
+            <button onClick={p.onSuggest} disabled={!!p.busy} className="pressable mt-3 inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 py-1.5 text-body font-medium text-ink hover:bg-warm-100">
               {p.busy === 'suggest' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Sparkles size={13} aria-hidden />} Ask AI for project-specific follow-ups
             </button>
-          ) : <p className="text-[12px] text-warm-500 mt-3">AI follow-ups are off ({p.llm.error || 'offline mode'}). The rule-based interview covers the core schedule drivers.</p>)}
+          ) : <p className="text-caption text-warm-500 mt-3">AI follow-ups are off ({p.llm.error || 'offline mode'}). The rule-based interview covers the core schedule drivers.</p>)}
         </Disclosure>
       </div>
     </div>
@@ -167,25 +167,25 @@ function StatusHeader({ ad, progress, hasSchedule, changed, canWrite, busy, onGe
   const loud = hasSchedule ? changed > 0 && nothingOpen : settled
   const label = hasSchedule ? 'Rebuild with my answers' : settled ? 'Build my schedule' : 'Build now'
   const look = loud
-    ? 'pressable inline-flex items-center gap-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-10 text-[14px] font-semibold disabled:opacity-50'
-    : 'pressable inline-flex items-center gap-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-10 text-[14px] font-medium disabled:opacity-50'
+    ? 'pressable inline-flex items-center gap-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-10 text-body font-semibold disabled:opacity-50'
+    : 'pressable inline-flex items-center gap-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-10 text-body font-medium disabled:opacity-50'
   return (
     <section aria-label="Interview progress" className="rounded-[14px] bg-white border border-warm-200 px-6 py-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <div className="text-[13px] text-warm-600">{settled ? 'Your brief is ready' : 'Questions that can still move your finish'}</div>
-          <div className="text-[28px] leading-none font-semibold text-ink tracking-[-0.02em] mt-1.5 tabular-nums">
-            {settled ? 'Enough to build' : ad.remainingThatMatter}
-          </div>
+          {/* One line says where the interview stands; it is this card's heading, at the size of every section heading. */}
+          <h2 className="text-heading font-semibold text-ink">
+            {settled ? 'Your brief is ready: enough to build' : <><span className="tabular-nums">{ad.remainingThatMatter}</span> {ad.remainingThatMatter === 1 ? 'question' : 'questions'} can still move your finish</>}
+          </h2>
           {hasSchedule ? (
-            <div className="text-[13px] text-warm-600 mt-2">
+            <div className="text-body text-warm-600 mt-1">
               {changed > 0 ? <>{changed} answer{changed === 1 ? '' : 's'} changed since the schedule was built</>
                 : !settled && ad.finishUncertaintyDays > 0 ? <>The finish could still move about ±{ad.finishUncertaintyDays} days</>
                 : nothingOpen ? <>Nothing left would change your finish date</>
                 : <>The open questions can&apos;t move the finish much</>}
             </div>
           ) : ad.baselineFinish ? (
-            <div className="text-[13px] text-warm-600 mt-2">
+            <div className="text-body text-warm-600 mt-1">
               Forecast finish <span className="font-semibold text-ink tabular-nums">{fmtDate(ad.baselineFinish)}</span>
               {ad.finishUncertaintyDays > 0 && !settled && <> · could still move about ±{ad.finishUncertaintyDays} days</>}
             </div>
@@ -202,7 +202,7 @@ function StatusHeader({ ad, progress, hasSchedule, changed, canWrite, busy, onGe
         <div className="meter-fill h-full rounded-full bg-accent-600" style={{ width: `${Math.max(4, Math.round(progress * 100))}%` }} />
       </div>
       {!settled && !hasSchedule && canWrite && (
-        <p className="text-[12px] text-warm-600 mt-3">Anything still open when you build becomes a stated assumption with contingency.</p>
+        <p className="text-caption text-warm-600 mt-3">Anything still open when you build becomes a stated assumption with contingency.</p>
       )}
     </section>
   )
@@ -237,12 +237,12 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
   return (
     <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 px-6 py-6 md:px-8 md:py-7">
       {/* Where the question belongs and how far its answer can move the finish: one quiet line above it. */}
-      <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-warm-600">
+      <p className="flex flex-wrap items-center gap-x-2 text-caption text-warm-600">
         <span>{SECTION_LABEL[q.section] || q.section}</span>
         {insight?.swingDays ? <><span aria-hidden>·</span><span>can move the finish up to <span className="font-semibold text-ink tabular-nums">{insight.swingDays} days</span></span></> : null}
         {q.id.startsWith('ai.') && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Sparkles size={11} aria-hidden /> AI follow-up</span></>}
       </p>
-      <h2 className="text-[20px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-1.5">{q.prompt}</h2>
+      <h2 className="text-heading leading-snug font-semibold text-ink mt-1">{q.prompt}</h2>
 
       <div className="mt-5">
         {choices && (
@@ -250,31 +250,31 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
             {choices.map((o, i) => (
               <button key={String(o.value)} disabled={busy || disabled} onClick={() => submit(o.value)}
                 className="pressable group flex items-center gap-3 w-full text-left rounded-lg border border-warm-300 bg-white hover:border-navy-900 hover:bg-warm-50 px-4 py-3 disabled:opacity-50">
-                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-[12px] text-warm-600 font-sans group-hover:border-navy-900 group-hover:text-ink">{i + 1}</kbd>}
-                <span className="text-[14px] text-ink">{o.label}</span>
+                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-caption text-warm-600 font-sans group-hover:border-navy-900 group-hover:text-ink">{i + 1}</kbd>}
+                <span className="text-body text-ink">{o.label}</span>
               </button>
             ))}
             {q.allowOther && q.kind === 'choice' && (
               other ? <TextAnswer kind="text" placeholder={q.otherPrompt || 'Type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} autoFocus />
-                : <button disabled={busy || disabled} onClick={() => setOther(true)} className="text-left text-[13px] text-accent-600 hover:underline px-1 py-1 w-fit">Something else…</button>
+                : <button disabled={busy || disabled} onClick={() => setOther(true)} className="text-left text-body text-accent-600 hover:underline px-1 py-1 w-fit">Something else…</button>
             )}
           </div>
         )}
         {q.kind === 'choice' && !choices && (other ? (
           <div>
             <TextAnswer kind="text" placeholder={q.id === 'project.state' ? 'e.g. Toronto, Ontario, Canada' : q.otherPrompt || 'Type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} autoFocus />
-            <button type="button" disabled={busy || disabled} onClick={() => setOther(false)} className="mt-2 text-[13px] text-accent-600 hover:underline">Choose from the list</button>
+            <button type="button" disabled={busy || disabled} onClick={() => setOther(false)} className="mt-2 text-body text-accent-600 hover:underline">Choose from the list</button>
           </div>
         ) : (
           <div>
             <div className="flex flex-wrap gap-2">
-              <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-lg border border-warm-300 bg-white px-3 h-11 text-[14px] text-ink">
+              <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-lg border border-warm-300 bg-white px-3 h-11 text-body text-ink">
                 <option value="">Choose…</option>
                 {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               <button disabled={busy || disabled || !value} onClick={() => submit(value)} className={CONTINUE}>Continue</button>
             </div>
-            {q.allowOther && <button type="button" disabled={busy || disabled} onClick={() => setOther(true)} className="mt-2 text-[13px] text-accent-600 hover:underline">{q.id === 'project.state' ? 'Not in the US?' : 'Something else…'}</button>}
+            {q.allowOther && <button type="button" disabled={busy || disabled} onClick={() => setOther(true)} className="mt-2 text-body text-accent-600 hover:underline">{q.id === 'project.state' ? 'Not in the US?' : 'Something else…'}</button>}
           </div>
         ))}
         {(q.kind === 'number' || q.kind === 'date' || q.kind === 'text') && (
@@ -282,7 +282,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
         )}
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-body">
         <button disabled={busy || disabled} onClick={() => onAnswer(q.id, withNote({ status: 'unknown' }))} className="text-warm-600 hover:text-ink disabled:opacity-50">I don&apos;t know yet</button>
         {q.allowWithheld && <button disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'withheld' })} className="inline-flex items-center gap-1 text-warm-600 hover:text-ink disabled:opacity-50" title="Plan around it without sharing the detail"><Lock size={12} aria-hidden /> Can&apos;t share</button>}
         {busy && <Loader2 size={14} className="animate-spin text-warm-500" aria-label="Saving" />}
@@ -290,20 +290,20 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
 
       <div className="mt-4">
         <Disclosure title="Why this matters">
-          <p className="text-[13px] text-warm-600">{fmtDates(q.why)}</p>
-          {insight?.reason && <p className="text-[13px] text-warm-500 mt-2">{insight.reason}</p>}
-          {q.fallback?.explanation && <p className="text-[13px] text-warm-500 mt-2">If you don&apos;t know: {fmtDates(q.fallback.explanation)}</p>}
+          <p className="text-body text-warm-600">{fmtDates(q.why)}</p>
+          {insight?.reason && <p className="text-body text-warm-500 mt-2">{insight.reason}</p>}
+          {q.fallback?.explanation && <p className="text-body text-warm-500 mt-2">If you don&apos;t know: {fmtDates(q.fallback.explanation)}</p>}
           {q.groundedBy && q.groundedBy.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
-              {q.groundedBy.map((s, i) => <span key={i} title={s.detail} className="text-[12px] text-warm-600 bg-warm-100 rounded-full px-2.5 py-0.5"><span className="font-medium">{SOURCE_LABEL[s.kind]}:</span> {s.label}</span>)}
+              {q.groundedBy.map((s, i) => <span key={i} title={s.detail} className="text-caption text-warm-600 bg-warm-100 rounded-full px-2.5 py-0.5"><span className="font-medium">{SOURCE_LABEL[s.kind]}:</span> {s.label}</span>)}
             </div>
           )}
         </Disclosure>
         <Disclosure title="Add detail in your own words">
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} maxLength={1000} aria-label="Detail for this answer"
             placeholder={q.section === 'permits' ? 'e.g. Issued for foundations only; superstructure still in review' : q.section === 'procurement' ? 'e.g. Needed, but the utility is designing a new substation' : 'e.g. Mostly yes, except the east wing'}
-            className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-[14px] text-ink placeholder:text-warm-600" />
-          <p className="text-[12px] text-warm-600 mt-1">Saved with whichever answer you choose; it goes into the Basis of Schedule and flags the related activities.</p>
+            className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-body text-ink placeholder:text-warm-600" />
+          <p className="text-caption text-warm-600 mt-1">Saved with whichever answer you choose; it goes into the Basis of Schedule and flags the related activities.</p>
         </Disclosure>
       </div>
     </div>
@@ -316,8 +316,8 @@ function TextAnswer({ kind, unit, placeholder, busy, disabled, onSubmit, autoFoc
     <form onSubmit={e => { e.preventDefault(); if (v.trim()) onSubmit(v.trim()) }} className="flex flex-wrap gap-2 items-center">
       <input autoFocus={autoFocus} type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'} value={v} onChange={e => setV(e.target.value)} min={kind === 'number' ? 0 : undefined} max={unit === '%' ? 100 : undefined}
         placeholder={placeholder} aria-label={placeholder}
-        className={`rounded-lg border border-warm-300 bg-white px-3 h-11 text-[14px] text-ink placeholder:text-warm-600 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
-      {unit && kind === 'number' && <span className="text-[13px] text-warm-600">{unit}</span>}
+        className={`rounded-lg border border-warm-300 bg-white px-3 h-11 text-body text-ink placeholder:text-warm-600 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
+      {unit && kind === 'number' && <span className="text-body text-warm-600">{unit}</span>}
       <button disabled={busy || disabled || !v.trim()} className={CONTINUE}>Continue</button>
     </form>
   )
@@ -344,24 +344,24 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
   }
   return (
     <div className="rise-in rounded-[14px] bg-white border border-warm-200 px-6 py-6 md:px-8 md:py-7">
-      <p className="text-[12px] text-warm-600">{group.label} · together they can move the finish up to <span className="font-semibold text-ink tabular-nums">{group.swingDays} days</span></p>
-      <h2 className="text-[20px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-1.5">
+      <p className="text-caption text-warm-600">{group.label} · together they can move the finish up to <span className="font-semibold text-ink tabular-nums">{group.swingDays} days</span></p>
+      <h2 className="text-heading leading-snug font-semibold text-ink mt-1">
         {group.id === 'procurement' ? 'Where does each of these stand?' : group.id === 'permits' ? 'Where is each approval?' : 'Do these apply?'}
       </h2>
-      <p className="text-[13px] text-warm-600 mt-1.5">Answer the ones you know. Any you leave are planned with typical lead times and a buffer.</p>
+      <p className="text-body text-warm-600 mt-1.5">Answer the ones you know. Any you leave are planned with typical lead times and a buffer.</p>
       <ul className="mt-5 divide-y divide-warm-200 border-y border-warm-200">
         {questions.map(q => {
           const opts = q.kind === 'boolean' ? [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] : (q.options || []).map(o => ({ value: o.value as string | boolean, label: SHORT[o.value] || o.label }))
           return (
             <li key={q.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="flex-1 min-w-0 text-[14px] text-ink">{shortName(q)}</span>
+              <span className="flex-1 min-w-0 text-body text-ink">{shortName(q)}</span>
               <div role="radiogroup" aria-label={shortName(q)} className="flex flex-wrap gap-0.5 rounded-lg bg-warm-100 p-0.5 w-fit">
                 {opts.map(o => {
                   const on = picked[q.id] === o.value
                   return (
                     <button key={String(o.value)} role="radio" aria-checked={on} disabled={busy || disabled}
                       onClick={() => setPicked(prev => { const n = { ...prev }; if (on) delete n[q.id]; else n[q.id] = o.value; return n })}
-                      className={`pressable rounded-md px-3 py-1 text-[12px] ${on ? 'bg-white text-ink font-semibold shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-700 hover:text-ink'}`}>{o.label}</button>
+                      className={`pressable rounded-md px-3 py-1 text-caption ${on ? 'bg-white text-ink font-semibold shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-700 hover:text-ink'}`}>{o.label}</button>
                   )
                 })}
               </div>
@@ -373,9 +373,9 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
         <button disabled={busy || disabled || !count} onClick={() => save('skip')} className={CONTINUE}>
           {busy ? <Loader2 size={14} className="animate-spin inline mr-1.5" aria-hidden /> : null}Save {count || ''} answer{count === 1 ? '' : 's'}
         </button>
-        <button disabled={busy || disabled} onClick={() => save('unknown')} className="text-[13px] text-warm-600 hover:text-ink">{count ? 'Save, and I don’t know the rest' : 'I don’t know any of these yet'}</button>
+        <button disabled={busy || disabled} onClick={() => save('unknown')} className="text-body text-warm-600 hover:text-ink">{count ? 'Save, and I don’t know the rest' : 'I don’t know any of these yet'}</button>
       </div>
-      <div className="mt-4"><Disclosure title="Why these are asked together"><p className="text-[13px] text-warm-600">{group.reason}</p></Disclosure></div>
+      <div className="mt-4"><Disclosure title="Why these are asked together"><p className="text-body text-warm-600">{group.reason}</p></Disclosure></div>
     </div>
   )
 }
@@ -386,13 +386,13 @@ function CompactQuestion({ q, reason, busy, disabled, onAnswer }: { q: Question;
   const choices = q.kind === 'boolean' ? [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] : q.kind === 'choice' && (q.options?.length || 0) <= 6 ? q.options!.map(o => ({ value: o.value as unknown, label: SHORT[o.value] || o.label })) : null
   return (
     <div className="py-3.5">
-      <div className="text-[14px] text-ink">{q.prompt}</div>
-      {reason && <div className="text-[12px] text-warm-500 mt-0.5">{reason}</div>}
+      <div className="text-body text-ink">{q.prompt}</div>
+      {reason && <div className="text-caption text-warm-500 mt-0.5">{reason}</div>}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         {choices ? choices.map(o => (
-          <button key={String(o.value)} disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'known', value: o.value as Answer['value'] })} className="pressable rounded-lg border border-warm-300 bg-white hover:bg-warm-100 px-3.5 py-1.5 text-[13px] text-ink">{o.label}</button>
+          <button key={String(o.value)} disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'known', value: o.value as Answer['value'] })} className="pressable rounded-lg border border-warm-300 bg-white hover:bg-warm-100 px-3.5 py-1.5 text-body text-ink">{o.label}</button>
         )) : <TextAnswer kind={q.kind === 'number' || q.kind === 'date' ? q.kind : 'text'} unit={q.unit} placeholder={q.unit || 'Your answer'} busy={busy} disabled={disabled} onSubmit={v => onAnswer(q.id, { status: 'known', value: q.kind === 'number' ? Number(v) : v })} />}
-        <button disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'unknown' })} className="text-[12px] text-warm-500 hover:text-ink ml-1">Don&apos;t know</button>
+        <button disabled={busy || disabled} onClick={() => onAnswer(q.id, { status: 'unknown' })} className="text-caption text-warm-500 hover:text-ink ml-1">Don&apos;t know</button>
       </div>
     </div>
   )
@@ -400,14 +400,14 @@ function CompactQuestion({ q, reason, busy, disabled, onAnswer }: { q: Question;
 
 function AnsweredRow({ a, issues, disabled, onAnswer }: { a: AnsweredItem; issues: string[]; disabled: boolean; onAnswer: SmartInterviewProps['onAnswer'] }) {
   return (
-    <li className="py-2.5 text-[13px]">
+    <li className="py-2.5 text-body">
       <div className="flex items-start gap-3">
         <span className="flex-1 min-w-0 text-warm-600">{a.prompt}</span>
         <span className="text-ink font-medium text-right flex items-center gap-1">{a.status === 'withheld' && <Lock size={11} aria-label="Withheld" />}{fmtDates(a.label)}</span>
         {!disabled && <button onClick={() => onAnswer(a.id, null)} aria-label={`Clear the answer to: ${a.prompt}`} title="Clear and ask again" className="text-warm-400 hover:text-status-at-risk mt-0.5"><X size={14} aria-hidden /></button>}
       </div>
-      {a.note && <p className="text-[12px] text-warm-500 mt-1">“{a.note}”</p>}
-      {issues.map((t, i) => <p key={i} className="text-[12px] text-status-at-risk mt-1">{fmtDates(t)}</p>)}
+      {a.note && <p className="text-caption text-warm-500 mt-1">“{a.note}”</p>}
+      {issues.map((t, i) => <p key={i} className="text-caption text-status-at-risk mt-1">{fmtDates(t)}</p>)}
     </li>
   )
 }
@@ -416,11 +416,11 @@ function AddNote({ busy, onAddNote }: { busy: boolean; onAddNote: (t: string) =>
   const [note, setNote] = useState('')
   return (
     <Disclosure title="Add something I didn’t ask">
-      <p className="text-[13px] text-warm-500 mb-2">Owner requirements, site constraints, phasing: anything that affects the schedule. It goes into the Basis of Schedule.</p>
+      <p className="text-body text-warm-500 mb-2">Owner requirements, site constraints, phasing: anything that affects the schedule. It goes into the Basis of Schedule.</p>
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} aria-label="Information to add"
         placeholder="e.g. The utility will only energize the substation after the owner's commissioning agent signs off"
-        className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-[14px] text-ink placeholder:text-warm-600" />
-      <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-9 text-[13px] font-medium disabled:opacity-50">Add to brief</button>
+        className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-body text-ink placeholder:text-warm-600" />
+      <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-9 text-body font-medium disabled:opacity-50">Add to brief</button>
     </Disclosure>
   )
 }

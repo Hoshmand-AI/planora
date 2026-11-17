@@ -95,22 +95,22 @@ export default function ReportsPage() {
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
               <Icon size={14} className="text-accent-400" aria-hidden />
             </div>
-            <h2 className="font-display text-[20px] text-ink">{rt?.title}</h2>
+            <h2 className="text-heading font-semibold text-ink">{rt?.title}</h2>
           </div>
           <button onClick={() => setReport(null)} aria-label="Close report" className="text-warm-500 hover:text-warm-700"><X size={18} aria-hidden /></button>
         </div>
 
         <div className="bg-warm-100 border border-warm-200 rounded-md p-3 mb-4 flex items-center justify-between">
-          <div className="text-[12px] text-warm-500">
+          <div className="text-caption text-warm-500">
             {report.scheduleName} · Generated {report.generatedAt ? fmtDateTime(report.generatedAt) : ''}
           </div>
-          <button onClick={handleExport} className="flex items-center gap-1.5 text-accent-600 text-[12px] font-medium hover:underline">
+          <button onClick={handleExport} className="flex items-center gap-1.5 text-accent-600 text-caption font-medium hover:underline">
             <Download size={13} aria-hidden /> Download (.md)
           </button>
         </div>
 
         <div className="bg-warm-50 border border-warm-200 rounded-lg p-6 md:p-8">
-          <Markdown text={report.content} className="text-[14px] text-warm-700 leading-relaxed" />
+          <Markdown text={report.content} className="text-body text-warm-700 leading-relaxed" />
         </div>
       </div>
     )
@@ -119,8 +119,8 @@ export default function ReportsPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6">
       <h2 className="sr-only">Reports</h2>
-      <p className="text-[13px] text-warm-600 mb-3">{reportMethod(llm)}.</p>
-      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-warm-700">
+      <p className="text-body text-warm-600 mb-3">{reportMethod(llm)}.</p>
+      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-body text-warm-700">
         <label htmlFor={docsId} className="flex items-center gap-1.5">
           <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
           Use project documents (contract and specification requirements, with citations)
@@ -132,8 +132,8 @@ export default function ReportsPage() {
           </label>
         )}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
-      {!canGenerate && <p className="mb-4 text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3">Your role cannot generate reports. Ask an admin for access.</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-body text-status-at-risk">{error}</p>}
+      {!canGenerate && <p className="mb-4 text-body text-warm-700 border-l-2 border-warm-300 pl-3">Your role cannot generate reports. Ask an admin for access.</p>}
       <div className="grid md:grid-cols-2 gap-3">
         {REPORT_TYPES.map(rt => (
           <button
@@ -149,10 +149,10 @@ export default function ReportsPage() {
               }
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-semibold text-ink mb-1">{rt.title}</div>
-              <div className="text-[13px] text-warm-600 leading-relaxed">{rt.desc}</div>
+              <div className="text-subhead font-semibold text-ink mb-1">{rt.title}</div>
+              <div className="text-body text-warm-600 leading-relaxed">{rt.desc}</div>
             </div>
-            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-lg border border-warm-300 bg-white group-hover:bg-warm-100 text-ink text-[13px] font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
+            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-lg border border-warm-300 bg-white group-hover:bg-warm-100 text-ink text-body font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
           </button>
         ))}
       </div>

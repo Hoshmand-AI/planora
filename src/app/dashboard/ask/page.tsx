@@ -116,15 +116,15 @@ export default function AskPage() {
         {messages.length === 0 && (
           <div className="max-w-[560px] mx-auto">
             <div className="mb-6">
-              <h2 className="font-display text-[20px] text-ink mb-1">Ask about your schedule</h2>
-              <p className="text-[13px] text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
-              {aiOff && <p className="text-[13px] text-warm-600 mt-2">AI is off for this organization, so the reply is a readout, not a written answer.</p>}
+              <h2 className="text-heading font-semibold text-ink mb-1">Ask about your schedule</h2>
+              <p className="text-body text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
+              {aiOff && <p className="text-body text-warm-600 mt-2">AI is off for this organization, so the reply is a readout, not a written answer.</p>}
             </div>
-            <div className="text-[12px] font-semibold text-warm-400 mb-2">Suggested questions</div>
+            <div className="text-caption font-semibold text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
               {SUGGESTED.map(q => (
                 <button key={q} onClick={() => handleSend(q)} disabled={!canAsk || loading}
-                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-[13px] text-warm-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-body text-warm-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
                   {q}
                 </button>
               ))}
@@ -135,14 +135,14 @@ export default function AskPage() {
         <div className="space-y-4 max-w-[700px] mx-auto">
           {messages.map(msg => (
             <div key={msg.id} className={`${msg.role === 'user' ? 'ml-auto max-w-[75%]' : 'max-w-[85%]'}`}>
-              <div className={`rounded-lg px-4 py-3 text-[14px] leading-relaxed ${
+              <div className={`rounded-lg px-4 py-3 text-body leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-navy-900 text-white'
                   : 'bg-warm-100 border border-warm-200 text-warm-700'
               }`}>
                 {msg.role === 'user' ? <div className="whitespace-pre-wrap">{fmtDates(msg.content)}</div> : <Markdown text={msg.content} />}
               </div>
-              <div className="text-[12px] text-warm-400 mt-1 px-1">
+              <div className="text-caption text-warm-400 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -150,7 +150,7 @@ export default function AskPage() {
 
           {loading && (
             <div className="max-w-[85%]">
-              <div className="bg-warm-100 border border-warm-200 rounded-lg px-4 py-3 text-[13px] text-warm-400">
+              <div className="bg-warm-100 border border-warm-200 rounded-lg px-4 py-3 text-body text-warm-400">
                 Analyzing schedule data…
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function AskPage() {
       </div>
 
       {/* Input bar */}
-      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-warm-700">
+      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-warm-700">
         <label htmlFor={docsId} className="flex items-center gap-1.5">
           <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
           Use project documents
@@ -179,7 +179,7 @@ export default function AskPage() {
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder={canAsk ? 'Ask about your schedule…' : 'Your role cannot use Ask AI. Ask an admin for access.'}
           aria-label="Ask about your schedule"
-          className="flex-1 bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
+          className="flex-1 bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-body text-warm-700 placeholder:text-warm-400"
           disabled={loading || !canAsk}
         />
         <button

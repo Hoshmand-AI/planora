@@ -16,15 +16,15 @@ export function Section({ title, description, children, tone = 'default', id }: 
   const long = text ? !!rest.trim() : !!description
   return (
     <section id={id} aria-labelledby={hid} className={`border rounded-[14px] p-5 md:p-6 bg-white ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
-      <h2 id={hid} className={`text-[14px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-ink'}`}>{title}</h2>
+      <h2 id={hid} className={`text-heading font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-ink'}`}>{title}</h2>
       {description && (
         text ? (
           // "More" follows the sentence it continues, instead of sitting alone at the card's right edge.
-          <p className="mb-4 text-[13px] text-warm-600">{first}{more && rest}{long && <> <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button></>}</p>
+          <p className="mb-4 text-body text-warm-600">{first}{more && rest}{long && <> <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-caption font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button></>}</p>
         ) : (
           <div className="mb-4 flex items-start gap-2">
-            <p className={`flex-1 min-w-0 text-[13px] text-warm-600 ${long && !more ? 'line-clamp-1' : ''}`}>{description}</p>
-            {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
+            <p className={`flex-1 min-w-0 text-body text-warm-600 ${long && !more ? 'line-clamp-1' : ''}`}>{description}</p>
+            {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-caption font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
           </div>
         )
       )}
@@ -50,19 +50,19 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   const hintId = `${id}-hint`
   return (
     <div>
-      <label htmlFor={id} className="block text-[13px] font-medium text-warm-700 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-body font-medium text-warm-700 mb-1.5">{label}</label>
       {children({ id, 'aria-describedby': hint ? hintId : undefined })}
-      {hint && <p id={hintId} className="text-[12px] text-warm-500 mt-1">{hint}</p>}
+      {hint && <p id={hintId} className="text-caption text-warm-500 mt-1">{hint}</p>}
     </div>
   )
 }
 
-export const inputClass = 'w-full bg-white border border-warm-300 rounded-lg px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400'
+export const inputClass = 'w-full bg-white border border-warm-300 rounded-lg px-3 py-2 text-body text-warm-700 placeholder:text-warm-400'
 
 /** A method note that is one press away instead of printed under every control: "How this works", then the text. */
 export function Hint({ label = 'How this works', children, className = '' }: { label?: string; children: React.ReactNode; className?: string }) {
   return (
-    <details className={`group text-[12px] text-warm-600 ${className}`}>
+    <details className={`group text-caption text-warm-600 ${className}`}>
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-accent-600 hover:underline [&::-webkit-details-marker]:hidden">{label}<span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span></summary>
       <div className="mt-1 max-w-[80ch]">{children}</div>
     </details>
@@ -71,8 +71,8 @@ export function Hint({ label = 'How this works', children, className = '' }: { l
 
 /** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
 export const buttonClass = {
-  primary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
-  secondary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-ink text-[13px] font-medium hover:bg-warm-100 transition-colors',
+  primary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold transition-colors',
+  secondary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-ink text-body font-medium hover:bg-warm-100 transition-colors',
 }
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
@@ -82,7 +82,7 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]
-  return <button {...props} className={`${variant === 'ghost' ? '' : 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
+  return <button {...props} className={`${variant === 'ghost' ? '' : 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg'} text-body transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
 }
 
 export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' | 'warning'; children: React.ReactNode }) {
@@ -92,7 +92,7 @@ export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' |
     info: 'bg-accent-100 border-accent-500 text-warm-700',
     warning: 'bg-status-attention-bg border-status-attention text-warm-700',
   }[tone]
-  return <div role={tone === 'error' ? 'alert' : 'status'} className={`border-l-2 text-[13px] px-3 py-2 rounded-md ${styles}`}>{children}</div>
+  return <div role={tone === 'error' ? 'alert' : 'status'} className={`border-l-2 text-body px-3 py-2 rounded-md ${styles}`}>{children}</div>
 }
 
 /** POST JSON and return { ok, data } without throwing. */

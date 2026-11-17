@@ -25,8 +25,8 @@ export function Disclosure({ title, meta, children, defaultOpen = false, tone = 
         <ChevronRight size={15} aria-hidden data-open={open} className="disclosure-chevron text-warm-400 group-hover:text-ink flex-shrink-0" />
         {/* The hint sits at the right while there is room, and drops under the title on a narrow screen instead of squeezing it. */}
         <span className="flex-1 min-w-0 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <span className="text-[14px] font-medium text-ink tracking-[-0.01em]">{title}</span>
-          {meta != null && <span className="text-[12px] text-warm-600 tabular-nums">{meta}</span>}
+          <span className="text-subhead font-medium text-ink">{title}</span>
+          {meta != null && <span className="text-caption text-warm-600 tabular-nums">{meta}</span>}
         </span>
       </button>
       <div id={pid} role="region" data-open={open} className="disclosure-panel" inert={!open || undefined}>

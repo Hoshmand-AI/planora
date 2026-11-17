@@ -33,7 +33,7 @@ interface RecoveryData {
 
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
-const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
+const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-body text-warm-700'
 const primary = buttonClass.primary
 const secondary = buttonClass.secondary
 const CONSTRAINTS = [['SNET', 'Start on or after'], ['SNLT', 'Start on or before'], ['FNET', 'Finish on or after'], ['FNLT', 'Finish on or before'], ['SO', 'Start on'], ['FO', 'Finish on'], ['MSO', 'Mandatory start'], ['MFO', 'Mandatory finish']]
@@ -41,7 +41,7 @@ const CONSTRAINTS = [['SNET', 'Start on or after'], ['SNLT', 'Start on or before
 /** Activities picker shared by the forms: type an activity ID or pick it from the list. */
 function ActivityInput({ id, label, value, onChange, listId }: { id: string; label: string; value: string; onChange: (v: string) => void; listId: string }) {
   return (
-    <label htmlFor={id} className="block text-[12px] text-warm-600">{label}
+    <label htmlFor={id} className="block text-caption text-warm-600">{label}
       <input id={id} list={listId} value={value} onChange={e => onChange(e.target.value)} placeholder="Activity ID" className={`${input} block mt-0.5 w-40`} />
     </label>
   )
@@ -129,17 +129,17 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     return { done: `Undone (${(d.reverted as string[] | undefined)?.length ?? 0} edit${(d.reverted as string[] | undefined)?.length === 1 ? '' : 's'} reverted, kept in the audit log). Forecast finish ${fmtDate(String(d.forecastFinish ?? ''))}.` }
   }
 
-  if (!data) return <p className="text-[13px] text-warm-600">{err || 'Loading…'}</p>
+  if (!data) return <p className="text-body text-warm-600">{err || 'Loading…'}</p>
   const applied = data.edits
   return (
-    <div className="space-y-4 text-[13px] text-warm-700">
+    <div className="space-y-4 text-body text-warm-700">
       <p className="text-warm-600">Edits change RunF9&apos;s copy of this schedule only; the uploaded file is kept unchanged. Each edit is recalculated with the full network, recorded with its reason in the audit log, and included in exports and reports.</p>
       {applied.length === 0 ? <p>No edits yet.</p> : (
-        <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Edits made in RunF9"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
+        <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Edits made in RunF9"><table className="w-full text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
-              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[12px] text-warm-600">· recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[12px] text-warm-600">· plain English</span>}{e.status === 'skipped' && <span className="block text-[12px] text-status-attention">Not applied: {e.note}</span>}</td>
+              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-caption text-warm-600">· recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-caption text-warm-600">· plain English</span>}{e.status === 'skipped' && <span className="block text-caption text-status-attention">Not applied: {e.note}</span>}</td>
               <td className={td}>{fmtDates(e.before)}</td><td className={td}>{fmtDates(e.after)}</td><td className={td}>{e.reason}</td>
               <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDay(e.at)}</span></td>
               {canEdit && data.editable && <td className={td}><button type="button" disabled={busy} onClick={() => revert(e)} className="text-accent-600 hover:underline">Revert</button></td>}
@@ -160,18 +160,18 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           <div className="flex flex-wrap gap-3 items-end">
             <ActivityInput id={`ea-${scheduleId}`} label={kind === 'link_set' || kind === 'link_remove' ? 'Predecessor' : 'Activity'} value={a} onChange={setA} listId={listId} />
             {(kind === 'link_set' || kind === 'link_remove') && <ActivityInput id={`eb-${scheduleId}`} label="Successor" value={b} onChange={setB} listId={listId} />}
-            {kind === 'duration' && <label className="block text-[12px] text-warm-600">Remaining (work days){picked ? ` — now ${picked.remaining}` : ''}<input type="number" min={0} value={num} onChange={e => setNum(e.target.value)} className={`${input} block mt-0.5 w-28`} /></label>}
+            {kind === 'duration' && <label className="block text-caption text-warm-600">Remaining (work days){picked ? ` — now ${picked.remaining}` : ''}<input type="number" min={0} value={num} onChange={e => setNum(e.target.value)} className={`${input} block mt-0.5 w-28`} /></label>}
             {kind === 'link_set' && <>
-              <label className="block text-[12px] text-warm-600">Type<select value={type} onChange={e => setType(e.target.value)} className={`${input} block mt-0.5`}>{['FS', 'SS', 'FF', 'SF'].map(t => <option key={t}>{t}</option>)}</select></label>
-              <label className="block text-[12px] text-warm-600">Lag (work days)<input type="number" value={num} onChange={e => setNum(e.target.value)} className={`${input} block mt-0.5 w-24`} /></label>
+              <label className="block text-caption text-warm-600">Type<select value={type} onChange={e => setType(e.target.value)} className={`${input} block mt-0.5`}>{['FS', 'SS', 'FF', 'SF'].map(t => <option key={t}>{t}</option>)}</select></label>
+              <label className="block text-caption text-warm-600">Lag (work days)<input type="number" value={num} onChange={e => setNum(e.target.value)} className={`${input} block mt-0.5 w-24`} /></label>
             </>}
             {kind === 'constraint' && <>
-              <label className="block text-[12px] text-warm-600">Constraint{picked?.constraint ? ` — now ${picked.constraint}` : ''}<select value={cType} onChange={e => setCType(e.target.value)} className={`${input} block mt-0.5`}><option value="">None (clear)</option>{CONSTRAINTS.map(([k, l]) => <option key={k} value={k}>{l} ({k})</option>)}</select></label>
-              {cType && <label className="block text-[12px] text-warm-600">Date<input type="date" value={cDate} onChange={e => setCDate(e.target.value)} className={`${input} block mt-0.5`} /></label>}
+              <label className="block text-caption text-warm-600">Constraint{picked?.constraint ? ` — now ${picked.constraint}` : ''}<select value={cType} onChange={e => setCType(e.target.value)} className={`${input} block mt-0.5`}><option value="">None (clear)</option>{CONSTRAINTS.map(([k, l]) => <option key={k} value={k}>{l} ({k})</option>)}</select></label>
+              {cType && <label className="block text-caption text-warm-600">Date<input type="date" value={cDate} onChange={e => setCDate(e.target.value)} className={`${input} block mt-0.5`} /></label>}
             </>}
           </div>
-          {picked && <p className="text-[12px] text-warm-600">{picked.code} {picked.name} · {picked.status.replace('_', ' ')}</p>}
-          <label className="block text-[12px] text-warm-600">Reason (required, kept with the edit)
+          {picked && <p className="text-caption text-warm-600">{picked.code} {picked.name} · {picked.status.replace('_', ' ')}</p>}
+          <label className="block text-caption text-warm-600">Reason (required, kept with the edit)
             <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Steel erector confirmed a second crew from 11/02" className={`${input} block mt-0.5 w-full`} />
           </label>
           <button type="submit" disabled={busy || reason.trim().length < 5 || !a.trim() || (kind === 'duration' && num.trim() === '')} className={primary}>{busy ? 'Recalculating…' : 'Save edit and recalculate'}</button>
@@ -214,9 +214,9 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
     onApplied()
   }
 
-  if (!data) return <p className="text-[13px] text-warm-600">{msg || 'Modeling options on this network…'}</p>
+  if (!data) return <p className="text-body text-warm-600">{msg || 'Modeling options on this network…'}</p>
   return (
-    <div className="space-y-3 text-[13px] text-warm-700">
+    <div className="space-y-3 text-body text-warm-700">
       {data.basisNote && <p className="border-l-2 border-status-info pl-2">{data.basisNote}</p>}
       <p className="text-warm-600">Target: {data.milestone ? `${data.milestone.code} ${data.milestone.name}` : 'project finish'}{data.required ? `, required ${fmtDate(data.required)}${data.requiredSource ? ` (${data.requiredSource})` : ''}` : ', no required date'}.</p>
       <ul className="list-disc pl-5 space-y-1">{data.explanation.map((x, i) => <li key={i}>{x}</li>)}</ul>
@@ -228,7 +228,7 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
             <p className="text-warm-600 mt-1">{o.description} <span className="text-warm-700">Trade-off:</span> {o.tradeoff}</p>
             {canEdit && data.editable && (
               <div className="flex flex-wrap gap-2 items-end mt-2">
-                <label className="flex-1 min-w-[240px] text-[12px] text-warm-600">Reason for applying
+                <label className="flex-1 min-w-[240px] text-caption text-warm-600">Reason for applying
                   <input value={reasons[o.id] ?? o.reason} onChange={e => setReasons(r => ({ ...r, [o.id]: e.target.value }))} className={`${input} block mt-0.5 w-full`} />
                 </label>
                 <button type="button" disabled={!!busy || (reasons[o.id] ?? o.reason).trim().length < 5} onClick={() => apply(o)} className={secondary}>{busy === o.id ? 'Applying…' : 'Apply as edit'}</button>
@@ -266,18 +266,18 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
   }
   const cell = `${input} w-16`
   return (
-    <div className="space-y-3 text-[13px] text-warm-700">
+    <div className="space-y-3 text-body text-warm-700">
       <p className="text-warm-600">Ranges are work days of remaining work (optimistic / most likely / pessimistic) and replace the rule-based range for that activity. By name, {inputs.defaults.procurement} fabrication / delivery / procurement activities use a supplier range and {inputs.defaults.cure} cure activities are held at fixed duration unless you give them a range.</p>
-      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Three-point ranges</caption>
+      <div className="overflow-x-auto"><table className="text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Three-point ranges</caption>
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Optimistic</th><th className={th}>Most likely</th><th className={th}>Pessimistic</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{ranges.map((r, i) => (
           <tr key={i}>
-            <td className={td}><input aria-label="Activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[12px]">{r.name}</span>}</td>
+            <td className={td}><input aria-label="Activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-caption">{r.name}</span>}</td>
             {(['optimistic', 'mostLikely', 'pessimistic'] as const).map(k => <td key={k} className={td}><input aria-label={k} type="number" min={0} disabled={!canEdit} value={r[k]} onChange={e => setRanges(rs => rs.map((x, j) => j === i ? { ...x, [k]: e.target.value } : x))} className={cell} /></td>)}
             {canEdit && <td className={td}><button type="button" onClick={() => setRanges(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
       {canEdit && <button type="button" onClick={() => setRanges(rs => [...rs, { activityId: '', optimistic: '', mostLikely: '', pessimistic: '' }])} className={secondary}>Add range</button>}
-      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Risk events</caption>
+      <div className="overflow-x-auto"><table className="text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Risk events</caption>
         <thead><tr><th className={th}>Event</th><th className={th}>Probability %</th><th className={th}>Impact (work days)</th><th className={th}>Affects activity or milestone</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{events.map((r, i) => (
           <tr key={i}>
@@ -288,11 +288,11 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
             {canEdit && <td className={td}><button type="button" onClick={() => setEvents(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
       {canEdit && <button type="button" onClick={() => setEvents(rs => [...rs, { activityId: '', name: '', probability: '', impactDays: '' }])} className={secondary}>Add risk event</button>}
-      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Committed delivery dates</caption>
+      <div className="overflow-x-auto"><table className="text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Committed delivery dates</caption>
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Committed date</th><th className={th}>Note (e.g. supplier letter)</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{commitments.map((r, i) => (
           <tr key={i}>
-            <td className={td}><input aria-label="Committed activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-[12px]">{r.name}</span>}</td>
+            <td className={td}><input aria-label="Committed activity ID" disabled={!canEdit} value={r.activityId} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, activityId: e.target.value } : x))} className={`${input} w-28`} />{r.name && <span className="block text-warm-500 text-caption">{r.name}</span>}</td>
             <td className={td}><input aria-label="Committed delivery date" type="date" disabled={!canEdit} value={r.date} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={input} /></td>
             <td className={td}><input aria-label="Commitment note" disabled={!canEdit} value={r.note ?? ''} onChange={e => setCommitments(rs => rs.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} className={`${input} w-48`} /></td>
             {canEdit && <td className={td}><button type="button" onClick={() => setCommitments(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
@@ -303,7 +303,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
           <button type="button" disabled={busy} onClick={save} className={primary}>{busy ? 'Saving…' : 'Save and re-run'}</button>
         </div>
       )}
-      {inputs.updatedAt && <p className="text-[12px] text-warm-600">Last changed {fmtDay(inputs.updatedAt)}.</p>}
+      {inputs.updatedAt && <p className="text-caption text-warm-600">Last changed {fmtDay(inputs.updatedAt)}.</p>}
       {err && <p role="alert" className="text-status-at-risk">{err}</p>}
     </div>
   )

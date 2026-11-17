@@ -39,25 +39,25 @@ export function UpdatesAndDelays() {
     <section id="updates" className="bg-accent-100 border-y border-warm-200 scroll-mt-12">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
       <Reveal className="max-w-[760px]">
-        <h2 className="text-[32px] md:text-[48px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Every update. Every delay.</h2>
-        <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 leading-snug">The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates.</p>
+        <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Every update. Every delay.</h2>
+        <p className="text-lead text-warm-600 mt-4 leading-snug">The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates.</p>
       </Reveal>
       <div className="grid md:grid-cols-2 gap-5 mt-12">
         {CARDS.map(({ id, icon: Icon, title, lead, points, foot }, i) => (
           <Reveal key={id} delay={i * 90} className="rounded-[22px] border border-warm-200 bg-white p-6 md:p-8 shadow-[0_1px_2px_rgb(29_33_37/0.06),0_14px_32px_-24px_rgb(29_33_37/0.16)]">
             <div id={`updates-${id}`} className="flex items-center gap-3">
               <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent-100 text-accent-700"><Icon size={20} aria-hidden /></span>
-              <h3 className="text-[20px] font-semibold text-ink tracking-[-0.01em]">{title}</h3>
+              <h3 className="text-h3 font-semibold text-ink tracking-[-0.01em]">{title}</h3>
             </div>
-            <p className="text-[16px] text-warm-700 leading-relaxed mt-4">{lead}</p>
+            <p className="text-copy text-warm-700 leading-relaxed mt-4">{lead}</p>
             <ul className="mt-4 space-y-2.5">
               {points.map(p => (
-                <li key={p} className="flex gap-2.5 text-[16px] text-warm-700 leading-snug">
+                <li key={p} className="flex gap-2.5 text-copy text-warm-700 leading-snug">
                   <span aria-hidden className="mt-[7px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-600" />{p}
                 </li>
               ))}
             </ul>
-            <p className="text-[14.5px] text-warm-700 mt-5 pt-4 border-t border-warm-200">{foot}</p>
+            <p className="text-small text-warm-700 mt-5 pt-4 border-t border-warm-200">{foot}</p>
           </Reveal>
         ))}
       </div>

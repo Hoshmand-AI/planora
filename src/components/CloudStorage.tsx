@@ -148,7 +148,7 @@ export function CloudStorage({ manage }: { manage: boolean }) {
       {note && <div className="mb-3"><Alert tone={note.tone}>{note.text}</Alert></div>}
       {loadErr && <div className="mb-3 space-y-2"><Alert tone="error">Could not load your cloud storage. Check your connection and try again.</Alert><Button variant="secondary" onClick={load}>Try again</Button></div>}
       {connections === null ? (
-        loadErr ? null : <p className="text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</p>
+        loadErr ? null : <p className="text-body text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</p>
       ) : (
         <>
           {connections.length > 0 && (
@@ -157,9 +157,9 @@ export function CloudStorage({ manage }: { manage: boolean }) {
                 <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <Cloud size={18} aria-hidden className="text-accent-600 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold text-ink">{c.name} <span className="font-normal text-warm-600">· {c.providerLabel}</span></div>
-                    <div className="text-[12px] text-warm-600 truncate">{c.location}</div>
-                    <div className="mt-1 flex flex-wrap gap-3 text-[12px]">
+                    <div className="text-subhead font-semibold text-ink">{c.name} <span className="font-normal text-warm-600">· {c.providerLabel}</span></div>
+                    <div className="text-caption text-warm-600 truncate">{c.location}</div>
+                    <div className="mt-1 flex flex-wrap gap-3 text-caption">
                       <Can ok={c.canRead} label="Import files" />
                       <Can ok={c.canWrite} label="Keep originals" />
                     </div>
@@ -185,18 +185,18 @@ export function CloudStorage({ manage }: { manage: boolean }) {
               )
             ) : (
               <div>
-                <p className="text-[13px] font-semibold text-ink mb-2">Connect storage</p>
+                <p className="text-body font-semibold text-ink mb-2">Connect storage</p>
                 <div className="flex flex-wrap gap-2">
                   {(['azure', 'aws', 'gcp', 's3'] as Provider[]).filter(p => providers.some(x => x.id === p)).map(p => (
                     <button key={p} type="button" onClick={() => { setAdding(p); setUseKey(false); setNote(null) }}
-                      className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-4 py-2 text-[13px] font-semibold text-ink hover:bg-warm-100">
+                      className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-4 py-2 text-body font-semibold text-ink hover:bg-warm-100">
                       <Plus size={14} aria-hidden /> {p === 'azure' ? 'Microsoft Azure' : p === 'aws' ? 'Amazon S3 (AWS)' : p === 'gcp' ? 'Google Cloud Storage' : 'S3-compatible'}
                     </button>
                   ))}
                 </div>
               </div>
             )
-          ) : connections.length === 0 && <p className="text-[13px] text-warm-600">No cloud storage is connected. An owner or admin can connect one.</p>}
+          ) : connections.length === 0 && <p className="text-body text-warm-600">No cloud storage is connected. An owner or admin can connect one.</p>}
         </>
       )}
     </Section>
@@ -233,13 +233,13 @@ function ConnectForm({ provider, onCancel, onConnected, onSignIn }: { provider: 
 
   return (
     <form onSubmit={submit} className="rounded-xl border border-warm-200 bg-white p-5">
-      <h3 className="text-[16px] font-semibold text-ink">{f.title}</h3>
-      <p className="text-[13px] text-warm-600 mt-0.5">{f.intro}</p>
-      <ol className="mt-3 list-decimal ml-5 space-y-1 text-[13px] text-warm-700">{f.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+      <h3 className="text-subhead font-semibold text-ink">{f.title}</h3>
+      <p className="text-body text-warm-600 mt-0.5">{f.intro}</p>
+      <ol className="mt-3 list-decimal ml-5 space-y-1 text-body text-warm-700">{f.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
       {f.policy && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-[13px] font-semibold text-accent-600">IAM policy for this bucket</summary>
-          <pre tabIndex={0} aria-label="Policy" className="mt-2 overflow-x-auto rounded-lg bg-warm-100 p-3 text-[12px] text-ink">{f.policy(values)}</pre>
+          <summary className="cursor-pointer text-body font-semibold text-accent-600">IAM policy for this bucket</summary>
+          <pre tabIndex={0} aria-label="Policy" className="mt-2 overflow-x-auto rounded-lg bg-warm-100 p-3 text-caption text-ink">{f.policy(values)}</pre>
         </details>
       )}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -256,7 +256,7 @@ function ConnectForm({ provider, onCancel, onConnected, onSignIn }: { provider: 
         <Button type="submit" disabled={busy}>{busy ? <><Loader2 size={13} className="inline animate-spin -mt-0.5" aria-hidden /> Testing the connection…</> : 'Test and connect'}</Button>
         <Button variant="ghost" type="button" onClick={onCancel}>Cancel</Button>
         {onSignIn && <Button variant="ghost" type="button" onClick={onSignIn}>{provider === 'aws' ? 'Use a role instead' : 'Sign in instead'}</Button>}
-        <span className="text-[12px] text-warm-600">RunF9 lists the folder and writes, then deletes, a small check file before saving.</span>
+        <span className="text-caption text-warm-600">RunF9 lists the folder and writes, then deletes, a small check file before saving.</span>
       </div>
     </form>
   )
@@ -342,8 +342,8 @@ function SignInForm({ provider, aws, onUseKey, onCancel, onConnected }: { provid
   return (
     <div className="rounded-xl border border-warm-200 bg-white p-5">
       <form onSubmit={start}>
-        <h3 className="text-[16px] font-semibold text-ink">{f.title}</h3>
-        <p className="text-[13px] text-warm-600 mt-0.5">{f.intro}</p>
+        <h3 className="text-subhead font-semibold text-ink">{f.title}</h3>
+        <p className="text-body text-warm-600 mt-0.5">{f.intro}</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Name in RunF9" hint="What your team sees when uploading, e.g. the client.">{p => <input {...p} value={name} required maxLength={80} onChange={e => setName(e.target.value)} placeholder={`Harbor client (${provider === 'azure' ? 'Azure' : provider === 'gcp' ? 'Google' : 'AWS'})`} className={inputClass} />}</Field>
           {f.fields.map(d => (
@@ -353,7 +353,7 @@ function SignInForm({ provider, aws, onUseKey, onCancel, onConnected }: { provid
             )}</Field>
           ))}
         </div>
-        <p className="mt-3 text-[12px] text-warm-600">{f.needs}</p>
+        <p className="mt-3 text-caption text-warm-600">{f.needs}</p>
         {!launch && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button type="submit" disabled={busy}>{busy ? <><Loader2 size={13} className="inline animate-spin -mt-0.5" aria-hidden /> One moment…</> : f.button}</Button>
@@ -364,7 +364,7 @@ function SignInForm({ provider, aws, onUseKey, onCancel, onConnected }: { provid
       </form>
       {launch && (
         <form onSubmit={connectRole} className="mt-4 border-t border-warm-200 pt-4">
-          <ol className="list-decimal ml-5 space-y-1.5 text-[13px] text-warm-700">
+          <ol className="list-decimal ml-5 space-y-1.5 text-body text-warm-700">
             {launch.launchUrl ? (
               <li>AWS opened in a new tab with the stack filled in. <a href={launch.launchUrl} target="_blank" rel="noopener noreferrer" className="text-accent-600 underline">Open it again</a>. Tick &ldquo;I acknowledge that AWS CloudFormation might create IAM resources&rdquo; and choose <strong>Create stack</strong>.</li>
             ) : (

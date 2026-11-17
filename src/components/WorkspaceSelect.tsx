@@ -16,8 +16,8 @@ export function WorkspaceSelect({ className = '', labelClassName = '' }: { class
   if (!data || !data.workspaces.length) return null
   return (
     <label className="block">
-      <span className={labelClassName || 'block text-[12px] font-semibold text-warm-600 mb-1.5'}>Workspace</span>
-      <select name="workspaceId" defaultValue={data.restricted ? data.workspaces[0].id : ''} className={className || 'w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700'}>
+      <span className={labelClassName || 'block text-caption font-semibold text-warm-600 mb-1.5'}>Workspace</span>
+      <select name="workspaceId" defaultValue={data.restricted ? data.workspaces[0].id : ''} className={className || 'w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700'}>
         {!data.restricted && <option value="">Organization-wide</option>}
         {data.workspaces.map(w => <option key={w.id} value={w.id}>{w.name}{w.walled ? ' (walled)' : ''}</option>)}
       </select>

@@ -92,13 +92,13 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
     else if (e.key === 'Home') { e.preventDefault(); select(0) }
     else if (e.key === 'End') { e.preventDefault(); select(OPTIONS.length - 1) }
   }
-  const btn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors px-7 py-3 text-[15px]'
+  const btn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors px-6 py-3 text-small'
 
   return (
     <section id="deployment" aria-labelledby="deployment-h" className="max-w-[1240px] mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
       <Reveal className="text-center mb-10 md:mb-12">
-        <h2 id="deployment-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Run it where your data lives.</h2>
-        <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>
+        <h2 id="deployment-h" className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Run it where your data lives.</h2>
+        <p className="text-lead text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>
       </Reveal>
       <Reveal className="max-w-[880px] mx-auto">
         <div role="tablist" aria-label="Where RunF9 runs" onKeyDown={onKey} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-warm-100 border border-warm-200 w-fit max-w-full mx-auto">
@@ -107,7 +107,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
               key={x.id} ref={el => { tabs.current[i] = el }} type="button" role="tab" id={`dep-tab-${x.id}`}
               aria-selected={i === active} aria-controls="dep-panel" tabIndex={i === active ? 0 : -1}
               onClick={() => setActive(i)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-small font-medium transition-colors ${i === active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
             >{x.tab}</button>
           ))}
         </div>
@@ -115,20 +115,20 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
           <div key={o.id} className="rise-in">
             <div className="flex flex-wrap items-center gap-3">
               {o.id === 'onprem' ? <Server size={22} className="text-accent-600" aria-hidden /> : <Cloud size={22} className="text-accent-600" aria-hidden />}
-              <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-ink">{o.title}</h3>
-              <span className={`text-[12.5px] font-semibold rounded-full px-2.5 py-1 ${o.status === 'Available now' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-accent-100 text-accent-700'}`}>{o.status}</span>
+              <h3 className="text-h3 font-semibold tracking-[-0.01em] text-ink leading-tight">{o.title}</h3>
+              <span className={`text-caption font-semibold rounded-full px-2.5 py-1 ${o.status === 'Available now' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-accent-100 text-accent-700'}`}>{o.status}</span>
             </div>
             <dl className="mt-6 grid gap-5 md:grid-cols-3">
               {ROW.map(r => (
                 <div key={r.key}>
-                  <dt className="flex items-center gap-2 text-[13.5px] font-semibold text-warm-600"><r.icon size={14} aria-hidden />{r.label}</dt>
-                  <dd className="mt-2 text-[15px] leading-relaxed text-warm-700">{o[r.key]}</dd>
+                  <dt className="flex items-center gap-2 text-fine font-semibold text-warm-600"><r.icon size={14} aria-hidden />{r.label}</dt>
+                  <dd className="mt-1.5 text-small leading-relaxed text-warm-700">{o[r.key]}</dd>
                 </div>
               ))}
             </dl>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link href={primaryHref} className={btn}>{primaryLabel}</Link>
-              <p className="text-[13.5px] text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : <>Connect storage after you sign up, under Organization &gt; Cloud storage, or <Link href={`/deploy${o.id === 'mixed' ? '' : `#${o.id}`}`} className="text-accent-600 underline">run RunF9 in your own cloud</Link>.</>}</p>
+              <p className="text-fine text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : <>Connect storage after you sign up, under Organization &gt; Cloud storage, or <Link href={`/deploy${o.id === 'mixed' ? '' : `#${o.id}`}`} className="text-accent-600 underline">run RunF9 in your own cloud</Link>.</>}</p>
             </div>
           </div>
         </div>

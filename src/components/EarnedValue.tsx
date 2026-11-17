@@ -40,21 +40,21 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
     return () => { live = false }
   }, [scheduleId])
 
-  if (loading) return <p className="text-[13px] text-warm-600" role="status">Loading earned value…</p>
-  if (error) return <p className="text-[13px] text-status-at-risk" role="alert">{error}</p>
+  if (loading) return <p className="text-body text-warm-600" role="status">Loading earned value…</p>
+  if (error) return <p className="text-body text-status-at-risk" role="alert">{error}</p>
   if (!evm) return null
 
   if (evm.status === 'not_available') {
     return (
       <section aria-labelledby="evm-h" className="space-y-3">
-        <h2 id="evm-h" className="text-[18px] font-semibold text-ink">Earned value</h2>
+        <h2 id="evm-h" className="text-heading font-semibold text-ink">Earned value</h2>
         <div className="bg-white border border-warm-200 rounded-[14px] p-5">
-          <p className="text-[14px] font-semibold text-ink">Not available for this upload. It needs:</p>
-          <ul className="list-disc pl-5 mt-2 space-y-1 text-[13px] text-warm-700">
+          <p className="text-body font-semibold text-ink">Not available for this upload. It needs:</p>
+          <ul className="list-disc pl-5 mt-2 space-y-1 text-body text-warm-700">
             {evm.missing.map(m => <li key={m.code}>{m.message}</li>)}
           </ul>
-          <p className="text-[12px] text-warm-600 mt-3">RunF9 computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
-          <p className="text-[12px] text-warm-600 mt-1">{evm.baseline.header}</p>
+          <p className="text-caption text-warm-600 mt-3">RunF9 computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
+          <p className="text-caption text-warm-600 mt-1">{evm.baseline.header}</p>
         </div>
       </section>
     )
@@ -86,27 +86,27 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
     <section aria-labelledby="evm-h" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="evm-h" className="text-[18px] font-semibold text-ink">Earned value</h2>
-          <p className="text-[12px] text-warm-600 mt-0.5">{evm.baseline.header} · data date {fmtDate(evm.dataDate)} · budget (BAC) {$(m.bac)}</p>
+          <h2 id="evm-h" className="text-heading font-semibold text-ink">Earned value</h2>
+          <p className="text-caption text-warm-600 mt-0.5">{evm.baseline.header} · data date {fmtDate(evm.dataDate)} · budget (BAC) {$(m.bac)}</p>
         </div>
-        <a href={`/api/schedules/${scheduleId}/evm?format=xlsx`} className="text-[13px] font-medium text-accent-600 hover:underline">Download (.xlsx)</a>
+        <a href={`/api/schedules/${scheduleId}/evm?format=xlsx`} className="text-body font-medium text-accent-600 hover:underline">Download (.xlsx)</a>
       </div>
-      {evm.labels.map((l, i) => <p key={i} className="border-l-2 border-status-attention pl-3 text-[13px] text-warm-700">{l}</p>)}
+      {evm.labels.map((l, i) => <p key={i} className="border-l-2 border-status-attention pl-3 text-body text-warm-700">{l}</p>)}
 
       {/* A number and a few words each. What every figure means, in full, is under "How these figures are calculated". */}
       <ul className="grid grid-cols-2 md:grid-cols-4 gap-3" aria-label="Earned value indicators">
         {tiles.map(t => (
           <li key={t.label} className={tile}>
-            <div className="text-[12px] text-warm-600">{t.label}</div>
-            <div className="text-[20px] font-semibold tabular-nums leading-tight text-ink mt-1">{t.value}</div>
-            <p className="text-[12px] text-warm-600 mt-1 leading-snug">{t.short}</p>
+            <div className="text-heading font-semibold tabular-nums text-ink">{t.value}</div>
+            <div className="text-caption text-warm-700">{t.label}</div>
+            <p className="text-caption text-warm-600 leading-snug">{t.short}</p>
           </li>
         ))}
         {es && (
           <li className={tile}>
-            <div className="text-[12px] text-warm-600">Earned schedule</div>
-            <div className="text-[20px] font-semibold tabular-nums leading-tight text-ink mt-1">{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
-            <p className="text-[12px] text-warm-600 mt-1 leading-snug">{es.forecastFinish ? `work finishes about ${fmtDate(es.forecastFinish)}` : `done work was planned by ${fmtDate(es.esDate)}`}</p>
+            <div className="text-heading font-semibold tabular-nums text-ink">{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
+            <div className="text-caption text-warm-700">Earned schedule</div>
+            <p className="text-caption text-warm-600 leading-snug">{es.forecastFinish ? `work finishes about ${fmtDate(es.forecastFinish)}` : `done work was planned by ${fmtDate(es.esDate)}`}</p>
           </li>
         )}
       </ul>
@@ -116,7 +116,7 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
       <div className="space-y-3">
         <Disclosure tone="card" title="By WBS" meta={`${evm.wbs.length} work area${evm.wbs.length === 1 ? '' : 's'}`}>
           <div tabIndex={0} role="region" aria-label="Earned value by WBS (scrolls sideways on small screens)" className="overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[640px]">
+            <table className="w-full text-body [&_th]:text-caption min-w-[640px]">
               <caption className="sr-only">Earned value by WBS</caption>
               <thead><tr><th scope="col" className={th}>WBS</th><th scope="col" className={th}>BAC</th><th scope="col" className={th}>PV</th><th scope="col" className={th}>EV</th><th scope="col" className={th}>AC</th><th scope="col" className={th}>SV</th><th scope="col" className={th}>CV</th><th scope="col" className={th}>SPI</th><th scope="col" className={th}>CPI</th></tr></thead>
               <tbody>{evm.wbs.slice(0, 200).map(w => (
@@ -132,36 +132,36 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
 
         {/* Open when something needs review; folded when every check passes or does not apply. */}
         <Disclosure tone="card" defaultOpen={flagged > 0} title="Earned value data integrity" meta={[flagged && `${flagged} to review`, passed && `${passed} pass`, notApplicable && `${notApplicable} not applicable`].filter(Boolean).join(' · ')}>
-          <p className="text-[12px] text-warm-600 mb-2">{EVM_PRINCIPLE_NOTE}</p>
+          <p className="text-caption text-warm-600 mb-2">{EVM_PRINCIPLE_NOTE}</p>
           <ul className="divide-y divide-warm-200">
             {evm.checks.map(c => (
-              <li key={c.id} className="py-2 text-[13px]">
+              <li key={c.id} className="py-2 text-body">
                 <div className="flex flex-wrap items-baseline gap-x-3">
                   <span className="flex-1 min-w-[200px] font-medium text-ink">{c.title}</span>
                   {c.result === 'flag'
-                    ? <span className="rounded-full bg-status-attention-bg px-2 py-0.5 text-[12px] font-semibold text-status-attention">Review</span>
-                    : <span className="text-[12px] text-warm-600">{c.result === 'pass' ? 'Pass' : 'Not applicable'}</span>}
+                    ? <span className="rounded-full bg-status-attention-bg px-2 py-0.5 text-caption font-semibold text-status-attention">Review</span>
+                    : <span className="text-caption text-warm-600">{c.result === 'pass' ? 'Pass' : 'Not applicable'}</span>}
                 </div>
                 <div className="text-warm-700">{c.detail}</div>
-                {c.activityCodes.length > 0 && <div className="text-[12px] text-warm-600">Activities: {c.activityCodes.slice(0, 20).join(', ')}{c.activityCodes.length > 20 ? ` and ${c.activityCodes.length - 20} more` : ''}</div>}
-                <div className="text-[12px] text-warm-600">{c.principle}</div>
+                {c.activityCodes.length > 0 && <div className="text-caption text-warm-600">Activities: {c.activityCodes.slice(0, 20).join(', ')}{c.activityCodes.length > 20 ? ` and ${c.activityCodes.length - 20} more` : ''}</div>}
+                <div className="text-caption text-warm-600">{c.principle}</div>
               </li>
             ))}
           </ul>
         </Disclosure>
 
         <Disclosure tone="card" title="How these figures are calculated" meta={evm.costSource === 'p6_xer' ? 'P6 XER' : evm.costSource === 'p6_xml' ? 'P6 XML' : evm.costSource === 'ms_xml' ? 'MS Project XML' : 'Spreadsheet'}>
-          <dl className="text-[12px] text-warm-700 space-y-1.5">
+          <dl className="text-caption text-warm-700 space-y-1.5">
             {(['bac', 'pv', 'ev', 'ac', 'es'] as const).map(k => <div key={k}><dt className="inline font-semibold text-ink">{k.toUpperCase()}: </dt><dd className="inline">{evm.methods[k]}</dd></div>)}
           </dl>
-          <h3 className="text-[12px] font-semibold text-ink mt-3 mb-1">What each figure means</h3>
-          <dl className="text-[12px] text-warm-700 space-y-1.5">
+          <h3 className="text-body font-semibold text-ink mt-3 mb-1">What each figure means</h3>
+          <dl className="text-caption text-warm-700 space-y-1.5">
             {tiles.map(t => <div key={t.label}><dt className="inline font-semibold text-ink">{t.label}: </dt><dd className="inline">{t.meaning}</dd></div>)}
             {es && <div><dt className="inline font-semibold text-ink">Earned schedule: </dt><dd className="inline">{esMeaning}</dd></div>}
           </dl>
-          {evm.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-[12px] text-warm-700 space-y-0.5">{evm.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
-          {series && series.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-[12px] text-warm-700 space-y-0.5">{series.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
-          <p className="text-[12px] text-warm-600 mt-2">Percent types used: {[...new Set(evm.activities.map(a => percentTypeLabel(a.percentType)))].join(', ')}.</p>
+          {evm.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-caption text-warm-700 space-y-0.5">{evm.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+          {series && series.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-caption text-warm-700 space-y-0.5">{series.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+          <p className="text-caption text-warm-600 mt-2">Percent types used: {[...new Set(evm.activities.map(a => percentTypeLabel(a.percentType)))].join(', ')}.</p>
         </Disclosure>
       </div>
     </section>
@@ -224,8 +224,8 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
   return (
     <figure className="bg-white border border-warm-200 rounded-[14px] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <figcaption id={titleId} className="text-[16px] font-semibold text-ink">Cumulative cost over time</figcaption>
-        <button type="button" onClick={() => setAsTable(v => !v)} aria-pressed={asTable} className="text-[13px] font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
+        <figcaption id={titleId} className="text-subhead font-semibold text-ink">Cumulative cost over time</figcaption>
+        <button type="button" onClick={() => setAsTable(v => !v)} aria-pressed={asTable} className="text-body font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
       </div>
       {/* The sentence the chart is described by: read by a screen reader, not printed above the picture that shows it. */}
       <p id={descId} className="sr-only">{summary}</p>
@@ -249,7 +249,7 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
             {acPts.slice(1).map((p, i) => <rect key={i} x={sx(p.date!) - 3.5} y={sy(p.v) - 3.5} width={7} height={7} fill="#555B61" />)}
           </svg>
           {/* The key carries the figures at the data date, so they are said once. */}
-          <ul className="flex flex-wrap gap-x-6 gap-y-1 mt-3 text-[12px] text-warm-700" aria-label={`Key, with the figures at the data date ${fmtDate(dd)}`}>
+          <ul className="flex flex-wrap gap-x-6 gap-y-1 mt-3 text-caption text-warm-700" aria-label={`Key, with the figures at the data date ${fmtDate(dd)}`}>
             <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#1D2125" strokeWidth="2" /></svg>Planned (PV) <span className="font-semibold text-ink tabular-nums">{$(m.pv)}</span></li>
             <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#2B63C1" strokeWidth="2" strokeDasharray="7 4" /><circle cx="14" cy="5" r="3.5" fill="#2B63C1" /></svg>Earned (EV) <span className="font-semibold text-ink tabular-nums">{$(m.ev)}</span></li>
             {acPts.length > 0 && <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#555B61" strokeWidth="2" strokeDasharray="2 3" /><rect x="10.5" y="1.5" width="7" height="7" fill="#555B61" /></svg>Actual cost (AC) <span className="font-semibold text-ink tabular-nums">{$(m.ac)}</span></li>}
@@ -258,7 +258,7 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
         </div>
       ) : (
         <div tabIndex={0} role="region" aria-label="Cumulative cost by date (scrolls)" className="overflow-auto max-h-[360px]">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body [&_th]:text-caption">
             <thead><tr><th scope="col" className={th}>Date</th><th scope="col" className={th}>Update</th><th scope="col" className={th}>PV (cumulative)</th><th scope="col" className={th}>EV</th><th scope="col" className={th}>AC</th></tr></thead>
             <tbody>{rows.map(d => {
               const u = upd.find(p => p.dataDate === d)

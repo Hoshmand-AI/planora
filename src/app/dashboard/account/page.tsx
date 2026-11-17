@@ -26,8 +26,8 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
   const [copied, setCopied] = useState(false)
   return (
     <div className="mt-3 border border-warm-300 rounded-md p-4 bg-warm-100">
-      <p className="text-[13px] text-warm-700 font-medium mb-2">Save these recovery codes now. Each works once if you lose your phone. They won&apos;t be shown again.</p>
-      <ul className="grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[14px] text-ink mb-3" aria-label="Recovery codes">
+      <p className="text-body text-warm-700 font-medium mb-2">Save these recovery codes now. Each works once if you lose your phone. They won&apos;t be shown again.</p>
+      <ul className="grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-body text-ink mb-3" aria-label="Recovery codes">
         {codes.map(c => <li key={c}>{c}</li>)}
       </ul>
       <div className="flex gap-2">
@@ -94,7 +94,7 @@ function AccountPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <div>
         <h1 className="page-title">Account &amp; security</h1>
-        <p className="text-[13px] text-warm-500">{data.user.email} · {data.org.name} · <span className="capitalize">{data.user.role}</span></p>
+        <p className="text-body text-warm-500">{data.user.email} · {data.org.name} · <span className="capitalize">{data.user.role}</span></p>
       </div>
 
       {(mfaNeeded || params.get('setup') === 'mfa') && !data.mfa.enabled && (
@@ -105,7 +105,7 @@ function AccountPage() {
         {note('mfa')}
         {data.mfa.enabled ? (
           <div className="space-y-3">
-            <p className="text-[13px] text-warm-700 flex items-center gap-1.5"><ShieldCheck size={16} className="text-status-on-track" aria-hidden="true" /> On since {fmtDateTime(data.mfa.enabledAt!)} · {data.mfa.recoveryCodesLeft} recovery codes left</p>
+            <p className="text-body text-warm-700 flex items-center gap-1.5"><ShieldCheck size={16} className="text-status-on-track" aria-hidden="true" /> On since {fmtDateTime(data.mfa.enabledAt!)} · {data.mfa.recoveryCodesLeft} recovery codes left</p>
             {codes && <RecoveryCodes codes={codes} />}
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Password">{p => <input {...p} type="password" autoComplete="current-password" className={inputClass} value={reauth.password} onChange={e => setReauth({ ...reauth, password: e.target.value })} />}</Field>
@@ -126,7 +126,7 @@ function AccountPage() {
           </div>
         ) : enroll ? (
           <div className="space-y-3">
-            <ol className="list-decimal pl-5 text-[13px] text-warm-700 space-y-1">
+            <ol className="list-decimal pl-5 text-body text-warm-700 space-y-1">
               <li>Open your authenticator app and add an account.</li>
               <li>Scan this QR code, or enter the key by hand.</li>
               <li>Type the 6-digit code it shows.</li>
@@ -134,8 +134,8 @@ function AccountPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               <div className="w-44 h-44 bg-white border border-warm-200 rounded-md p-2" role="img" aria-label="QR code for your authenticator app" dangerouslySetInnerHTML={{ __html: enroll.qrSvg }} />
               <div className="space-y-2 flex-1 min-w-0">
-                <div className="text-[12px] font-semibold text-warm-500">Setup key</div>
-                <code className="block break-all font-mono text-[14px] text-ink bg-warm-100 border border-warm-200 rounded px-2 py-1">{enroll.secret.match(/.{1,4}/g)?.join(' ')}</code>
+                <div className="text-caption font-semibold text-warm-500">Setup key</div>
+                <code className="block break-all font-mono text-body text-ink bg-warm-100 border border-warm-200 rounded px-2 py-1">{enroll.secret.match(/.{1,4}/g)?.join(' ')}</code>
                 <Field label="Code from the app">{p => <input {...p} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={`${inputClass} font-mono tracking-[0.2em] max-w-[160px]`} value={enrollCode} onChange={e => setEnrollCode(e.target.value)} />}</Field>
                 <div className="flex gap-2">
                   <Button disabled={busy === 'mfa' || enrollCode.trim().length < 6} onClick={async () => {
@@ -160,7 +160,7 @@ function AccountPage() {
 
       <Section title="Profile">
         {note('profile')}
-        <div className="mb-3 text-[13px] text-warm-700">
+        <div className="mb-3 text-body text-warm-700">
           <span className="font-medium text-ink">{data.user.email}</span>{' · '}
           {data.user.emailVerifiedAt
             ? <span className="text-status-on-track font-medium">Email confirmed</span>
@@ -200,8 +200,8 @@ function AccountPage() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <Monitor size={16} className="text-warm-400 flex-shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
-                  <div className="text-[13px] text-ink font-medium">{device(s.userAgent)}{s.current && <span className="ml-2 text-[12px] font-semibold text-status-on-track">This device</span>}</div>
-                  <div className="text-[12px] text-warm-500 truncate">{s.ip || 'unknown IP'} · signed in {fmtDateTime(s.createdAt)} · last active {fmtDateTime(s.lastSeenAt)}</div>
+                  <div className="text-body text-ink font-medium">{device(s.userAgent)}{s.current && <span className="ml-2 text-caption font-semibold text-status-on-track">This device</span>}</div>
+                  <div className="text-caption text-warm-500 truncate">{s.ip || 'unknown IP'} · signed in {fmtDateTime(s.createdAt)} · last active {fmtDateTime(s.lastSeenAt)}</div>
                 </div>
               </div>
               {!s.current && <Button variant="ghost" onClick={async () => { if (await act('sessions', { action: 'revoke_session', sessionId: s.id }, 'Signed out that device.')) load() }}>Sign out</Button>}

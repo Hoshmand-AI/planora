@@ -13,7 +13,7 @@ import { useId } from 'react'
 interface LogoProps {
   /** 'light' = white letters (dark backgrounds), 'dark' = navy letters (light backgrounds) */
   variant?: 'light' | 'dark'
-  /** Tailwind text size class, e.g. 'text-xl'; the logo is 1.5em tall */
+  /** Tailwind height class for the logo, e.g. 'h-[30px]' (the app's bars) */
   size?: string
   /** The R mark alone (collapsed sidebar, small spaces) */
   mark?: boolean
@@ -56,20 +56,20 @@ function RMark({ id, onDark }: { id: string; onDark: boolean }) {
   )
 }
 
-export function Logo({ variant = 'light', size = 'text-[18px]', mark = false }: LogoProps) {
+export function Logo({ variant = 'light', size = 'h-[27px]', mark = false }: LogoProps) {
   const id = `rf9${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const onDark = variant === 'light'
   const word = onDark ? '#FFFFFF' : '#07172D'
   return (
     <span className={`inline-flex items-center leading-none select-none ${size}`}>
       {mark ? (
-        <svg viewBox="14 14 114 92" role="img" aria-label="RunF9" className="h-[1.5em] w-auto">
+        <svg viewBox="14 14 114 92" role="img" aria-label="RunF9" className="h-full w-auto">
           <title>RunF9</title>
           <RMark id={id} onDark={onDark} />
         </svg>
       ) : (
         // Master lockup: R at translate(10 18) scale(1.12), then the "unF9" outlines.
-        <svg viewBox="20 24 392 110" role="img" aria-label="RunF9" className="h-[1.5em] w-auto overflow-visible">
+        <svg viewBox="20 24 392 110" role="img" aria-label="RunF9" className="h-full w-auto overflow-visible">
           <title>RunF9</title>
           <g transform="translate(10 18) scale(1.12)"><RMark id={id} onDark={onDark} /></g>
           <path d={WORD} fill={word} />

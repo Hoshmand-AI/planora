@@ -1,7 +1,8 @@
 'use client'
 
 // The project overview's first answer: will we finish on time? The forecast finish, how it compares with the
-// required date (or the baseline when there is none), and a ribbon from the start to the forecast.
+// required date (or the baseline when there is none), and a ribbon from the start to the forecast. The answer is
+// set at the section-heading size: the page title above it stays the largest text on the page.
 
 import { fmtDate } from '@/lib/format'
 
@@ -63,19 +64,22 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
   const late = target && forecast && diff != null && diff > 0
 
   return (
-    <section aria-label="Finish forecast" className="rise-in rounded-[14px] border border-warm-200 bg-white text-ink p-6 md:p-8">
-      <p className="text-[14px] text-warm-600">Will we finish on time?</p>
-      {/* The largest figure is the answer. A date that has already passed is not one, so then it is how late the work is. */}
-      <p className="mt-1 text-[28px] md:text-[36px] font-semibold tracking-[-0.02em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
-      {/* The verdict sits on its own line under the date: beside it, it competed with the date and wrapped into a block on a phone. */}
-      {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[14px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
+    <section aria-labelledby="finish-h" className="rise-in rounded-[14px] border border-warm-200 bg-white text-ink p-5 md:p-6">
+      {/* The answer is this section's heading, the first thing under the page title: the forecast finish, with the verdict
+          beside it (under it on a phone). A date that has already passed is not an answer, so then it is how late the work is. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 id="finish-h" className="text-heading font-semibold tabular-nums">
+          {overdue ? `${plural(diff!)} overdue` : <><span className="font-normal text-warm-600">Forecast finish</span> {forecast ? fmtDate(forecast) : '—'}</>}
+        </h2>
+        {verdict && <p role="status" className={`text-body font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
+      </div>
       {/* One line of explanation; the rest is under "Why this status". */}
-      {overdue ? <p className="mt-3 text-[14px] text-warm-600 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
-        : reason && <p className="mt-3 text-[14px] text-warm-600 leading-relaxed max-w-3xl">{reason}</p>}
-      {note && <p className="mt-2 text-[13px] text-warm-600 leading-relaxed max-w-3xl">{note}</p>}
+      {overdue ? <p className="mt-2 text-body text-warm-600 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
+        : reason && <p className="mt-2 text-body text-warm-600 leading-relaxed max-w-3xl">{reason}</p>}
+      {note && <p className="mt-2 text-body text-warm-600 leading-relaxed max-w-3xl">{note}</p>}
 
       {span != null && (
-        <div className="mt-6">
+        <div className="mt-5">
           <div className="relative h-2.5 rounded-full bg-warm-200" aria-hidden="true">
             {dd && <div className="grow-x absolute inset-y-0 left-0 rounded-full bg-accent-600" style={{ width: `${at(dd)}%` }} />}
             {late && <div className="absolute inset-y-0 rounded-r-lg" style={{ left: `${at(target!.date)}%`, right: `${100 - at(today ?? forecast!)}%`, background: '#A64848' }} />}
@@ -84,7 +88,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
             {forecast && !today && <Tick left={at(forecast)} color={FORECAST} />}
             {today && <Tick left={at(today)} color="#1D2125" />}
           </div>
-          <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-2 text-[13px]">
+          <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-2 text-body">
             {start && <Item label="Start" date={start} dot="#A2A7AC" />}
             {dd && <Item label="Data date" date={dd} dot={DATA_DATE} />}
             {target && <Item label={target.label} date={target.date} dot={TARGET} />}

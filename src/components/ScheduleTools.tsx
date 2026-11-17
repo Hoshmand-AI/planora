@@ -103,39 +103,39 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
   return (
     <section aria-labelledby="tools-h" className="space-y-2">
-      <h2 id="tools-h" className="font-display text-[18px] text-ink mb-2">Analysis tools for this schedule</h2>
+      <h2 id="tools-h" className="text-heading font-semibold text-ink mb-2">Analysis tools for this schedule</h2>
       {editsCount > 0 && (
-        <fieldset className="text-[13px] text-warm-700 mb-2">
+        <fieldset className="text-body text-warm-700 mb-2">
           <legend className="font-semibold text-ink mb-1">Basis for recovery, comparison, risk and exports</legend>
           <label className="mr-4"><input type="radio" name="basis" checked={basis === 'submitted'} onChange={() => setBasis('submitted')} /> As submitted</label>
           <label><input type="radio" name="basis" checked={basis === 'scenario'} onChange={() => setBasis('scenario')} /> With RunF9 edits ({editsCount})</label>
-          <p className="text-[12px] text-warm-600 mt-1">{basis === 'scenario' ? `A what-if scenario: the ${editsCount} edit${editsCount === 1 ? '' : 's'} made in RunF9 are applied. Outputs say so, and exports say they are derived from the original file.` : 'The schedule exactly as submitted. Status, variance, quality and the portfolio always use it.'}</p>
+          <p className="text-caption text-warm-600 mt-1">{basis === 'scenario' ? `A what-if scenario: the ${editsCount} edit${editsCount === 1 ? '' : 's'} made in RunF9 are applied. Outputs say so, and exports say they are derived from the original file.` : 'The schedule exactly as submitted. Status, variance, quality and the portfolio always use it.'}</p>
         </fieldset>
       )}
 
       <Disclosure tone="card" id="compare" title="What changed since the last update" meta={series.length > 1 ? `${series.length} uploads of this project` : 'first upload'} defaultOpen={!!cmp}>
         {others.length > 0 && (
-          <label className="block text-[13px] text-warm-700 mb-3">Compare against{' '}
+          <label className="block text-body text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={base} onChange={e => setBase(e.target.value)}>
               <option value="">previous update (earlier data date)</option>
               {others.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
             </select>
           </label>
         )}
-        {!cmp ? <p className="text-[13px] text-warm-600">{cmpMsg || 'Loading…'}</p> : (
-          <div className="space-y-4 text-[13px] text-warm-700">
+        {!cmp ? <p className="text-body text-warm-600">{cmpMsg || 'Loading…'}</p> : (
+          <div className="space-y-4 text-body text-warm-700">
             <p className="text-warm-600">Against {cmp.before.version}{cmp.before.dataDate ? ` (data date ${fmtDate(cmp.before.dataDate)})` : ''}:{' '}
               <a className="underline text-ink" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), ...bq, format: 'csv' }).toString()}`}>Download differences (CSV)</a>{' · '}
               <a className="underline text-ink" href={`/api/schedules/compare?${new URLSearchParams({ id: scheduleId, ...(base ? { base } : {}), ...bq, format: 'xlsx' }).toString()}`}>Excel, sheet per change type</a>{' · '}
               <a className="underline text-ink" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, ...bq, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
-              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Largest float erosion (work days)"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Largest float erosion (work days)</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Largest float erosion (work days)"><table className="w-full text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Largest float erosion (work days)</caption>
                 <thead><tr><th className={th}>ID</th><th className={th}>Activity</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Change</th></tr></thead>
                 <tbody>{cmp.floatErosion.slice(0, 10).map(f => <tr key={f.code}><td className={td}>{f.code}</td><td className={td}>{f.name}</td><td className={td}>{f.before}</td><td className={td}>{f.after}</td><td className={td}>{f.delta}</td></tr>)}</tbody></table></div>
             )}
             {cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).length > 0 && (
-              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Duration, constraint and calendar changes"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Duration, constraint and calendar changes</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Duration, constraint and calendar changes"><table className="w-full text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Duration, constraint and calendar changes</caption>
                 <thead><tr><th className={th}>ID</th><th className={th}>Activity</th><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th></tr></thead>
                 <tbody>{cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).slice(0, 20).map((c, i) => <tr key={i}><td className={td}>{c.code}</td><td className={td}>{c.name}</td><td className={td}>{c.field}</td><td className={td}>{fmtDates(String(c.before ?? '—'))}</td><td className={td}>{fmtDates(String(c.after ?? '—'))}</td></tr>)}</tbody></table></div>
             )}
@@ -149,8 +149,8 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       </Disclosure>
 
       <Disclosure tone="card" id="delays" title="Delays (time impact analysis)">
-        <p className="text-[13px] text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
-        <a href="/dashboard/time-impact" className="inline-block px-3.5 py-1.5 rounded-lg border border-warm-300 text-ink text-[13px] hover:bg-warm-100">Open time impact analysis</a>
+        <p className="text-body text-warm-700 mb-2">Model a delay event as a fragnet, insert it into this update as of its data date, recalculate, and compare the contract and interim milestones before and after, with the driving path, concurrency indicators and a downloadable report. The result is a calculation; entitlement is a contractual determination.</p>
+        <a href="/dashboard/time-impact" className="inline-block px-3.5 py-1.5 rounded-lg border border-warm-300 text-ink text-body hover:bg-warm-100">Open time impact analysis</a>
       </Disclosure>
 
       <Disclosure tone="card" title="Edits made in RunF9" meta={editsCount ? `${editsCount} edit${editsCount === 1 ? '' : 's'}` : 'none'} defaultOpen={editsCount > 0}>
@@ -163,36 +163,36 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
 
       <Disclosure tone="card" title="Schedule risk analysis (Monte Carlo)" meta={sra ? `P80 ${fmtDate(sra.percentiles.p80)}` : undefined}>
         {!sra ? (
-          <div className="text-[13px] text-warm-700 space-y-2">
+          <div className="text-body text-warm-700 space-y-2">
             <p>Simulates this schedule&apos;s own network with three-point duration ranges and reports one labeled P50/P80.</p>
-            <button type="button" onClick={runRisk} disabled={busy} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{busy ? 'Running…' : 'Run risk analysis'}</button>
+            <button type="button" onClick={runRisk} disabled={busy} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">{busy ? 'Running…' : 'Run risk analysis'}</button>
             {sraErr && <p className="text-status-at-risk">{sraErr}</p>}
           </div>
         ) : (
-          <div className="text-[13px] text-warm-700 space-y-4">
+          <div className="text-body text-warm-700 space-y-4">
             {/* The answer first: three figures. How it was simulated, and the scheduler's own inputs, are folded below. */}
-            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-4">
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-4 [&>div]:flex [&>div]:flex-col">
               <div>
-                <dt className="text-[12px] text-warm-600">P50 finish</dt>
-                <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.percentiles.p50)}</dd>
-                <dd className="text-[12px] text-warm-600">half of the simulated outcomes finish by then</dd>
+                <dt className="order-2 text-caption text-warm-700">P50 finish</dt>
+                <dd className="order-1 text-subhead font-semibold text-ink tabular-nums">{fmtDate(sra.percentiles.p50)}</dd>
+                <dd className="order-3 text-caption text-warm-600">half of the simulated outcomes finish by then</dd>
               </div>
               <div>
-                <dt className="text-[12px] text-warm-600">P80 finish</dt>
-                <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.percentiles.p80)}</dd>
-                <dd className="text-[12px] text-warm-600">a date to commit to with 80% confidence</dd>
+                <dt className="order-2 text-caption text-warm-700">P80 finish</dt>
+                <dd className="order-1 text-subhead font-semibold text-ink tabular-nums">{fmtDate(sra.percentiles.p80)}</dd>
+                <dd className="order-3 text-caption text-warm-600">a date to commit to with 80% confidence</dd>
               </div>
               {sra.required ? (
                 <div>
-                  <dt className="text-[12px] text-warm-600">Chance of meeting {fmtDate(sra.required.date)}</dt>
-                  <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{Math.round(sra.required.probability * 100)}%</dd>
-                  <dd className="text-[12px] text-warm-600">deterministic forecast {fmtDate(sra.deterministic)}</dd>
+                  <dt className="order-2 text-caption text-warm-700">Chance of meeting {fmtDate(sra.required.date)}</dt>
+                  <dd className="order-1 text-subhead font-semibold text-ink tabular-nums">{Math.round(sra.required.probability * 100)}%</dd>
+                  <dd className="order-3 text-caption text-warm-600">deterministic forecast {fmtDate(sra.deterministic)}</dd>
                 </div>
               ) : (
                 <div>
-                  <dt className="text-[12px] text-warm-600">Deterministic forecast</dt>
-                  <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.deterministic)}</dd>
-                  <dd className="text-[12px] text-warm-600">if every activity takes its planned duration</dd>
+                  <dt className="order-2 text-caption text-warm-700">Deterministic forecast</dt>
+                  <dd className="order-1 text-subhead font-semibold text-ink tabular-nums">{fmtDate(sra.deterministic)}</dd>
+                  <dd className="order-3 text-caption text-warm-600">if every activity takes its planned duration</dd>
                 </div>
               )}
             </dl>
@@ -203,18 +203,18 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
               ? <p className="text-warm-600">These are also the dates of the contract milestone {sra.contract.code} {sra.contract.name}{sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}.</p>
               : <p><span className="font-semibold text-ink">Contract milestone {sra.contract.code} {sra.contract.name}: P50 {fmtDate(sra.contract.p50)} · P80 {fmtDate(sra.contract.p80)}</span>{sra.contract.required && sra.contract.probability != null ? `; ${Math.round(sra.contract.probability * 100)}% chance of meeting ${fmtDate(sra.contract.required)}${sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}` : '; no date to meet'}.</p>)}
             {sra.milestones && sra.milestones.filter(m => !m.contract).length > 0 && (
-              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Milestones with a finish constraint"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Milestones with a finish constraint</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Milestones with a finish constraint"><table className="w-full text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Milestones with a finish constraint</caption>
                 <thead><tr><th className={th}>Milestone</th><th className={th}>Date to meet</th><th className={th}>P50</th><th className={th}>P80</th><th className={th}>Chance of meeting</th></tr></thead>
                 <tbody>{sra.milestones.filter(m => !m.contract).map(m => <tr key={m.id}><td className={td}>{m.code} {m.name}</td><td className={td}>{m.required ? fmtDate(m.required) : '—'}</td><td className={td}>{fmtDate(m.p50)}</td><td className={td}>{fmtDate(m.p80)}</td><td className={td}>{m.probability != null ? `${Math.round(m.probability * 100)}%` : '—'}</td></tr>)}</tbody></table></div>
             )}
             {sra.sensitivity.length > 0 && (
               <div>
-                <p className="text-[12px] font-semibold text-ink mb-1">Biggest drivers of the finish</p>
+                <p className="text-caption font-semibold text-ink mb-1">Biggest drivers of the finish</p>
                 <ol className="list-decimal pl-5 space-y-0.5">{sra.sensitivity.slice(0, 5).map(s => <li key={s.code}><span className="tabular-nums text-warm-600">{s.code}</span> {s.name}</li>)}</ol>
               </div>
             )}
             {sra.events && sra.events.length > 0 && (
-              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Risk events in the simulation"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Risk events in the simulation</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Risk events in the simulation"><table className="w-full text-body [&_th]:text-caption"><caption className="text-left font-semibold text-ink mb-1">Risk events in the simulation</caption>
                 <thead><tr><th className={th}>Event</th><th className={th}>Activity</th><th className={th}>Probability</th><th className={th}>Impact (wd)</th><th className={th}>Finish when it occurs</th></tr></thead>
                 <tbody>{sra.events.map(e => <tr key={e.id}><td className={td}>{e.name}</td><td className={td}>{e.code}</td><td className={td}>{Math.round(e.probability * 100)}%</td><td className={td}>{e.impactDays}</td><td className={td}>{e.finishDeltaDays > 0 ? `+${e.finishDeltaDays} calendar days` : 'no effect on the finish'}</td></tr>)}</tbody></table></div>
             )}
@@ -239,18 +239,18 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
       </Disclosure>
 
       <Disclosure tone="card" title="Export and original file">
-        <div className="flex flex-wrap gap-2 text-[13px]">
+        <div className="flex flex-wrap gap-2 text-body">
           {[['xer', 'Primavera P6 (.xer)'], ['xml', 'MS Project (.xml)'], ['xlsx-p6', 'Excel, P6 layout'], ['xlsx-import', 'Excel for import'], ['lookahead-xlsx', 'Excel, 3-week look-ahead'], ...(restricted ? [] : [['csv', 'CSV'], ['ipmdar', 'IPMDAR schedule dataset (.zip)']]), ['original', 'Original file as uploaded']].map(([f, label]) => (
             <a key={f} href={exp(f)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-ink hover:bg-warm-100">{label}</a>
           ))}
         </div>
-        <p className="text-[12px] text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
-        {!restricted && <p className="text-[12px] text-warm-600 mt-1">The IPMDAR dataset follows the DoD Schedule Performance Dataset format, version 1.0, and carries the UNCLASSIFIED marking only when this schedule&apos;s classification is set to Unclassified; otherwise the marking is left for you to fill. Run it through the government&apos;s validator and add your contract details before you submit it.</p>}
-        {restricted && <p className="text-[12px] text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
+        <p className="text-caption text-warm-600 mt-2">Exports keep the file&apos;s activity IDs, WBS, progress and required finish. {basis === 'scenario' ? `These exports are the what-if scenario with ${editsCount} RunF9 edit${editsCount === 1 ? '' : 's'}; their provenance says they are derived from the original file.` : 'These exports are the schedule as submitted (no RunF9 edits).'} The original file is stored with its SHA-256, recorded in the audit log.</p>
+        {!restricted && <p className="text-caption text-warm-600 mt-1">The IPMDAR dataset follows the DoD Schedule Performance Dataset format, version 1.0, and carries the UNCLASSIFIED marking only when this schedule&apos;s classification is set to Unclassified; otherwise the marking is left for you to fill. Run it through the government&apos;s validator and add your contract details before you submit it.</p>}
+        {restricted && <p className="text-caption text-warm-700 mt-1">This schedule is marked {classification === 'cui' ? 'CUI' : 'classified'}: every export carries the banner and designation markings, and CSV is not offered because it cannot carry them.</p>}
       </Disclosure>
 
       <Disclosure tone="card" title="How RunF9 schedules this file">
-        <div className="text-[13px] text-warm-700 space-y-3">
+        <div className="text-body text-warm-700 space-y-3">
           <fieldset>
             <legend className="font-semibold text-ink mb-1">Out-of-sequence progress</legend>
             <div className="flex flex-wrap gap-x-6 gap-y-2">

@@ -64,13 +64,13 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
   const exts = accept.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
   const importable = (key: string) => !exts.length || exts.some(x => key.toLowerCase().endsWith(x))
   const crumbs = listing ? listing.prefix.slice(listing.base.length).split('/').filter(Boolean) : []
-  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-lg px-3 py-2 text-[13px] text-warm-700'
+  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-lg px-3 py-2 text-body text-warm-700'
 
   return (
     <div className="space-y-4">
       {readable.length > 0 && (
       <fieldset>
-        <legend className="block text-[12px] font-semibold text-warm-600 mb-1.5">Upload from</legend>
+        <legend className="block text-caption font-semibold text-warm-600 mb-1.5">Upload from</legend>
         <div className="flex flex-wrap gap-1.5">
           <SourceChip active={from === 'computer'} onClick={() => choose('computer')} icon={<Laptop size={14} aria-hidden />} label="This computer" />
           {readable.map(c => <SourceChip key={c.id} active={from === c.id} onClick={() => choose(c.id)} icon={<Cloud size={14} aria-hidden />} label={c.name} title={`${c.providerLabel} · ${c.location}`} />)}
@@ -81,14 +81,14 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
       {from === 'computer' ? (
         <div>
           <input type="file" name="file" accept={accept} required aria-label="File"
-            className={`${fieldClass} file:mr-3 file:bg-white file:text-ink file:border file:border-solid file:border-warm-300 file:rounded-lg file:px-3.5 file:py-1.5 file:text-[13px] file:font-medium file:cursor-pointer hover:file:bg-warm-100`} />
-          {hint && <p className="text-[12px] text-warm-600 mt-1.5">{hint}</p>}
+            className={`${fieldClass} file:mr-3 file:bg-white file:text-ink file:border file:border-solid file:border-warm-300 file:rounded-lg file:px-3.5 file:py-1.5 file:text-body file:font-medium file:cursor-pointer hover:file:bg-warm-100`} />
+          {hint && <p className="text-caption text-warm-600 mt-1.5">{hint}</p>}
         </div>
       ) : (
         <div className="rounded-lg border border-warm-300 bg-white">
           <input type="hidden" name="sourceConnectionId" value={from} />
           <input type="text" name="sourceKey" value={picked} onChange={() => {}} required tabIndex={-1} aria-hidden="true" className="sr-only" />
-          <nav aria-label="Folder" className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-warm-200 text-[12px]">
+          <nav aria-label="Folder" className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-warm-200 text-caption">
             <button type="button" className="font-semibold text-accent-600 hover:underline" onClick={() => listing && browse(from, listing.base)}>{readable.find(c => c.id === from)?.name}</button>
             {crumbs.map((c, i) => (
               <span key={i} className="flex items-center gap-1">
@@ -99,14 +99,14 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
           </nav>
           <div className="max-h-56 overflow-y-auto">
             {browsing ? (
-              <p className="px-3 py-4 text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading files…</p>
+              <p className="px-3 py-4 text-body text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading files…</p>
             ) : browseError ? (
-              <p role="alert" className="px-3 py-4 text-[13px] text-status-at-risk">{browseError}</p>
+              <p role="alert" className="px-3 py-4 text-body text-status-at-risk">{browseError}</p>
             ) : listing && (
               <ul>
                 {listing.folders.map(f => (
                   <li key={f}>
-                    <button type="button" onClick={() => browse(from, f)} className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-warm-50">
+                    <button type="button" onClick={() => browse(from, f)} className="w-full flex items-center gap-2 px-3 py-2 text-left text-body text-ink hover:bg-warm-50">
                       <Folder size={14} aria-hidden className="text-warm-600" /> {f.slice(listing.prefix.length).replace(/\/$/, '')}
                     </button>
                   </li>
@@ -116,35 +116,35 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
                   return (
                     <li key={f.key}>
                       <button type="button" disabled={!ok} aria-pressed={picked === f.key} onClick={() => setPicked(f.key)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] ${picked === f.key ? 'bg-accent-100 text-ink font-semibold' : ok ? 'text-ink hover:bg-warm-50' : 'text-warm-500 cursor-not-allowed'}`}>
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-body ${picked === f.key ? 'bg-accent-100 text-ink font-semibold' : ok ? 'text-ink hover:bg-warm-50' : 'text-warm-500 cursor-not-allowed'}`}>
                         <FileText size={14} aria-hidden className="text-warm-600 flex-shrink-0" />
                         <span className="truncate flex-1">{f.key.slice(listing.prefix.length)}</span>
-                        <span className="text-[12px] text-warm-600 tabular-nums">{fmtSize(f.size)}</span>
+                        <span className="text-caption text-warm-600 tabular-nums">{fmtSize(f.size)}</span>
                       </button>
                     </li>
                   )
                 })}
-                {listing.folders.length === 0 && listing.files.length === 0 && <li className="px-3 py-4 text-[13px] text-warm-600">This folder is empty.</li>}
+                {listing.folders.length === 0 && listing.files.length === 0 && <li className="px-3 py-4 text-body text-warm-600">This folder is empty.</li>}
               </ul>
             )}
           </div>
-          <p className="px-3 py-2 border-t border-warm-200 text-[12px] text-warm-600">{picked ? <>Selected: <span className="font-semibold text-ink">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
+          <p className="px-3 py-2 border-t border-warm-200 text-caption text-warm-600">{picked ? <>Selected: <span className="font-semibold text-ink">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
         </div>
       )}
 
       {writable.length > 0 ? (
       <label className="block">
-        <span className="block text-[12px] font-semibold text-warm-600 mb-1.5">Keep the original file in</span>
+        <span className="block text-caption font-semibold text-warm-600 mb-1.5">Keep the original file in</span>
         <select name="keepIn" defaultValue={keepValue} className={fieldClass}>
           <option value={keepValue}>{keepLabel}</option>
           {writable.map(c => <option key={c.id} value={c.id}>{c.name} ({c.providerLabel})</option>)}
         </select>
-        <span className="block text-[12px] text-warm-600 mt-1.5">Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.</span>
+        <span className="block text-caption text-warm-600 mt-1.5">Kept in your storage, RunF9 records only where the file is and its fingerprint (SHA-256), and checks it each time it reads it back.</span>
       </label>
       ) : <input type="hidden" name="keepIn" value={keepValue} />}
       {/* No storage connected: one line says where to connect it, for uploading from it and for keeping originals in it. */}
       {connections && readable.length === 0 && writable.length === 0 && (
-        <p className="text-[12px] text-warm-600">
+        <p className="text-caption text-warm-600">
           {canManage ? <>To upload from, or keep originals in, AWS, Azure or Google Cloud, <Link href="/dashboard/org#cloud-storage" className="text-accent-600 underline">connect your cloud storage</Link>.</> : 'An admin can connect your AWS, Azure or Google Cloud storage in Organization settings.'}
         </p>
       )}
@@ -155,7 +155,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
 function SourceChip({ active, onClick, icon, label, title }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; title?: string }) {
   return (
     <button type="button" aria-pressed={active} onClick={onClick} title={title}
-      className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold border ${active ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
+      className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-caption font-semibold border ${active ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
       {icon}{label}
     </button>
   )

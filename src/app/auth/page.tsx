@@ -143,34 +143,34 @@ function AuthForm() {
     <div className="min-h-screen bg-warm-50 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       {/* On a wide screen the left half says what RunF9 is, so the page is not a bare form. */}
       <aside className="hidden lg:flex flex-col justify-between bg-navy-950 text-white p-12 xl:p-16">
-        <Link href="/" aria-label="RunF9 home"><Logo variant="light" size="text-[24px]" /></Link>
+        <Link href="/" aria-label="RunF9 home"><Logo variant="light" size="h-[36px]" /></Link>
         <div>
-          <p className="text-[48px] xl:text-[48px] font-semibold tracking-[-0.02em] leading-[1.02]">Construction schedules, calculated and explained.</p>
+          <p className="text-h1 font-semibold tracking-[-0.03em] leading-[1.1]">Construction schedules, calculated and explained.</p>
           <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-500 mt-8 mb-6" />
-          <ul className="space-y-3 text-[16px] text-navy-200">
+          <ul className="space-y-3 text-copy text-navy-200">
             <li>All 14 DCMA checks on every schedule.</li>
             <li>Every update compared, every delay modeled.</li>
             <li>A daily brief for the project manager, the field and the client.</li>
           </ul>
         </div>
-        <p className="text-[13px] text-navy-200">Arithmetic, not AI: every figure traces to an activity.</p>
+        <p className="text-fine text-navy-200">Arithmetic, not AI: every figure traces to an activity.</p>
       </aside>
       <div className="flex flex-col min-h-screen lg:min-h-0">
       <nav className="lg:hidden h-16 flex items-center px-6 border-b border-warm-200 bg-white">
         <Link href="/" aria-label="RunF9 home">
-          <Logo variant="dark" size="text-[20px]" />
+          <Logo variant="dark" size="h-[30px]" />
         </Link>
       </nav>
 
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[400px]">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-warm-400 text-[13px] font-medium hover:text-warm-700 transition-colors mb-8">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-warm-400 text-fine font-medium hover:text-warm-700 transition-colors mb-8">
             <ArrowLeft size={14} /> Back to home
           </Link>
-          <h1 className="font-display text-[28px] text-ink mb-2">
+          <h1 className="font-display text-h2 text-ink mb-2">
             {challenge ? 'Two-step verification' : forgot ? 'Reset your password' : mode === 'signin' ? 'Welcome back' : invitation?.orgName ? `Join ${invitation.orgName}` : betaInvited ? 'Welcome to the RunF9 beta' : 'Create your account'}
           </h1>
-          <p className="text-warm-500 text-[14px] mb-8">
+          <p className="text-warm-500 text-small mb-8">
             {challenge
               ? 'Enter the 6-digit code from your authenticator app, or one of your recovery codes.'
               : forgot
@@ -185,7 +185,7 @@ function AuthForm() {
           </p>
 
           {inviteOnly && !challenge && !ssoMode && !forgot && !invitation?.orgName && !betaInvited && (
-            <div role="note" aria-label="Private beta" className="bg-warm-100 border border-warm-200 border-l-2 border-l-accent-500 text-warm-700 text-[13px] px-4 py-3 rounded-md mb-5">
+            <div role="note" aria-label="Private beta" className="bg-warm-100 border border-warm-200 border-l-2 border-l-accent-500 text-warm-700 text-fine px-4 py-3 rounded-md mb-5">
               <strong className="font-semibold text-ink">RunF9 is in private beta</strong> — sign up with your invitation link.
               {mode === 'signup' && ' No link yet? Ask your organization admin to invite you.'}
               {requestHref && <> <a href={requestHref} className="text-accent-600 font-medium underline hover:text-ink">Request access</a></>}
@@ -193,26 +193,26 @@ function AuthForm() {
           )}
 
           {cuiWarning && mode === 'signup' && !challenge && (
-            <div role="note" aria-label="Controlled information warning" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-5">
+            <div role="note" aria-label="Controlled information warning" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-fine px-4 py-3 rounded-md mb-5">
               <strong className="font-semibold text-ink">No CUI or classified information.</strong> {cuiWarning}
             </div>
           )}
 
           {invitation?.invalid && !challenge && (
-            <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-5">
+            <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-fine px-4 py-3 rounded-md mb-5">
               This invitation link has expired or was already used. Ask your admin for a new one.
             </div>
           )}
 
           {betaInvitation?.invalid && !challenge && (
-            <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-5">
+            <div role="alert" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-fine px-4 py-3 rounded-md mb-5">
               This beta invitation link has expired, was revoked or was already used. Ask for a new one.
               {requestHref && <> <a href={requestHref} className="text-ink font-medium underline">Request access</a></>}
             </div>
           )}
 
           {error && (
-            <div role="alert" className="bg-status-at-risk-bg border border-status-at-risk/20 text-status-at-risk text-[13px] px-4 py-3 rounded-md mb-5 border-l-2 border-l-status-at-risk">
+            <div role="alert" className="bg-status-at-risk-bg border border-status-at-risk/20 text-status-at-risk text-fine px-4 py-3 rounded-md mb-5 border-l-2 border-l-status-at-risk">
               {error}
               {requestHref && (errorCode === 'invite_only' || errorCode === 'beta_access_required') && (
                 <> <a href={requestHref} className="font-semibold underline">Request access</a></>
@@ -223,47 +223,47 @@ function AuthForm() {
           {forgot && !challenge ? (
             <form onSubmit={handleForgot} className="space-y-4">
               <div>
-                <label htmlFor="reset-email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Email</label>
+                <label htmlFor="reset-email" className="block text-caption font-semibold text-warm-400 mb-1.5">Email</label>
                 <input id="reset-email" type="email" autoComplete="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400" />
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400" />
               </div>
               <div role="status" aria-live="polite">
                 {resetNote && (
-                  <p className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-[13px] px-4 py-3 rounded-md">{resetNote}</p>
+                  <p className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-fine px-4 py-3 rounded-md">{resetNote}</p>
                 )}
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 {loading ? 'Sending…' : resetNote ? 'Send another link' : 'Send reset link'}
               </button>
-              <button type="button" onClick={closeForgot} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Back to sign in</button>
+              <button type="button" onClick={closeForgot} className="w-full text-fine text-warm-500 hover:text-warm-700">Back to sign in</button>
             </form>
           ) : ssoMode && !challenge ? (
             <form onSubmit={handleSso} className="space-y-4">
               <div>
-                <label htmlFor="sso-email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Work email</label>
+                <label htmlFor="sso-email" className="block text-caption font-semibold text-warm-400 mb-1.5">Work email</label>
                 <input id="sso-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400" />
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400" />
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 pressable shadow-sm">
+              <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 pressable shadow-sm">
                 {loading ? 'Redirecting…' : 'Continue with single sign-on'}
               </button>
-              <button type="button" onClick={() => { setSsoMode(false); setError('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">Use email and password instead</button>
+              <button type="button" onClick={() => { setSsoMode(false); setError('') }} className="w-full text-fine text-warm-500 hover:text-warm-700">Use email and password instead</button>
             </form>
           ) : challenge ? (
             <form onSubmit={handleCode} className="space-y-4">
               <div>
-                <label htmlFor="mfa-code" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Verification code</label>
+                <label htmlFor="mfa-code" className="block text-caption font-semibold text-warm-400 mb-1.5">Verification code</label>
                 <input
                   id="mfa-code" value={code} onChange={e => setCode(e.target.value)} required autoFocus
                   inputMode="text" autoComplete="one-time-code" placeholder="123456" maxLength={20}
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[18px] tracking-[0.2em] text-warm-700 placeholder:text-warm-400 font-mono"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-lead tracking-[0.2em] text-warm-700 placeholder:text-warm-400 font-mono"
                 />
               </div>
               <button type="submit" disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
+                className="w-full flex items-center justify-center gap-2 bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 <ShieldCheck size={16} aria-hidden="true" /> {loading ? 'Checking…' : 'Verify and sign in'}
               </button>
-              <button type="button" onClick={() => { setChallenge(null); setError(''); setPassword('') }} className="w-full text-[13px] text-warm-500 hover:text-warm-700">
+              <button type="button" onClick={() => { setChallenge(null); setError(''); setPassword('') }} className="w-full text-fine text-warm-500 hover:text-warm-700">
                 Use a different account
               </button>
             </form>
@@ -271,38 +271,38 @@ function AuthForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label htmlFor="name" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Name</label>
+                <label htmlFor="name" className="block text-caption font-semibold text-warm-400 mb-1.5">Name</label>
                 <input
                   id="name" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} required
                   placeholder="Your name"
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400"
                 />
               </div>
             )}
             {mode === 'signup' && !invitation?.orgName && (
               <div>
-                <label htmlFor="company" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Firm</label>
+                <label htmlFor="company" className="block text-caption font-semibold text-warm-400 mb-1.5">Firm</label>
                 <input
                   id="company" type="text" value={company} onChange={e => setCompany(e.target.value)}
                   placeholder="Your company (private workspace)"
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400"
                 />
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Email</label>
+              <label htmlFor="email" className="block text-caption font-semibold text-warm-400 mb-1.5">Email</label>
               <input
                 id="email" autoComplete="email" readOnly={(!!invitation?.email || betaInvited) && mode === 'signup'}
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
                 placeholder="you@company.com"
-                className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
+                className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400"
               />
             </div>
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
-                <label htmlFor="password" className="block text-[12px] font-semibold text-warm-400">Password</label>
+                <label htmlFor="password" className="block text-caption font-semibold text-warm-400">Password</label>
                 {mode === 'signin' && (
-                  <button type="button" onClick={openForgot} className="text-[12px] font-medium text-accent-600 hover:underline">Forgot password?</button>
+                  <button type="button" onClick={openForgot} className="text-caption font-medium text-accent-600 hover:underline">Forgot password?</button>
                 )}
               </div>
               <div className="relative">
@@ -310,28 +310,28 @@ function AuthForm() {
                   id="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
                   type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={mode === 'signup' ? 12 : 1}
                   placeholder={mode === 'signup' ? 'At least 12 characters' : 'Your password'}
-                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400 pr-10"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-small text-warm-700 placeholder:text-warm-400 pr-10"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-warm-400 hover:text-warm-600">
                   {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
-              {mode === 'signup' && <p id="password-hint" className="text-[12px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>}
+              {mode === 'signup' && <p id="password-hint" className="text-caption text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>}
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
+              className="w-full bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign in' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create account'}
             </button>
           </form>
           )}
 
           {!challenge && !ssoMode && !forgot && mode === 'signin' && (
-            <button type="button" onClick={() => { setSsoMode(true); setError('') }} className="w-full mt-3 border border-warm-300 text-ink py-2.5 rounded-md text-[14px] font-medium hover:bg-warm-100 transition-colors">
+            <button type="button" onClick={() => { setSsoMode(true); setError('') }} className="w-full mt-3 border border-warm-300 text-ink py-2.5 rounded-md text-small font-medium hover:bg-warm-100 transition-colors">
               Sign in with SSO
             </button>
           )}
           {!challenge && !ssoMode && !forgot && (
-          <p className="text-center text-[13px] text-warm-500 mt-6">
+          <p className="text-center text-fine text-warm-500 mt-6">
             {mode === 'signin' && inviteOnly ? (
               <>Have an invitation? <button onClick={() => { setMode('signup'); setError('') }} className="text-accent-600 font-medium hover:underline">Sign up</button>
                 {requestHref && <> · <a href={requestHref} className="text-accent-600 font-medium hover:underline">Request access</a></>}</>
@@ -343,7 +343,7 @@ function AuthForm() {
           </p>
           )}
 
-          <p className="text-center text-[12px] text-warm-400 mt-8">
+          <p className="text-center text-caption text-warm-400 mt-8">
             By continuing, you agree to our{' '}
             <Link href="/terms" className="underline hover:text-warm-600">Terms</Link> and{' '}
             <Link href="/privacy" className="underline hover:text-warm-600">Privacy Policy</Link>.

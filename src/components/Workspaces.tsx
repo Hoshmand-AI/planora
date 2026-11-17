@@ -51,7 +51,7 @@ export function Workspaces({ members }: { members: Member[] }) {
   ) : null
   const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Former member'
   const restricted = new Set(data.restrictedMemberIds)
-  const selectClass = 'bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px] text-warm-700'
+  const selectClass = 'bg-warm-100 border border-warm-300 rounded px-2 py-1 text-body text-warm-700'
   const none = !data.workspaces.length
 
   return (
@@ -61,7 +61,7 @@ export function Workspaces({ members }: { members: Member[] }) {
       {/* The form opens on request: until then the card is one line and one button. */}
       {!creating && (
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          {none && <p className="flex-1 min-w-[220px] text-[13px] text-warm-600">None yet: every member sees every schedule and plan their role allows.</p>}
+          {none && <p className="flex-1 min-w-[220px] text-body text-warm-600">None yet: every member sees every schedule and plan their role allows.</p>}
           <Button variant="secondary" onClick={() => setCreating(true)}>New workspace</Button>
         </div>
       )}
@@ -70,7 +70,7 @@ export function Workspaces({ members }: { members: Member[] }) {
         if (await act('create', { action: 'create', ...draft }, `Workspace "${draft.name.trim()}" created.`)) { setDraft({ name: '', walled: true }); setCreating(false) }
       }}>
         <Field label="New workspace name" hint="For example the client or the project number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
-        <label className="flex items-center gap-2 text-[13px] text-warm-700 sm:mt-[26px] sm:min-h-[40px]"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
+        <label className="flex items-center gap-2 text-body text-warm-700 sm:mt-[26px] sm:min-h-[40px]"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
         {/* The checkbox and the button sit on the input's line, not under its hint. */}
         <div className="sm:mt-[26px] flex gap-2"><Button type="submit" className="min-h-[38px]" disabled={busy === 'create'}>Create workspace</Button><Button type="button" variant="secondary" className="min-h-[38px]" onClick={() => setCreating(false)}>Cancel</Button></div>
       </form>}
@@ -80,8 +80,8 @@ export function Workspaces({ members }: { members: Member[] }) {
           <li key={w.id} className="border border-warm-200 rounded-md p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-medium text-ink text-[14px]">{w.name}</span>
-                <span className="text-[12px] text-warm-600"> · {w.walled ? 'Restricted: members only' : 'Open to the organization'} · {w.scheduleCount} schedule(s), {w.planCount} plan(s)</span>
+                <span className="font-medium text-ink text-subhead">{w.name}</span>
+                <span className="text-caption text-warm-600"> · {w.walled ? 'Restricted: members only' : 'Open to the organization'} · {w.scheduleCount} schedule(s), {w.planCount} plan(s)</span>
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" disabled={busy === w.id} onClick={() => act(w.id, { action: 'update', workspaceId: w.id, walled: !w.walled }, w.walled ? `${w.name} is now open to the organization.` : `${w.name} is now restricted to its members.`)}>{w.walled ? 'Open' : 'Restrict'}</Button>
@@ -93,11 +93,11 @@ export function Workspaces({ members }: { members: Member[] }) {
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5 items-center">
               {w.memberIds.length ? w.memberIds.map(id => (
-                <span key={id} className="inline-flex items-center gap-1 bg-warm-100 border border-warm-200 rounded px-2 py-0.5 text-[12px] text-warm-700">
+                <span key={id} className="inline-flex items-center gap-1 bg-warm-100 border border-warm-200 rounded px-2 py-0.5 text-caption text-warm-700">
                   {nameOf(id)}
                   <button type="button" className="text-warm-600 hover:text-status-at-risk" aria-label={`Remove ${nameOf(id)} from ${w.name}`} onClick={() => act(w.id, { action: 'remove_member', workspaceId: w.id, userId: id })}>×</button>
                 </span>
-              )) : <span className="text-[12px] text-warm-600">No members yet.</span>}
+              )) : <span className="text-caption text-warm-600">No members yet.</span>}
               <select aria-label={`Add a member to ${w.name}`} className={selectClass} value={adding[w.id] ?? ''} onChange={async e => {
                 const userId = e.target.value
                 setAdding({ ...adding, [w.id]: '' })
@@ -113,14 +113,14 @@ export function Workspaces({ members }: { members: Member[] }) {
 
       {/* Limiting a member means something only once there is a workspace to limit them to. */}
       {!none && <>
-      <h3 className="text-[13px] font-medium text-ink mb-1">Limit members to their workspaces</h3>
-      <p className="text-[12px] text-warm-600 mb-2">A limited member sees only the schedules and plans in workspaces they belong to, including on exports, reports, comparisons, the portfolio and firm history.</p>
+      <h3 className="text-subhead font-semibold text-ink mb-1">Limit members to their workspaces</h3>
+      <p className="text-caption text-warm-600 mb-2">A limited member sees only the schedules and plans in workspaces they belong to, including on exports, reports, comparisons, the portfolio and firm history.</p>
       <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md mb-5">
         {members.map(m => (
-          <li key={m.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
+          <li key={m.id} className="flex items-center justify-between px-3 py-2 text-body">
             <span><span className="text-ink font-medium">{m.name}</span> <span className="text-warm-600">· <span className="capitalize">{m.role}</span></span></span>
             {SEES_ALL.includes(m.role)
-              ? <span className="text-[12px] text-warm-600">Sees every workspace</span>
+              ? <span className="text-caption text-warm-600">Sees every workspace</span>
               : <label className="flex items-center gap-2 text-warm-700"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={restricted.has(m.id)} disabled={busy === `r:${m.id}`}
                   onChange={e => act(`r:${m.id}`, { action: 'set_restricted', userId: m.id, restricted: e.target.checked }, e.target.checked ? `${m.name} now sees only their workspaces.` : `${m.name} is no longer limited.`)} />Limited</label>}
           </li>
@@ -130,18 +130,18 @@ export function Workspaces({ members }: { members: Member[] }) {
 
       {!!data.workspaces.length && (
         <>
-          <h3 className="text-[13px] font-medium text-ink mb-1">Schedules and plans</h3>
-          <p className="text-[12px] text-warm-600 mb-2">Moving an uploaded schedule moves every update of that project; moving a plan moves the schedules published from it.</p>
+          <h3 className="text-subhead font-semibold text-ink mb-1">Schedules and plans</h3>
+          <p className="text-caption text-warm-600 mb-2">Moving an uploaded schedule moves every update of that project; moving a plan moves the schedules published from it.</p>
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-body">
               <caption className="sr-only">Workspace of each schedule and plan</caption>
-              <thead><tr className="text-left text-[12px] text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-caption text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">Item</th><th scope="col" className="py-2 font-semibold">Workspace</th>
               </tr></thead>
               <tbody>
                 {([['schedule', data.items.schedules], ['plan', data.items.plans]] as const).flatMap(([type, items]) => items.map(it => (
                   <tr key={`${type}:${it.id}`} className="border-b border-warm-100">
-                    <td className="py-2 pr-3 text-ink">{it.name}<span className="text-warm-600 text-[12px]"> · {type === 'schedule' ? 'Uploaded schedule' : 'Plan'}</span></td>
+                    <td className="py-2 pr-3 text-ink">{it.name}<span className="text-warm-600 text-caption"> · {type === 'schedule' ? 'Uploaded schedule' : 'Plan'}</span></td>
                     <td className="py-2">
                       <select aria-label={`Workspace for ${it.name}`} className={selectClass} value={it.workspaceId ?? ''} disabled={busy === `a:${it.id}`}
                         onChange={e => act(`a:${it.id}`, { action: 'assign', itemType: type, itemId: it.id, workspaceId: e.target.value || null }, `${it.name} moved.`)}>

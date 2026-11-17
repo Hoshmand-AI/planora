@@ -88,7 +88,7 @@ input[type='date'] { accent-color: var(--accent-600); }
 /* A primary button that cannot be pressed yet is grey, not pale blue: pale blue read as a washed-out live button. */
 button:disabled[class*='bg-accent-600'] { background-color: var(--warm-200); color: var(--warm-600); opacity: 1; box-shadow: none; cursor: not-allowed; }
 /* One disabled look for every pill button, filled or outlined, so a page never shows two kinds of "not yet". */
-button:disabled[class*='rounded-lg'][class*='text-[1'] { background-color: var(--warm-200); color: var(--warm-600); border-color: transparent; opacity: 1; box-shadow: none; cursor: not-allowed; }
+button:disabled[class*='rounded-lg']:is([class*='text-body'], [class*='text-caption'], [class*='text-subhead']) { background-color: var(--warm-200); color: var(--warm-600); border-color: transparent; opacity: 1; box-shadow: none; cursor: not-allowed; }
 
 /* Tap and click targets. With a mouse, nothing you can press is under 28px tall (WCAG 2.2 asks for 24).
    On touch screens the floor is 44px, the size Apple and Google both recommend for a finger.
@@ -102,7 +102,7 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 
 .skip-link {
   position: absolute; left: 8px; top: -48px; z-index: 100;
-  background: var(--navy-950); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 14px; font-weight: 600;
+  background: var(--navy-950); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;
 }
 .skip-link:focus { top: 8px; }
 
@@ -226,14 +226,10 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 @keyframes skeleton-sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .skeleton { background: linear-gradient(90deg, var(--warm-100) 25%, var(--warm-200) 50%, var(--warm-100) 75%); background-size: 200% 100%; animation: skeleton-sheen 1.4s ease-in-out infinite; }
 
-/* Design system v2: one page-title style on every app page (25px phone / 30px desktop, weight 750,
-   -0.032em, line-height 1.22). Marketing and legal pages keep their own display sizes. */
+/* The page title: the largest text on an app page, once, at the top-left (docs/design/DESIGN-SYSTEM.md, "Type").
+   The same size on a phone and a desktop. Every other size is a Tailwind token from tailwind.config.js. */
 @layer components {
-  .page-title { font-size: 22px; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; color: theme('colors.ink'); }
-  @media (min-width: 768px) { .page-title { font-size: 24px; line-height: 1.25; } }
-  /* The title of one tab inside a project: the project's name above it is the page title, so this one is smaller. */
-  .tab-title { font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; color: theme('colors.ink'); }
-  @media (min-width: 768px) { .tab-title { font-size: 20px; } }
+  .page-title { font-size: theme('fontSize.title'); line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; color: theme('colors.ink'); }
 }
 
 /* The app's working area: a quiet grey canvas with white cards lifted off it by a soft shadow instead of an outline,

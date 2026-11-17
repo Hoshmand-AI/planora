@@ -149,7 +149,7 @@ export function ProjectsDashboard() {
   }
   const togglePin = (r: PortfolioRow) => setPins(pins.includes(key(r)) ? pins.filter(k => k !== key(r)) : [...pins, key(r)])
 
-  if (error) return <div className="px-5 md:px-6 py-8"><p role="alert" className="text-[14px] text-status-at-risk">{error}</p></div>
+  if (error) return <div className="px-5 md:px-6 py-8"><p role="alert" className="text-body text-status-at-risk">{error}</p></div>
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -157,9 +157,10 @@ export function ProjectsDashboard() {
         <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
-      {/* With no project yet, the page itself offers the ways to start: a second filled button up here would repeat one of them. */}
+      {/* With no project yet, the page itself offers the ways to start: a second filled button up here would repeat one of them.
+          On a phone the bar at the foot of the screen already has "New", so the button is for wider screens only. */}
       {rows.length > 0 && (
-      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold">
+      <Link href="/dashboard/plan" className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-body font-semibold">
         <Plus size={15} aria-hidden /> New project
       </Link>
       )}
@@ -184,7 +185,7 @@ export function ProjectsDashboard() {
         Every project you upload or build shows up here, with its status and forecast finish.
       </EmptyState>
       {can('schedule.write') && <div className="-mt-8 pb-12 text-center">
-        <p className="text-[13px] text-warm-600 mb-2">Or see a live project first: a data center in construction, with late switchgear, meeting minutes and a risk register.</p>
+        <p className="text-body text-warm-600 mb-2">Or see a live project first: a data center in construction, with late switchgear, meeting minutes and a risk register.</p>
         <DataCenterSampleButton />
       </div>}
       </>
@@ -207,7 +208,7 @@ export function ProjectsDashboard() {
         <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-ink'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-body font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-ink'}`}>
               <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
             </button>
           ))}
@@ -233,7 +234,7 @@ export function ProjectsDashboard() {
             const on = filter === f.id
             return (
               <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
-                className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
+                className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-body font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
                 {on && <Check size={14} aria-hidden="true" />}{f.label} <span className={`tabular-nums font-medium ${on ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id]}</span>
               </button>
             )
@@ -251,9 +252,9 @@ export function ProjectsDashboard() {
           return (
             <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
               className={`card-lift min-w-0 text-left rounded-[14px] border px-3 py-2.5 md:px-4 md:py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'}`}>
-              <span aria-hidden className="hidden md:inline-flex items-center justify-center w-7 h-7 rounded-lg bg-accent-100 text-accent-600 mb-2"><f.icon size={15} /></span>
-              <div className={`text-[20px] md:text-[24px] font-semibold tracking-[-0.02em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
-              <div className="text-[12px] md:text-[12px] font-medium text-warm-600 mt-1 md:mt-1.5 leading-tight">{f.label}</div>
+              <span aria-hidden className="hidden md:inline-flex items-center justify-center w-7 h-7 rounded-lg bg-accent-100 text-accent-600 mb-1.5"><f.icon size={15} /></span>
+              <div className={`text-heading font-semibold tabular-nums ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
+              <div className="text-caption font-medium text-warm-600 leading-tight">{f.label}</div>
             </button>
           )
         })}
@@ -266,14 +267,14 @@ export function ProjectsDashboard() {
           <Search size={16} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-500" />
           <label htmlFor="project-search" className="sr-only">Search projects</label>
           <input id="project-search" ref={searchRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Search projects  ( / )"
-            className="w-full rounded-md border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-[14px] text-ink placeholder:text-warm-500" />
+            className="w-full rounded-md border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-body text-ink placeholder:text-warm-500" />
           {q && <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-warm-600 hover:text-ink"><X size={15} /></button>}
         </div>
         <label className="sr-only" htmlFor="project-sort">Sort projects</label>
         <div className="relative">
           <ArrowUpDown size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500 pointer-events-none" />
           <select id="project-sort" value={sort} onChange={e => { setSort(e.target.value as Sort); setCol(null) }}
-            className="appearance-none rounded-md border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13px] font-medium text-ink">
+            className="appearance-none rounded-md border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-body font-medium text-ink">
             <option value="attention">Most urgent first</option>
             <option value="recent">Recently updated</option>
             <option value="finish">Finish date</option>
@@ -287,8 +288,8 @@ export function ProjectsDashboard() {
 
       {!shown.length ? (
         <div className="text-center py-16 rounded-[14px] border border-dashed border-warm-300">
-          <p className="text-[14px] font-semibold text-ink">No projects match</p>
-          <p className="text-[13px] text-warm-600 mt-1">Try another word, or <button type="button" className="text-accent-600 font-medium hover:underline" onClick={() => { setQ(''); setFilter('all') }}>show all projects</button>.</p>
+          <p className="text-subhead font-semibold text-ink">No projects match</p>
+          <p className="text-body text-warm-600 mt-1">Try another word, or <button type="button" className="text-accent-600 font-medium hover:underline" onClick={() => { setQ(''); setFilter('all') }}>show all projects</button>.</p>
         </div>
       ) : view === 'table' || !viewLoaded ? (
         view === 'table' ? <ProjectTable rows={shown} onOpen={open} pins={pins} onPin={togglePin} col={col} setCol={setCol} /> : null
@@ -314,8 +315,8 @@ function Group({ title, note, rows, ...p }: { title: string; note?: string; rows
   return (
     <section aria-label={title}>
       <div className="flex items-baseline gap-2 mb-3">
-        <h2 className="text-[14px] font-semibold text-ink">{title}</h2>
-        {note && <span className="text-[12px] text-warm-600">{note}</span>}
+        <h2 className="text-heading font-semibold text-ink">{title}</h2>
+        {note && <span className="text-body text-warm-600">{note}</span>}
       </div>
       <Grid rows={rows} {...p} />
     </section>
@@ -332,7 +333,7 @@ function Monogram({ title }: { title: string }) {
   const words = title.trim().split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w))
   const letters = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[1][0] : words[0]?.[1] ?? '')).toUpperCase() || 'P'
   const tint = MONO_TINTS[[...title].reduce((n, c) => n + c.charCodeAt(0), 0) % MONO_TINTS.length]
-  return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[14px] font-semibold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
+  return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg text-body font-semibold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
 }
 
 /**
@@ -354,25 +355,25 @@ function OpenItems({ rows, onOpen }: { rows: PortfolioRow[]; onOpen: (r: Portfol
   return (
     <section aria-labelledby="open-items-h" className="rounded-[14px] border border-warm-200 bg-white p-5 md:p-6">
       <div className="flex items-baseline gap-2">
-        <h2 id="open-items-h" className="text-[14px] font-semibold text-ink">Open items</h2>
-        <span className="text-[13px] tabular-nums text-warm-600">{total}</span>
+        <h2 id="open-items-h" className="text-heading font-semibold text-ink">Open items</h2>
+        <span className="text-body tabular-nums text-warm-600">{total}</span>
       </div>
       <div className="mt-2 space-y-4">
         {shown.map(({ r, items }) => (
           <div key={key(r)}>
-            {rows.length > 1 && <h3 className="pt-1"><button type="button" onClick={() => onOpen(r)} className="text-left text-[14px] font-semibold text-accent-700 hover:underline">{r.title}</button></h3>}
+            {rows.length > 1 && <h3 className="pt-1"><button type="button" onClick={() => onOpen(r)} className="text-left text-subhead font-semibold text-accent-700 hover:underline">{r.title}</button></h3>}
             <ul className="divide-y divide-warm-200">
               {items.map((a, i) => (
                 <li key={`${a.code}-${i}`} className="flex items-start gap-3 py-2.5">
-                  <span className={`mt-px flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-[12px] font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
-                  <p className="min-w-0 flex-1 text-[13px] leading-snug text-warm-700 pt-0.5">{fmtDates(a.text)}</p>
+                  <span className={`mt-px flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-caption font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
+                  <p className="min-w-0 flex-1 text-body leading-snug text-warm-700 pt-0.5">{fmtDates(a.text)}</p>
                 </li>
               ))}
             </ul>
           </div>
         ))}
       </div>
-      {total > 6 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${total}`}</button>}
+      {total > 6 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="mt-2 text-body font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${total}`}</button>}
     </section>
   )
 }
@@ -403,44 +404,44 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
     <li className="rise-in" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
       <div className={`card-lift group relative h-full rounded-[14px] border border-warm-200 bg-white p-5 flex flex-col hover:border-warm-300 ${wide ? 'lg:flex-row lg:items-center lg:gap-10 lg:px-7 lg:py-6' : ''}`}>
         <div className={`flex items-start justify-between gap-3 ${wide ? 'lg:w-[26%] lg:flex-shrink-0' : ''}`}>
-          <div className="flex items-start gap-3.5 min-w-0">
+          <div className="flex items-start gap-3 min-w-0">
           <Monogram title={r.title} />
           <div className="min-w-0">
             {/* The whole card opens the project; the link's box covers it */}
-            <button type="button" onClick={() => onOpen(r)} className="text-left text-[16px] font-semibold tracking-[-0.01em] text-ink leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
-              {r.title}
+            <button type="button" onClick={() => onOpen(r)} title={r.title} className="text-left text-subhead font-semibold text-ink leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
+              <span className="line-clamp-2">{r.title}</span>
             </button>
-            <div className="text-[12px] text-warm-600 mt-0.5 truncate">{sourceLine(r)}</div>
+            <div className="text-caption text-warm-600 mt-0.5 truncate">{sourceLine(r)}</div>
           </div>
           </div>
           <PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} />
         </div>
         <div className={wide ? 'lg:flex-1 lg:min-w-0' : ''}>
-        <div className={`mt-3 ${wide ? 'lg:mt-0' : ''}`}><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
+        <div className={`mt-3 ${wide ? 'lg:mt-0' : ''}`}><span className={`inline-flex items-center gap-1.5 text-caption font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
         </div>
         {draft ? (
           <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
-            <div className="text-[12px] font-medium text-warm-600">Next step</div>
-            <div className="text-[14px] font-semibold text-ink mt-0.5">Finish the interview to generate the schedule</div>
+            <div className="text-body font-semibold text-ink">Finish the interview to generate the schedule</div>
+            <div className="text-caption text-warm-600">Next step</div>
           </div>
         ) : (
           <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
-            <div className="text-[12px] font-medium text-warm-600">Forecast finish</div>
-            <div className="flex flex-wrap items-baseline gap-x-2.5 mt-0.5">
-              <span className="text-[20px] font-semibold tracking-[-0.02em] text-ink tabular-nums">{fmtDate(r.finish)}</span>
-              {v && <span className={`text-[13px] font-semibold ${v.cls}`}>{v.text}</span>}
-              {!v && pastDays != null && <span className="text-[13px] font-semibold text-status-at-risk">{pastDays} {pastDays === 1 ? 'day' : 'days'} ago, not finished</span>}
+            <div className="flex flex-wrap items-baseline gap-x-2.5">
+              <span className="text-subhead font-semibold text-ink tabular-nums">{fmtDate(r.finish)}</span>
+              {v && <span className={`text-body font-semibold ${v.cls}`}>{v.text}</span>}
+              {!v && pastDays != null && <span className="text-body font-semibold text-status-at-risk">{pastDays} {pastDays === 1 ? 'day' : 'days'} ago, not finished</span>}
             </div>
+            <div className="text-caption text-warm-600">Forecast finish</div>
           </div>
         )}
         <div className={`mt-auto pt-4 ${wide ? 'lg:mt-0 lg:pt-0 lg:w-[230px] lg:flex-shrink-0' : ''}`}>
           {pct != null && (
             <div className="mb-3">
-              <div className="flex justify-between text-[12px] text-warm-600 mb-1"><span>Complete</span><span className="tabular-nums font-medium text-warm-700">{pct}%</span></div>
+              <div className="flex justify-between text-caption text-warm-600 mb-1"><span>Complete</span><span className="tabular-nums font-medium text-warm-700">{pct}%</span></div>
               <div className="h-1.5 rounded-full bg-warm-200 overflow-hidden" aria-hidden><div className="meter-fill h-full rounded-full bg-accent-600" style={{ width: `${pct}%` }} /></div>
             </div>
           )}
-          <div className="flex items-center justify-between text-[12px] text-warm-600 border-t border-warm-200 pt-3">
+          <div className="flex items-center justify-between text-caption text-warm-600 border-t border-warm-200 pt-3">
             <span>{r.dataDate ? <>Data date <span className="tabular-nums text-warm-700 font-medium">{fmtDate(r.dataDate)}</span></> : <>No data date · saved <span className="tabular-nums text-warm-700 font-medium">{fmtDay(r.updatedAt)}</span></>}</span>
             {isStale(r) && <span className="ml-3 flex-shrink-0 rounded-full bg-status-attention-bg px-2 py-0.5 font-semibold text-status-attention">Needs an update</span>}
           </div>
@@ -459,7 +460,7 @@ const COLS: { id: Col; label: string; num?: boolean }[] = [
 function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: PortfolioRow[]; col: { c: Col; dir: 1 | -1 } | null; setCol: (c: { c: Col; dir: 1 | -1 } | null) => void } & CardProps) {
   return (
     <div className="rounded-[14px] border border-warm-200 bg-white overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-body">
         <caption className="sr-only">Projects. Select a column heading to sort.</caption>
         <thead>
           <tr className="border-b border-warm-200 text-left">
@@ -487,7 +488,7 @@ function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: Portfo
                 <td className="pl-4"><PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} /></td>
                 <td className="px-3 py-3 min-w-[220px]">
                   <button type="button" onClick={() => onOpen(r)} className="text-left font-semibold text-ink hover:underline">{r.title}</button>
-                  <div className="text-[12px] text-warm-600">{sourceLine(r)}</div>
+                  <div className="text-caption text-warm-600">{sourceLine(r)}</div>
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap"><span className="inline-flex items-center gap-1.5 text-warm-700"><span className={`w-2 h-2 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></td>
                 <td className="px-3 py-3 text-right tabular-nums text-ink font-medium whitespace-nowrap">{fmtDate(r.finish)}</td>
@@ -515,7 +516,7 @@ function DataLocationPicker({ loc }: { loc: DataLocation }) {
   return (
     <div className="mt-2">
       <button type="button" aria-expanded={open} aria-controls={pid} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-lg border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-ink">
+        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-lg border border-warm-200 bg-white px-3 py-1.5 text-body text-warm-600 hover:border-warm-300 hover:text-ink">
         <Cloud size={14} aria-hidden className="flex-shrink-0" />
         <span className="sr-only">Data storage: </span>
         <span className="truncate font-semibold text-ink">{loc.label}</span>
@@ -523,15 +524,15 @@ function DataLocationPicker({ loc }: { loc: DataLocation }) {
       </button>
       <div id={pid} role="region" aria-label="Data storage" data-open={open} className="disclosure-panel" inert={!open || undefined}>
         <div className="disclosure-inner">
-          <div className="mt-2 max-w-xl rounded-2xl border border-warm-200 bg-white p-4 text-[13px] leading-relaxed">
+          <div className="mt-2 max-w-xl rounded-2xl border border-warm-200 bg-white p-4 text-body leading-relaxed">
             <dl className="space-y-2">
               <div><dt className="font-semibold text-ink">Stored in</dt><dd className="text-warm-700">{loc.database}</dd></div>
               <div><dt className="font-semibold text-ink">Document search</dt><dd className="text-warm-700">{loc.documentSearch}</dd></div>
             </dl>
-            <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-accent-700">
+            <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 px-3.5 py-2 text-body font-semibold text-white hover:bg-accent-700">
               Connect AWS, Azure or Google Cloud
             </Link>
-            <p className="mt-2 text-[12px] text-warm-600">Keep schedule files and originals in your own cloud storage. Organization admins set this up.</p>
+            <p className="mt-2 text-caption text-warm-600">Keep schedule files and originals in your own cloud storage. Organization admins set this up.</p>
           </div>
         </div>
       </div>

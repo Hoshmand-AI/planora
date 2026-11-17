@@ -31,16 +31,18 @@ export function EmptyState({ title, children, action, secondary, mood = 'idle', 
           <Robot mood={mood} size={inline ? 56 : 84} />
         </div>
       )}
-      <H className={`${inline ? 'text-[14px]' : 'text-[20px]'} font-semibold text-ink tracking-[-0.01em] mb-1.5`}>{title}</H>
-      {children && <div className="text-[14px] text-warm-600 max-w-[400px] leading-relaxed">{children}</div>}
+      {/* With no other heading on the page this line is the page's title; inside a page it is a section's or a card's. */}
+      {heading === 'h1' ? <h1 className="page-title mb-1">{title}</h1>
+        : <H className={`${inline ? 'text-subhead' : 'text-heading'} font-semibold text-ink mb-1`}>{title}</H>}
+      {children && <div className="text-body text-warm-600 max-w-[400px] leading-relaxed">{children}</div>}
       {action && <div className={inline ? 'mt-4' : 'mt-5'}><ActionEl a={action} primary /></div>}
       {secondary && <div className="mt-3"><ActionEl a={secondary} /></div>}
     </div>
   )
 }
 
-const PRIMARY = 'inline-flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-lg text-[14px] font-semibold transition-colors pressable'
-const QUIET = 'text-[13px] font-medium text-accent-600 hover:underline'
+const PRIMARY = 'inline-flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-lg text-body font-semibold transition-colors pressable'
+const QUIET = 'text-body font-medium text-accent-600 hover:underline'
 
 function ActionEl({ a, primary = false }: { a: Action; primary?: boolean }) {
   const cls = primary ? PRIMARY : QUIET
