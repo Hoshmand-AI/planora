@@ -1,7 +1,9 @@
-// "Build. Check. Forecast." — three rows, each beside a screenshot of the page that does it,
-// taken from the sample data center project (public/landing).
+'use client'
 
-import { Reveal } from './motion'
+// "Build. Check. Forecast.": three large tabs, each showing its explanation beside a screenshot of the page
+// that does it, taken from the sample data center project (public/landing).
+
+import { useState } from 'react'
 import { Shot } from './Sections'
 
 const PILLARS = [
@@ -17,13 +19,29 @@ const PILLARS = [
 ]
 
 export default function Pillars() {
+  // One pillar at a time: the three sit behind three large tabs, so the section is one screen and not three.
+  const [at, setAt] = useState(0)
   return (
-    <div className="space-y-20 md:space-y-32">
+    <div>
+      <div role="tablist" aria-label="What RunF9 does" className="grid grid-cols-3 gap-2 md:gap-4"
+        onKeyDown={e => {
+          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+          const next = (at + (e.key === 'ArrowRight' ? 1 : PILLARS.length - 1)) % PILLARS.length
+          setAt(next); document.getElementById(`pillar-tab-${PILLARS[next].key}`)?.focus()
+        }}>
+        {PILLARS.map((p, i) => (
+          <button key={p.key} type="button" role="tab" id={`pillar-tab-${p.key}`} aria-selected={at === i} aria-controls={`pillar-panel-${p.key}`} tabIndex={at === i ? 0 : -1} onClick={() => setAt(i)}
+            className={`pressable text-left rounded-2xl md:rounded-3xl px-4 py-4 md:px-7 md:py-6 transition-colors ${at === i ? 'bg-navy-950 text-white' : 'bg-white text-navy-950 border border-warm-200 hover:border-navy-900'}`}>
+            <span className="block text-[24px] md:text-[40px] font-bold tracking-[-0.04em] leading-none">{p.title}</span>
+            <span className={`hidden md:block text-[15px] mt-2 ${at === i ? 'text-navy-200' : 'text-warm-700'}`}>{p.lead}</span>
+          </button>
+        ))}
+      </div>
       {PILLARS.map((p, i) => (
-        <Reveal key={p.key} className={`grid grid-cols-1 ${i % 2 === 1 ? 'lg:grid-cols-[3fr_2fr]' : 'lg:grid-cols-[2fr_3fr]'} gap-10 lg:gap-16 items-center`}>
-          <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-            <h3 className="text-[44px] md:text-[56px] font-semibold tracking-[-0.035em] text-navy-950 leading-none">{p.title}</h3>
-            <p className="text-[21px] md:text-[24px] font-semibold tracking-[-0.015em] text-navy-950 mt-4">{p.lead}</p>
+        <div key={p.key} role="tabpanel" id={`pillar-panel-${p.key}`} aria-labelledby={`pillar-tab-${p.key}`} hidden={at !== i}
+          className={`${at === i ? 'grid' : 'hidden'} mt-10 md:mt-14 grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center`}>
+          <div>
+            <h3 className="text-[26px] md:text-[34px] font-bold tracking-[-0.03em] text-navy-950 leading-tight">{p.lead}</h3>
             <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-3">{p.text}</p>
             <ul className="mt-5 space-y-2.5">
               {p.points.map(x => (
@@ -33,8 +51,8 @@ export default function Pillars() {
               ))}
             </ul>
           </div>
-          <Shot name={p.shot} height={'height' in p ? p.height : 1200} alt={p.alt} label={p.label} className={i % 2 === 1 ? 'lg:order-1' : ''} />
-        </Reveal>
+          <Shot name={p.shot} height={'height' in p ? p.height : 1200} alt={p.alt} label={p.label} />
+        </div>
       ))}
     </div>
   )

@@ -132,9 +132,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <DailyBrief />
 
       {/* Build. Check. Forecast. */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
+      <section id="features" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
-          <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
+          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </Reveal>
         <Pillars />
@@ -147,9 +147,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <Audiences />
 
       {/* How it works: four steps */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 md:py-32 scroll-mt-12">
+      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto">
-          <h2 className="text-[36px] md:text-[52px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Four steps to a finish date you can defend.</h2>
+          <h2 className="text-[36px] md:text-[52px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Four steps to a finish date you can defend.</h2>
         </Reveal>
         <ol className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
           {[
@@ -169,7 +169,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Reports */}
       <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
-        <div className="max-w-6xl mx-auto px-6 py-24 md:py-32 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
+        <div className="max-w-6xl mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
           <Reveal>
             <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight">Reports, written from your numbers.</h2>
             <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
@@ -201,9 +201,9 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <Security contactHref={contactHref} />
 
       {/* Pricing */}
-      <section id="pricing" className="max-w-6xl mx-auto px-6 py-24 md:py-36 scroll-mt-12">
+      <section id="pricing" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center mb-14 md:mb-16">
-          <h2 className="text-[36px] md:text-[56px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Simple, transparent pricing.</h2>
+          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Simple, transparent pricing.</h2>
           <p className="text-[17px] md:text-[19px] text-warm-600 mt-4">{inviteOnly ? 'RunF9 is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-5 max-w-[1040px] mx-auto">
@@ -230,7 +230,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <Faq />
 
       {/* Evidence: how each figure on this page can be checked */}
-      <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-24 md:pb-32 scroll-mt-24">
+      <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-16 md:pb-24 scroll-mt-24">
         <Reveal className="text-center">
           <h2 className="text-[28px] md:text-[36px] font-semibold tracking-[-0.03em] text-navy-950">Where these numbers come from</h2>
           <p className="text-[16px] text-warm-700 mt-3 mb-8">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
@@ -256,11 +256,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </section>
 
       {/* Closing call to action */}
-      <section className="px-6 pb-24 md:pb-32">
+      <section className="px-6 pb-16 md:pb-24">
         <Reveal className="max-w-6xl mx-auto rounded-[36px] bg-navy-950 px-8 py-20 md:py-28 text-center relative overflow-hidden">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
-            <h2 className="text-[36px] md:text-[60px] font-semibold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 on your next schedule</h2>
+            <h2 className="text-[36px] md:text-[60px] font-bold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 on your next schedule</h2>
             <p className="text-[17px] md:text-[20px] text-navy-200 mt-5 max-w-[620px] mx-auto">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
             <Cta href={primaryHref} className={`${primaryBtn} mt-10 px-8 py-4 text-[17px]`}>{inviteOnly ? 'Request access' : 'Get started free'}</Cta>
             <p className="text-[14px] text-navy-200 mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>
