@@ -45,6 +45,9 @@ export default function DocumentsPage() {
   const [addWay, setAddWay] = useState<'file' | 'paste' | 'inbox'>('file')
   // With documents already here, adding one is a dialog over the library, so the page is the library and not a form.
   const [adding, setAdding] = useState(false)
+  // The record open in the reading pane beside the list (a split view on a wide screen; under the list on a phone).
+  const [openId, setOpenId] = useState<string | null>(null)
+  useEffect(() => { setOpenId(null) }, [selectedSchedule?.id])
   const addClose = useRef<HTMLButtonElement>(null)
   // "Add to project → Project record" in the header lands here with ?add=1: open the dialog (with no records yet the page is already the form).
   useEffect(() => { if (new URLSearchParams(window.location.search).get('add') === '1') setAdding(true) }, [selectedSchedule?.id])
@@ -97,8 +100,10 @@ export default function DocumentsPage() {
   }
 
   const hasDocs = !!data?.documents.length
+  const openDoc = data?.documents.find(d => d.id === openId) ?? null
   const libraryBlock = (
     <>
+      <div className={openDoc ? 'space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-4 lg:items-start' : ''}>
       <Section title="Records in this project" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
           : !data.documents.length ? (
@@ -111,10 +116,10 @@ export default function DocumentsPage() {
           : (
             <ul className="divide-y divide-warm-200">
               {data.documents.map(d => (
-                <li key={d.id} className="py-3 flex flex-col md:flex-row md:items-start gap-2 md:gap-4">
+                <li key={d.id} className={`py-3 flex flex-col md:flex-row md:items-start gap-2 md:gap-4 ${openId === d.id ? '-mx-3 px-3 rounded-lg bg-warm-100' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[14px] font-semibold text-navy-950 break-words">{d.title}</span>
+                      <button type="button" aria-pressed={openId === d.id} onClick={() => setOpenId(openId === d.id ? null : d.id)} className={`text-left text-[14px] font-semibold break-words hover:underline ${openId === d.id ? 'text-accent-700' : 'text-navy-950'}`}>{d.title}</button>
                       <TrustBadge trust={d.trust} />
                       {d.scope === 'org' && <span className={`${badge} bg-accent-100 border-accent-500/40 text-warm-700`}>Organization standard</span>}
                       {d.classification && d.classification !== 'unclassified' && <span className={`${badge} bg-status-at-risk-bg border-status-at-risk/40 text-status-at-risk`}>{d.classification.toUpperCase()}</span>}
@@ -153,6 +158,20 @@ export default function DocumentsPage() {
             </ul>
           )}
       </Section>
+      {openDoc && (
+        <RecordPane key={openDoc.id} base={base} doc={openDoc} typeLabel={data?.docTypes.find(t => t.id === openDoc.docType)?.label ?? openDoc.docType} onClose={() => setOpenId(null)}
+          actions={(() => {
+            const scoped = openDoc.scope === 'project' || can('org.manage')
+            return (
+              <>
+                {can('plan.review') && scoped && openDoc.trust !== 'approved' && <Button onClick={() => setTrust(openDoc, 'approved')}>Approve</Button>}
+                {can('plan.review') && scoped && openDoc.trust === 'approved' && <Button variant="secondary" onClick={() => setTrust(openDoc, 'unreviewed')}>Mark unreviewed</Button>}
+                {can('schedule.write') && scoped && <Button variant="secondary" className="text-status-at-risk" onClick={async () => { await remove(openDoc); setOpenId(null) }}>Delete</Button>}
+              </>
+            )
+          })()} />
+      )}
+      </div>
 
       {data && data.documents.length > 0 && <SearchPanel base={base} unreviewed={data.documents.filter(d => d.trust === 'unreviewed').length} />}
 
@@ -209,6 +228,56 @@ export default function DocumentsPage() {
         </div>
       , document.body)}
     </div>
+  )
+}
+
+interface Passage { chunkId: string; ordinal: number; section: string | null; heading: string | null; page: number | null; pageEnd: number | null; text: string; flagged: boolean; flagReasons: string[] }
+
+/**
+ * The reading pane of the split view: the selected record's facts, its actions, and its text passage by passage,
+ * each with its section and page. Flagged passages are marked, as they are in search.
+ */
+function RecordPane({ base, doc, typeLabel, actions, onClose }: { base: string; doc: Doc; typeLabel: string; actions: React.ReactNode; onClose: () => void }) {
+  const [state, setState] = useState<{ loading: boolean; error: string; passages: Passage[]; truncated: boolean }>({ loading: true, error: '', passages: [], truncated: false })
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    let live = true
+    fetch(`${base}/${doc.id}`).then(async r => {
+      const d = await r.json().catch(() => ({}))
+      if (!live) return
+      setState(r.ok ? { loading: false, error: '', passages: d.passages ?? [], truncated: !!d.truncated } : { loading: false, error: d.error || 'The record could not be opened.', passages: [], truncated: false })
+    }).catch(() => { if (live) setState({ loading: false, error: 'Network error. Check your connection and try again.', passages: [], truncated: false }) })
+    // On a narrow screen the pane is under the list: bring it into view.
+    if (window.matchMedia('(max-width: 1023px)').matches) ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    return () => { live = false }
+  }, [base, doc.id])
+  return (
+    <section ref={ref} aria-labelledby="record-h" className="rounded-[14px] border border-warm-200 bg-white flex flex-col min-w-0 scroll-mt-20 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)]">
+      <div className="flex items-start justify-between gap-3 px-5 pt-5">
+        <div className="min-w-0">
+          <h2 id="record-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950 break-words">{doc.title}</h2>
+          <p className="mt-0.5 text-[12.5px] text-warm-600">{typeLabel} · {doc.format.toUpperCase()}{doc.pageCount ? ` · ${doc.pageCount} pages` : ''} · {passages(doc.chunkCount)}{doc.uploadedByName ? ` · added by ${doc.uploadedByName}` : ''} · {fmtDay(doc.createdAt)}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close this record" className="flex-shrink-0 -mr-1.5 -mt-1.5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-navy-950 hover:bg-warm-100"><X size={17} aria-hidden="true" /></button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 px-5 pt-3 pb-4 border-b border-warm-200">
+        <TrustBadge trust={doc.trust} />
+        <span className="flex-1" />
+        {actions}
+      </div>
+      <div className="min-h-0 overflow-y-auto px-5 py-4 space-y-4" tabIndex={0} aria-label={`Text of ${doc.title}`}>
+        {state.loading ? <p className="text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Opening…</p>
+          : state.error ? <p role="alert" className="text-[13px] text-status-at-risk">{state.error}</p>
+          : state.passages.map(p => (
+            <div key={p.chunkId} className={p.flagged ? 'rounded-lg border border-status-attention/50 bg-status-attention-bg p-3' : ''}>
+              <p className="text-[12px] font-semibold text-warm-600">{[p.section, p.heading].filter(Boolean).join(' · ') || `Passage ${p.ordinal + 1}`}{p.page ? ` · page ${p.page}${p.pageEnd && p.pageEnd !== p.page ? `–${p.pageEnd}` : ''}` : ''}</p>
+              {p.flagged && <p className="mt-0.5 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> Flagged: {p.flagReasons.join(', ') || 'possible instruction to an AI'}. It is never sent to a model.</p>}
+              <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-warm-700">{p.text}</p>
+            </div>
+          ))}
+        {state.truncated && <p className="text-[12.5px] text-warm-600">Showing the first {state.passages.length} of {doc.chunkCount} passages. Search the records to find text further in.</p>}
+      </div>
+    </section>
   )
 }
 
