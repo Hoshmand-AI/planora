@@ -5,7 +5,7 @@ import type { DataLocation } from '@/lib/server/data-location'
 import { CloudStorage } from '@/components/CloudStorage'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck, ShieldAlert, Copy, Download, Lock, CheckCircle2, XCircle } from 'lucide-react'
-import { Section, Field, Button, Alert, inputClass, postJson } from '@/components/ui'
+import { Section, Field, Button, Alert, PageHeader, inputClass, postJson } from '@/components/ui'
 import { Integrations } from '@/components/Integrations'
 import { EnterpriseIdentity } from '@/components/EnterpriseIdentity'
 import { Workspaces } from '@/components/Workspaces'
@@ -136,13 +136,14 @@ export default function OrgPage() {
   const assignable = data.roles.filter(r => isOwner || !['owner', 'admin'].includes(r.id))
 
   return (
-    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
-      <div>
+    <>
+    <PageHeader>
+      <div className="pb-4">
         <h1 className="page-title">{data.org.name}</h1>
         <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
-      <div role="tablist" aria-label="Organization settings" className="flex gap-0 border-b border-warm-200 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={e => {
+      <div role="tablist" aria-label="Organization settings" className="flex gap-0 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={e => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         const at = tabs.findIndex(t => t.id === active), next = tabs[(at + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
         pickTab(next.id); document.getElementById(`org-tab-${next.id}`)?.focus()
@@ -154,6 +155,8 @@ export default function OrgPage() {
           </button>
         ))}
       </div>
+    </PageHeader>
+    <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
 
       <div role="tabpanel" id="org-panel-plan" aria-labelledby="org-tab-plan" hidden={active !== 'plan'} className="space-y-5">
       <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai; the change takes effect at once.">
@@ -444,6 +447,7 @@ export default function OrgPage() {
       )}
       </div>
     </div>
+    </>
   )
 }
 
