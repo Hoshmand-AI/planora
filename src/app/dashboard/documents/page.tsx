@@ -108,7 +108,7 @@ export default function DocumentsPage() {
         {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
           : !data.documents.length ? (
             <div className="py-10 text-center">
-              <p className="text-[16px] font-semibold text-navy-950">No records yet</p>
+              <p className="text-[16px] font-semibold text-ink">No records yet</p>
               <p className="mt-1 text-[14px] text-warm-600">{can('schedule.write') ? 'Start with the contract or the scheduling specification.' : 'Nothing has been added to this project.'}</p>
               {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
             </div>
@@ -119,7 +119,7 @@ export default function DocumentsPage() {
                 <li key={d.id} className={`py-3 flex flex-col md:flex-row md:items-start gap-2 md:gap-4 ${openId === d.id ? '-mx-3 px-3 rounded-lg bg-warm-100' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <button type="button" aria-pressed={openId === d.id} onClick={() => setOpenId(openId === d.id ? null : d.id)} className={`text-left text-[14px] font-semibold break-words hover:underline ${openId === d.id ? 'text-accent-700' : 'text-navy-950'}`}>{d.title}</button>
+                      <button type="button" aria-pressed={openId === d.id} onClick={() => setOpenId(openId === d.id ? null : d.id)} className={`text-left text-[14px] font-semibold break-words hover:underline ${openId === d.id ? 'text-accent-700' : 'text-ink'}`}>{d.title}</button>
                       <TrustBadge trust={d.trust} />
                       {d.scope === 'org' && <span className={`${badge} bg-accent-100 border-accent-500/40 text-warm-700`}>Organization standard</span>}
                       {d.classification && d.classification !== 'unclassified' && <span className={`${badge} bg-status-at-risk-bg border-status-at-risk/40 text-status-at-risk`}>{d.classification.toUpperCase()}</span>}
@@ -147,7 +147,7 @@ export default function DocumentsPage() {
                       ]
                       return (
                         <>
-                          {review && d.trust !== 'approved' && <Button onClick={() => setTrust(d, 'approved')} aria-label={`Approve ${d.title}`}>Approve</Button>}
+                          {review && d.trust !== 'approved' && <Button variant="secondary" onClick={() => setTrust(d, 'approved')} aria-label={`Approve ${d.title}`}>Approve</Button>}
                           {items.length > 0 && <MoreMenu label={`More actions for ${d.title}`} items={items} />}
                         </>
                       )
@@ -186,7 +186,7 @@ export default function DocumentsPage() {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
         <h2 className="sr-only">Project records</h2>
-        <p className="text-[13.5px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
+        <p className="text-[13px] text-warm-500 max-w-[720px] max-md:line-clamp-2">
           Records are shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
@@ -206,14 +206,14 @@ export default function DocumentsPage() {
         <div className={`${digitsFont.variable} font-sans fixed inset-0 z-50 overflow-y-auto bg-navy-950/45 p-3 md:p-8 flex justify-center items-start`} onMouseDown={e => { if (e.target === e.currentTarget) setAdding(false) }}>
         <div id="upload-documents" role="dialog" aria-modal="true" aria-labelledby="add-h"
           className={'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(6_20_27/0.45)]'}>
-          {<button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-navy-950 hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
+          {<button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-ink hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
           {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">
-              <h2 id="add-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950">Add to this project</h2>
+              <h2 id="add-h" className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Add to this project</h2>
               <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-0 border-b border-warm-200">
                 {ADD_WAYS.map(w => (
                   <button key={w.id} role="tab" type="button" aria-selected={addWay === w.id} onClick={() => setAddWay(w.id)}
-                    className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${addWay === w.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{w.label}</button>
+                    className={`pressable px-1 pb-2 pt-1 mr-4 text-[13px] font-semibold border-b-2 ${addWay === w.id ? 'border-accent-600 text-ink' : 'border-transparent text-warm-600 hover:text-ink'}`}>{w.label}</button>
                 ))}
               </div>
             </div>
@@ -255,10 +255,10 @@ function RecordPane({ base, doc, typeLabel, actions, onClose }: { base: string; 
     <section ref={ref} aria-labelledby="record-h" className="rounded-[14px] border border-warm-200 bg-white flex flex-col min-w-0 scroll-mt-20 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)]">
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
         <div className="min-w-0">
-          <h2 id="record-h" className="text-[17px] font-semibold tracking-[-0.01em] text-navy-950 break-words">{doc.title}</h2>
-          <p className="mt-0.5 text-[12.5px] text-warm-600">{typeLabel} · {doc.format.toUpperCase()}{doc.pageCount ? ` · ${doc.pageCount} pages` : ''} · {passages(doc.chunkCount)}{doc.uploadedByName ? ` · added by ${doc.uploadedByName}` : ''} · {fmtDay(doc.createdAt)}</p>
+          <h2 id="record-h" className="text-[16px] font-semibold tracking-[-0.01em] text-ink break-words">{doc.title}</h2>
+          <p className="mt-0.5 text-[12px] text-warm-600">{typeLabel} · {doc.format.toUpperCase()}{doc.pageCount ? ` · ${doc.pageCount} pages` : ''} · {passages(doc.chunkCount)}{doc.uploadedByName ? ` · added by ${doc.uploadedByName}` : ''} · {fmtDay(doc.createdAt)}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close this record" className="flex-shrink-0 -mr-1.5 -mt-1.5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-navy-950 hover:bg-warm-100"><X size={17} aria-hidden="true" /></button>
+        <button type="button" onClick={onClose} aria-label="Close this record" className="flex-shrink-0 -mr-1.5 -mt-1.5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink hover:bg-warm-100"><X size={17} aria-hidden="true" /></button>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-5 pt-3 pb-4 border-b border-warm-200">
         <TrustBadge trust={doc.trust} />
@@ -272,10 +272,10 @@ function RecordPane({ base, doc, typeLabel, actions, onClose }: { base: string; 
             <div key={p.chunkId} className={p.flagged ? 'rounded-lg border border-status-attention/50 bg-status-attention-bg p-3' : ''}>
               <p className="text-[12px] font-semibold text-warm-600">{[p.section, p.heading].filter(Boolean).join(' · ') || `Passage ${p.ordinal + 1}`}{p.page ? ` · page ${p.page}${p.pageEnd && p.pageEnd !== p.page ? `–${p.pageEnd}` : ''}` : ''}</p>
               {p.flagged && <p className="mt-0.5 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> Flagged: {p.flagReasons.join(', ') || 'possible instruction to an AI'}. It is never sent to a model.</p>}
-              <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-warm-700">{p.text}</p>
+              <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-warm-700">{p.text}</p>
             </div>
           ))}
-        {state.truncated && <p className="text-[12.5px] text-warm-600">Showing the first {state.passages.length} of {doc.chunkCount} passages. Search the records to find text further in.</p>}
+        {state.truncated && <p className="text-[12px] text-warm-600">Showing the first {state.passages.length} of {doc.chunkCount} passages. Search the records to find text further in.</p>}
       </div>
     </section>
   )
@@ -421,7 +421,7 @@ function SearchPanel({ base, unreviewed }: { base: string; unreviewed: number })
             {hits.map(h => (
               <li key={h.chunkId} className={`border rounded-md p-3 ${h.flagged ? 'border-status-attention bg-status-attention-bg' : 'border-warm-200 bg-warm-100'}`}>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[13px] font-semibold text-navy-950">{h.citation}</span>
+                  <span className="text-[13px] font-semibold text-ink">{h.citation}</span>
                   <span className="text-[12px] text-warm-500">{h.tierLabel}</span>
                   {h.trust !== 'approved' && <TrustBadge trust={h.trust} />}
                 </div>
@@ -452,7 +452,7 @@ function Requirements({ base, items, canDecide, onChange, onError }: { base: str
         {items.map(c => (
           <li key={`${c.documentId}:${c.key}`} className="border border-warm-200 rounded-md p-3 bg-warm-50">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13.5px] font-semibold text-navy-950">{c.label}: {c.value}</span>
+              <span className="text-[13px] font-semibold text-ink">{c.label}: {c.value}</span>
               {c.review && <span className={`${badge} ${c.review.status === 'confirmed' ? 'bg-status-on-track-bg border-status-on-track/40 text-status-on-track' : 'bg-warm-100 border-warm-300 text-warm-600'}`}>{c.review.status === 'confirmed' ? 'Confirmed' : 'Dismissed'} {fmtDay(c.review.createdAt)}</span>}
               {c.documentTrust !== 'approved' && <TrustBadge trust={c.documentTrust} />}
             </div>
@@ -520,14 +520,14 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
           {error && <Alert tone="error">{error}</Alert>}
           {fresh && (
             <div className="border border-accent-600/40 bg-white rounded-md p-3 space-y-2" role="status">
-              <p className="text-[13px] font-semibold text-navy-950">“{fresh.name}” is ready. Copy the token now: it is shown only once.</p>
-              <div className="grid gap-2 text-[12.5px]">
-                <div><span className="text-warm-700">Send to (POST): </span><code className="font-mono text-navy-950 break-all">{data.address}</code> <button type="button" onClick={() => copy('address', data.address)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'address' ? 'Copied' : 'Copy'}</button></div>
-                <div><span className="text-warm-700">Token (Authorization: Bearer): </span><code className="font-mono text-navy-950 break-all">{fresh.token}</code> <button type="button" onClick={() => copy('token', fresh.token)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'token' ? 'Copied' : 'Copy'}</button></div>
+              <p className="text-[13px] font-semibold text-ink">“{fresh.name}” is ready. Copy the token now: it is shown only once.</p>
+              <div className="grid gap-2 text-[12px]">
+                <div><span className="text-warm-700">Send to (POST): </span><code className="font-mono text-ink break-all">{data.address}</code> <button type="button" onClick={() => copy('address', data.address)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'address' ? 'Copied' : 'Copy'}</button></div>
+                <div><span className="text-warm-700">Token (Authorization: Bearer): </span><code className="font-mono text-ink break-all">{fresh.token}</code> <button type="button" onClick={() => copy('token', fresh.token)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'token' ? 'Copied' : 'Copy'}</button></div>
               </div>
-              <pre className="bg-warm-100 rounded p-2 text-[12px] text-navy-950 overflow-x-auto"><code>{example}</code></pre>
+              <pre className="bg-warm-100 rounded p-2 text-[12px] text-ink overflow-x-auto"><code>{example}</code></pre>
               <p className="text-[12px] text-warm-700">In Microsoft Power Automate, Zapier or n8n: on a new email in the project mailbox (or a finished meeting transcript), add an HTTP step that posts to the address with this token. Accepted: a raw email (message/rfc822), a transcript (text/vtt), plain text, or JSON with type, title and text.</p>
-              <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-[12.5px] font-medium text-accent-600 hover:underline">I have copied it</button>
+              <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-[12px] font-medium text-accent-600 hover:underline">I have copied it</button>
             </div>
           )}
           {active.length > 0 && (
@@ -535,10 +535,10 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
               {active.map(i => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
                   <div>
-                    <span className="font-medium text-navy-950">{i.name}</span>
+                    <span className="font-medium text-ink">{i.name}</span>
                     <span className="text-warm-600"> · token {i.prefix}… · {i.received} received{i.lastUsedAt ? `, last ${fmtDay(i.lastUsedAt)}` : ''} · created {fmtDay(i.createdAt)}</span>
                   </div>
-                  <button type="button" onClick={() => turnOff(i)} className="text-[12.5px] font-medium text-status-at-risk hover:underline">Turn off</button>
+                  <button type="button" onClick={() => turnOff(i)} className="text-[12px] font-medium text-status-at-risk hover:underline">Turn off</button>
                 </li>
               ))}
             </ul>
@@ -613,13 +613,13 @@ function ProjectMailbox({ base, onReceived }: { base: string; onReceived: () => 
             {active.map(m => (
               <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
                 <div className="min-w-0">
-                  <span className="font-medium text-navy-950 break-all">{m.address}</span>
+                  <span className="font-medium text-ink break-all">{m.address}</span>
                   <span className="text-warm-600"> · folder “{m.folderName}” · {m.received} copied · connected {fmtDay(m.createdAt)}</span>
                   <div className="text-[12px] text-warm-600">{m.lastSyncAt ? `Last read ${fmtDay(m.lastSyncAt)}: ${m.lastStatus || ''}` : 'Not read yet.'}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => sync(m)} disabled={!!busy} className="text-[12.5px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy === m.id ? 'Reading…' : 'Sync now'}</button>
-                  {data.canConnect && <button type="button" onClick={() => disconnect(m)} className="text-[12.5px] font-medium text-status-at-risk hover:underline">Disconnect</button>}
+                  <button type="button" onClick={() => sync(m)} disabled={!!busy} className="text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy === m.id ? 'Reading…' : 'Sync now'}</button>
+                  {data.canConnect && <button type="button" onClick={() => disconnect(m)} className="text-[12px] font-medium text-status-at-risk hover:underline">Disconnect</button>}
                 </div>
               </li>
             ))}
@@ -630,7 +630,7 @@ function ProjectMailbox({ base, onReceived }: { base: string; onReceived: () => 
             <Field label="Outlook folder to read">{p => <input {...p} required maxLength={80} className={inputClass} value={folder} onChange={e => setFolder(e.target.value)} />}</Field>
             <Button type="submit" disabled={busy === 'connect' || !folder.trim()}>{busy === 'connect' ? 'Opening Microsoft…' : 'Sign in with Microsoft'}</Button>
           </form>
-        ) : <p className="text-[12.5px] text-warm-600">An organization admin connects or disconnects a mailbox.</p>}
+        ) : <p className="text-[12px] text-warm-600">An organization admin connects or disconnects a mailbox.</p>}
         {data.canConnect && <p className="text-[12px] text-warm-600">Create the folder in Outlook first and move this project’s emails into it, or add an Outlook rule that does. RunF9 starts with the last {data.firstSyncDays} days of that folder. Attachments are not read. Sign in with a work account.</p>}
       </div>
     </Section>

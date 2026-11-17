@@ -14,7 +14,7 @@ const PILL: Record<Status, string> = {
   on_track: 'bg-status-on-track-bg text-status-on-track', complete: 'bg-status-complete-bg text-status-complete', no_baseline: 'text-navy-200',
 }
 // Ribbon marks (palette): progress to the data date in blue with a white tick, target light steel, forecast sky blue.
-const FORECAST = '#60A5FA', TARGET = '#CCD0CF', DATA_DATE = '#2563EB'
+const FORECAST = '#7FAAE8', TARGET = '#D3D6D9', DATA_DATE = '#2B63C1'
 
 const day = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000
 const plural = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
@@ -66,9 +66,9 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
     <section aria-label="Finish forecast" className="rise-in rounded-[14px] bg-navy-900 text-white p-6 md:p-8 shadow-[0_24px_48px_-28px_rgba(6,20,27,0.6)]">
       <p className="text-[14px] text-warm-200">Will we finish on time?</p>
       {/* The largest figure is the answer. A date that has already passed is not one, so then it is how late the work is. */}
-      <p className="mt-1 text-[40px] md:text-[48px] font-bold tracking-[-0.03em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
+      <p className="mt-1 text-[36px] md:text-[48px] font-semibold tracking-[-0.02em] tabular-nums leading-none">{overdue ? `${plural(diff!)} overdue` : forecast ? fmtDate(forecast) : '—'}</p>
       {/* The verdict sits on its own line under the date: beside it, it competed with the date and wrapped into a block on a phone. */}
-      {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[15px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
+      {verdict && <p role="status" className={`mt-3 inline-block text-[14px] md:text-[14px] font-semibold leading-snug ${pill === PILL.no_baseline ? '' : 'rounded-lg px-2.5 py-1'} ${pill}`}>{verdict}</p>}
       {/* One line of explanation; the rest is under "Why this status". */}
       {overdue ? <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">The schedule still shows {fmtDate(forecast!)}, a date that has passed. Upload an update or record progress to get a real forecast.</p>
         : reason && <p className="mt-3 text-[14px] text-warm-200 leading-relaxed max-w-3xl">{reason}</p>}
@@ -85,7 +85,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
             {today && <Tick left={at(today)} color="#FFFFFF" />}
           </div>
           <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-2 text-[13px]">
-            {start && <Item label="Start" date={start} dot="#9BA8AB" />}
+            {start && <Item label="Start" date={start} dot="#A2A7AC" />}
             {dd && <Item label="Data date" date={dd} dot={DATA_DATE} />}
             {target && <Item label={target.label} date={target.date} dot={TARGET} />}
             {forecast && !today && <Item label="Forecast" date={forecast} dot={FORECAST} />}

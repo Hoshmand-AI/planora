@@ -7,11 +7,11 @@
 export type RobotMood = 'working' | 'waiting' | 'done' | 'worried' | 'idle'
 
 const COLOR: Record<RobotMood, string> = {
-  working: '#2563eb',
-  waiting: '#1D4ED8',
+  working: '#2B63C1',
+  waiting: '#1F4E9E',
   done: '#2F7358',
   worried: '#A64848',
-  idle: '#56656F',
+  idle: '#666C72',
 }
 
 export function Robot({ mood = 'working', size = 64, label, className = '', still = false }: {

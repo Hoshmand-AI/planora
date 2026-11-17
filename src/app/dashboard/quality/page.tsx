@@ -162,17 +162,17 @@ export default function QualityPage() {
           <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6 flex max-sm:flex-col items-center sm:items-center gap-5">
             <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} />
             <div className="min-w-0">
-              <h2 className="text-[19px] font-bold tracking-[-0.02em] text-navy-950 leading-snug">{grade.short}</h2>
-              <p className="text-[13.5px] text-warm-600 mt-1 leading-relaxed">{grade.title} {grade.sub}</p>
+              <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ink leading-snug">{grade.short}</h2>
+              <p className="text-[13px] text-warm-600 mt-1 leading-relaxed">{grade.title} {grade.sub}</p>
               {/* Each outcome counted on its own: a check that could not run is never shown as passed */}
-              <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+              <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
                 {([['pass', 'Pass', 'text-status-on-track'], ['fail', 'Fail', 'text-status-at-risk'], ['warn', 'Warning', 'text-status-attention'], ['n/a', 'Not applicable', 'text-warm-600']] as const)
                   .map(([r, label, cls]) => ({ label, cls, n: data.dcma.checks.filter(c => c.result === r).length }))
                   .filter(x => x.n > 0 || x.label !== 'Warning')
                   .map(x => (
                     <div key={x.label} className="flex items-baseline gap-1.5">
                       <dt className="text-warm-600">{x.label}</dt>
-                      <dd className={`order-first text-[15px] font-bold tabular-nums ${x.cls}`}>{x.n}</dd>
+                      <dd className={`order-first text-[14px] font-semibold tabular-nums ${x.cls}`}>{x.n}</dd>
                     </div>
                   ))}
               </dl>
@@ -186,16 +186,16 @@ export default function QualityPage() {
             </div>
           </div>
           <section aria-labelledby="fix-first-h" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6">
-            <h2 id="fix-first-h" className="text-[17px] font-semibold text-navy-950">Fix these first</h2>
+            <h2 id="fix-first-h" className="text-[16px] font-semibold text-ink">Fix these first</h2>
             {flagged.length === 0 ? (
               <p className="text-[14px] text-warm-600 mt-2"><CheckCircle2 size={15} className="inline mr-1.5 -mt-0.5 text-status-on-track" aria-hidden />Nothing to fix: every applicable check passes.</p>
             ) : (
               <ol className="mt-1 divide-y divide-warm-200">
                 {flagged.slice(0, 3).map(c => (
                   <li key={c.id} className="flex items-start gap-3 py-3">
-                    <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[12px] font-bold ${c.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{c.result === 'fail' ? 'Fails' : 'Warning'}</span>
+                    <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[12px] font-semibold ${c.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{c.result === 'fail' ? 'Fails' : 'Warning'}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[14.5px] font-semibold text-navy-950">{c.name}: {c.metric} <span className="font-normal text-warm-600">(target {c.threshold})</span></div>
+                      <div className="text-[14px] font-semibold text-ink">{c.name}: {c.metric} <span className="font-normal text-warm-600">(target {c.threshold})</span></div>
                       <p className="text-[13px] text-warm-600 mt-0.5 line-clamp-2">{c.explanation}</p>
                     </div>
                     <button type="button" onClick={() => openCheck(c.id)} className="flex-shrink-0 text-[13px] font-semibold text-accent-600 hover:underline whitespace-nowrap">{c.offenders.length ? `Show ${c.offenders.length}` : 'Details'}</button>
@@ -203,13 +203,13 @@ export default function QualityPage() {
                 ))}
               </ol>
             )}
-            {flagged.length > 3 && <p className="text-[12.5px] text-warm-600 pt-1">+{flagged.length - 3} more in the checks below.</p>}
+            {flagged.length > 3 && <p className="text-[12px] text-warm-600 pt-1">+{flagged.length - 3} more in the checks below.</p>}
             {guidance.length > 0 && <button type="button" onClick={() => setTab('fix')} className="pressable mt-1 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold">See how to fix {guidance.length === 1 ? 'it' : `all ${guidance.length}`}</button>}
           </section>
         </div>
         {/* Design system v2: say plainly what the number is and is not. */}
         <Disclosure tone="card" title="What this score means" meta={`${data.dcma.passed} of ${data.dcma.applicable} applicable checks pass`}>
-          <ul className="space-y-1.5 text-[13.5px] text-warm-700 list-disc pl-5">
+          <ul className="space-y-1.5 text-[13px] text-warm-700 list-disc pl-5">
             <li>It counts the DCMA 14-Point checks that <strong>apply</strong> to this schedule and pass. Checks marked “Not applicable” are left out of the count, never counted as passes; a check that needs data the file doesn&apos;t have says so instead of passing.</li>
             <li>Thresholds are the DCMA defaults, as adjusted by an admin under Organization → “Quality check thresholds (DCMA 14-point)”.</li>
             <li>A high score is not an approval. Each finding still needs a decision (accept with a reason, or mark to fix), and the submission review records the reviewer&apos;s verdict.</li>
@@ -219,7 +219,7 @@ export default function QualityPage() {
         {/* All checks at a glance: failing ones outlined in red; select one for its detail */}
         <section aria-labelledby="dcma-h" className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">{showAllChecks ? `All ${data.dcma.checks.length} DCMA checks` : `Checks that need work (${needWork.length})`}</h2>
+            <h2 id="dcma-h" className="text-[16px] font-semibold text-ink">{showAllChecks ? `All ${data.dcma.checks.length} DCMA checks` : `Checks that need work (${needWork.length})`}</h2>
             <span className="text-[13px] text-warm-600">select one to see what it found</span>
             {needWork.length > 0 && needWork.length < data.dcma.checks.length && (
               <button type="button" aria-expanded={allChecks} onClick={() => setAllChecks(v => !v)} className="ml-auto text-[13px] font-semibold text-accent-600 hover:underline">{allChecks ? 'Show only the ones that need work' : `Show all ${data.dcma.checks.length} checks`}</button>
@@ -230,9 +230,9 @@ export default function QualityPage() {
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
                 className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}border border-warm-200 ${c.result === 'fail' ? 'border-t-[3px] border-t-status-at-risk' : c.result === 'warn' ? 'border-t-[3px] border-t-status-attention' : ''}`}>
-                <span className="text-[12px] font-bold text-warm-500 tabular-nums">{c.id}</span>
-                <span className="text-[13.5px] font-semibold text-navy-950 leading-tight min-h-[2.4em]">{c.name}</span>
-                <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[19px] tracking-[-0.02em]'} font-bold tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
+                <span className="text-[12px] font-semibold text-warm-500 tabular-nums">{c.id}</span>
+                <span className="text-[13px] font-semibold text-ink leading-tight min-h-[2.4em]">{c.name}</span>
+                <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[18px] tracking-[-0.02em]'} font-semibold tabular-nums inline-flex items-center gap-2 ${c.result === 'n/a' ? 'text-warm-400' : 'text-ink'}`}>{c.result !== 'n/a' && <span aria-hidden="true" className={`h-2 w-2 flex-shrink-0 rounded-full ${c.result === 'pass' ? 'bg-status-on-track' : c.result === 'fail' ? 'bg-status-at-risk' : 'bg-status-attention'}`} />}{c.result === 'n/a' ? 'n/a' : c.metric}</span>
                 <span className="text-[12px] text-warm-600">{c.basis && c.result !== 'n/a' ? <>{c.basis} · </> : null}target {c.threshold}</span>
               </button>
             ))}
@@ -241,12 +241,12 @@ export default function QualityPage() {
             <div id="dcma-detail" role="region" aria-label={`Check ${selectedCheck.id}: ${selectedCheck.name}`} className="rise-in bg-white border border-warm-200 rounded-2xl p-5">
               <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
                 <span className={`font-semibold uppercase text-[12px] ${resultStyle(selectedCheck.result)}`}>{selectedCheck.result}</span>
-                <span className="text-navy-950 font-semibold">#{selectedCheck.id} {selectedCheck.name}</span>
+                <span className="text-ink font-semibold">#{selectedCheck.id} {selectedCheck.name}</span>
                 <span className="text-warm-600 tabular-nums">{selectedCheck.metric} (target {selectedCheck.threshold})</span>
               </div>
-              <p className="text-[13.5px] text-warm-700 mt-1.5">{selectedCheck.explanation}</p>
+              <p className="text-[13px] text-warm-700 mt-1.5">{selectedCheck.explanation}</p>
               {selectedCheck.offenders.length > 0 && (
-                <p className="text-[12.5px] text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
+                <p className="text-[12px] text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
               )}
               {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" onClick={() => setTab('fix')} className="inline-block mt-2 text-[13px] font-semibold text-accent-600 hover:underline">How to fix it</a>}
             </div>
@@ -257,7 +257,7 @@ export default function QualityPage() {
         <div hidden={tab !== 'review'} className="space-y-6">
         {data.brief && (
           <Disclosure tone="card" title="About this project" meta="also on Overview">
-            <p className="text-[13.5px] text-warm-700">{data.brief.summary}</p>
+            <p className="text-[13px] text-warm-700">{data.brief.summary}</p>
           </Disclosure>
         )}
 
@@ -268,8 +268,8 @@ export default function QualityPage() {
         {guidance.length === 0 && <p className="text-[14px] text-warm-700">Nothing to fix: every applicable check passes.</p>}
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
-            <h2 id="what-to-fix-h" className="text-[15px] font-semibold text-navy-950">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
-            <p className="text-[12.5px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the Overview tab.</p>
+            <h2 id="what-to-fix-h" className="text-[14px] font-semibold text-ink">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
+            <p className="text-[12px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the Overview tab.</p>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
@@ -283,10 +283,10 @@ export default function QualityPage() {
 
         <section aria-labelledby="data-questions-h" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="data-questions-h" className="text-[15px] font-semibold text-navy-950">RunF9&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
+            <h2 id="data-questions-h" className="text-[14px] font-semibold text-ink">RunF9&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
             <label className="text-[12px] text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
           </div>
-          {shown.length === 0 && <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[13.5px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
+          {shown.length === 0 && <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[13px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
           {shown.map(q => {
             const Icon = SEV_ICON[q.severity]
             return (
@@ -294,15 +294,15 @@ export default function QualityPage() {
                 <div className="flex gap-2">
                   <Icon size={15} className="flex-shrink-0 mt-0.5 text-warm-500" />
                   <div className="flex-1">
-                    <div className="text-[13.5px] text-navy-950">{fmtDates(q.question)}</div>
+                    <div className="text-[13px] text-ink">{fmtDates(q.question)}</div>
                     <div className="text-[12px] text-warm-500 mt-1">{fmtDates(q.detail)}</div>
                     {q.response ? (
                       <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
                     ) : !can('schedule.write') ? null : (
                       <div className="flex flex-wrap gap-2 mt-2.5">
-                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">Yes, intentional</button>
-                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">No — will fix in source</button>
-                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950 transition-colors">Not an issue</button>
+                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">Yes, intentional</button>
+                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">No — will fix in source</button>
+                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">Not an issue</button>
                       </div>
                     )}
                     <ReviewControl itemId={q.id} label={q.question} disposition={dispositionOf(q.id)} reviewer={reviewer} onDispose={dispose} />
@@ -314,11 +314,11 @@ export default function QualityPage() {
         </section>
 
         <Disclosure tone="card" title="Calendars — as labeled vs. as understood" meta={`${data.schedule.calendars.length} calendar${data.schedule.calendars.length === 1 ? '' : 's'}${importNotes ? ` · ${importNotes} import note${importNotes === 1 ? '' : 's'}` : ''}`}>
-          {data.schedule.calendars.length === 0 && <p className="text-[12.5px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
+          {data.schedule.calendars.length === 0 && <p className="text-[12px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
           <ul className="space-y-2">
             {data.schedule.calendars.map(c => (
-              <li key={c.id} className="text-[12.5px]">
-                <div className="text-navy-950 font-medium">“{c.sourceName || c.name}”</div>
+              <li key={c.id} className="text-[12px]">
+                <div className="text-ink font-medium">“{c.sourceName || c.name}”</div>
                 <div className="text-warm-500">{c.canonical || `${c.workDays.map(d => DAYS[d]).join(', ')} × ${c.hoursPerDay}h`} · {c.holidays.length} holidays</div>
               </li>
             ))}
@@ -362,14 +362,14 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
         <Robot mood="idle" size={80} className="mx-auto" />
         <h2 className="tab-title mt-3">Schedule quality</h2>
         <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
-        <p className="text-[12.5px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
+        <p className="text-[12px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
           {latest ? (
             <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
           ) : canUpload ? (
             <button type="button" onClick={onUpload} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Upload a schedule</button>
           ) : (
-            <p className="text-[12.5px] text-warm-600">Ask a scheduler on your team to upload one.</p>
+            <p className="text-[12px] text-warm-600">Ask a scheduler on your team to upload one.</p>
           )}
         </div>
       </MoodTile>
@@ -384,16 +384,16 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
   return (
     <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
       <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <span className={`text-[12px] font-bold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
-        <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
+        <span className={`text-[12px] font-semibold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
+        <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
         {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
         {disposition && <span className="text-[12px] font-semibold uppercase text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition]}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
         <div className="px-5 pb-4 space-y-2.5">
-          <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">What it means: </span>{g.meaning}</p>
-          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">Why it matters: </span>{g.whyItMatters}</p>}
+          <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
+          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
           {g.actions.some(a => a.kind === 'link') && (
             <div className="flex flex-wrap gap-2">
@@ -402,11 +402,11 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
           )}
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
           {g.decision ? (
-            <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
+            <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
           ) : !canDecide ? null : (
             <div className="flex flex-wrap gap-2 items-center">
               <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-navy-950">Accept with justification</button>
+              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink">Accept with justification</button>
               <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">I&apos;ll fix it in P6 / MSP</button>
             </div>
           )}
@@ -435,20 +435,20 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
   return (
     <div className="mt-2.5 pt-2.5 border-t border-warm-200">
       {disposition && !editing ? (
-        <p className="text-[12.5px] text-warm-700">
-          <span className="font-semibold text-navy-950">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
+        <p className="text-[12px] text-warm-700">
+          <span className="font-semibold text-ink">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
           {disposition.justification ? ` — “${disposition.justification}”` : ''}
           <span className="text-warm-500"> · {disposition.reviewer ?? 'reviewer'}, {fmtDay(disposition.createdAt)}</span>
-          {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950">Change</button>}
+          {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink">Change</button>}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-[12px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
-          <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-lg px-2 py-1 text-[12.5px] text-navy-950">
+          <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-lg px-2 py-1 text-[12px] text-ink">
             <option value="" disabled>Choose…</option>
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
-          <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1 text-[12.5px]" />
+          <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1 text-[12px]" />
           <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Save</button>
           {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
         </div>
@@ -478,16 +478,16 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
     <section aria-labelledby="submission-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
       <h2 id="submission-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
       {s && !editing ? (
-        <div className="text-[13.5px] text-warm-700 space-y-1">
-          <p><span className="font-semibold text-navy-950">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
-            {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-navy-950 text-[12.5px]">Change</button>}</p>
+        <div className="text-[13px] text-warm-700 space-y-1">
+          <p><span className="font-semibold text-ink">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
+            {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink text-[12px]">Change</button>}</p>
           {s.comments && <p className="whitespace-pre-wrap">{s.comments}</p>}
           <p className="text-[12px] text-warm-500">Findings and questions dispositioned: {counts}</p>
         </div>
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
-            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-[13px] text-navy-950">
+            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-[13px] text-ink">
               {/* No decision is pre-selected: a reviewer picks one, so a default never reads as a recorded approval. */}
               <option value="" disabled>Choose a disposition…</option>
               {SUBMISSION_DISPOSITIONS.map(d => <option key={d} value={d}>{SUBMISSION_LABELS[d]}</option>)}
@@ -497,7 +497,7 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
           <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={!choice || choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
           <div className="flex items-center gap-2">
             <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Record disposition</button>
-            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-navy-950">Cancel</button>}
+            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-ink">Cancel</button>}
             {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
           </div>
         </div>
@@ -524,7 +524,7 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
       {QUALITY_TABS.map(t => (
         <button key={t.id} id={`quality-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={tab === t.id ? `quality-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
-          className={`pressable rounded-lg px-3 min-h-[32px] text-[13px] font-semibold border ${tab === t.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-warm-300 bg-white text-warm-700 hover:text-navy-950'}`}>
+          className={`pressable rounded-lg px-3 min-h-[32px] text-[13px] font-semibold border ${tab === t.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-warm-300 bg-white text-warm-700 hover:text-ink'}`}>
           {t.label}
         </button>
       ))}
@@ -539,10 +539,10 @@ function ScoreRing({ passed, applicable }: { passed: number; applicable: number 
   const share = applicable ? passed / applicable : 0
   return (
     <svg width="112" height="112" viewBox="0 0 112 112" className="flex-shrink-0" role="img" aria-label={`${passed} of ${applicable} checks pass (green), ${applicable - passed} fail (red)`}>
-      <circle cx="56" cy="56" r={r} fill="none" stroke={applicable && passed < applicable ? '#A64848' : '#EBEEEE'} strokeWidth="10" />
+      <circle cx="56" cy="56" r={r} fill="none" stroke={applicable && passed < applicable ? '#A64848' : '#E8EAEC'} strokeWidth="10" />
       <circle cx="56" cy="56" r={r} fill="none" stroke="#2F7358" strokeWidth="10" strokeLinecap="round" transform="rotate(-90 56 56)"
         strokeDasharray={c} strokeDashoffset={c * (1 - share)} className="ring-draw" style={{ ['--ring-c' as string]: c }} />
-      <text x="56" y="62" textAnchor="middle" fontSize="24" fontWeight="700" fill="#06141B">{passed}/{applicable}</text>
+      <text x="56" y="62" textAnchor="middle" fontSize="24" fontWeight="700" fill="#1D2125">{passed}/{applicable}</text>
     </svg>
   )
 }
@@ -551,7 +551,7 @@ function Card({ label, value, sub }: { label: string; value: string; sub: string
   return (
     <div className="bg-white border border-warm-200 rounded-xl px-3 py-2">
       <div className="text-[12px] text-warm-600">{label}</div>
-      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[18px]'} font-semibold text-navy-950 tabular-nums break-words`}>{value}</div>
+      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[18px]'} font-semibold text-ink tabular-nums break-words`}>{value}</div>
       <div className="text-[12px] text-warm-600">{sub}</div>
     </div>
   )

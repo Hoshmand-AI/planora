@@ -16,7 +16,7 @@ function Cta({ href, className, children }: { href: string; className: string; c
   return href.startsWith('mailto:') ? <a href={href} className={className}>{children}</a> : <Link href={href} className={className}>{children}</Link>
 }
 
-const footLink = 'block text-[14px] text-warm-600 py-1.5 hover:text-navy-950 transition-colors'
+const footLink = 'block text-[14px] text-warm-600 py-1.5 hover:text-ink transition-colors'
 const primaryBtn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors'
 const secondaryBtn = 'pressable inline-flex items-center justify-center rounded-full text-accent-600 font-semibold hover:bg-accent-100 transition-colors'
 
@@ -67,20 +67,20 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <Logo variant="dark" size="text-[26px]" />
           </Link>
           <div className="hidden lg:flex items-center gap-7 xl:gap-9 whitespace-nowrap">
-            {nav.map(([href, label]) => <a key={href} href={href} className="text-[15.5px] font-medium text-navy-950 hover:text-accent-700 transition-colors">{label}</a>)}
+            {nav.map(([href, label]) => <a key={href} href={href} className="text-[15.5px] font-medium text-ink hover:text-accent-700 transition-colors">{label}</a>)}
           </div>
           <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
             <Link href="/auth" className={`${secondaryBtn} px-4 py-2.5 text-[15.5px]`}>Sign in</Link>
             <Cta href={primaryHref} className={`${primaryBtn} gap-1.5 px-6 py-3 text-[15.5px]`}>{primaryLabel}<ArrowRight size={16} aria-hidden /></Cta>
           </div>
-          <button className="lg:hidden text-navy-950 p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
+          <button className="lg:hidden text-ink p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
         {menuOpen && (
           <div className="lg:hidden px-6 pb-6 pt-2">
-            {nav.map(([href, label]) => <a key={href} href={href} className="block py-3 text-[17px] text-navy-950 border-b border-warm-200" onClick={() => setMenuOpen(false)}>{label}</a>)}
-            <Link href="/auth" className="block py-3 text-[17px] text-navy-950 border-b border-warm-200">Sign in</Link>
+            {nav.map(([href, label]) => <a key={href} href={href} className="block py-3 text-[17px] text-ink border-b border-warm-200" onClick={() => setMenuOpen(false)}>{label}</a>)}
+            <Link href="/auth" className="block py-3 text-[17px] text-ink border-b border-warm-200">Sign in</Link>
             <Cta href={primaryHref} className={`${primaryBtn} w-full mt-5 py-3 text-[16px]`}>{primaryLabel}</Cta>
           </div>
         )}
@@ -94,7 +94,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <p className="hero-rise text-[15px] md:text-[17px] font-medium text-warm-700 tracking-[-0.01em] mb-3 md:mb-4">
             {inviteOnly ? 'Construction schedule analysis · private beta, by invitation' : 'Construction schedule analysis'}
           </p>
-          <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[72px] xl:text-[84px] xl:leading-[1] font-bold tracking-[-0.05em] text-navy-950 max-w-[1150px]">
+          <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[72px] xl:text-[84px] xl:leading-[1] font-bold tracking-[-0.05em] text-ink max-w-[1150px]">
             Construction schedules, calculated and explained.
           </h1>
           <div className="hero-rise [animation-delay:140ms] mt-7 md:mt-9 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-x-16 gap-y-7">
@@ -106,7 +106,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:pb-1 flex-shrink-0">
               <Cta href={primaryHref} className={`${primaryBtn} gap-2 px-8 py-4 text-[17px] shadow-[0_14px_30px_-14px_rgba(37,99,235,0.7)]`}>{primaryLabel}<ArrowRight size={18} aria-hidden /></Cta>
-              <a href="#today" className="pressable text-[16px] font-semibold text-navy-950 underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
+              <a href="#today" className="pressable text-[16px] font-semibold text-ink underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
             </div>
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             inviteOnly ? [<>2,300+</>, 'automated tests run on every change to RunF9'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
-              <div className="text-[32px] min-[360px]:text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 tabular-nums leading-none">{value}</div>
+              <div className="text-[32px] min-[360px]:text-[40px] md:text-[48px] font-semibold tracking-[-0.04em] text-ink tabular-nums leading-none">{value}</div>
               <div className="text-[15px] text-warm-700 mt-3 leading-snug max-w-[220px] mx-auto">{label}</div>
             </Reveal>
           ))}
@@ -150,7 +150,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                   : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
               ].map(([term, def], i) => (
                 <details key={term} open={i === 0} className="group border-b border-warm-200">
-                  <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-navy-950">
+                  <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-ink">
                     {term}
                     <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
                   </summary>
@@ -170,7 +170,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Build. Check. Forecast. */}
       <section id="features" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
-          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
+          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </Reveal>
         <Pillars />
@@ -185,7 +185,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* How it works: four steps */}
       <section id="how-it-works" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto">
-          <h2 className="text-[36px] md:text-[52px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Four steps to a finish date you can defend.</h2>
+          <h2 className="text-[36px] md:text-[52px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Four steps to a finish date you can defend.</h2>
         </Reveal>
         <ol className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
           {[
@@ -196,7 +196,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           ].map(({ title, desc }, i) => (
             <Reveal as="li" key={title} delay={i * 80}>
               <span aria-hidden className="w-10 h-10 rounded-full bg-accent-600 text-white font-semibold text-[16px] flex items-center justify-center">{i + 1}</span>
-              <div className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em] mt-4">{title}</div>
+              <div className="text-[19px] font-semibold text-ink tracking-[-0.01em] mt-4">{title}</div>
               <p className="text-[16px] text-warm-700 leading-relaxed mt-1.5">{desc}</p>
             </Reveal>
           ))}
@@ -207,7 +207,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
         <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
           <Reveal>
-            <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight">Reports, written from your numbers.</h2>
+            <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-ink leading-tight">Reports, written from your numbers.</h2>
             <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
             <ul className="mt-6 space-y-3">
               {[
@@ -219,7 +219,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               ].map(([t, d]) => (
                 <li key={t} className="flex gap-2.5 text-[16px] text-warm-700 leading-snug">
                   <span aria-hidden className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-600" />
-                  <span><span className="font-semibold text-navy-950">{t}:</span> {d}.</span>
+                  <span><span className="font-semibold text-ink">{t}:</span> {d}.</span>
                 </li>
               ))}
             </ul>
@@ -239,7 +239,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Pricing */}
       <section id="pricing" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center mb-14 md:mb-16">
-          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Simple, transparent pricing.</h2>
+          <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Simple, transparent pricing.</h2>
           <p className="text-[17px] md:text-[19px] text-warm-600 mt-4">{inviteOnly ? 'RunF9 is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-5">
@@ -249,11 +249,11 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (SAML, OpenID Connect) and SCIM', 'Enforced 2-step & approval policies', 'Deploy in your AWS, Azure or Google Cloud account, or air-gapped', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
           ].map((p, i) => (
             <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 flex flex-col ${p.featured ? 'bg-navy-950 text-white shadow-[0_30px_60px_-30px_rgba(6,20,27,0.55)]' : 'bg-white border border-warm-200'}`}>
-              <div className={`text-[15px] font-semibold ${p.featured ? 'text-white' : 'text-navy-950'}`}>{p.name}</div>
-              <div className={`mt-3 text-[48px] font-bold tracking-[-0.045em] leading-none ${p.featured ? 'text-white' : 'text-navy-950'}`}>{p.price}<span className={`text-[16px] font-medium tracking-normal ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.per}</span></div>
+              <div className={`text-[15px] font-semibold ${p.featured ? 'text-white' : 'text-ink'}`}>{p.name}</div>
+              <div className={`mt-3 text-[48px] font-bold tracking-[-0.045em] leading-none ${p.featured ? 'text-white' : 'text-ink'}`}>{p.price}<span className={`text-[16px] font-medium tracking-normal ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.per}</span></div>
               {/* The same height on every card, so the buttons and the lists line up across the row. */}
               <p className={`text-[15px] mt-3 md:min-h-[46px] ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.blurb}</p>
-              <Cta href={p.href} className={`mt-5 mb-7 ${p.featured ? 'pressable inline-flex items-center justify-center rounded-full bg-white text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors' : 'pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors'}`}>{p.cta}</Cta>
+              <Cta href={p.href} className={`mt-5 mb-7 ${p.featured ? 'pressable inline-flex items-center justify-center rounded-full bg-white text-ink font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors' : 'pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-ink font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors'}`}>{p.cta}</Cta>
               <ul className="space-y-3 flex-1">
                 {p.yes.map(f => <li key={f} className={`flex items-start gap-2.5 text-[15.5px] ${p.featured ? 'text-white' : 'text-warm-700'}`}><CheckCircle size={17} className={`${p.featured ? 'text-accent-400' : 'text-accent-600'} flex-shrink-0 mt-0.5`} aria-hidden />{f}</li>)}
                 {p.no.length > 0 && <li className="pt-3 text-[13px] font-semibold uppercase tracking-wider text-warm-600">Not included</li>}
@@ -287,19 +287,19 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <p className="text-[14px] text-warm-600 mt-4 max-w-[280px] leading-relaxed">Construction scheduling, explained. Built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field.</p>
           </div>
           <div>
-            <div className="text-[13px] font-semibold text-navy-950 mb-3">Product</div>
+            <div className="text-[13px] font-semibold text-ink mb-3">Product</div>
             {[['#today', 'Daily Brief'], ['#features', 'Features'], ['#updates', 'Updates & delays'], ['#how-it-works', 'How it works'], ['#reports', 'Reports'], ['#integrations', 'Integrations'], ['#pricing', 'Pricing']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
           </div>
           <div>
-            <div className="text-[13px] font-semibold text-navy-950 mb-3">Trust</div>
+            <div className="text-[13px] font-semibold text-ink mb-3">Trust</div>
             {[['#deployment', 'Your cloud'], ['#security', 'Security'], ['#evidence', 'Evidence'], ['#faq', 'FAQ']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
           </div>
           <div>
-            <div className="text-[13px] font-semibold text-navy-950 mb-3">Company</div>
+            <div className="text-[13px] font-semibold text-ink mb-3">Company</div>
             <a href="https://www.hoshmand.ai" className={footLink}>Hoshmand AI</a>
             <a href="mailto:support@hoshmand.ai" className={footLink}>Contact</a>
             <Link href="/auth" className={footLink}>Sign in</Link>
-            <div className="text-[13px] font-semibold text-navy-950 mb-3 mt-6">Legal</div>
+            <div className="text-[13px] font-semibold text-ink mb-3 mt-6">Legal</div>
             <Link href="/privacy" className={footLink}>Privacy Policy</Link>
             <Link href="/terms" className={footLink}>Terms of Service</Link>
           </div>

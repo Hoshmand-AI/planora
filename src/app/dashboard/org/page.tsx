@@ -140,7 +140,7 @@ export default function OrgPage() {
     <PageHeader>
       <div className="pb-4">
         <h1 className="page-title">{data.org.name}</h1>
-        <p className="text-[13.5px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
+        <p className="text-[13px] text-warm-500">Organization since {fmtDay(data.org.createdAt)} · you are <span className="capitalize">{data.you.role}</span>. Your firm&apos;s data is private to this organization.</p>
       </div>
 
       <div role="tablist" aria-label="Organization settings" className="flex gap-0 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0 max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" onKeyDown={e => {
@@ -150,7 +150,7 @@ export default function OrgPage() {
       }}>
         {tabs.map(t => (
           <button key={t.id} id={`org-tab-${t.id}`} role="tab" type="button" aria-selected={active === t.id} aria-controls={`org-panel-${t.id}`} tabIndex={active === t.id ? 0 : -1} onClick={() => pickTab(t.id)}
-            className={`pressable px-1 pb-2 pt-1 mr-4 text-[13.5px] font-semibold border-b-2 ${active === t.id ? 'border-accent-600 text-navy-950' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>
+            className={`pressable px-1 pb-2 pt-1 mr-4 text-[13px] font-semibold border-b-2 ${active === t.id ? 'border-accent-600 text-ink' : 'border-transparent text-warm-600 hover:text-ink'}`}>
             {t.label}
           </button>
         ))}
@@ -161,12 +161,12 @@ export default function OrgPage() {
       <div role="tabpanel" id="org-panel-plan" aria-labelledby="org-tab-plan" hidden={active !== 'plan'} className="space-y-5">
       <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai; the change takes effect at once.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-navy-950 font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-navy-950 font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Reports</dt><dd className="text-navy-950 font-medium">{data.plan.reports.length === 4 ? 'All four' : 'Executive summary'}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Exports</dt><dd className="text-navy-950 font-medium">{data.plan.exports.includes('pdf') ? 'P6, MS Project, PDF, Excel, CSV' : 'P6, MS Project, CSV'}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Single sign-on</dt><dd className="text-navy-950 font-medium">{data.plan.sso ? 'Included' : 'Enterprise plan'}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Roles, 2-step, audit log</dt><dd className="text-navy-950 font-medium">Included</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-ink font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-ink font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Reports</dt><dd className="text-ink font-medium">{data.plan.reports.length === 4 ? 'All four' : 'Executive summary'}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Exports</dt><dd className="text-ink font-medium">{data.plan.exports.includes('pdf') ? 'P6, MS Project, PDF, Excel, CSV' : 'P6, MS Project, CSV'}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Single sign-on</dt><dd className="text-ink font-medium">{data.plan.sso ? 'Included' : 'Enterprise plan'}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Roles, 2-step, audit log</dt><dd className="text-ink font-medium">Included</dd></div>
         </dl>
       </Section>
 
@@ -231,7 +231,7 @@ export default function OrgPage() {
             <tbody>
               {data.members.map(m => (
                 <tr key={m.id} className="border-b border-warm-100 align-middle">
-                  <td className="py-2.5 pr-3 max-w-[180px] md:max-w-none"><div className="font-medium text-navy-950">{m.name}{m.id === data.you.id && <span className="text-warm-600 font-normal"> (you)</span>}</div><div className="text-warm-600 text-[12px] truncate" title={m.email}>{m.email}</div></td>
+                  <td className="py-2.5 pr-3 max-w-[180px] md:max-w-none"><div className="font-medium text-ink">{m.name}{m.id === data.you.id && <span className="text-warm-600 font-normal"> (you)</span>}</div><div className="text-warm-600 text-[12px] truncate" title={m.email}>{m.email}</div></td>
                   <td className="py-2.5 pr-3">
                     {manage && m.id !== data.you.id && (isOwner || !['owner', 'admin'].includes(m.role)) ? (
                       <select aria-label={`Role for ${m.name}`} value={m.role} className="bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px]"
@@ -272,7 +272,7 @@ export default function OrgPage() {
           <p className="text-[12px] text-warm-500 mt-2">{data.roles.find(r => r.id === invite.role)?.description}</p>
           {inviteLink && (
             <div className="mt-3 flex gap-2 items-center bg-warm-100 border border-warm-200 rounded-md p-2.5">
-              <code className="flex-1 text-[12px] break-all text-navy-950">{inviteLink}</code>
+              <code className="flex-1 text-[12px] break-all text-ink">{inviteLink}</code>
               <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(inviteLink)}><Copy size={13} className="inline mr-1" aria-hidden="true" />Copy</Button>
             </div>
           )}
@@ -280,7 +280,7 @@ export default function OrgPage() {
             <ul className="mt-4 divide-y divide-warm-200 border border-warm-200 rounded-md">
               {data.invitations.map(i => (
                 <li key={i.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
-                  <span><span className="text-navy-950 font-medium">{i.email}</span> · <span className="capitalize">{i.role}</span> · expires {fmtDay(i.expiresAt)}</span>
+                  <span><span className="text-ink font-medium">{i.email}</span> · <span className="capitalize">{i.role}</span> · expires {fmtDay(i.expiresAt)}</span>
                   <Button variant="ghost" onClick={async () => { if (await act('invite', { action: 'revoke_invite', invitationId: i.id }, 'Invitation revoked.')) load() }}>Revoke</Button>
                 </li>
               ))}
@@ -296,7 +296,7 @@ export default function OrgPage() {
           {note('settings')}
           {data.service?.cuiWarning && (
             <div role="note" className="bg-status-attention-bg border-l-2 border-status-attention text-warm-700 text-[13px] px-4 py-3 rounded-md mb-4">
-              <strong className="font-semibold text-navy-950">Controlled information.</strong> {data.service.cuiWarning}
+              <strong className="font-semibold text-ink">Controlled information.</strong> {data.service.cuiWarning}
             </div>
           )}
           <div className="space-y-3">
@@ -309,7 +309,7 @@ export default function OrgPage() {
             ] as const).map(([k, label, help]) => (
               <label key={k} className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={settings[k]} onChange={e => setSettings({ ...settings, [k]: e.target.checked })} />
-                <span><span className="block text-[13.5px] font-medium text-navy-950">{label}</span><span className="block text-[12.5px] text-warm-500">{help}</span></span>
+                <span><span className="block text-[13px] font-medium text-ink">{label}</span><span className="block text-[12px] text-warm-500">{help}</span></span>
               </label>
             ))}
             <div className="grid sm:grid-cols-2 gap-3 pt-2">
@@ -319,8 +319,8 @@ export default function OrgPage() {
               <Field label="Delete inactive projects after (days)" hint="Plans and uploaded schedules unchanged this long are deleted. 0 = keep until deleted.">{p => <input {...p} type="number" min={0} max={3650} className={inputClass} value={settings.projectRetentionDays} onChange={e => setSettings({ ...settings, projectRetentionDays: Number(e.target.value) })} />}</Field>
             </div>
             <fieldset className="pt-2">
-              <legend className="text-[13.5px] font-medium text-navy-950">Quality check thresholds (DCMA 14-point)</legend>
-              <p className="text-[12.5px] text-warm-500 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
+              <legend className="text-[13px] font-medium text-ink">Quality check thresholds (DCMA 14-point)</legend>
+              <p className="text-[12px] text-warm-500 mb-2">Defaults are the published DCMA values (5%, 90% FS, 44 days, 0.95). Tighten or relax them to match your company or owner standard; every quality report states the threshold it used.</p>
               <div className="grid sm:grid-cols-3 gap-3">
                 <Field label="Max share of offenders (%)" hint="Logic, lags, hard constraints, high float, high duration, missed tasks. 1–25.">{p => <input {...p} type="number" min={1} max={25} className={inputClass} value={settings.quality.maxPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, maxPct: Number(e.target.value) } })} />}</Field>
                 <Field label="Min finish-to-start links (%)" hint="Relationship types. 50–100.">{p => <input {...p} type="number" min={50} max={100} className={inputClass} value={settings.quality.minFsPct} onChange={e => setSettings({ ...settings, quality: { ...settings.quality, minFsPct: Number(e.target.value) } })} />}</Field>
@@ -330,14 +330,14 @@ export default function OrgPage() {
               </div>
             </fieldset>
             <fieldset className="pt-2">
-              <legend className="text-[13.5px] font-medium text-navy-950">Default standards framework</legend>
-              <p className="text-[12.5px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
+              <legend className="text-[13px] font-medium text-ink">Default standards framework</legend>
+              <p className="text-[12px] text-warm-500 mb-2">Which framework the Standards view on the Quality page runs first. Anyone can still pick another framework for a single run.</p>
               <div className="space-y-1.5">
                 {STANDARD_FRAMEWORK_OPTIONS.map(([fw, label]) => {
                   const current = settings.standards?.defaultFrameworks ?? ['RUNF9_COMPOSITE']
                   const on = current.includes(fw)
                   return (
-                    <label key={fw} className="flex items-center gap-2.5 text-[13px] text-navy-950 cursor-pointer">
+                    <label key={fw} className="flex items-center gap-2.5 text-[13px] text-ink cursor-pointer">
                       <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={on}
                         onChange={e => {
                           const next = e.target.checked ? [...current.filter(x => x !== fw), fw] : current.filter(x => x !== fw)
@@ -375,13 +375,13 @@ export default function OrgPage() {
                 <Field label="Client secret" hint={data.sso?.hasSecret ? 'A secret is saved. Leave blank to keep it.' : 'Stored encrypted; never shown again.'}>{p => <input {...p} type="password" autoComplete="off" className={inputClass} value={sso.clientSecret} onChange={e => setSso({ ...sso, clientSecret: e.target.value })} />}</Field>
                 <Field label="Email domains" hint="Comma-separated, e.g. acme.com, acme.co.uk">{p => <input {...p} className={inputClass} value={sso.domains} onChange={e => setSso({ ...sso, domains: e.target.value })} />}</Field>
                 <Field label="Role for new members">{p => <select {...p} className={inputClass} value={sso.defaultRole} onChange={e => setSso({ ...sso, defaultRole: e.target.value })}>{data.roles.filter(r => r.id !== 'owner').map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select>}</Field>
-                <div className="text-[12px] text-warm-600 self-end">Redirect URI to register with your provider:<br /><code className="text-navy-950 break-all">{typeof window !== 'undefined' ? `${window.location.origin}/api/auth/sso/callback` : ''}</code></div>
+                <div className="text-[12px] text-warm-600 self-end">Redirect URI to register with your provider:<br /><code className="text-ink break-all">{typeof window !== 'undefined' ? `${window.location.origin}/api/auth/sso/callback` : ''}</code></div>
               </div>
               {(data.sso?.verification || ssoHelp) && (
-                <p className="text-[12.5px] text-warm-600">Domain ownership: add a DNS TXT record at <code className="text-navy-950">{ssoHelp?.hosts.join(', ') || data.sso?.verification?.host}</code> with the value <code className="text-navy-950 break-all">{ssoHelp?.value || data.sso?.verification?.value}</code>.</p>
+                <p className="text-[12px] text-warm-600">Domain ownership: add a DNS TXT record at <code className="text-ink">{ssoHelp?.hosts.join(', ') || data.sso?.verification?.host}</code> with the value <code className="text-ink break-all">{ssoHelp?.value || data.sso?.verification?.value}</code>.</p>
               )}
-              <label className="flex items-start gap-3"><input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={sso.enabled} onChange={e => setSso({ ...sso, enabled: e.target.checked })} /><span className="text-[13.5px] text-navy-950 font-medium">Turn on single sign-on</span></label>
-              <label className="flex items-start gap-3"><input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={sso.enforce} onChange={e => setSso({ ...sso, enforce: e.target.checked })} /><span><span className="block text-[13.5px] text-navy-950 font-medium">Require single sign-on</span><span className="block text-[12.5px] text-warm-600">Members can no longer use a password. Owners keep password sign-in as an emergency account.</span></span></label>
+              <label className="flex items-start gap-3"><input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={sso.enabled} onChange={e => setSso({ ...sso, enabled: e.target.checked })} /><span className="text-[13px] text-ink font-medium">Turn on single sign-on</span></label>
+              <label className="flex items-start gap-3"><input type="checkbox" className="mt-1 w-4 h-4 accent-accent-500" checked={sso.enforce} onChange={e => setSso({ ...sso, enforce: e.target.checked })} /><span><span className="block text-[13px] text-ink font-medium">Require single sign-on</span><span className="block text-[12px] text-warm-600">Members can no longer use a password. Owners keep password sign-in as an emergency account.</span></span></label>
               <Button type="submit" disabled={busy === 'sso'}>{busy === 'sso' ? 'Checking provider…' : 'Save single sign-on'}</Button>
             </form>
           )}
@@ -414,7 +414,7 @@ export default function OrgPage() {
                 else setVerify(d)
               } catch { setVerifyErr('The check could not run (network error). This says nothing about the records.') } finally { setBusy(null) }
             }}>{busy === 'verify' ? 'Verifying…' : 'Verify integrity'}</Button>
-            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-lg text-[13px] border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
+            <a href={AUDIT_CSV[actionFilter] ?? AUDIT_CSV['']} className="px-3.5 py-2 rounded-lg text-[13px] border border-warm-300 bg-white text-ink hover:bg-warm-100 font-medium"><Download size={13} className="inline mr-1" aria-hidden="true" />Download CSV</a>
           </div>
           {verifyErr && <div className="mb-3"><Alert tone="warning">{verifyErr}</Alert></div>}
           {verify && (
@@ -425,7 +425,7 @@ export default function OrgPage() {
           )}
           <p className="sm:hidden text-[12px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
           <div tabIndex={0} role="region" aria-label="Audit log, newest first" className="relative overflow-x-auto">
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[12px]">
               <caption className="sr-only">Audit log, newest first</caption>
               <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">When</th><th scope="col" className="py-2 pr-3 font-semibold">Who</th><th scope="col" className="py-2 pr-3 font-semibold">What</th><th scope="col" className="py-2 font-semibold">Details</th>
@@ -435,7 +435,7 @@ export default function OrgPage() {
                   <tr key={e.seq} className="border-b border-warm-100 align-top">
                     <td className="py-2 pr-3 whitespace-nowrap text-warm-600">{fmtDateTime(e.at)}</td>
                     <td className="py-2 pr-3 text-warm-700">{e.actorEmail || 'system'}{e.ip && <div className="text-[12px] text-warm-400">{e.ip}</div>}</td>
-                    <td className="py-2 pr-3 text-navy-950 font-medium">{actionLabel(e.action)}</td>
+                    <td className="py-2 pr-3 text-ink font-medium">{actionLabel(e.action)}</td>
                     <td className="py-2 text-warm-600 break-words">{summarize(e)}</td>
                   </tr>
                 ))}
@@ -455,12 +455,12 @@ export default function OrgPage() {
 function DataLocationSection({ loc }: { loc: DataLocation }) {
   return (
     <Section id="data-location" title="Where your data lives" description="Schedules, analysis and the document-search index are stored in this deployment's database. Original files can be kept in your own cloud storage (below).">
-      <dl className="grid gap-4 md:grid-cols-3 text-[13.5px]">
-        <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-navy-950">{loc.label}</dd></div>
+      <dl className="grid gap-4 md:grid-cols-3 text-[13px]">
+        <div><dt className="text-warm-600">This deployment</dt><dd className="mt-1 font-semibold text-ink">{loc.label}</dd></div>
         <div><dt className="text-warm-600">Database</dt><dd className="mt-1 text-warm-700">{loc.database}</dd></div>
         <div><dt className="text-warm-600">Document search</dt><dd className="mt-1 text-warm-700">{loc.documentSearch}</dd></div>
       </dl>
-      <p className="mt-4 border-t border-warm-200 pt-3 text-[12.5px] text-warm-600 max-w-3xl">
+      <p className="mt-4 border-t border-warm-200 pt-3 text-[12px] text-warm-600 max-w-3xl">
         Need the database itself in a client&apos;s AWS, Azure or Google Cloud account? <a href="/deploy" className="text-accent-600 underline">Run RunF9 in that cloud</a> from one template: the app, database, documents and search index all stay there, with the same company sign-in (SSO).
       </p>
     </Section>

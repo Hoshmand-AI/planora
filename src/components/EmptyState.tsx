@@ -29,7 +29,7 @@ export function EmptyState({ title, children, action, secondary, mood = 'idle', 
       <div className={`mood-tile border ${inline ? 'rounded-2xl px-4 pt-3 pb-2 mb-3' : 'rounded-[14px] px-6 pt-5 pb-3 mb-5'}`} data-mood={mood}>
         <Robot mood={mood} size={inline ? 56 : 84} />
       </div>
-      <H className={`${inline ? 'text-[15px]' : 'text-[18px]'} font-semibold text-navy-950 tracking-[-0.01em] mb-1.5`}>{title}</H>
+      <H className={`${inline ? 'text-[14px]' : 'text-[18px]'} font-semibold text-ink tracking-[-0.01em] mb-1.5`}>{title}</H>
       {children && <div className="text-[14px] text-warm-600 max-w-[400px] leading-relaxed">{children}</div>}
       {action && <div className={inline ? 'mt-4' : 'mt-5'}><ActionEl a={action} primary /></div>}
       {secondary && <div className="mt-3"><ActionEl a={secondary} /></div>}

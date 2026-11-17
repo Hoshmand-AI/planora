@@ -99,7 +99,7 @@ const TAB_ICON: Record<string, typeof LayoutGrid> = {
 }
 /** One row of the sidebar: an icon and a name; the current one is tinted with a bar on its left edge. */
 const sideItem = (active: boolean, open: boolean) =>
-  `relative flex items-center gap-3 py-2 rounded-lg text-[14px] transition-colors ${open ? 'px-3' : 'justify-center px-0'} ${active ? "bg-accent-100 text-navy-950 font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent-600 before:content-['']" : 'text-warm-700 font-medium hover:bg-warm-100 hover:text-navy-950'}`
+  `relative flex items-center gap-3 py-2 rounded-lg text-[14px] transition-colors ${open ? 'px-3' : 'justify-center px-0'} ${active ? "bg-accent-100 text-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent-600 before:content-['']" : 'text-warm-700 font-medium hover:bg-warm-100 hover:text-ink'}`
 /** The name of the page a path shows, for the top bar. */
 const pageLabel = (pathname: string) => {
   for (const t of PROJECT_TABS) {
@@ -449,7 +449,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-warm-50 flex items-center justify-center px-6">
         {authError ? (
           <div role="alert" className="max-w-sm text-center">
-            <p className="text-[15px] text-navy-950 font-semibold">RunF9 could not load.</p>
+            <p className="text-[14px] text-ink font-semibold">RunF9 could not load.</p>
             <p className="text-[14px] text-warm-600 mt-1">Check your connection and try again.</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-lg text-[13px] font-semibold hover:bg-accent-700">Try again</button>
           </div>
@@ -487,13 +487,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Sidebar (desktop) ─────────────────────────────── */}
-        <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-white text-navy-950 border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
+        <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-white text-ink border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
           <div className={`flex items-center pb-6 flex-shrink-0 ${sidebarOpen ? 'justify-between pl-2.5' : 'flex-col gap-3'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects">
-              <Logo variant="dark" size="text-[21px]" mark={!sidebarOpen} />
+              <Logo variant="dark" size="text-[20px]" mark={!sidebarOpen} />
             </Link>
             <button type="button" onClick={toggleSidebar} aria-expanded={sidebarOpen} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              className="grid place-items-center w-9 h-9 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-navy-950 transition-colors">
+              className="grid place-items-center w-9 h-9 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-ink transition-colors">
               {sidebarOpen ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={18} aria-hidden="true" />}
               <span className="sr-only">{sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}</span>
             </button>
@@ -514,7 +514,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         return (
                           <li key={s.id}>
                             <Link href={`/dashboard/project?schedule=${s.id}`} onClick={() => setSelectedSchedule(s)} aria-current={here ? 'page' : undefined}
-                              className={`block truncate py-1.5 text-[13.5px] transition-colors ${here ? 'text-navy-950 font-semibold' : 'text-warm-600 hover:text-navy-950'}`}>{s.name}</Link>
+                              className={`block truncate py-1.5 text-[13px] transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 hover:text-ink'}`}>{s.name}</Link>
                           </li>
                         )
                       })}
@@ -539,14 +539,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <Icon size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>{t.label}</span>
                         </Link>
                         {/* How many things need action today: beside the link, not inside it, so it is still named "Overview". */}
-                        {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className={`pointer-events-none absolute min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white ${sidebarOpen ? 'right-2.5 top-1/2 -translate-y-1/2' : 'right-1 top-0.5'}`}>{todayCount}</span>}
+                        {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className={`pointer-events-none absolute min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-semibold leading-[18px] text-white ${sidebarOpen ? 'right-2.5 top-1/2 -translate-y-1/2' : 'right-1 top-0.5'}`}>{todayCount}</span>}
                       </div>
                       {here && t.views && sidebarOpen && (
                         <nav aria-label={`${t.label} views`} className="ml-[38px] mb-1 flex flex-col border-l border-warm-200">
                           {t.views.map(v => {
                             const on = pathname.startsWith(v.href)
                             return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'true' : undefined}
-                              className={`-ml-px border-l-2 pl-3 py-1.5 text-[13.5px] transition-colors ${on ? 'border-accent-600 text-navy-950 font-semibold' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{v.label}</Link>
+                              className={`-ml-px border-l-2 pl-3 py-1.5 text-[13px] transition-colors ${on ? 'border-accent-600 text-ink font-semibold' : 'border-transparent text-warm-600 hover:text-ink'}`}>{v.label}</Link>
                           })}
                         </nav>
                       )}
@@ -578,9 +578,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button type="button" onClick={() => setShowSettings(true)}
               className={`flex items-center gap-3 py-2 rounded-lg text-left hover:bg-warm-100 transition-colors ${sidebarOpen ? 'px-2.5' : 'justify-center px-0'}`}>
               <span className="sr-only">Account menu: </span>
-              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-950 text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-950 text-white flex items-center justify-center text-[13px] font-semibold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
               <span className={sidebarOpen ? 'min-w-0' : 'sr-only'}>
-                <span className="block text-[13.5px] font-semibold truncate">{user.name}</span>
+                <span className="block text-[13px] font-semibold truncate">{user.name}</span>
                 {org && <span className="block text-[12px] text-warm-600 truncate">{org.name}</span>}
               </span>
             </button>
@@ -591,9 +591,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ── Top bar (phones) ─────────────────────────────── */}
           {/* Inside a project the project's own header is the app bar, so the page starts one bar higher: the name is the headline and the account is in its menu. */}
           <header className={`md:hidden glass-bar sticky top-0 z-40 h-14 items-center justify-between px-4 border-b border-white/5 ${inProject && selectedSchedule ? 'hidden' : 'flex'}`}>
-            <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[21px]" /></Link>
+            <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[20px]" /></Link>
             <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
-              className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-bold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
+              className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-semibold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
           </header>
 
           {/* ── Top bar (desktop): a thin navy bar that says where you are ── */}
@@ -625,11 +625,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <p className="text-[13px] text-warm-600 max-md:hidden">{selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}</p>
                       {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
                       <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
-                        <Link href="/dashboard" aria-label="All projects" className="md:hidden flex-shrink-0 -ml-2 inline-flex items-center justify-center w-9 h-11 text-navy-950"><ChevronDown size={20} className="rotate-90" aria-hidden="true" /></Link>
-                        <h1 className="page-title min-w-0 max-md:text-[17px] max-md:leading-[1.2] max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
+                        <Link href="/dashboard" aria-label="All projects" className="md:hidden flex-shrink-0 -ml-2 inline-flex items-center justify-center w-9 h-11 text-ink"><ChevronDown size={20} className="rotate-90" aria-hidden="true" /></Link>
+                        <h1 className="page-title min-w-0 max-md:text-[16px] max-md:leading-[1.2] max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
-                          return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
+                          return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
                         })()}
                       </div>
                     </div>
@@ -664,7 +664,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     })()}
                   </div>
                 ) : (
-                  <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-navy-950 font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
+                  <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-ink font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
                 )}
                 {/* Tabs scroll sideways on narrow screens: the right edge fades to show there are more, and the current tab is scrolled into view */}
                 {/* A chevron at the right edge on narrow screens says the strip scrolls; a fade alone was too faint to read as "more". */}
@@ -676,12 +676,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     return (
                       <Fragment key={t.href}>
                       <Link href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
-                        className={`relative whitespace-nowrap px-3 py-3 text-[14px] transition-colors ${here ? 'text-navy-950 font-semibold' : 'text-warm-600 font-medium hover:text-navy-950'}`}>
+                        className={`relative whitespace-nowrap px-3 py-3 text-[14px] transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 font-medium hover:text-ink'}`}>
                         {t.label}
                         <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
                       </Link>
                       {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Overview". */}
-                      {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white">{todayCount}</span>}
+                      {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-semibold leading-[18px] text-white">{todayCount}</span>}
                       </Fragment>
                     )
                   })}
@@ -698,7 +698,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {t.views.map(v => {
                           const on = pathname.startsWith(v.href)
                           return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
-                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-navy-950 shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-navy-950'}`}>{v.label}</Link>
+                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-ink shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-ink'}`}>{v.label}</Link>
                         })}
                       </nav>
                     </div>
@@ -719,9 +719,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <button type="button" disabled={resend.busy} onClick={resendConfirmation} className="font-medium text-accent-600 hover:underline disabled:opacity-60 disabled:cursor-wait">
                     {resend.busy ? 'Sending…' : 'Resend the link'}
                   </button>
-                  <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-navy-950">Why?</button>
+                  <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-ink">Why?</button>
                   <span role="status" aria-live="polite" className={resend.ok ? 'text-warm-700' : 'text-status-at-risk'}>{resend.note}</span>
-                  <span id="email-why" hidden={!emailWhy} className="basis-full text-[12.5px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
+                  <span id="email-why" hidden={!emailWhy} className="basis-full text-[12px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
                 </div>
               </div>
             )}
@@ -757,7 +757,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {uploadDialog.mounted && (
           <Dialog closing={uploadDialog.closing} labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <h2 id="upload-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Upload a schedule</h2>
+                <h2 id="upload-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Upload a schedule</h2>
                 <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
 
@@ -772,7 +772,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {uploadSummary ? (
                 <div className="space-y-3">
                   <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 text-[13px] text-warm-600 space-y-1">
-                    <div><span className="font-semibold text-navy-950">{uploadSummary.activitiesImported.toLocaleString()}</span> activities, <span className="font-semibold text-navy-950">{uploadSummary.relationshipsImported.toLocaleString()}</span> relationships, {uploadSummary.calendarsImported} calendars imported.</div>
+                    <div><span className="font-semibold text-ink">{uploadSummary.activitiesImported.toLocaleString()}</span> activities, <span className="font-semibold text-ink">{uploadSummary.relationshipsImported.toLocaleString()}</span> relationships, {uploadSummary.calendarsImported} calendars imported.</div>
                     <div>{uploadSummary.classifiedPct}% of activities mapped to standard work categories.</div>
                     {uploadSummary.warnings.slice(0, 4).map((w, i) => <div key={i} className="text-warm-500">· {w}</div>)}
                   </div>
@@ -790,7 +790,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {uploadSummary.dataQuestions > 0 && (
                       <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-lg text-[13px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     )}
-                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-lg text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-navy-950 font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
+                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-lg text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-ink font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
                   </div>
                 </div>
               ) : (
@@ -832,7 +832,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="mb-5">
                   <label htmlFor="upload-version" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Version Label</label>
                   <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
-                    className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13.5px] text-warm-700" />
+                    className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13px] text-warm-700" />
                 </div>
                 <button type="submit" disabled={uploading}
                   className="w-full bg-accent-600 text-white py-3 rounded-full text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
@@ -848,7 +848,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Dialog closing={listDialog.closing} labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 id="switch-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Switch project</h2>
+                <h2 id="switch-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Switch project</h2>
                 <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
@@ -865,7 +865,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           : 'border-warm-200 hover:border-warm-300 bg-warm-100'
                       }`}
                     >
-                      <div className="text-[14px] font-semibold text-navy-950">{s.name}</div>
+                      <div className="text-[14px] font-semibold text-ink">{s.name}</div>
                       <div className="text-[12px] text-warm-400 mt-0.5">
                         {s.version} · {s.activityCount.toLocaleString()} activities · {sourceLabel(s.sourceType)}
                       </div>
@@ -876,7 +876,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {can('schedule.write') && (
               <button
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
-                className="w-full mt-4 border border-warm-300 text-navy-950 py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors"
+                className="w-full mt-4 border border-warm-300 text-ink py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors"
               >
                 + Upload a new project
               </button>
@@ -889,29 +889,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Dialog closing={settingsDialog.closing} labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-5">
-                <h2 id="account-dialog-h" className="text-[20px] font-bold tracking-[-0.02em] text-navy-950">Account</h2>
+                <h2 id="account-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Account</h2>
                 <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
               </div>
               <div className="space-y-3">
                 <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
                   <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Profile</div>
-                  <div className="text-[15px] font-semibold text-navy-950">{user.name}</div>
+                  <div className="text-[14px] font-semibold text-ink">{user.name}</div>
                   <div className="text-[13px] text-warm-500">{user.email}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {user.role && <span className="inline-block text-[12px] font-bold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
+                    {user.role && <span className="inline-block text-[12px] font-semibold uppercase tracking-wider text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md border-l-2 border-accent-500">{user.role}</span>}
                     {org && <span className="inline-block text-[12px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <UserCog size={14} aria-hidden="true" /> Account &amp; security
                   </Link>
-                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <Building2 size={14} aria-hidden="true" /> Organization
                   </Link>
                 </div>
                 {platformAdmin && (
-                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-navy-950 py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
+                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
                     <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
                   </Link>
                 )}
@@ -937,7 +937,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-center gap-2 border border-warm-300 text-warm-600 py-2.5 rounded-md text-[13.5px] font-medium hover:bg-warm-100 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 border border-warm-300 text-warm-600 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors"
                 >
                   <LogOut size={14} /> Sign Out
                 </button>

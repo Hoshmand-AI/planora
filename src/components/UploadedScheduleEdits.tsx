@@ -135,7 +135,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
     <div className="space-y-4 text-[13px] text-warm-700">
       <p className="text-warm-600">Edits change RunF9&apos;s copy of this schedule only; the uploaded file is kept unchanged. Each edit is recalculated with the full network, recorded with its reason in the audit log, and included in exports and reports.</p>
       {applied.length === 0 ? <p>No edits yet.</p> : (
-        <div className="overflow-x-auto"><table className="w-full text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
+        <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">{applied.length} edit{applied.length === 1 ? '' : 's'} made in RunF9 · forecast finish {fmtDate(data.forecastFinish)}</caption>
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
@@ -152,7 +152,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
         <form className="border border-warm-200 rounded-lg p-3 space-y-2 bg-warm-50" onSubmit={e => { e.preventDefault(); submit() }}>
           <datalist id={listId}>{data.activities.map(x => <option key={x.id} value={x.code}>{x.name}</option>)}</datalist>
           <fieldset className="flex flex-wrap gap-3">
-            <legend className="font-semibold text-navy-950 mb-1">New edit</legend>
+            <legend className="font-semibold text-ink mb-1">New edit</legend>
             {([['duration', 'Remaining duration'], ['link_set', 'Add / change relationship'], ['link_remove', 'Remove relationship'], ['constraint', 'Set / clear constraint']] as const).map(([k, l]) => (
               <label key={k}><input type="radio" name={`kind-${scheduleId}`} checked={kind === k} onChange={() => setKind(k)} /> {l}</label>
             ))}
@@ -223,7 +223,7 @@ export function RecoveryPanel({ scheduleId, canEdit, onApplied, refreshKey, basi
       {data.options.length > 0 && (
         <ul className="space-y-3">{data.options.map(o => (
           <li key={o.id} className="border border-warm-200 rounded-lg p-3 bg-warm-50">
-            <p className="font-semibold text-navy-950">{o.title}</p>
+            <p className="font-semibold text-ink">{o.title}</p>
             <p className="mt-0.5">{data.milestone ? data.milestone.code : 'Finish'} {fmtDate(o.newFinish)} ({o.daysSaved > 0 ? `${o.daysSaved} calendar days earlier` : o.daysSaved < 0 ? `${-o.daysSaved} days later` : 'no change'}){o.minFloatBefore != null && o.minFloatAfter != null ? ` · lowest float ${o.minFloatBefore} → ${o.minFloatAfter} work days` : ''}{o.meetsDate != null ? (o.meetsDate ? ' · meets the required date' : ' · still after the required date') : ''}.</p>
             <p className="text-warm-600 mt-1">{o.description} <span className="text-warm-700">Trade-off:</span> {o.tradeoff}</p>
             {canEdit && data.editable && (
@@ -267,9 +267,9 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
   const cell = `${input} w-16`
   return (
     <div className="space-y-3 text-[13px] text-warm-700 border-t border-warm-200 pt-3">
-      <p className="font-semibold text-navy-950">Your ranges and risk events</p>
+      <p className="font-semibold text-ink">Your ranges and risk events</p>
       <p className="text-warm-600">Ranges are work days of remaining work (optimistic / most likely / pessimistic) and replace the rule-based range for that activity. By name, {inputs.defaults.procurement} fabrication / delivery / procurement activities use a supplier range and {inputs.defaults.cure} cure activities are held at fixed duration unless you give them a range.</p>
-      <div className="overflow-x-auto"><table className="text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Three-point ranges</caption>
+      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Three-point ranges</caption>
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Optimistic</th><th className={th}>Most likely</th><th className={th}>Pessimistic</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{ranges.map((r, i) => (
           <tr key={i}>
@@ -278,7 +278,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
             {canEdit && <td className={td}><button type="button" onClick={() => setRanges(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
       {canEdit && <button type="button" onClick={() => setRanges(rs => [...rs, { activityId: '', optimistic: '', mostLikely: '', pessimistic: '' }])} className={secondary}>Add range</button>}
-      <div className="overflow-x-auto"><table className="text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Risk events</caption>
+      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Risk events</caption>
         <thead><tr><th className={th}>Event</th><th className={th}>Probability %</th><th className={th}>Impact (work days)</th><th className={th}>Affects activity or milestone</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{events.map((r, i) => (
           <tr key={i}>
@@ -289,7 +289,7 @@ export function RiskInputsPanel({ scheduleId, inputs, canEdit, onSaved }: { sche
             {canEdit && <td className={td}><button type="button" onClick={() => setEvents(rs => rs.filter((_, j) => j !== i))} className="text-accent-600 hover:underline">Remove</button></td>}
           </tr>))}</tbody></table></div>
       {canEdit && <button type="button" onClick={() => setEvents(rs => [...rs, { activityId: '', name: '', probability: '', impactDays: '' }])} className={secondary}>Add risk event</button>}
-      <div className="overflow-x-auto"><table className="text-[12.5px]"><caption className="text-left font-semibold text-navy-950 mb-1">Committed delivery dates</caption>
+      <div className="overflow-x-auto"><table className="text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Committed delivery dates</caption>
         <thead><tr><th className={th}>Activity ID</th><th className={th}>Committed date</th><th className={th}>Note (e.g. supplier letter)</th>{canEdit && <th className={th}><span className="sr-only">Remove</span></th>}</tr></thead>
         <tbody>{commitments.map((r, i) => (
           <tr key={i}>

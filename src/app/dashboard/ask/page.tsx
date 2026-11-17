@@ -116,15 +116,15 @@ export default function AskPage() {
         {messages.length === 0 && (
           <div className="max-w-[560px] mx-auto">
             <div className="mb-6">
-              <h2 className="font-display text-[22px] text-navy-950 mb-1">Ask about your schedule</h2>
-              <p className="text-[13.5px] text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
+              <h2 className="font-display text-[20px] text-ink mb-1">Ask about your schedule</h2>
+              <p className="text-[13px] text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
               {aiOff && <p className="text-[13px] text-warm-600 mt-2">AI is off for this organization, so the reply is a readout, not a written answer.</p>}
             </div>
             <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
               {SUGGESTED.map(q => (
                 <button key={q} onClick={() => handleSend(q)} disabled={!canAsk || loading}
-                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-[13.5px] text-warm-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                  className="w-full text-left bg-warm-100 border border-warm-200 hover:border-warm-300 rounded-md px-4 py-2.5 text-[13px] text-warm-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
                   {q}
                 </button>
               ))}
@@ -159,7 +159,7 @@ export default function AskPage() {
       </div>
 
       {/* Input bar */}
-      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-warm-700">
+      <div className="bg-warm-50 border-t border-warm-200 px-5 pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-warm-700">
         <label htmlFor={docsId} className="flex items-center gap-1.5">
           <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
           Use project documents

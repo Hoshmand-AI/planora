@@ -119,7 +119,7 @@ export default function ProjectPage() {
           {m ? <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
             : <CounterTile mood="idle" value="—" label="complete" sub="Progress (by duration)" />}
           <CounterTile mood={varianceTone}
-            value={!m ? '—' : varianceDays == null ? <span className="text-[17px] font-semibold text-warm-600">{isBaselineUpload ? 'This is the baseline' : 'No baseline'}</span> : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
+            value={!m ? '—' : varianceDays == null ? <span className="text-[16px] font-semibold text-warm-600">{isBaselineUpload ? 'This is the baseline' : 'No baseline'}</span> : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Variance vs baseline"
             sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? (isBaselineUpload ? 'measured from the next update' : 'mark an upload as Baseline to measure it') : baselineHeader ? `calendar days · baseline: ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
@@ -133,7 +133,7 @@ export default function ProjectPage() {
         </div>
         {criticalPath?.detail && (
           <p role="note" className="text-[13px] text-warm-700 bg-white/70 border border-warm-200 rounded-xl px-4 py-2.5">
-            <span className="font-semibold text-navy-950">Critical path: </span>{fmtDates(criticalPath.detail)}
+            <span className="font-semibold text-ink">Critical path: </span>{fmtDates(criticalPath.detail)}
           </p>
         )}
         {hasWhy && (
@@ -147,7 +147,7 @@ export default function ProjectPage() {
                 <p className="text-warm-600">RunF9&apos;s recalculated forecast finish is {fmtDate(forecastFinish)}{twoFinishes ? ' (logic-driven)' : ''}; the file&apos;s header says {fmtDate(reportedFinish)}.</p>
               )}
               {(baselineHeader || varianceBasis) && (
-                <p className="text-[12.5px] text-warm-600 pt-1"><span className="font-medium text-navy-950">How variance is measured: </span>{varianceNote(baselineHeader, varianceBasis)}</p>
+                <p className="text-[12px] text-warm-600 pt-1"><span className="font-medium text-ink">How variance is measured: </span>{varianceNote(baselineHeader, varianceBasis)}</p>
               )}
             </div>
           </Disclosure>
@@ -165,12 +165,12 @@ export default function ProjectPage() {
           <h2 className="sr-only">Next milestones</h2>
           <div className="flex flex-wrap gap-x-5 gap-y-1">
             {brief.facts.filter(f => /^(type|duration)$/i.test(f.label)).map(f => (
-              <div key={f.label} className="text-[12.5px]"><span className="text-warm-600">{f.label}:</span> <span className="text-navy-950 font-medium">{f.value}</span></div>
+              <div key={f.label} className="text-[12px]"><span className="text-warm-600">{f.label}:</span> <span className="text-ink font-medium">{f.value}</span></div>
             ))}
           </div>
           {brief.nextMilestones.length > 0 && (
-            <div className="mt-2 text-[12.5px] text-warm-600">
-              <span className="font-semibold text-navy-950">Next milestones: </span>
+            <div className="mt-2 text-[12px] text-warm-600">
+              <span className="font-semibold text-ink">Next milestones: </span>
               {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.basis === 'logic' ? <span className="text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}> (logic-driven; {ms.scheduled} as scheduled)</span> : null}{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
             </div>
           )}

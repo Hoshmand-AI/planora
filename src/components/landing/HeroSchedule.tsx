@@ -71,7 +71,7 @@ export default function HeroSchedule() {
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 mb-5">
             <div>
               <div className="text-[13.5px] text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
-              <div className="text-[18px] font-semibold text-navy-950 tracking-[-0.01em]">Schedule calculated by RunF9</div>
+              <div className="text-[18px] font-semibold text-ink tracking-[-0.01em]">Schedule calculated by RunF9</div>
             </div>
             <div className="text-[13px] text-warm-700 flex items-center gap-4" aria-hidden="true">
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-accent-600 align-middle" /> critical</span>
@@ -97,7 +97,7 @@ export default function HeroSchedule() {
                       style={{
                         left: `${(a.es / SPAN) * 100}%`,
                         width: shown ? `${(a.dur / SPAN) * 100}%` : '0%',
-                        background: lit ? '#2563eb' : '#9BA8AB',
+                        background: lit ? '#2B63C1' : '#A2A7AC',
                         transition: shown ? `width 700ms ${ease} ${i * 110}ms, background-color 500ms ease ${a.crit ? i * 70 : 0}ms` : 'none',
                       }}
                     />
@@ -106,7 +106,7 @@ export default function HeroSchedule() {
               )
             })}
             <div className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3 pt-0.5">
-              <div className="text-[13px] md:text-[14px] font-semibold text-navy-950">Substantial completion</div>
+              <div className="text-[13px] md:text-[14px] font-semibold text-ink">Substantial completion</div>
               <div className="relative h-[18px]">
                 <div
                   className="absolute top-1/2 w-3.5 h-3.5 bg-navy-950"
@@ -139,7 +139,7 @@ export default function HeroSchedule() {
             <span
               aria-hidden="true"
               className="flex-shrink-0 flex items-center justify-center w-[58px] h-[58px] rounded-[15px] bg-navy-900 border-2 border-accent-400 text-white font-bold text-[20px] tracking-tight transition-transform duration-150"
-              style={{ transform: pressed ? 'translateY(4px)' : 'none', boxShadow: pressed ? '0 1px 0 #06141B' : '0 5px 0 #06141B, 0 18px 30px -10px rgba(59,130,246,0.6)' }}
+              style={{ transform: pressed ? 'translateY(4px)' : 'none', boxShadow: pressed ? '0 1px 0 #1D2125' : '0 5px 0 #1D2125, 0 18px 30px -10px rgba(59,130,246,0.6)' }}
             >F9</span>
             <span className="text-[14.5px] text-navy-200 group-hover:text-white transition-colors leading-snug">Press F9 to recalculate.<br />Arithmetic, not AI.</span>
           </button>

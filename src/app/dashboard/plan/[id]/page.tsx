@@ -283,14 +283,14 @@ export default function PlanPage() {
   // One obvious next step; everything else is quieter.
   const canPublish = !!g && can('plan.publish')
   const primary: 'generate' | 'publish' | 'export' | null = !g ? (can('plan.write') ? 'generate' : null) : canPublish && !plan.scheduleId ? 'publish' : 'export'
-  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-navy-950 hover:bg-warm-200/70 disabled:opacity-50'
+  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-warm-200/70 disabled:opacity-50'
  const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold'
 
   return (
     <div className="px-4 md:px-6 pb-8">
       {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
       <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
-        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-navy-950"><ArrowLeft size={12} aria-hidden /> Projects</Link>
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-ink"><ArrowLeft size={12} aria-hidden /> Projects</Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
           <h1 className="page-title min-w-0 md:truncate">{plan.name}</h1>
           <div className="flex flex-wrap items-center gap-1 flex-shrink-0">
@@ -308,20 +308,20 @@ export default function PlanPage() {
         </div>
         <div data-mood={status.mood} className="mood-tile mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
-          <div className="flex-1 min-w-[180px] text-[14px] font-medium text-navy-950 leading-snug py-1">
+          <div className="flex-1 min-w-[180px] text-[14px] font-medium text-ink leading-snug py-1">
             {status.onClick
               ? <button onClick={status.onClick} className="text-left hover:underline underline-offset-2 decoration-warm-400">{status.text} <span aria-hidden className="text-warm-500">→</span></button>
               : <span role="status">{status.text}</span>}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            {g?.cpm && <div className="text-[12.5px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-navy-950 tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
+            {g?.cpm && <div className="text-[12px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
             <MoreNumbers rows={numbers} />
           </div>
         </div>
         <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/60 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-navy-950 shadow-[0_1px_3px_rgba(6,20,27,0.12)]' : 'text-warm-600 hover:text-navy-950'}`}>
+              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_3px_rgba(6,20,27,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
               {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
@@ -350,14 +350,14 @@ export default function PlanPage() {
 
       {g && tab !== 'interview' && tab !== 'audit' && ad.ask.length > 0 && !(lateDays <= 0 && !ad.enoughToBuild && ad.remainingThatMatter > 0) && (
         <p className="text-[13px] text-warm-600 mb-4">
-          {ad.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-navy-950">{ad.remainingThatMatter} open question{ad.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}{' '}
+          {ad.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-ink">{ad.remainingThatMatter} open question{ad.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}{' '}
           <button onClick={() => goTab('interview')} className="font-medium text-accent-600 hover:underline">Answer remaining questions</button>
         </p>
       )}
 
       {tab === 'interview' && (<>
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
-          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-navy-950">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
+          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-ink">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
         )}
         <DocumentPrefill planId={id} canWrite={can('plan.write')} onSave={saveAnswers} />
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
@@ -366,7 +366,7 @@ export default function PlanPage() {
       {tab === 'schedule' && g && <ScheduleTab plan={plan} textEdit={can('plan.write') ? (<>
         <PlainEnglishEdit id={id} examples="For example: “extend Spread Footings by 5 days”, “start A1070 3 days after A1060 starts”, “add &quot;Owner move-in&quot; (10 days) after A1300”, “rename A1050 to &quot;Roof membrane&quot;”."
           preview={previewText} apply={applyText} undo={undoLast} />
-        {view.undo && <p className="text-[12.5px] text-warm-600 mt-2">Last change: {view.undo.summary} ({view.undo.by}, {fmtDateTime(view.undo.at)}). <button type="button" disabled={!!busy} onClick={() => { void undoLast().then(r => { if ('done' in r && r.done) setNotice(r.done) }) }} className="text-accent-600 underline">Undo it</button></p>}
+        {view.undo && <p className="text-[12px] text-warm-600 mt-2">Last change: {view.undo.summary} ({view.undo.by}, {fmtDateTime(view.undo.at)}). <button type="button" disabled={!!busy} onClick={() => { void undoLast().then(r => { if ('done' in r && r.done) setNotice(r.done) }) }} className="text-accent-600 underline">Undo it</button></p>}
       </>) : null} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
@@ -423,7 +423,7 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
   const [open, setOpen] = useState(false)
   const item = (format: string, label: string, sub: string) => (
     <a key={format} href={`/api/plans/${id}/export?format=${format}`} onClick={() => setOpen(false)} className="block px-3 py-2 hover:bg-warm-100">
-      <div className="text-navy-950">{label}</div><div className="text-[12px] text-warm-400">{sub}</div>
+      <div className="text-ink">{label}</div><div className="text-[12px] text-warm-400">{sub}</div>
     </a>
   )
   const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
@@ -431,7 +431,7 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
         ? 'pressable flex items-center gap-1.5 rounded-full bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 text-[13px] font-semibold'
-        : 'pressable flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-navy-950 hover:bg-warm-200/70'}>
+        : 'pressable flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-warm-200/70'}>
         <Download size={13} aria-hidden /> Export <ChevronDown size={12} aria-hidden />
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
@@ -483,8 +483,8 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
       <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-5 rounded-2xl bg-white/70 border border-warm-200 px-5 py-4">
         {[['Start', fmtDate(g.projectStart)], ['Finish', fmtDate(g.cpm?.projectFinish)], ['Activities', `${g.activities.length} (${criticalCount} critical)`], ['Your overrides', String(overrides)]].map(([k, v]) => (
           <div key={k}>
-            <dt className="text-[12.5px] text-warm-500">{k}</dt>
-            <dd className="text-[17px] font-semibold text-navy-950 tabular-nums mt-0.5">{v}</dd>
+            <dt className="text-[12px] text-warm-500">{k}</dt>
+            <dd className="text-[16px] font-semibold text-ink tabular-nums mt-0.5">{v}</dd>
           </div>
         ))}
       </dl>
@@ -492,14 +492,14 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
       {focusCodes && (
         <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
           <span className="flex-1">Showing the {focusCodes.length} activities flagged by the quality check. Open one to see why it is there and override it.</span>
-          <button onClick={onClearFocus} className="text-[12.5px] font-medium text-navy-950 underline">Show all</button>
+          <button onClick={onClearFocus} className="text-[12px] font-medium text-ink underline">Show all</button>
         </div>
       )}
       {(g.cpm?.warnings?.length ?? 0) > 0 && <Banner kind="warn">{g.cpm!.warnings.slice(0, 3).join(' · ')}</Banner>}
       {(g.notes?.length ?? 0) > 0 && (
         <div className="mb-3">
           <Disclosure title="Notes about how this schedule was built" meta={g.notes!.length}>
-            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12.5px] text-warm-600">{fmtDates(n)}</li>)}</ul>
+            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12px] text-warm-600">{fmtDates(n)}</li>)}</ul>
           </Disclosure>
         </div>
       )}
@@ -517,9 +517,9 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
         {canWrite && <button onClick={() => { if (confirm('Rebuild from the interview and discard all overrides?')) onRegenerateFresh() }} disabled={!!busy} className="text-[12px] text-warm-500 hover:text-status-at-risk">Discard overrides & rebuild</button>}
       </div>
 
-      <p className="text-[12.5px] text-warm-500 mb-2">Open any activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</p>
+      <p className="text-[12px] text-warm-500 mb-2">Open any activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</p>
       <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white/70 border border-warm-200 rounded-2xl overflow-x-auto">
-        <table className="w-full text-[12.5px] min-w-[760px]">
+        <table className="w-full text-[12px] min-w-[760px]">
           <thead>
             <tr className="text-left text-[12px] font-medium text-warm-500 border-b border-warm-200">
               <th className="px-3 py-2.5 w-6"><span className="sr-only">Open</span></th><th className="px-2 py-2.5 font-medium">ID</th><th className="px-2 py-2.5 font-medium">Activity</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Duration in work days (cd = calendar days)" className="no-underline">Days</abbr></th>
@@ -541,7 +541,7 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
       </div>
 
       {(g.removed?.length ?? 0) > 0 && (
-        <div className="mt-4 text-[12.5px] text-warm-500">
+        <div className="mt-4 text-[12px] text-warm-500">
           <div className="font-semibold text-warm-600 mb-1">Removed by scheduler</div>
           {g.removed!.map(r => <div key={r.id}>· {r.name} — {r.override.reason} ({r.override.by})</div>)}
         </div>
@@ -572,10 +572,10 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
           <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label="Duration in work days (0 for a milestone)" className="w-20 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
           <span className="text-[12px] text-warm-500">work days (0 = milestone)</span>
         </div>
-        <select value={after} onChange={e => setAfter(e.target.value)} aria-label="Starts after" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12.5px]">
+        <select value={after} onChange={e => setAfter(e.target.value)} aria-label="Starts after" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
           <option value="">Starts after…</option>{activities.map(opt)}
         </select>
-        <select value={before} onChange={e => setBefore(e.target.value)} aria-label="Must finish before" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12.5px]">
+        <select value={before} onChange={e => setBefore(e.target.value)} aria-label="Must finish before" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
           <option value="">Must finish before… (default: substantial completion)</option>{activities.map(opt)}
         </select>
         <input value={reason} onChange={e => setReason(e.target.value)} aria-label="Reason for adding this activity" placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
@@ -608,12 +608,12 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
       <tr onClick={onToggle} className={`border-b border-warm-200 cursor-pointer hover:bg-warm-50 ${a.placeholder ? 'bg-warm-200/40' : ''}`}>
         <td className="px-3 py-2 text-warm-400">
           {/* The keyboard and screen-reader way to open the row (a click anywhere on the row does the same) */}
-          <button type="button" aria-expanded={open} aria-label={`${a.code} ${a.name}: details`} onClick={e => { e.stopPropagation(); onToggle() }} className="grid place-items-center w-6 h-6 -m-1 rounded text-warm-600 hover:text-navy-950">
+          <button type="button" aria-expanded={open} aria-label={`${a.code} ${a.name}: details`} onClick={e => { e.stopPropagation(); onToggle() }} className="grid place-items-center w-6 h-6 -m-1 rounded text-warm-600 hover:text-ink">
             {open ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
           </button>
         </td>
         <td className="px-2 py-2 font-mono text-[12px] text-warm-500">{a.code}</td>
-        <td className="px-2 py-2 text-navy-950">
+        <td className="px-2 py-2 text-ink">
           <div className="flex items-center gap-1.5">
             {a.placeholder && <Lock size={11} className="text-warm-500 flex-shrink-0" />}
             <span className={tm?.critical ? 'font-semibold' : ''}>{a.name}</span>
@@ -644,7 +644,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                 {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
 
                 <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
-                {preds.length === 0 && <p className="text-[12.5px] text-warm-500">No predecessors (project start).</p>}
+                {preds.length === 0 && <p className="text-[12px] text-warm-500">No predecessors (project start).</p>}
                 {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
                 {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
               </div>
@@ -664,20 +664,20 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
                 )}
                 <div className="flex flex-wrap gap-2 items-center">
                   <Link2 size={13} className="text-warm-400" />
-                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} aria-label={`Successor to add after ${a.code}`} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12.5px]">
+                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} aria-label={`Successor to add after ${a.code}`} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
                     <option value="">Add successor…</option>
                     {[...byId.values()].filter(x => x.id !== a.id).map(x => <option key={x.id} value={x.id}>{x.code} {x.name}</option>)}
                   </select>
-                  <select value={linkType} onChange={e => setLinkType(e.target.value)} aria-label="Link type" className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12.5px]">
+                  <select value={linkType} onChange={e => setLinkType(e.target.value)} aria-label="Link type" className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
                     {['FS', 'SS', 'FF', 'SF'].map(x => <option key={x}>{x}</option>)}
                   </select>
-                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12.5px]" />
+                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]" />
                   <button disabled={!!busy || !reason.trim() || !linkTarget} onClick={async () => { if (await onEdit({ kind: 'add_link', from: a.id, to: linkTarget, type: linkType, lag: Number(linkLag) || 0, reason })) { setReason(''); setLinkTarget('') } }}
           className="bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold">Link</button>
                 </div>
                 {!['ntp', 'substantial_completion', 'final_completion'].includes(a.category) && (
                   <button disabled={!!busy || !reason.trim()} onClick={async () => { if (confirm(`Remove ${a.code}? Its predecessors will be linked to its successors.`)) await onEdit({ kind: 'remove_activity', activityId: a.id, reason }) }}
-                    className="flex items-center gap-1 text-[12.5px] text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
+                    className="flex items-center gap-1 text-[12px] text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
                 )}
                 </>}
                 {a.overrides?.map((o, i) => (
@@ -698,9 +698,9 @@ function LinkRow({ l, other, dir, onEdit, busy, canWrite }: { l: PlanLink; other
     if (reason && reason.trim()) await onEdit({ kind: 'remove_link', linkId: l.id, reason })
   }
   return (
-    <div className="text-[12.5px] text-warm-600 py-1 flex gap-2 items-start">
+    <div className="text-[12px] text-warm-600 py-1 flex gap-2 items-start">
       <span className="font-mono text-[12px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
-      <span className="flex-1"><span className="font-medium text-navy-950">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
+      <span className="flex-1"><span className="font-medium text-ink">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
       {canWrite && <button disabled={!!busy} onClick={remove} title="Remove relationship" aria-label={`Remove the relationship with ${other?.code ?? 'this activity'}`} className="text-warm-600 hover:text-status-at-risk flex-shrink-0"><X size={12} aria-hidden="true" /></button>}
     </div>
   )
@@ -736,9 +736,9 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         <div className="mt-2">
           <Disclosure title="What these numbers mean">
             <ul className="text-[13px] text-warm-600 space-y-1.5">
-              <li><span className="font-medium text-navy-950">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
-              <li><span className="font-medium text-navy-950">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
-              <li><span className="font-medium text-navy-950">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-navy-950">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-navy-950">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
+              <li><span className="font-medium text-ink">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
+              <li><span className="font-medium text-ink">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
+              <li><span className="font-medium text-ink">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-ink">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-ink">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
               <li>{fc.method === 'monte_carlo'
                 ? 'P50 and P80 come from the Monte Carlo simulation below.'
                 : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis below has run. Basis: {ev.forecast.basis}</>}</li>
@@ -749,7 +749,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
 
       {guidance.length > 0 && (
         <section aria-labelledby="decisions-title">
-          <h3 id="decisions-title" className="text-[15px] font-semibold text-navy-950 mb-1">What needs your decision</h3>
+          <h3 id="decisions-title" className="text-[14px] font-semibold text-ink mb-1">What needs your decision</h3>
           <p className="text-[13px] text-warm-500 mb-3">{guidance.filter(g => !g.decision).length} of {guidance.length} open. Fix each one, or accept it with a short reason.</p>
           <div className="space-y-2.5">
             {guidance.map((g, i) => <GuideCard key={g.id} g={g} startOpen={!g.decision && guidance.findIndex(x => !x.decision) === i} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} />)}
@@ -763,7 +763,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
 
       {ev.dateChecks.length > 0 && (
         <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          <h3 className="text-[14px] font-semibold text-navy-950 mb-2">Your dates vs. what the logic can achieve</h3>
+          <h3 className="text-[14px] font-semibold text-ink mb-2">Your dates vs. what the logic can achieve</h3>
           <ul className="space-y-1.5">
             {ev.dateChecks.map((c, i) => (
               <li key={i} className="text-[13px] text-warm-700 flex gap-2">
@@ -777,7 +777,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
 
       {ev.findings.length > 0 && (
         <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          <h3 className="text-[14px] font-semibold text-navy-950 mb-2">Findings</h3>
+          <h3 className="text-[14px] font-semibold text-ink mb-2">Findings</h3>
           <ul className="space-y-1.5">{ev.findings.slice(0, 3).map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
           {ev.findings.length > 3 && (
             <div className="mt-2">
@@ -790,15 +790,15 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       )}
 
       <div>
-        <h3 className="text-[14px] font-semibold text-navy-950 mb-1">The detail behind the grade</h3>
+        <h3 className="text-[14px] font-semibold text-ink mb-1">The detail behind the grade</h3>
         <Disclosure title="DCMA 14-point assessment" meta={`${ev.dcma.passed}/${ev.dcma.applicable} passing`}>
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-[12px]">
             <caption className="sr-only">DCMA 14-point checks with metric, threshold and result</caption>
             <tbody>
               {ev.dcma.checks.map(c => (
                 <tr key={c.id} className="border-b border-warm-200 last:border-0" title={c.explanation}>
                   <td className="py-1.5 pr-2 text-warm-500 tabular-nums">{c.id}</td>
-                  <td className="py-1.5 pr-2 text-navy-950">{c.name}</td>
+                  <td className="py-1.5 pr-2 text-ink">{c.name}</td>
                   <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
                   <td className="py-1.5 pr-2 text-warm-500">{c.threshold}</td>
                   <td className={`py-1.5 font-semibold uppercase text-[12px] ${resultStyle(c.result)}`}>{c.result}</td>
@@ -808,14 +808,14 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           </table>
         </Disclosure>
         <Disclosure title="Against how your projects actually went" meta={ev.benchmark.rows.length ? `${ev.benchmark.rows.length} activities${ev.benchmark.rows.some(r => r.verdict === 'optimistic') ? ` · ${ev.benchmark.rows.filter(r => r.verdict === 'optimistic').length} optimistic` : ''}` : 'no comparables yet'}>
-          <p className="text-[12.5px] text-warm-500 mb-2">{ev.benchmark.basis}</p>
+          <p className="text-[12px] text-warm-500 mb-2">{ev.benchmark.basis}</p>
           {ev.benchmark.rows.length === 0 ? <p className="text-[13px] text-warm-500">No comparable activities yet.</p> : (
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[12px]">
               <thead><tr className="text-left text-[12px] text-warm-500"><th className="py-1 font-medium">Activity</th><th className="py-1 font-medium text-right">Plan</th><th className="py-1 font-medium text-right">Firm P20–P80</th><th className="py-1 pl-2 font-medium">Verdict</th></tr></thead>
               <tbody>
                 {ev.benchmark.rows.map(r => (
                   <tr key={r.activityId} className="border-t border-warm-200">
-                    <td className="py-1.5 text-navy-950">{r.code} {r.name}</td>
+                    <td className="py-1.5 text-ink">{r.code} {r.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
                     <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
                     <td className={`py-1.5 pl-2 text-[12px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
@@ -829,9 +829,9 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           {ev.coverage.length === 0 && <p className="text-[13px] text-warm-500">No permits or long-lead items apply yet — answer facility type and state.</p>}
           <ul className="space-y-1">
             {ev.coverage.map((c, i) => (
-              <li key={i} className="text-[12.5px] flex gap-2">
+              <li key={i} className="text-[12px] flex gap-2">
                 <span className={`font-semibold uppercase text-[12px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
-                <span><span className="text-navy-950">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
+                <span><span className="text-ink">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
               </li>
             ))}
           </ul>
@@ -842,15 +842,15 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       </div>
 
       <section aria-labelledby="review-title" className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-        <h3 id="review-title" className="text-[14px] font-semibold text-navy-950">Expert review {ev.review.status !== 'none' && <span className="font-normal text-warm-500">— {ev.review.status.replace('_', ' ')}</span>}</h3>
-        <p className="text-[12.5px] text-warm-500 mt-0.5 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
+        <h3 id="review-title" className="text-[14px] font-semibold text-ink">Expert review {ev.review.status !== 'none' && <span className="font-normal text-warm-500">— {ev.review.status.replace('_', ' ')}</span>}</h3>
+        <p className="text-[12px] text-warm-500 mt-0.5 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
-            <span className="font-semibold text-navy-950">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[12px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
+            <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[12px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
-        {!canReview ? <p className="text-[12.5px] text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
+        {!canReview ? <p className="text-[12px] text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
           <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]">
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
@@ -882,39 +882,39 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
     <div className={`border rounded-2xl ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-white border-status-attention/40'}`}>
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
         <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
-        <span className="text-[13.5px] font-semibold text-navy-950 flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
+        <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
         {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
         <div className="px-4 md:px-5 pb-4 space-y-2.5">
-          <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">What it means: </span>{g.meaning}</p>
-          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-navy-950">Why it matters: </span>{g.whyItMatters}</p>}
+          <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
+          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && (
             <div>
-              <div className="text-[12.5px] font-semibold text-navy-950">How to fix it</div>
+              <div className="text-[12px] font-semibold text-ink">How to fix it</div>
               <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5 mt-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
             </div>
           )}
           {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Flagged: {check.offenders.slice(0, 12).join(', ')}{check.offenders.length > 12 ? ` and ${check.offenders.length - 12} more` : ''}</p>}
           {g.decision && (
-            <p className="text-[12.5px] text-warm-600 border-l-2 border-status-on-track pl-2">
+            <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">
               {g.decision.decision === 'accept' ? 'Accepted' : 'Marked to fix'} by {g.decision.by} on {fmtDateTime(g.decision.at)}{g.decision.note ? ` — “${g.decision.note}”` : ''}
               {canWrite && <button onClick={() => onDecide(key, null, '')} className="ml-2 underline text-warm-600">Undo</button>}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             {g.actions.map((a, i) => a.kind === 'filter'
-              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-navy-950 hover:bg-warm-100">{a.label}</button>
+              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
               : a.kind === 'recovery'
         ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</button>
                 : a.kind === 'interview'
-                  ? <button key={i} onClick={onInterview} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-navy-950 hover:bg-warm-100">{a.label}</button>
-                  : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-navy-950 hover:bg-warm-100">{a.label}…</button>)}
+                  ? <button key={i} onClick={onInterview} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
+                  : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}…</button>)}
             {!g.decision && !accept && canWrite && (
-              <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-lg border border-dashed border-warm-400 text-[12.5px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
+              <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-lg border border-dashed border-warm-400 text-[12px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
             )}
-            {!g.decision && canWrite && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-navy-950 hover:bg-warm-100">I&apos;ll fix it</button>}
+            {!g.decision && canWrite && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">I&apos;ll fix it</button>}
           </div>
           {accepting && !g.decision && canWrite && (
             <div className="flex flex-col gap-2">
@@ -931,8 +931,8 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div>
-      <dt className="text-[12.5px] text-warm-500">{label}</dt>
-      <dd className="text-[18px] font-semibold text-navy-950 tabular-nums mt-0.5">{value}</dd>
+      <dt className="text-[12px] text-warm-500">{label}</dt>
+      <dd className="text-[18px] font-semibold text-ink tabular-nums mt-0.5">{value}</dd>
       {sub && <dd className="text-[12px] text-warm-500 mt-0.5">{sub}</dd>}
     </div>
   )
@@ -959,14 +959,14 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
   return (
     <section aria-labelledby="sra-title" className="border border-warm-200 rounded-2xl p-5 bg-white/70">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <h3 id="sra-title" className="text-[14px] font-semibold text-navy-950">Schedule risk analysis (Monte Carlo)</h3>
-        {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-navy-950 px-3.5 py-1.5 text-[13px] font-medium">
+        <h3 id="sra-title" className="text-[14px] font-semibold text-ink">Schedule risk analysis (Monte Carlo)</h3>
+        {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-3.5 py-1.5 text-[13px] font-medium">
           {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
         </button>}
       </div>
-      {!r && state !== 'running' && <p className="text-[12.5px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
-      {state === 'locked' && <p role="status" className="text-[12.5px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
-      {state === 'error' && <p role="alert" className="text-[12.5px] text-status-at-risk">The simulation could not run. Try again.</p>}
+      {!r && state !== 'running' && <p className="text-[12px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {state === 'locked' && <p role="status" className="text-[12px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
+      {state === 'error' && <p role="alert" className="text-[12px] text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">
           {r.required && (
@@ -979,13 +979,13 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
             {([['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90], ['Deterministic', r.deterministic]] as const).map(([l, d]) => (
               <div key={l}>
                 <dt className="text-[12px] text-warm-500">{l}</dt>
-                <dd className="text-[15px] font-semibold text-navy-950 tabular-nums">{fmtDate(d)}</dd>
+                <dd className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(d)}</dd>
               </div>
             ))}
           </dl>
-          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12.5px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
+          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
           <div>
-            <div className="text-[12.5px] text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
+            <div className="text-[12px] text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
             <div className="flex items-end gap-0.5 h-24" role="img" aria-label={`Histogram of simulated finish dates from ${fmtDate(r.histogram[0]?.from)} to ${fmtDate(r.histogram[r.histogram.length - 1]?.to)}; median ${fmtDate(r.percentiles.p50)}.`}>
               {r.histogram.map((h, i) => (
                 <div key={i} title={`${fmtDate(h.from)}–${fmtDate(h.to)}: ${h.count} runs`} className={`flex-1 rounded-t ${r.required && h.to <= r.required.date ? 'bg-status-on-track/70' : 'bg-accent-500/70'}`} style={{ height: `${Math.max(2, (h.count / max) * 100)}%` }} />
@@ -996,7 +996,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
           <div>
           {r.sensitivity.length > 0 && (
             <Disclosure title="What drives the risk" meta={`${r.sensitivity.length} activities`}>
-              <table className="w-full text-[12.5px]">
+              <table className="w-full text-[12px]">
                 <caption className="sr-only">Activities whose uncertainty moves the finish date most</caption>
                 <thead><tr className="text-left text-[12px] text-warm-500"><th scope="col" className="py-1 font-medium">Activity</th><th scope="col" className="py-1 font-medium text-right">Sensitivity</th><th scope="col" className="py-1 font-medium text-right">Critical in</th><th scope="col" className="py-1 pl-3 font-medium hidden md:table-cell">Range used</th></tr></thead>
                 <tbody>
@@ -1014,7 +1014,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
             </Disclosure>
           )}
           <Disclosure title="Method and assumptions">
-            <div className="text-[12.5px] text-warm-600">
+            <div className="text-[12px] text-warm-600">
               <p>{r.method}</p>
               <ul className="list-disc ml-5 mt-1 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
             </div>
@@ -1042,13 +1042,13 @@ function AuditTab({ plan, onDelete, fullLog }: { plan: Plan; onDelete?: () => vo
     <div>
       {records ? (
         <>
-          <p className="text-[12.5px] text-warm-500 mb-2">Complete record from the organization audit log ({records.length} entries). Each entry is hash-chained; verify integrity or download the full log under Organization.</p>
+          <p className="text-[12px] text-warm-500 mb-2">Complete record from the organization audit log ({records.length} entries). Each entry is hash-chained; verify integrity or download the full log under Organization.</p>
           <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
             {records.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
             {records.map(e => (
-              <div key={e.seq} className="px-4 py-2.5 text-[12.5px] flex flex-col sm:flex-row gap-1 sm:gap-3">
+              <div key={e.seq} className="px-4 py-2.5 text-[12px] flex flex-col sm:flex-row gap-1 sm:gap-3">
                 <span className="text-warm-500 tabular-nums sm:w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
-                <span className="text-navy-950 sm:w-44 flex-shrink-0 truncate" title={e.ip ? `from ${e.ip}` : undefined}>{e.actorEmail || 'system'}</span>
+                <span className="text-ink sm:w-44 flex-shrink-0 truncate" title={e.ip ? `from ${e.ip}` : undefined}>{e.actorEmail || 'system'}</span>
                 <span className="text-warm-600 min-w-0"><span className="font-medium">{e.action.replace(/^plan\./, '')}</span>{e.detail?.detail ? ` — ${fmtDates(String(e.detail.detail))}` : e.detail?.format ? ` — ${String(e.detail.format)}` : ''}</span>
                 <span className="sm:ml-auto font-mono text-[12px] text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
               </div>
@@ -1059,15 +1059,15 @@ function AuditTab({ plan, onDelete, fullLog }: { plan: Plan; onDelete?: () => vo
         <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
           {plan.audit.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
           {[...plan.audit].reverse().map((e, i) => (
-            <div key={i} className="px-4 py-2.5 text-[12.5px] flex gap-3">
+            <div key={i} className="px-4 py-2.5 text-[12px] flex gap-3">
               <span className="text-warm-500 tabular-nums w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
-              <span className="text-navy-950 w-28 flex-shrink-0 truncate">{e.by}</span>
+              <span className="text-ink w-28 flex-shrink-0 truncate">{e.by}</span>
               <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
             </div>
           ))}
         </div>
       )}
-      {onDelete && <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-[12.5px] text-status-at-risk"><Trash2 size={12} aria-hidden="true" /> Delete plan</button>}
+      {onDelete && <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-[12px] text-status-at-risk"><Trash2 size={12} aria-hidden="true" /> Delete plan</button>}
     </div>
   )
 }

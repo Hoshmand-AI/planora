@@ -119,17 +119,17 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
             {CHOICES.map(c => (
               <label key={c.value} className={`flex items-start gap-2.5 rounded-md border px-3 py-2 cursor-pointer ${choice === c.value ? 'border-navy-900 bg-warm-50' : 'border-warm-300 bg-warm-50'}`}>
                 <input type="radio" name="framework" value={c.value} checked={choice === c.value} onChange={() => setChoice(c.value)} className="mt-1 accent-accent-500" />
-                <span><span className="block text-[13.5px] font-medium text-navy-950">{c.label}</span><span className="block text-[12px] text-warm-600">{c.hint}</span></span>
+                <span><span className="block text-[13px] font-medium text-ink">{c.label}</span><span className="block text-[12px] text-warm-600">{c.hint}</span></span>
               </label>
             ))}
           </div>
         </fieldset>
         {choice === 'multiple' && (
           <fieldset className="mt-3">
-            <legend className="text-[12.5px] font-medium text-navy-950 mb-1">Frameworks to run</legend>
+            <legend className="text-[12px] font-medium text-ink mb-1">Frameworks to run</legend>
             <div className="flex flex-wrap gap-4">
               {SINGLE.map(fw => (
-                <label key={fw} className="flex items-center gap-2 text-[13px] text-navy-950 cursor-pointer">
+                <label key={fw} className="flex items-center gap-2 text-[13px] text-ink cursor-pointer">
                   <input type="checkbox" className="w-4 h-4 accent-accent-500" checked={multi.includes(fw)}
                     onChange={e => setMulti(m => e.target.checked ? [...m.filter(x => x !== fw), fw] : m.filter(x => x !== fw))} />
                   {FRAMEWORK_LABELS[fw]}
@@ -143,7 +143,7 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
      {canRecord && <button type="button" onClick={record} disabled={loading || recording || !frameworks?.length} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Record this assessment</button>}
           <span className="text-[12px] text-warm-600">Recording keeps the results, rules version and thresholds so this assessment can be reproduced later.</span>
         </div>
-        <div aria-live="polite" className="text-[12.5px] mt-2">
+        <div aria-live="polite" className="text-[12px] mt-2">
           {status && <span className="text-status-on-track">{status}</span>}
           {error && <span role="alert" className="text-status-at-risk">{error}</span>}
         </div>
@@ -152,14 +152,14 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
       {viewing && (
         <div role="status" className="bg-status-info-bg border-l-2 border-status-info rounded-md px-4 py-3 text-[13px] text-warm-700 flex flex-wrap items-center gap-2">
           <span>Showing the assessment recorded {fmtDateTime(viewing.createdAt)}{viewing.createdByName ? ` by ${viewing.createdByName}` : ''} (rules version {viewing.rulesVersion}).</span>
-          <button type="button" onClick={() => setViewing(null)} className="underline text-navy-950">Back to the current results</button>
+          <button type="button" onClick={() => setViewing(null)} className="underline text-ink">Back to the current results</button>
         </div>
       )}
 
       {loading && !shown && <div className="text-[14px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Running rules…</div>}
       {shown && (
         <>
-          <p role="note" className="text-[12.5px] text-warm-700 bg-warm-100 border border-warm-200 rounded-md px-4 py-3">
+          <p role="note" className="text-[12px] text-warm-700 bg-warm-100 border border-warm-200 rounded-md px-4 py-3">
             <Scale size={14} className="inline mr-1.5 -mt-0.5 text-warm-600" aria-hidden />{shown.disclaimer}
           </p>
           {shown.frameworks.map(f => <FrameworkView key={f.framework} f={f} />)}
@@ -169,15 +169,15 @@ export function StandardsPanel({ endpoint, canRecord }: { endpoint: string; canR
 
       <section aria-labelledby="runs-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
         <h2 id="runs-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Recorded assessments</h2>
-        {runs.length === 0 ? <p className="text-[12.5px] text-warm-600">None recorded yet.</p> : (
+        {runs.length === 0 ? <p className="text-[12px] text-warm-600">None recorded yet.</p> : (
           <ul className="divide-y divide-warm-200">
             {runs.map(r => (
-              <li key={r.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
-                <span className="text-navy-950 font-medium">{fmtDateTime(r.createdAt)}</span>
+              <li key={r.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+                <span className="text-ink font-medium">{fmtDateTime(r.createdAt)}</span>
                 <span className="text-warm-600">{r.frameworks.map(f => FRAMEWORK_LABELS[f] ?? f).join(', ')}</span>
                 <span className="text-warm-600">{r.createdByName ?? ''}</span>
                 <span className="text-warm-600 font-mono">rules {r.rulesVersion}</span>
-                <button type="button" onClick={() => view(r.id)} className="ml-auto underline text-navy-950">View</button>
+                <button type="button" onClick={() => view(r.id)} className="ml-auto underline text-ink">View</button>
               </li>
             ))}
           </ul>
@@ -200,22 +200,22 @@ function FrameworkView({ f }: { f: FrameworkResult }) {
     <section aria-label={f.label} className="bg-warm-100 border border-warm-200 rounded-lg p-5 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="font-display text-[19px] text-navy-950 leading-tight">{f.label}</h2>
+          <h2 className="font-display text-[18px] text-ink leading-tight">{f.label}</h2>
           <p className="text-[12px] text-warm-600">{f.frameworkVersion}</p>
         </div>
         <div className="text-right">
-          <div className="text-[20px] font-semibold text-navy-950 tabular-nums">{f.score === null ? '—' : `${f.score}`}<span className="text-[12px] font-normal text-warm-600"> / 100 screening score</span></div>
+          <div className="text-[20px] font-semibold text-ink tabular-nums">{f.score === null ? '—' : `${f.score}`}<span className="text-[12px] font-normal text-warm-600"> / 100 screening score</span></div>
           <Counts c={f.counts} />
         </div>
       </div>
       <p className="text-[12px] text-warm-700">{f.disclaimer}</p>
       {f.conflicts.length > 0 && (
         <div className="bg-status-attention-bg border-l-2 border-status-attention rounded-md px-4 py-3">
-          <h3 className="text-[13px] font-semibold text-navy-950 mb-1">Threshold conflicts between sources ({f.conflicts.length})</h3>
-          <ul className="space-y-1.5 text-[12.5px] text-warm-700">
+          <h3 className="text-[13px] font-semibold text-ink mb-1">Threshold conflicts between sources ({f.conflicts.length})</h3>
+          <ul className="space-y-1.5 text-[12px] text-warm-700">
             {f.conflicts.map(c => (
               <li key={c.metricKey}>
-                <span className="font-semibold text-navy-950">{metricLabel(c.metricKey)}</span> — {c.sides.map(s => `${s.ruleId} ${s.threshold.display} (${SOURCE_LABEL[s.threshold.source]}): ${RESULT_UI[s.result].label.toLowerCase()}`).join('; ')}
+                <span className="font-semibold text-ink">{metricLabel(c.metricKey)}</span> — {c.sides.map(s => `${s.ruleId} ${s.threshold.display} (${SOURCE_LABEL[s.threshold.source]}): ${RESULT_UI[s.result].label.toLowerCase()}`).join('; ')}
               </li>
             ))}
           </ul>
@@ -225,7 +225,7 @@ function FrameworkView({ f }: { f: FrameworkResult }) {
       {f.groups.map(g => (
         <div key={g.key}>
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-warm-300 pb-1 mb-2">
-            <h3 className="text-[14px] font-semibold text-navy-950">{g.label}</h3>
+            <h3 className="text-[14px] font-semibold text-ink">{g.label}</h3>
             <span className="text-[12px] text-warm-600">{g.score === null ? 'not assessable' : `score ${g.score}`} · <Counts c={g.counts} /></span>
           </div>
           <ul className="space-y-2">{g.rules.map(r => <RuleRow key={r.ruleId} r={r} />)}</ul>
@@ -243,15 +243,15 @@ function RuleRow({ r }: { r: RuleResult }) {
         <summary className="cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className={`inline-flex items-center gap-1 text-[12px] font-semibold uppercase ${ui.cls}`}><ui.Icon size={13} aria-hidden />{ui.label}</span>
           <span className="font-mono text-[12px] text-warm-600">{r.ruleId}</span>
-          <span className="text-[13px] text-navy-950 flex-1 min-w-[180px]">{r.title}</span>
+          <span className="text-[13px] text-ink flex-1 min-w-[180px]">{r.title}</span>
           <span className="text-[12px] text-warm-600">{r.metric}</span>
         </summary>
-        <div className="px-3 pb-3 pt-1 space-y-1.5 text-[12.5px] text-warm-700">
+        <div className="px-3 pb-3 pt-1 space-y-1.5 text-[12px] text-warm-700">
           <p>{r.message}</p>
-          {r.reason && <p><span className="font-semibold text-navy-950">{r.result === 'not_assessable' ? 'Why not assessable: ' : 'Detail: '}</span>{r.reason}</p>}
-          {r.threshold && <p><span className="font-semibold text-navy-950">Threshold: </span>{r.threshold.display} ({SOURCE_LABEL[r.threshold.source]}){r.parameters.map(p => `; ${metricLabel(p.metricKey).toLowerCase()} ${p.display} (${SOURCE_LABEL[p.source]})`).join('')}</p>}
-          {r.evidence.length > 0 && <p><span className="font-semibold text-navy-950">Evidence: </span><span className="font-mono text-[12px]">{r.evidence.slice(0, 25).join(', ')}</span>{r.evidenceTotal > 25 ? ` and ${r.evidenceTotal - 25} more` : ''}</p>}
-          {r.recommendation && r.result !== 'pass' && <p><span className="font-semibold text-navy-950">Recommendation: </span>{r.recommendation}</p>}
+          {r.reason && <p><span className="font-semibold text-ink">{r.result === 'not_assessable' ? 'Why not assessable: ' : 'Detail: '}</span>{r.reason}</p>}
+          {r.threshold && <p><span className="font-semibold text-ink">Threshold: </span>{r.threshold.display} ({SOURCE_LABEL[r.threshold.source]}){r.parameters.map(p => `; ${metricLabel(p.metricKey).toLowerCase()} ${p.display} (${SOURCE_LABEL[p.source]})`).join('')}</p>}
+          {r.evidence.length > 0 && <p><span className="font-semibold text-ink">Evidence: </span><span className="font-mono text-[12px]">{r.evidence.slice(0, 25).join(', ')}</span>{r.evidenceTotal > 25 ? ` and ${r.evidenceTotal - 25} more` : ''}</p>}
+          {r.recommendation && r.result !== 'pass' && <p><span className="font-semibold text-ink">Recommendation: </span>{r.recommendation}</p>}
           <p className="text-[12px] text-warm-600">Source: {r.sourceReference} · {RULE_KIND_LABELS[r.kind]} · {FRAMEWORK_LABELS[r.framework]} · rule v{r.version} · {r.calculation}</p>
         </div>
       </details>

@@ -9,18 +9,19 @@ below in code; never hard-code the hex values.
 - **Brand assets:** `public/brand/runf9-logo-light.svg`, `runf9-logo-dark.svg`, `runf9-mark.svg`,
   `runf9-icon.svg`, `runf9-favicon.svg` are byte-for-byte the package's files. `src/components/Logo.tsx` is the in-app lockup.
 - **Typeface:** DM Sans through `next/font` (`src/app/layout.tsx`), Tailwind `font-sans` / `font-display`.
+- **The pattern (11/2026):** greys carry no hue and step evenly from `ink` to `warm-400`; color appears only where it means something (one filled blue button per view, status dots and badges, the navy bar). Text sizes in the app come from one scale: 12, 13, 14 for text; 16, 18, 20 for headings; 24, 28 for titles; 36, 48 for figures. Weights are regular, medium and semibold only; no half-pixel sizes and no bold or heavier.
 - **Color tokens:** every value in the package's `runf9.tokens.css` equals `tailwind.config.js`:
 
 | Package token | Tailwind | Value | Use |
 |---|---|---|---|
-| `--rf-navy-950` / text | `navy-950` | #06141B | headings, primary text |
-| `--rf-navy-900` | `navy-900` | #11212D | app sidebar, dark surfaces |
-| `--rf-navy-800/700/400/200` | `navy-800/700/400/200` | #253745 #4A5C6A #9BA8AB #CCD0CF | dark-surface layers |
-| `--rf-accent-700/600/500/400/100` | `accent-700/600/500/400/100` | #1D4ED8 #2563EB #3B82F6 #60A5FA #EFF6FF | actions, links, selection, focus |
-| `--rf-warm-50` / canvas | `warm-50` | #FAFBFB | page background |
-| `--rf-warm-100/200/300` | `warm-100/200/300` | #F4F6F6 #EBEEEE #CCD0CF | soft surface, dividers, input borders |
-| `--rf-warm-400/500/600/700` | `warm-400/500/600/700` | #56656F #4C5B66 #3F4E5A #253745 | muted → body text (all AA on light surfaces) |
-| `--rf-status-*` and `*-bg` | `status-on-track`, `status-attention`, `status-at-risk`, `status-info`, `status-complete` (+ `-bg`) | #2F7358 **#1D4ED8** #A64848 #3A6A9C #4F7F61 | data meaning only, always with a word label. *Attention* was amber #94601C in the handoff; the owner's palette has no amber, so it uses the palette's deep blue (#1D4ED8 on #EFF6FF). |
+| text | `ink` | #1D2125 | titles, figures, primary text: a neutral near-black with no hue |
+| `--rf-navy-950/900/800` | `navy-950/900/800` | #0C2340 #14304F #1F3F61 | the one brand dark: the top bar, the finish forecast, dark sections of the public site |
+| `--rf-navy-700/400/200` | `navy-700/400/200` | #555B61 #A2A7AC #D3D6D9 | neutral greys used on dark surfaces |
+| `--rf-accent-700/600/500/400/100` | `accent-700/600/500/400/100` | #1F4E9E #2B63C1 #4A82D6 #7FAAE8 #EEF3FB | actions, links, selection, focus |
+| `--rf-warm-50` / canvas | `warm-50` | #FAFAFB | page background |
+| `--rf-warm-100/200/300` | `warm-100/200/300` | #F4F5F6 #E8EAEC #D3D6D9 | soft surface, dividers, input borders |
+| `--rf-warm-400/500/600/700` | `warm-400/500/600/700` | #666C72 #5A6066 #4B5056 #33383D | muted → body text, in even steps (all AA on light surfaces) |
+| `--rf-status-*` and `*-bg` | `status-on-track`, `status-attention`, `status-at-risk`, `status-info`, `status-complete` (+ `-bg`) | #2F7358 **#1F4E9E** #A64848 #3A6A9C #4F7F61 | data meaning only, always with a word label. *Attention* was amber #94601C in the handoff; the owner's palette has no amber, so it uses the palette's deep blue (#1D4ED8 on #EFF6FF). |
 
 - **Motion:** the package's timings are the ones in `src/app/globals.css` (`.pressable` 120 ms, color 160 ms,
   `.page-enter` 420 ms, disclosure 320 ms, `cubic-bezier(.22,1,.36,1)`), with `prefers-reduced-motion` honored.

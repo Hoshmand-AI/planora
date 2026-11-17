@@ -6,8 +6,8 @@
 import { MoodTile, type RobotMood } from '@/components/Robot'
 
 // Palette colors only: accent for work in progress, the status colors for attention / on track / at risk.
-const RING: Record<RobotMood, string> = { working: '#2563eb', waiting: '#1D4ED8', done: '#2F7358', worried: '#A64848', idle: '#56656F' }
-const FIGURE: Record<RobotMood, string> = { working: 'text-navy-950', idle: 'text-navy-950', waiting: 'text-status-attention', done: 'text-status-on-track', worried: 'text-status-at-risk' }
+const RING: Record<RobotMood, string> = { working: '#2B63C1', waiting: '#1F4E9E', done: '#2F7358', worried: '#A64848', idle: '#666C72' }
+const FIGURE: Record<RobotMood, string> = { working: 'text-ink', idle: 'text-ink', waiting: 'text-status-attention', done: 'text-status-on-track', worried: 'text-status-at-risk' }
 
 /** A share as a ring with the percentage in the middle; the label says what it is a share of. */
 export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; percent: number; label: string; sub?: React.ReactNode }) {
@@ -16,12 +16,12 @@ export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; perce
   return (
     <MoodTile mood={mood} className="flex items-center gap-4 h-full">
       <svg viewBox="0 0 64 64" width="64" height="64" className="flex-shrink-0 -rotate-90" role="img" aria-label={`${p}% ${label}`}>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="#CCD0CF" strokeWidth="7" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="#D3D6D9" strokeWidth="7" />
         {p > 0 && <circle cx="32" cy="32" r={r} fill="none" stroke={RING[mood]} strokeWidth="7" strokeLinecap="round"
           strokeDasharray={`${(p / 100) * c} ${c}`} className="meter-fill" />}
       </svg>
       <div className="min-w-0">
-        <div className="text-[30px] font-bold text-navy-950 tabular-nums leading-none" aria-hidden="true">{p}%</div>
+        <div className="text-[28px] font-semibold text-ink tabular-nums leading-none" aria-hidden="true">{p}%</div>
         <div className="text-[13px] text-warm-700 mt-1">{label}</div>
         {sub && <div className="text-[12px] text-warm-600 mt-0.5">{sub}</div>}
       </div>
@@ -33,7 +33,7 @@ export function RingTile({ mood, percent, label, sub }: { mood: RobotMood; perce
 export function CounterTile({ mood, value, label, sub }: { mood: RobotMood; value: React.ReactNode; label: string; sub?: React.ReactNode }) {
   return (
     <MoodTile mood={mood} className="flex flex-col justify-center h-full">
-      <div className={`text-[30px] font-bold tabular-nums leading-none ${FIGURE[mood]}`}>{value}</div>
+      <div className={`text-[28px] font-semibold tabular-nums leading-none ${FIGURE[mood]}`}>{value}</div>
       <div className="text-[13px] text-warm-700 mt-1.5">{label}</div>
       {sub && <div className="text-[12px] text-warm-600 mt-0.5">{sub}</div>}
     </MoodTile>

@@ -22,9 +22,9 @@ export function Disclosure({ title, meta, children, defaultOpen = false, tone = 
     <div id={id} className={tone === 'card' ? 'bg-white/70 border border-warm-200 rounded-2xl' : 'border-t border-warm-200'}>
       <button type="button" aria-expanded={open} aria-controls={pid} onClick={() => setOpen(o => !o)}
         className={`w-full flex items-center gap-2.5 text-left ${tone === 'card' ? 'px-5 py-4' : 'py-3.5'} group`}>
-        <ChevronRight size={15} aria-hidden data-open={open} className="disclosure-chevron text-warm-400 group-hover:text-navy-950 flex-shrink-0" />
-        <span className="flex-1 text-[14px] font-medium text-navy-950 tracking-[-0.005em]">{title}</span>
-        {meta != null && <span className="text-[12.5px] text-warm-500 tabular-nums">{meta}</span>}
+        <ChevronRight size={15} aria-hidden data-open={open} className="disclosure-chevron text-warm-400 group-hover:text-ink flex-shrink-0" />
+        <span className="flex-1 text-[14px] font-medium text-ink tracking-[-0.01em]">{title}</span>
+        {meta != null && <span className="text-[12px] text-warm-500 tabular-nums">{meta}</span>}
       </button>
       <div id={pid} role="region" data-open={open} className="disclosure-panel" inert={!open || undefined}>
         <div className="disclosure-inner">

@@ -16,15 +16,15 @@ export function Section({ title, description, children, tone = 'default', id }: 
   const long = text ? !!rest.trim() : !!description
   return (
     <section id={id} aria-labelledby={hid} className={`border rounded-[14px] p-5 md:p-6 bg-white ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
-      <h2 id={hid} className={`text-[15px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-navy-950'}`}>{title}</h2>
+      <h2 id={hid} className={`text-[14px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-ink'}`}>{title}</h2>
       {description && (
         text ? (
           // "More" follows the sentence it continues, instead of sitting alone at the card's right edge.
-          <p className="mb-4 text-[13px] text-warm-600">{first}{more && rest}{long && <> <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button></>}</p>
+          <p className="mb-4 text-[13px] text-warm-600">{first}{more && rest}{long && <> <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button></>}</p>
         ) : (
           <div className="mb-4 flex items-start gap-2">
             <p className={`flex-1 min-w-0 text-[13px] text-warm-600 ${long && !more ? 'line-clamp-1' : ''}`}>{description}</p>
-            {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12.5px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
+            {long && <button type="button" data-compact aria-expanded={more} onClick={() => setMore(v => !v)} className="flex-shrink-0 text-[12px] font-semibold text-accent-600 hover:underline">{more ? 'Less' : 'More'}</button>}
           </div>
         )
       )}
@@ -62,7 +62,7 @@ export const inputClass = 'w-full bg-white border border-warm-300 rounded-lg px-
 /** A method note that is one press away instead of printed under every control: "How this works", then the text. */
 export function Hint({ label = 'How this works', children, className = '' }: { label?: string; children: React.ReactNode; className?: string }) {
   return (
-    <details className={`group text-[12.5px] text-warm-600 ${className}`}>
+    <details className={`group text-[12px] text-warm-600 ${className}`}>
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-accent-600 hover:underline [&::-webkit-details-marker]:hidden">{label}<span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span></summary>
       <div className="mt-1 max-w-[80ch]">{children}</div>
     </details>
@@ -72,13 +72,13 @@ export function Hint({ label = 'How this works', children, className = '' }: { l
 /** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
 export const buttonClass = {
   primary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
-  secondary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 text-[13px] font-medium hover:bg-warm-100 transition-colors',
+  secondary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-ink text-[13px] font-medium hover:bg-warm-100 transition-colors',
 }
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
   const styles = {
     primary: 'bg-accent-600 text-white hover:bg-accent-700 font-semibold pressable shadow-sm',
-    secondary: 'border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 font-medium',
+    secondary: 'border border-warm-300 bg-white text-ink hover:bg-warm-100 font-medium',
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]

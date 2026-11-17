@@ -52,7 +52,7 @@ export function MoreMenu({ label, items, trigger }: { label: string; items: More
   return (
     <div ref={wrap} className="relative flex-shrink-0">
       <button ref={button} type="button" aria-label={trigger ? undefined : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(o => !o)}
-        className={`pressable inline-flex items-center justify-center rounded-lg border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 ${trigger ? 'gap-1.5 px-4 h-9 text-[13px] font-semibold' : 'w-9 h-9'}`}>
+        className={`pressable inline-flex items-center justify-center rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 ${trigger ? 'gap-1.5 px-4 h-9 text-[13px] font-semibold' : 'w-9 h-9'}`}>
         {trigger ?? <MoreHorizontal size={18} aria-hidden="true" />}
       </button>
       {(open || shown) && (
@@ -60,7 +60,7 @@ export function MoreMenu({ label, items, trigger }: { label: string; items: More
           className={`${open ? 'menu-in' : 'menu-out'} absolute right-0 top-full mt-2 z-30 min-w-[220px] w-max max-w-[min(340px,calc(100vw-32px))] rounded-xl border border-warm-200 bg-white p-1.5 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_18px_40px_-18px_rgb(6_20_27/0.35)]`}>
           {items.map(it => (
             <button key={it.label} type="button" role="menuitem" onClick={() => { setOpen(false); it.onSelect() }}
-              className={`w-full flex items-center gap-2.5 rounded-lg px-3 min-h-[44px] text-left text-[14px] font-medium hover:bg-warm-100 ${it.danger ? 'text-status-at-risk' : 'text-navy-950'} ${it.className ?? ''}`}>
+              className={`w-full flex items-center gap-2.5 rounded-lg px-3 min-h-[44px] text-left text-[14px] font-medium hover:bg-warm-100 ${it.danger ? 'text-status-at-risk' : 'text-ink'} ${it.className ?? ''}`}>
               {it.icon}{it.label}
             </button>
           ))}
