@@ -130,7 +130,7 @@ export function EnterpriseIdentity({ roles, hideUnavailable = false }: { roles: 
     <>
       {!(hideUnavailable && !saml.available) && <Section id="saml" title="SAML single sign-on" description="Use SAML 2.0 with Microsoft Entra ID, Okta, Ping, ADFS, Google Workspace or any SAML identity provider (alongside, or instead of, OpenID Connect above). Responses must be signed with one of the certificates below; people with an allowed email domain are added on first sign-in.">
         {note('saml')}
-        {!saml.available ? <p className="text-body text-warm-600">SAML single sign-on is part of the Enterprise plan.</p> : (
+        {!saml.available ? <p className="text-body text-warm-600">SAML single sign-on is not included in your organization's license.</p> : (
           <form className="space-y-3" onSubmit={save}>
             {sp ? (
               <div className="grid gap-2 border border-warm-200 rounded-md p-3">
@@ -191,7 +191,7 @@ export function EnterpriseIdentity({ roles, hideUnavailable = false }: { roles: 
 
       {!(hideUnavailable && scim && !scim.available) && <Section id="scim" title="SCIM provisioning" description="Let your identity provider add, update and remove members automatically (SCIM 2.0). Deactivating or deleting someone in your identity provider disables their RunF9 account and signs them out everywhere at once. Members are matched by email and must be in one of your verified single sign-on domains.">
         {note('scim')}
-        {scim && (!scim.available ? <p className="text-body text-warm-600">SCIM provisioning is part of the Enterprise plan.</p> : (
+        {scim && (!scim.available ? <p className="text-body text-warm-600">SCIM provisioning is not included in your organization's license.</p> : (
           <div className="space-y-4">
             <CopyLine label="SCIM base URL (tenant URL)" value={scim.baseUrl} />
             {secret && (

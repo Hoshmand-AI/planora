@@ -52,7 +52,7 @@ export function Integrations() {
   return (
     <Section title="Integrations: API and webhooks" description="Connect RunF9 to BI dashboards, a data warehouse or your own tools. API keys act with a limited role and can be revoked at any time; webhooks send signed notifications when things happen. Everything here is in the audit log. The developer guide (endpoints, webhook signatures) is available from support@hoshmand.ai.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
-      {!data.available && <div className="mb-3"><Alert tone="info">API keys and webhooks are included in the Pro and Enterprise plans.</Alert></div>}
+      {!data.available && <div className="mb-3"><Alert tone="info">API keys and webhooks are not included in your organization's license. To add them, contact support@hoshmand.ai.</Alert></div>}
       {secret && (
         <div className="mb-4 border border-status-attention bg-status-attention-bg rounded-md p-3">
           <p className="text-body text-warm-700 font-medium">{secret.label} Copy it now: it won&apos;t be shown again.</p>

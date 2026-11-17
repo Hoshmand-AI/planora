@@ -20,7 +20,7 @@ export const GET = publicApi<{ connection: string }>(async (req, { params, auth 
   const test = new URL(req.url).searchParams.get('test') === '1'
   if (test && !(auth && auth.orgId === found.orgId && can(auth.role, 'org.manage'))) throw new ApiError(403, 'Only an admin of this organization can test its SAML connection.')
   if (!test && !found.config.enabled) throw new ApiError(404, 'SAML single sign-on is not turned on for this organization.', 'sso_not_configured')
-  if (!entitlementsFor(found.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
+  if (!entitlementsFor(found.plan).sso) throw new ApiError(402, "Your organization's license doesn't include single sign-on.", 'plan_limit')
   const origin = samlOrigin(req)
   if (!origin) throw new ApiError(500, SAML_NEEDS_APP_URL, 'app_url_required')
   const { url, stateCookie } = await startSaml(found.orgId, found.config, origin, { test })

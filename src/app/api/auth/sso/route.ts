@@ -19,7 +19,7 @@ export const POST = publicApi(async req => {
   const saml = email ? await samlOrgForEmail(email) : null
   if (saml) {
     const org = await getOrganization(saml.orgId)
-    if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
+    if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's license doesn't include single sign-on.", 'plan_limit')
     const origin = appOrigin(req)
     const { url, stateCookie } = await startSaml(saml.orgId, saml.config, origin)
     const res = json({ url })
@@ -29,7 +29,7 @@ export const POST = publicApi(async req => {
   const found = email ? await orgForEmail(email) : null
   if (!found) throw new ApiError(404, "Single sign-on isn't set up for that email domain. Sign in with your password, or ask your admin.", 'sso_not_configured')
   const org = await getOrganization(found.orgId)
-  if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's plan doesn't include single sign-on.", 'plan_limit')
+  if (!entitlementsFor(org?.plan).sso) throw new ApiError(402, "Your organization's license doesn't include single sign-on.", 'plan_limit')
   // The public address (APP_URL) when set: behind a proxy the request's own origin can be an internal one.
   const callback = `${appOrigin(req)}/api/auth/sso/callback`
   const { url, stateCookie } = await startSso(found.orgId, found.config, email, callback)

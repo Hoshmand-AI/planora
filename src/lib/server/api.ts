@@ -197,7 +197,7 @@ export function scimApi<P = Record<string, string>>(handler: (req: NextRequest, 
         const scim = await resolveScimToken(bearer)
         if (!scim) throw new ScimError(401, 'Invalid or revoked SCIM token.')
         Object.assign(info, { orgId: scim.orgId, userId: `scim:${scim.tokenId}`, email: `scim-token:${scim.tokenName}`, name: `SCIM token “${scim.tokenName}”`, plan: scim.plan })
-        if (!entitlementsFor(scim.plan).sso) throw new ScimError(403, 'SCIM provisioning is part of the Enterprise plan.')
+        if (!entitlementsFor(scim.plan).sso) throw new ScimError(403, 'SCIM provisioning is not included in this organization\'s license.')
         const rl = await hit(`scim:token:${scim.tokenId}`, LIMITS.apiPerUser.limit, LIMITS.apiPerUser.windowSec)
         if (!rl.ok) throw new ScimError(429, 'Too many requests. Slow down and try again shortly.')
         await maybeRunMaintenance()
