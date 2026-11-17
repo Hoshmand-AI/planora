@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A stand-in aerial picture source for scripts/e2e-site-map.mjs: a picture for most map squares, a web page for
-// zoom 5, nothing for zoom 6. It writes what each request carried (path and header names) to the file named in
-// LOG, one JSON line per request, so the test can show the source is told the square and nothing else.
+// zoom 5, nothing for zoom 6. It writes the square each request asked for, and whether it carried anything beyond
+// a plain fetch, to the file named in LOG, one JSON line per request, so the test can show the source is told the square and nothing else.
 //   PORT=4599 LOG=/tmp/tiles.jsonl node scripts/mock-tiles.mjs
 
 import fs from 'node:fs'
@@ -25,10 +25,14 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     const m = /^\/(\d{1,2})\/(\d{1,8})\/(\d{1,8})\.png$/.exec(req.url || '')
     // Only what the test needs, in a fixed shape: the square asked for and whether anything about a member came with it.
     const h = req.headers
-    if (LOG) fs.appendFileSync(LOG, JSON.stringify({ square: m ? `${Number(m[1])}/${Number(m[2])}/${Number(m[3])}` : null, cookie: 'cookie' in h, authorization: 'authorization' in h, referer: 'referer' in h, forwarded: 'x-forwarded-for' in h || 'forwarded' in h, headerCount: Object.keys(h).length }) + '\n')
+    // Every header the request carried is checked here against what a plain fetch sends plus the two the tile
+    // route sets, and only the verdict is written: nothing a caller chose reaches the file.
+    const plain = new Set(['host', 'connection', 'accept', 'user-agent', 'accept-language', 'accept-encoding', 'sec-fetch-mode'])
+    const extra = Object.keys(h).filter(n => !plain.has(n)).length
+    if (LOG) fs.appendFileSync(LOG, JSON.stringify({ square: m ? `${Number(m[1])}/${Number(m[2])}/${Number(m[3])}` : null, extra, fixed: h['user-agent'] === 'RunF9' && h.accept === 'image/*' }) + '\n')
     if (!m) { res.writeHead(404); res.end(); return }
     if (m[1] === '5') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end('<!doctype html><html><script>alert(1)</script></html>'); return }
     if (m[1] === '6') { res.writeHead(404); res.end(); return }
     res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(TILE)
-  }).listen(Number(process.env.PORT || 4599), '127.0.0.1')
+  }).listen(Number(process.env.PORT || 4599), '127.0.0.1', () => { if (LOG) fs.appendFileSync(LOG, JSON.stringify({ ready: true }) + '\n') })
 }

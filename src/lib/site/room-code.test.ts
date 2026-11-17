@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { roomCodePath } from './plan'
-import { parseRoomCode, roomCodeIsOurs } from './room-code'
+import { parseRoomCode, resolveRoomCode, roomCodeIsOurs } from './room-code'
 
 describe('reading a room code back', () => {
   it('reads what RunF9 printed, with or without the site address in front', () => {
@@ -26,5 +26,13 @@ describe('reading a room code back', () => {
     expect(roomCodeIsOurs({ scheduleId: 'old', level: 'level 3', room: 'unit 302 KITCHEN' }, 's2', plans)).toBe(true)
     expect(roomCodeIsOurs({ scheduleId: 'other', level: 'Level 3', room: 'Unit 999' }, 's2', plans)).toBe(false)
     expect(roomCodeIsOurs({ scheduleId: null, level: 'Level 3', room: null }, 's2', plans)).toBe(false)
+    // Half a place is not what RunF9 prints, even with this upload's id
+    expect(roomCodeIsOurs({ scheduleId: 's1', level: 'Level 3', room: null }, 's1', plans)).toBe(false)
+  })
+  it('gives the place in the drawing\'s own spelling', () => {
+    const plans = [{ level: 'Level 3', rooms: [{ id: 'a', name: 'Unit 302 kitchen', x: 0.5, y: 0.5 }] }]
+    expect(resolveRoomCode({ scheduleId: 'old', level: 'level 3', room: 'UNIT 302 KITCHEN' }, 's2', plans)).toEqual({ level: 'Level 3', room: 'Unit 302 kitchen' })
+    expect(resolveRoomCode({ scheduleId: 's2', level: 'Roof', room: 'Plant room' }, 's2', plans)).toEqual({ level: 'Roof', room: 'Plant room' })
+    expect(resolveRoomCode({ scheduleId: 'other', level: 'Roof', room: 'Plant room' }, 's2', plans)).toBeNull()
   })
 })

@@ -73,6 +73,9 @@ export const POST = api<{ id: string }>({ permission: 'site.capture' }, async (r
 
   let form: FormData
   try { form = await req.formData() } catch { throw new ApiError(400, 'Send the capture as multipart form data.') }
+  // A capture kept on a phone belongs to the member who took it: it is never filed under another member's sign-in.
+  const author = form.get('authorId')
+  if (typeof author === 'string' && author && author !== auth.userId) throw new ApiError(403, 'This capture was taken by another member. It will be sent when they are signed in.', 'capture_author')
   const parsed = parseCaptureFields(Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string')))
   if ('error' in parsed) throw new ApiError(400, parsed.error, 'invalid_capture')
 

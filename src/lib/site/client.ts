@@ -122,6 +122,8 @@ export async function sendCapture(p: PendingCapture): Promise<SendResult> {
   const fd = new FormData()
   for (const [k, v] of Object.entries(p.fields)) fd.set(k, v)
   fd.set('clientId', p.id)
+  // Who took it: RunF9 refuses it under anyone else's sign-in (a page left open while another member signs in).
+  fd.set('authorId', p.userId)
   p.photos.forEach((b, i) => fd.append('photo', b, `photo-${i + 1}.jpg`))
   if (p.audio) { fd.append('audio', p.audio, 'voice-note'); if (p.audioSeconds) fd.set('audioSeconds', String(Math.round(p.audioSeconds * 10) / 10)) }
   let res: Response
@@ -130,7 +132,8 @@ export async function sendCapture(p: PendingCapture): Promise<SendResult> {
   const data = await res.json().catch(() => null)
   if (res.ok && data?.capture) return { ok: true, capture: data.capture as SiteCapture }
   // A gateway answering for RunF9 while it cannot be reached is the same as no signal.
-  const offline = res.status === 502 || res.status === 503 || res.status === 504
+  // So is a sign-in that is not the author's: the capture waits for its author.
+  const offline = res.status === 502 || res.status === 503 || res.status === 504 || (res.status === 403 && data?.code === 'capture_author')
   return { ok: false, offline, error: data?.error || (res.status === 413 ? 'This capture is too large to send. Remove a photo and try again.' : 'The capture could not be saved. Try again.') }
 }
 
@@ -255,23 +258,29 @@ export async function readCodeInPhoto(photo: Blob): Promise<string | null> {
     try {
       const Detector = (globalThis as { BarcodeDetector?: new (o: { formats: string[] }) => { detect(i: ImageBitmap): Promise<{ rawValue: string }[]> } }).BarcodeDetector
       if (Detector) {
-        try { const found = await new Detector({ formats: ['qr_code'] }).detect(bitmap); if (found[0]?.rawValue) return found[0].rawValue } catch { /* fall through to the shipped reader */ }
+        // The browser's reader looked and found nothing: that is the answer. Only a failure falls through.
+        try { const found = await new Detector({ formats: ['qr_code'] }).detect(bitmap); return found[0]?.rawValue || null } catch { /* the shipped reader below */ }
       }
-      // A code a few centimetres wide in a photo of a room is small: look at the photo at full size first, then smaller.
       const { default: jsQR } = await import('jsqr')
-      for (const side of [1600, 1000, 600]) {
-        const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height))
-        const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale))
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d', { willReadFrequently: true })
-        if (!ctx) return null
-        ctx.drawImage(bitmap, 0, 0, w, h)
-        const hit = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })
-        if (hit?.data) return hit.data
-        if (scale === 1 && side !== 1600) break
-      }
-      return null
+      // A code a few centimetres wide in a photo of a room is small: look at full size first, then smaller.
+      // One canvas, each size once, and the screen gets a turn between passes (a pass can take a moment on a phone).
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return null
+      const long = Math.max(bitmap.width, bitmap.height)
+      const sides = [...new Set([1600, 1000, 600].map(s => Math.min(s, long)))]
+      try {
+        for (const side of sides) {
+          const scale = side / long
+          const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale))
+          canvas.width = w; canvas.height = h
+          ctx.drawImage(bitmap, 0, 0, w, h)
+          const hit = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })
+          if (hit?.data) return hit.data
+          await new Promise(r => setTimeout(r))
+        }
+        return null
+      } finally { canvas.width = 0; canvas.height = 0 }
     } finally { bitmap.close() }
   } catch { return null }
 }

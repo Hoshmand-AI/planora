@@ -19,13 +19,20 @@ export function parseRoomCode(text: string): RoomCode | null {
 }
 
 /**
- * Whether a code belongs to this project: it names this upload, or a room marked on one of the project's
- * drawings (a code printed before a schedule update still names the same room). A code from another project
- * is ignored rather than trusted.
+ * The place a code names on this project, in the drawings' own spelling; null when the code is not this
+ * project's. A code is this project's when it names a room marked on one of its drawings (a code printed before
+ * a schedule update still names the same room), or when it names this upload. A code holds no more of the
+ * project than that, so a code from elsewhere that names a room on these drawings reads as that room; any other
+ * code is ignored. Only a code with both a level and a room counts: that is what RunF9 prints.
  */
-export function roomCodeIsOurs(code: RoomCode, scheduleId: string, plans: Pick<SitePlan, 'level' | 'rooms'>[]): boolean {
-  if (code.scheduleId && code.scheduleId === scheduleId) return true
-  if (!code.level || !code.room) return false
-  const room = code.room.toLowerCase()
-  return plans.some(p => sameLevel(p.level, code.level!) && p.rooms.some(r => r.name.toLowerCase() === room))
+export function resolveRoomCode(code: RoomCode, scheduleId: string, plans: Pick<SitePlan, 'level' | 'rooms'>[]): { level: string; room: string } | null {
+  if (!code.level || !code.room) return null
+  const wanted = code.room.toLowerCase()
+  for (const p of plans) {
+    if (!sameLevel(p.level, code.level)) continue
+    const r = p.rooms.find(x => x.name.toLowerCase() === wanted)
+    if (r) return { level: p.level, room: r.name }
+  }
+  return code.scheduleId && code.scheduleId === scheduleId ? { level: code.level, room: code.room } : null
 }
+export const roomCodeIsOurs = (code: RoomCode, scheduleId: string, plans: Pick<SitePlan, 'level' | 'rooms'>[]): boolean => !!resolveRoomCode(code, scheduleId, plans)

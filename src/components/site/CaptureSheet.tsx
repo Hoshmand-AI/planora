@@ -15,10 +15,10 @@ import {
 } from '@/lib/site/capture'
 import { PlanView } from './PlanCanvas'
 import { fitPlan, locate as locatePlace, onSheet, roomAt, sameLevel, type SitePlan } from '@/lib/site/plan'
-import { parseRoomCode, roomCodeIsOurs } from '@/lib/site/room-code'
+import { parseRoomCode, resolveRoomCode } from '@/lib/site/room-code'
 import { accuracyLabel, canRecordAudio, currentPosition, outboxAdd, readCodeInPhoto, resizePhoto, sendCapture, startRecording, type PendingCapture, type Recording } from '@/lib/site/client'
 
-interface Photo { blob: Blob; url: string }
+interface Photo { blob: Blob; url: string; /** A room code in this photo set the place */ coded?: boolean }
 interface Voice { blob: Blob; url: string; seconds: number }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
@@ -49,6 +49,8 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
   const [note, setNote] = useState('')
   const [level, setLevel] = useState(preset?.level ?? '')
   const [room, setRoom] = useState(preset?.room ?? '')
+  const roomNow = useRef(room)
+  roomNow.current = room
   const [placeSource, setPlaceSource] = useState<PlaceSource>(preset?.level || preset?.room ? 'code' : 'none')
   const [codes, setCodes] = useState<string[]>([])
   const [find, setFind] = useState('')
@@ -65,6 +67,11 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
   const [pinning, setPinning] = useState(false)
   const [codeInPhoto, setCodeInPhoto] = useState(false)
   const takenAt = useRef<string | null>(null)
+  // True once the place was set in this sheet: by the person, a pin, a scanned code or a code in an earlier photo.
+  // The place remembered from the last capture does not count, so a code in the photo replaces it.
+  const placeSet = useRef(!!(preset?.level || preset?.room))
+  const beforeCode = useRef<{ level: string; room: string; placeSource: PlaceSource } | null>(null)
+  const picked = (source: PlaceSource = 'picked') => { placeSet.current = true; setPlaceSource(source) }
   const fileInput = useRef<HTMLInputElement>(null)
   const closeBtn = useRef<HTMLButtonElement>(null)
   const titleId = useId(), levelList = useId(), roomList = useId()
@@ -117,25 +124,39 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
     try {
       const room = MAX_PHOTOS_PER_CAPTURE - photos.length
       const added: Photo[] = []
-      let code: ReturnType<typeof parseRoomCode> = null
+      let place: { level: string; room: string } | null = null
       for (const f of [...files].slice(0, room)) {
         const { blob } = await resizePhoto(f)
-        added.push({ blob, url: URL.createObjectURL(blob) })
+        const photo: Photo = { blob, url: URL.createObjectURL(blob) }
+        added.push(photo)
         // A room code in the frame says where the photo was taken: the surest evidence there is.
-        if (!code) { const text = await readCodeInPhoto(blob); const read = text ? parseRoomCode(text) : null; if (read && roomCodeIsOurs(read, scheduleId, plans)) code = read }
+        if (!place) { const text = await readCodeInPhoto(blob); const read = text ? parseRoomCode(text) : null; place = read ? resolveRoomCode(read, scheduleId, plans) : null; if (place) photo.coded = true }
       }
-      if (code && alive.current) {
-        if (code.level) setLevel(code.level)
-        if (code.room) setRoom(code.room)
-        setPlaceSource('code'); setCodeInPhoto(true)
-      }
+      // It fills the place only when the person has not set one in this sheet (also while the photo was being read).
+      if (place && alive.current && !placeSet.current) {
+        beforeCode.current = { level, room: roomNow.current, placeSource }
+        placeSet.current = true
+        setLevel(place.level); setRoom(place.room); setPlaceSource('code'); setCodeInPhoto(true)
+      } else for (const ph of added) ph.coded = false
       if (!takenAt.current) takenAt.current = new Date().toISOString()
       setPhotos(p => [...p, ...added])
       if (files.length > room) setError(`A capture holds up to ${MAX_PHOTOS_PER_CAPTURE} photos. Save this one and start another for the rest.`)
     } catch { setError('That file could not be read as a photo. Take the photo again.') }
     finally { setPreparing(false); if (fileInput.current) fileInput.current.value = '' }
   }
-  const removePhoto = (i: number) => setPhotos(p => { URL.revokeObjectURL(p[i].url); return p.filter((_, j) => j !== i) })
+  function removePhoto(i: number) {
+    const gone = photos[i]
+    if (!gone) return
+    URL.revokeObjectURL(gone.url)
+    const rest = photos.filter((_, j) => j !== i)
+    setPhotos(rest)
+    // The photo that carried the room code is gone: the place goes back to what it was, unless the person changed it since.
+    if (gone.coded && !rest.some(ph => ph.coded) && codeInPhoto && placeSource === 'code' && beforeCode.current) {
+      const was = beforeCode.current
+      setLevel(was.level); setRoom(was.room); setPlaceSource(was.placeSource); setCodeInPhoto(false)
+      placeSet.current = false; beforeCode.current = null
+    }
+  }
 
   async function record() {
     // One microphone at a time: a second tap while the browser is still asking must not open a second one.
@@ -201,7 +222,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
     if (!levelPlan) return
     setPin({ planId: levelPlan.id, x: p.x, y: p.y })
     const r = roomAt(levelPlan, p)
-    if (r && (!room.trim() || placeSource === 'position')) { setRoom(r.name); setPlaceSource('picked') }
+    if (r && (!room.trim() || placeSource === 'position')) { setRoom(r.name); picked() }
   }
   const roomsHere = useMemo(() => [...new Set(rooms.filter(r => !level || !r.level || r.level === level).map(r => r.room))], [rooms, level])
   const nameOf = (code: string) => activities.find(a => a.code === code)?.name ?? ''
@@ -313,13 +334,13 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
               <div>
                 <label htmlFor={`${titleId}-level`} className="sr-only">Level</label>
                 <input id={`${titleId}-level`} list={levelList} value={level} maxLength={MAX_PLACE_CHARS} placeholder="Level" autoComplete="off"
-                  onChange={e => { setLevel(e.target.value); setPlaceSource('picked') }} className={field} />
+                  onChange={e => { setLevel(e.target.value); picked() }} className={field} />
                 <datalist id={levelList}>{levels.map(l => <option key={l} value={l} />)}</datalist>
               </div>
               <div>
                 <label htmlFor={`${titleId}-room`} className="sr-only">Room or area</label>
                 <input id={`${titleId}-room`} list={roomList} value={room} maxLength={MAX_PLACE_CHARS} placeholder="Room or area" autoComplete="off"
-                  onChange={e => { setRoom(e.target.value); setPlaceSource('picked') }} className={field} />
+                  onChange={e => { setRoom(e.target.value); picked() }} className={field} />
                 <datalist id={roomList}>{roomsHere.map(r => <option key={r} value={r} />)}</datalist>
               </div>
             </div>
@@ -336,7 +357,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
               {near?.onSite && !level.trim() && levelsHere.length > 0 && (
                 <div role="group" aria-label="Which level are you on?" className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-body text-warm-700">Which level are you on?</span>
-                  {levelsHere.map(l => <button key={l} type="button" onClick={() => { setLevel(l); setPlaceSource('picked') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{l}</button>)}
+                  {levelsHere.map(l => <button key={l} type="button" onClick={() => { setLevel(l); picked() }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{l}</button>)}
                 </div>
               )}
               {placeSource === 'code' && codeInPhoto && <p className="mt-2 text-caption text-warm-600">Place read from the room code in your photo.</p>}
@@ -344,7 +365,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
               {near?.onSite && placeSource !== 'position' && !room.trim() && level.trim() && near.rooms.length > 0 && (
                 <div role="group" aria-label="Rooms near you" className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-body text-warm-700">Near you:</span>
-                  {near.rooms.slice(0, 4).map(r => <button key={`${r.level}-${r.room}`} type="button" onClick={() => { setRoom(r.room); setPlaceSource('position') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{r.room}</button>)}
+                  {near.rooms.slice(0, 4).map(r => <button key={`${r.level}-${r.room}`} type="button" onClick={() => { setRoom(r.room); picked('position') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{r.room}</button>)}
                 </div>
               )}
             </div>

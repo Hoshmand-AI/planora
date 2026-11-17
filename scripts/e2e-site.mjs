@@ -24,6 +24,7 @@ if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.sig
   process.exit(1)
 }
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'src', 'lib', 'parsers', '__fixtures__')
+if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
 let passed = 0
 function ok(cond, msg, extra) {
   if (!cond) { console.error(`✗ ${msg}`, extra ?? ''); process.exit(1) }
@@ -34,10 +35,11 @@ function ok(cond, msg, extra) {
 // Inviting a member needs a confirmed email address. The confirmation link itself is covered by
 // scripts/e2e-security.mjs; here the address is marked confirmed in the test database directly.
 async function confirmEmail(address) {
-  if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
   const db = new postgres.Client({ connectionString: process.env.DATABASE_URL })
   await db.connect()
-  try { await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address]) } finally { await db.end() }
+  let updated = 0
+  try { updated = (await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address])).rowCount ?? 0 } finally { await db.end() }
+  if (updated !== 1) { console.error('✗ DATABASE_URL is not the database the server under test uses: the account just created is not in it.'); process.exit(1) }
 }
 
 class Client {
@@ -122,6 +124,8 @@ ok((await a.get(base)).data.captures.filter(c => /answer was lost/.test(c.note))
 ok((await a.del(`${base}/${once.data.capture.id}`)).status === 200 && (await a.post(base, capture({ status: 'progress', note: 'Sent, and the answer was lost on the way.', clientId }))).status === 410, 'sending it again after it was deleted does not bring it back')
 
 // Refusals: each with a message a person can act on.
+const foreign = await a.post(base, capture({ status: 'progress', note: 'Taken by someone else.', authorId: '00000000-0000-4000-8000-000000000000' }))
+ok(foreign.status === 403 && foreign.data.code === 'capture_author', 'a capture taken by another member is not filed under this sign-in', foreign.data)
 const page = await a.post(base, capture({ status: 'progress' }, { photos: [{ bytes: Buffer.from('<!doctype html><html><script>alert(1)</script></html>'), type: 'image/jpeg', name: 'photo.jpg' }] }))
 ok(page.status === 400 && page.data.code === 'unsupported_media', 'a web page sent as a photo is refused, whatever it is called', page.data)
 ok((await a.post(base, capture({ status: 'progress', note: 'ok' }))).data.code === 'empty_capture', 'a capture with nothing in it is refused')
@@ -297,6 +301,7 @@ await sheet.getByRole('button', { name: 'Save capture' }).click()
 await pg.getByText(/1 capture is saved on this phone and not sent yet/).waitFor()
 await confirmEmail(`site-a-${stamp}@example.com`)
 const invite = await a.post('/api/org', { action: 'invite', email: `site-second-${stamp}@example.com`, role: 'scheduler' })
+ok(invite.status === 200 && invite.data.link?.includes('/auth?invite='), 'the owner invites a second member', invite.data)
 const second = new Client()
 ok((await second.post('/api/auth', { action: 'signup', email: `site-second-${stamp}@example.com`, password: 'correct horse battery staple', name: 'Sam Second', invite: new URL(invite.data.link).searchParams.get('invite') })).status === 200, 'a second member joins firm A')
 const cookieName = a.cookie.split('=')[0]

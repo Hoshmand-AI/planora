@@ -29,6 +29,7 @@ if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.sig
   process.exit(1)
 }
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'src', 'lib', 'parsers', '__fixtures__')
+if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
 let passed = 0
 function ok(cond, msg, extra) {
   if (!cond) { console.error(`✗ ${msg}`, extra ?? ''); process.exit(1) }
@@ -46,16 +47,24 @@ const TILE_LOG = path.join(TILE_DIR, 'asked.jsonl')
 fs.writeFileSync(TILE_LOG, '', { mode: 0o600 })
 const tiles = spawn(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), 'mock-tiles.mjs')], { env: { ...process.env, PORT: String(TILE_PORT), LOG: TILE_LOG }, stdio: 'inherit' })
 process.on('exit', () => { tiles.kill(); try { fs.rmSync(TILE_DIR, { recursive: true, force: true }) } catch { /* already gone */ } })
-await new Promise(r => setTimeout(r, 600))
-const asked = () => fs.readFileSync(TILE_LOG, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(1)) // so the line above runs
+let tilesDown = false
+tiles.once('error', () => { tilesDown = true })
+tiles.once('exit', () => { tilesDown = true })
+const tileLog = () => fs.readFileSync(TILE_LOG, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+// Ready only when the stand-in says it is listening (a port already in use ends it instead).
+for (let i = 0; i < 100 && !tilesDown && !tileLog().some(l => l.ready); i++) await new Promise(r => setTimeout(r, 100))
+if (tilesDown || !tileLog().some(l => l.ready)) { console.error(`✗ The stand-in aerial picture source did not start on port ${TILE_PORT} (is the port in use?).`); process.exit(1) }
+const asked = () => tileLog().filter(l => !l.ready)
 
 // Inviting a member needs a confirmed email address. The confirmation link itself is covered by
 // scripts/e2e-security.mjs; here the address is marked confirmed in the test database directly.
 async function confirmEmail(address) {
-  if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
   const db = new postgres.Client({ connectionString: process.env.DATABASE_URL })
   await db.connect()
-  try { await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address]) } finally { await db.end() }
+  let updated = 0
+  try { updated = (await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address])).rowCount ?? 0 } finally { await db.end() }
+  if (updated !== 1) { console.error('✗ DATABASE_URL is not the database the server under test uses: the account just created is not in it.'); process.exit(1) }
 }
 
 class Client {
@@ -169,7 +178,7 @@ const tile = await a.raw('GET', '/api/site/tiles/16/18000/26000')
 ok(tile.status === 200 && tile.headers.get('content-type') === 'image/png' && Buffer.from(await tile.arrayBuffer()).equals(TILE), 'an aerial square is fetched by the server and passed on')
 const sent = asked().slice(before)
 ok(sent.length === 1 && sent[0].square === '16/18000/26000', 'the source is asked for that square and nothing else')
-ok(sent[0].cookie === false && sent[0].authorization === false && sent[0].referer === false && sent[0].forwarded === false && sent[0].headerCount <= 8, 'the source is told nothing about the member: no cookie, no address, no referrer')
+ok(sent[0].extra === 0 && sent[0].fixed === true, 'the source is told nothing about the member: only what any plain request carries, with a fixed sender name')
 ok(/sandbox/.test(tile.headers.get('content-security-policy') || '') && tile.headers.get('x-content-type-options') === 'nosniff', 'the square is served as a file only')
 ok((await a.raw('GET', '/api/site/tiles/5/3/7')).status === 502, 'a web page sent by the source in place of a picture is not passed on')
 ok((await a.raw('GET', '/api/site/tiles/6/3/7')).status === 404, 'a square the source does not have is a plain 404')
@@ -275,11 +284,28 @@ ok(await sheet.getByLabel('Room or area').inputValue() === '' && await sheet.get
 await sheet.locator('input[type=file]').setInputFiles({ name: 'IMG_0003.png', mimeType: 'image/png', buffer: await codePhoto(`${BASE}/dashboard/site?schedule=an-older-upload&level=${encodeURIComponent('Level 3')}&room=${encodeURIComponent('Unit 301 kitchen')}&new=1`) })
 await sheet.getByText('Place read from the room code in your photo.').waitFor()
 ok(await sheet.getByLabel('Level', { exact: true }).inputValue() === 'Level 3' && await sheet.getByLabel('Room or area').inputValue() === 'Unit 301 kitchen', 'a room code in the photo fills in the level and the room, even one printed before a schedule update')
+// Taking the coded photo out puts the place back; a place the person typed is never overwritten by a code.
+await sheet.getByRole('button', { name: 'Remove photo 2' }).click()
+await sheet.getByText('Place read from the room code in your photo.').waitFor({ state: 'detached' })
+ok(await sheet.getByLabel('Room or area').inputValue() === '' && await sheet.getByLabel('Level', { exact: true }).inputValue() === '', 'removing the photo that carried the code puts the place back as it was')
+await sheet.getByLabel('Room or area').fill('Typed by hand')
+await sheet.locator('input[type=file]').setInputFiles({ name: 'IMG_0004.png', mimeType: 'image/png', buffer: await codePhoto(`${BASE}/dashboard/site?schedule=an-older-upload&level=${encodeURIComponent('Level 3')}&room=${encodeURIComponent('Unit 301 kitchen')}&new=1`) })
+await sheet.getByRole('img', { name: 'Photo 2' }).waitFor()
+await pg.waitForTimeout(500)
+ok(await sheet.getByLabel('Room or area').inputValue() === 'Typed by hand', 'a place the person typed is not overwritten by a code in a later photo')
+await sheet.getByRole('button', { name: 'Remove photo 2' }).click()
+await sheet.getByLabel('Room or area').fill('')
+await sheet.getByRole('button', { name: 'Close' }).click()
+await pg.goto(`${BASE}/dashboard/site?schedule=${sid}&new=1`, { waitUntil: 'networkidle' })
+await sheet.waitFor()
+await sheet.locator('input[type=file]').setInputFiles({ name: 'IMG_0005.png', mimeType: 'image/png', buffer: await codePhoto(`${BASE}/dashboard/site?schedule=an-older-upload&level=${encodeURIComponent('level 3')}&room=${encodeURIComponent('UNIT 301 KITCHEN')}&new=1`) })
+await sheet.getByText('Place read from the room code in your photo.').waitFor()
+ok(await sheet.getByLabel('Room or area').inputValue() === 'Unit 301 kitchen', 'the place is filled in the drawing\'s own spelling')
 await sheet.getByRole('button', { name: 'Done', exact: true }).click()
 await sheet.getByRole('button', { name: 'Save capture' }).click()
 await pg.getByText('Capture saved.').waitFor()
 const coded = (await a.get(caps)).data.captures[0]
-ok(coded.placeSource === 'code' && coded.level === 'Level 3' && coded.room === 'Unit 301 kitchen' && coded.media.length === 2, 'the capture records that its place came from a room code', coded)
+ok(coded.placeSource === 'code' && coded.level === 'Level 3' && coded.room === 'Unit 301 kitchen' && coded.media.length === 1, 'the capture records that its place came from a room code', coded)
 
 // Setting up: mark a room by tapping the drawing.
 await pg.getByRole('button', { name: 'Map', exact: true }).click()
