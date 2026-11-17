@@ -46,13 +46,13 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
   if (evm.status === 'not_available') {
     return (
       <section aria-labelledby="evm-h" className="space-y-3">
-        <h2 id="evm-h" className="font-display text-[18px] text-navy-950">Earned value</h2>
+        <h2 id="evm-h" className="font-display text-[18px] text-ink">Earned value</h2>
         <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-          <p className="text-[14px] font-semibold text-navy-950">Not available for this upload. It needs:</p>
+          <p className="text-[14px] font-semibold text-ink">Not available for this upload. It needs:</p>
           <ul className="list-disc pl-5 mt-2 space-y-1 text-[13px] text-warm-700">
             {evm.missing.map(m => <li key={m.code}>{m.message}</li>)}
           </ul>
-          <p className="text-[12.5px] text-warm-600 mt-3">RunF9 computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
+          <p className="text-[12px] text-warm-600 mt-3">RunF9 computes earned value only from real budgets and costs in the uploaded file (P6 resource assignments and expenses, MS Project cost fields, or cost columns in a spreadsheet). It never estimates them from durations.</p>
           <p className="text-[12px] text-warm-600 mt-1">{evm.baseline.header}</p>
         </div>
       </section>
@@ -79,8 +79,8 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
     <section aria-labelledby="evm-h" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="evm-h" className="font-display text-[18px] text-navy-950">Earned value</h2>
-          <p className="text-[12.5px] text-warm-600 mt-0.5">{evm.baseline.header} · data date {fmtDate(evm.dataDate)} · BAC {$(m.bac)} · PV {$(m.pv)} · EV {$(m.ev)} · AC {$(m.ac)}</p>
+          <h2 id="evm-h" className="font-display text-[18px] text-ink">Earned value</h2>
+          <p className="text-[12px] text-warm-600 mt-0.5">{evm.baseline.header} · data date {fmtDate(evm.dataDate)} · BAC {$(m.bac)} · PV {$(m.pv)} · EV {$(m.ev)} · AC {$(m.ac)}</p>
         </div>
         <a href={`/api/schedules/${scheduleId}/evm?format=xlsx`} className="text-[13px] font-medium text-accent-600 hover:underline">Download earned value (.xlsx)</a>
       </div>
@@ -90,14 +90,14 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
         {tiles.map(t => (
           <li key={t.label} className="bg-warm-50 border border-warm-200 rounded-lg p-4">
             <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">{t.label}</div>
-            <div className={`text-[22px] font-bold tabular-nums leading-none ${t.tone === 'on-track' ? 'text-status-on-track' : t.tone === 'attention' ? 'text-status-attention' : 'text-navy-950'}`}>{t.value}</div>
+            <div className={`text-[20px] font-semibold tabular-nums leading-none ${t.tone === 'on-track' ? 'text-status-on-track' : t.tone === 'attention' ? 'text-status-attention' : 'text-ink'}`}>{t.value}</div>
             <p className="text-[12px] text-warm-600 mt-2 leading-snug">{t.meaning}</p>
           </li>
         ))}
         {es && (
           <li className="bg-warm-50 border border-warm-200 rounded-lg p-4">
             <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Earned schedule</div>
-            <div className={`text-[22px] font-bold tabular-nums leading-none ${es.svT < 0 ? 'text-status-attention' : 'text-status-on-track'}`}>{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
+            <div className={`text-[20px] font-semibold tabular-nums leading-none ${es.svT < 0 ? 'text-status-attention' : 'text-status-on-track'}`}>{es.svT > 0 ? '+' : ''}{es.svT} day{Math.abs(es.svT) === 1 ? '' : 's'}</div>
             <p className="text-[12px] text-warm-600 mt-2 leading-snug">The work done was planned by {fmtDate(es.esDate)}: SV(t) {es.svT} calendar days, SPI(t) {idx(es.spiT)}.{es.forecastFinish ? ` At this rate the work finishes about ${fmtDate(es.forecastFinish)} (baseline ${fmtDate(es.baselineFinish)}).` : ''}</p>
           </li>
         )}
@@ -107,8 +107,8 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
       {series && series.notes.length > 0 && <ul className="text-[12px] text-warm-600 space-y-0.5">{series.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-[12.5px]">
-          <caption className="text-left font-semibold text-navy-950 mb-1">By WBS</caption>
+        <table className="w-full text-[12px]">
+          <caption className="text-left font-semibold text-ink mb-1">By WBS</caption>
           <thead><tr><th scope="col" className={th}>WBS</th><th scope="col" className={th}>BAC</th><th scope="col" className={th}>PV</th><th scope="col" className={th}>EV</th><th scope="col" className={th}>AC</th><th scope="col" className={th}>SV</th><th scope="col" className={th}>CV</th><th scope="col" className={th}>SPI</th><th scope="col" className={th}>CPI</th></tr></thead>
           <tbody>{evm.wbs.slice(0, 200).map(w => (
             <tr key={w.key}>
@@ -121,13 +121,13 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
       </div>
 
       <div>
-        <h3 className="text-[14px] font-semibold text-navy-950">Earned value data integrity</h3>
+        <h3 className="text-[14px] font-semibold text-ink">Earned value data integrity</h3>
         <p className="text-[12px] text-warm-600 mb-2">{EVM_PRINCIPLE_NOTE}</p>
         <ul className="space-y-2">
           {evm.checks.map(c => (
             <li key={c.id} className={`border-l-2 pl-3 text-[13px] ${c.result === 'flag' ? 'border-status-attention' : c.result === 'pass' ? 'border-status-on-track' : 'border-warm-300'}`}>
-              <span className="font-medium text-navy-950">{c.title}</span>{' '}
-              <span className={`text-[12px] font-bold uppercase tracking-wider ${c.result === 'flag' ? 'text-status-attention' : c.result === 'pass' ? 'text-status-on-track' : 'text-warm-600'}`}>{c.result === 'flag' ? 'Review' : c.result === 'pass' ? 'Pass' : 'n/a'}</span>
+              <span className="font-medium text-ink">{c.title}</span>{' '}
+              <span className={`text-[12px] font-semibold uppercase tracking-wider ${c.result === 'flag' ? 'text-status-attention' : c.result === 'pass' ? 'text-status-on-track' : 'text-warm-600'}`}>{c.result === 'flag' ? 'Review' : c.result === 'pass' ? 'Pass' : 'n/a'}</span>
               <div className="text-warm-700">{c.detail}</div>
               {c.activityCodes.length > 0 && <div className="text-[12px] text-warm-600">Activities: {c.activityCodes.slice(0, 20).join(', ')}{c.activityCodes.length > 20 ? ` and ${c.activityCodes.length - 20} more` : ''}</div>}
               <div className="text-[12px] text-warm-500">{c.principle}</div>
@@ -137,10 +137,10 @@ export function EarnedValue({ scheduleId }: { scheduleId: string }) {
       </div>
 
       <Disclosure title="How these figures are calculated" meta={evm.costSource === 'p6_xer' ? 'P6 XER' : evm.costSource === 'p6_xml' ? 'P6 XML' : evm.costSource === 'ms_xml' ? 'MS Project XML' : 'Spreadsheet'}>
-        <dl className="text-[12.5px] text-warm-700 space-y-1.5">
-          {(['bac', 'pv', 'ev', 'ac', 'es'] as const).map(k => <div key={k}><dt className="inline font-semibold text-navy-950">{k.toUpperCase()}: </dt><dd className="inline">{evm.methods[k]}</dd></div>)}
+        <dl className="text-[12px] text-warm-700 space-y-1.5">
+          {(['bac', 'pv', 'ev', 'ac', 'es'] as const).map(k => <div key={k}><dt className="inline font-semibold text-ink">{k.toUpperCase()}: </dt><dd className="inline">{evm.methods[k]}</dd></div>)}
         </dl>
-        {evm.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-[12.5px] text-warm-700 space-y-0.5">{evm.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+        {evm.notes.length > 0 && <ul className="list-disc pl-5 mt-2 text-[12px] text-warm-700 space-y-0.5">{evm.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
         <p className="text-[12px] text-warm-600 mt-2">Percent types used: {[...new Set(evm.activities.map(a => percentTypeLabel(a.percentType)))].join(', ')}.</p>
       </Disclosure>
     </section>
@@ -187,8 +187,8 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
   return (
     <figure className="bg-warm-50 border border-warm-200 rounded-lg p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <figcaption id={titleId} className="text-[14px] font-semibold text-navy-950">Cumulative cost over time (S-curve)</figcaption>
-        <button type="button" onClick={() => setAsTable(v => !v)} aria-pressed={asTable} className="text-[12.5px] font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
+        <figcaption id={titleId} className="text-[14px] font-semibold text-ink">Cumulative cost over time (S-curve)</figcaption>
+        <button type="button" onClick={() => setAsTable(v => !v)} aria-pressed={asTable} className="text-[12px] font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
       </div>
       <p id={descId} className="text-[12px] text-warm-600 mb-2">{summary}</p>
       {!asTable ? (
@@ -196,30 +196,30 @@ function SCurve({ evm, points }: { evm: EvmAnalysis; points: EvmTrendPoint[] | n
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-labelledby={`${titleId} ${descId}`}>
             {ticksY.map((v, i) => (
               <g key={i}>
-                <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="#CCD0CF" strokeWidth={1} />
-                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={12} fill="#3F4E5A">{$(v)}</text>
+                <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="#D3D6D9" strokeWidth={1} />
+                <text x={L - 6} y={sy(v) + 4} textAnchor="end" fontSize={12} fill="#4B5056">{$(v)}</text>
               </g>
             ))}
-            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={12} fill="#3F4E5A">{fmtDate(d)}</text>)}
+            {ticksX.map((d, i) => <text key={i} x={sx(d)} y={H - B + 16} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'} fontSize={12} fill="#4B5056">{fmtDate(d)}</text>)}
             {dd && t(dd) >= x0 && t(dd) <= x1 && (
-              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#56656F" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={12} fill="#253745">Data date</text></g>
+              <g><line x1={sx(dd)} x2={sx(dd)} y1={T} y2={H - B} stroke="#666C72" strokeWidth={1} strokeDasharray="2 3" /><text x={sx(dd) + 4} y={T + 10} fontSize={12} fill="#33383D">Data date</text></g>
             )}
-            <path d={path(pvPts)} fill="none" stroke="#11212D" strokeWidth={2.25} />
-            <path d={path(evPts)} fill="none" stroke="#2563eb" strokeWidth={2.25} strokeDasharray="7 4" />
-            {evPts.slice(1).map((p, i) => <circle key={i} cx={sx(p.date!)} cy={sy(p.v)} r={4} fill="#2563eb" />)}
-            {acPts.length > 0 && <path d={path(acPts)} fill="none" stroke="#4A5C6A" strokeWidth={2.25} strokeDasharray="2 3" />}
-            {acPts.slice(1).map((p, i) => <rect key={i} x={sx(p.date!) - 3.5} y={sy(p.v) - 3.5} width={7} height={7} fill="#4A5C6A" />)}
+            <path d={path(pvPts)} fill="none" stroke="#1D2125" strokeWidth={2.25} />
+            <path d={path(evPts)} fill="none" stroke="#2B63C1" strokeWidth={2.25} strokeDasharray="7 4" />
+            {evPts.slice(1).map((p, i) => <circle key={i} cx={sx(p.date!)} cy={sy(p.v)} r={4} fill="#2B63C1" />)}
+            {acPts.length > 0 && <path d={path(acPts)} fill="none" stroke="#555B61" strokeWidth={2.25} strokeDasharray="2 3" />}
+            {acPts.slice(1).map((p, i) => <rect key={i} x={sx(p.date!) - 3.5} y={sy(p.v) - 3.5} width={7} height={7} fill="#555B61" />)}
           </svg>
           <ul className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-[12px] text-warm-700" aria-label="Legend">
-            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#11212D" strokeWidth="2.25" /></svg>PV, planned value (solid)</li>
-            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#2563eb" strokeWidth="2.25" strokeDasharray="7 4" /><circle cx="14" cy="5" r="3.5" fill="#2563eb" /></svg>EV, earned value (dashed, circles)</li>
-            {acPts.length > 0 && <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#4A5C6A" strokeWidth="2.25" strokeDasharray="2 3" /><rect x="10.5" y="1.5" width="7" height="7" fill="#4A5C6A" /></svg>AC, actual cost (dotted, squares)</li>}
+            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#1D2125" strokeWidth="2.25" /></svg>PV, planned value (solid)</li>
+            <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#2B63C1" strokeWidth="2.25" strokeDasharray="7 4" /><circle cx="14" cy="5" r="3.5" fill="#2B63C1" /></svg>EV, earned value (dashed, circles)</li>
+            {acPts.length > 0 && <li className="flex items-center gap-2"><svg width="28" height="10" aria-hidden><line x1="0" x2="28" y1="5" y2="5" stroke="#555B61" strokeWidth="2.25" strokeDasharray="2 3" /><rect x="10.5" y="1.5" width="7" height="7" fill="#555B61" /></svg>AC, actual cost (dotted, squares)</li>}
           </ul>
           <p className="text-[12px] text-warm-600 mt-1">EV and AC are known at each update&apos;s data date{obs.length > 1 ? ` (${obs.length} updates)` : ''}; between updates the lines are straight.</p>
         </>
       ) : (
         <div className="overflow-x-auto max-h-[360px]">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-[12px]">
             <thead><tr><th scope="col" className={th}>Date</th><th scope="col" className={th}>Update</th><th scope="col" className={th}>PV (cumulative)</th><th scope="col" className={th}>EV</th><th scope="col" className={th}>AC</th></tr></thead>
             <tbody>{rows.map(d => {
               const u = upd.find(p => p.dataDate === d)

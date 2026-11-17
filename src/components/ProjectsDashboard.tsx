@@ -188,7 +188,7 @@ export function ProjectsDashboard() {
       </>
       {/* First run (design package step 7): how RunF9 works, in three steps that match the real flow. */}
       <section aria-labelledby="first-run-h" className="max-w-4xl mx-auto">
-        <h2 id="first-run-h" className="text-[17px] font-semibold text-navy-950 text-center">Better schedules start with better questions</h2>
+        <h2 id="first-run-h" className="text-[16px] font-semibold text-ink text-center">Better schedules start with better questions</h2>
         <ol className="mt-4 grid gap-3 md:grid-cols-3">
           {([
             [MessageCircleQuestion, 'Ask what matters', 'The interview asks about your facility, permits, calendars and long-lead items. "Don\u2019t know" and "Can\u2019t share" are real answers; each becomes a visible assumption.'],
@@ -197,7 +197,7 @@ export function ProjectsDashboard() {
           ] as const).map(([Icon, title, text], i) => (
             <li key={title} className="rounded-[14px] border border-warm-200 bg-white p-4">
               <span aria-hidden className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-accent-100 text-accent-600"><Icon size={16} /></span>
-              <h3 className="mt-2 text-[14.5px] font-semibold text-navy-950"><span className="sr-only">Step {i + 1}: </span>{title}</h3>
+              <h3 className="mt-2 text-[14px] font-semibold text-ink"><span className="sr-only">Step {i + 1}: </span>{title}</h3>
               <p className="mt-1 text-[13px] leading-relaxed text-warm-600">{text}</p>
             </li>
           ))}
@@ -207,7 +207,7 @@ export function ProjectsDashboard() {
   )
 
   const FILTERS: { id: Filter; label: string; tone: string; icon: LucideIcon }[] = [
-    { id: 'all', label: 'All projects', tone: 'text-navy-950', icon: Folder },
+    { id: 'all', label: 'All projects', tone: 'text-ink', icon: Folder },
     { id: 'at_risk', label: 'At risk', tone: 'text-status-at-risk', icon: TriangleAlert },
     { id: 'attention', label: 'Watch', tone: 'text-status-attention', icon: ShieldAlert },
     { id: 'stale', label: 'Needs an update', tone: 'text-status-attention', icon: Clock },
@@ -222,7 +222,7 @@ export function ProjectsDashboard() {
         <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-navy-950'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-ink'}`}>
               <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
             </button>
           ))}
@@ -242,7 +242,7 @@ export function ProjectsDashboard() {
             const on = filter === f.id
             return (
               <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
-                className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+                className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
                 {on && <Check size={14} aria-hidden="true" />}{f.label} <span className={`tabular-nums font-medium ${on ? 'text-accent-700' : 'text-warm-600'}`}>{counts[f.id]}</span>
               </button>
             )
@@ -259,8 +259,8 @@ export function ProjectsDashboard() {
             <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
               className={`card-lift min-w-0 text-left rounded-[14px] border px-3 py-2.5 md:px-4 md:py-3 ${on ? 'border-navy-950 bg-white shadow-sm' : 'border-warm-200 bg-white/70 hover:bg-white'}`}>
               <span aria-hidden className="hidden md:inline-flex items-center justify-center w-7 h-7 rounded-lg bg-accent-100 text-accent-600 mb-2"><f.icon size={15} /></span>
-              <div className={`text-[20px] md:text-[26px] font-semibold tracking-[-0.03em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
-              <div className="text-[12px] md:text-[12.5px] font-medium text-warm-600 mt-1 md:mt-1.5 leading-tight">{f.label}</div>
+              <div className={`text-[20px] md:text-[24px] font-semibold tracking-[-0.02em] tabular-nums leading-none ${n === 0 && f.id !== 'all' ? 'text-warm-500' : f.tone}`}>{n}</div>
+              <div className="text-[12px] md:text-[12px] font-medium text-warm-600 mt-1 md:mt-1.5 leading-tight">{f.label}</div>
             </button>
           )
         })}
@@ -273,14 +273,14 @@ export function ProjectsDashboard() {
           <Search size={16} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-500" />
           <label htmlFor="project-search" className="sr-only">Search projects</label>
           <input id="project-search" ref={searchRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Search projects  ( / )"
-            className="w-full rounded-md border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-[14px] text-navy-950 placeholder:text-warm-500" />
-          {q && <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-warm-600 hover:text-navy-950"><X size={15} /></button>}
+            className="w-full rounded-md border border-warm-300 bg-white pl-10 pr-9 py-2.5 text-[14px] text-ink placeholder:text-warm-500" />
+          {q && <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-warm-600 hover:text-ink"><X size={15} /></button>}
         </div>
         <label className="sr-only" htmlFor="project-sort">Sort projects</label>
         <div className="relative">
           <ArrowUpDown size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-500 pointer-events-none" />
           <select id="project-sort" value={sort} onChange={e => { setSort(e.target.value as Sort); setCol(null) }}
-            className="appearance-none rounded-md border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13.5px] font-medium text-navy-950">
+            className="appearance-none rounded-md border border-warm-300 bg-white pl-9 pr-4 py-2.5 text-[13px] font-medium text-ink">
             <option value="attention">Most urgent first</option>
             <option value="recent">Recently updated</option>
             <option value="finish">Finish date</option>
@@ -294,8 +294,8 @@ export function ProjectsDashboard() {
 
       {!shown.length ? (
         <div className="text-center py-16 rounded-[14px] border border-dashed border-warm-300">
-          <p className="text-[15px] font-semibold text-navy-950">No projects match</p>
-          <p className="text-[13.5px] text-warm-600 mt-1">Try another word, or <button type="button" className="text-accent-600 font-medium hover:underline" onClick={() => { setQ(''); setFilter('all') }}>show all projects</button>.</p>
+          <p className="text-[14px] font-semibold text-ink">No projects match</p>
+          <p className="text-[13px] text-warm-600 mt-1">Try another word, or <button type="button" className="text-accent-600 font-medium hover:underline" onClick={() => { setQ(''); setFilter('all') }}>show all projects</button>.</p>
         </div>
       ) : view === 'table' || !viewLoaded ? (
         view === 'table' ? <ProjectTable rows={shown} onOpen={open} pins={pins} onPin={togglePin} col={col} setCol={setCol} /> : null
@@ -321,8 +321,8 @@ function Group({ title, note, rows, ...p }: { title: string; note?: string; rows
   return (
     <section aria-label={title}>
       <div className="flex items-baseline gap-2 mb-3">
-        <h2 className="text-[15px] font-semibold text-navy-950">{title}</h2>
-        {note && <span className="text-[12.5px] text-warm-600">{note}</span>}
+        <h2 className="text-[14px] font-semibold text-ink">{title}</h2>
+        {note && <span className="text-[12px] text-warm-600">{note}</span>}
       </div>
       <Grid rows={rows} {...p} />
     </section>
@@ -339,7 +339,7 @@ function Monogram({ title }: { title: string }) {
   const words = title.trim().split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w))
   const letters = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[1][0] : words[0]?.[1] ?? '')).toUpperCase() || 'P'
   const tint = MONO_TINTS[[...title].reduce((n, c) => n + c.charCodeAt(0), 0) % MONO_TINTS.length]
-  return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[14px] font-bold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
+  return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[14px] font-semibold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
 }
 
 /** The open items of every project in one list: what is late, at risk or stale, most serious first, each opening its project. */
@@ -352,7 +352,7 @@ function OpenItems({ rows, onOpen }: { rows: PortfolioRow[]; onOpen: (r: Portfol
   return (
     <section aria-labelledby="open-items-h" className="rounded-[14px] border border-warm-200 bg-white p-5 md:p-6">
       <div className="flex items-baseline gap-2">
-        <h2 id="open-items-h" className="text-[15px] font-semibold text-navy-950">Open items</h2>
+        <h2 id="open-items-h" className="text-[14px] font-semibold text-ink">Open items</h2>
         <span className="rounded-full border border-warm-300 px-2 text-[12px] font-semibold tabular-nums text-warm-700">{shown.length} of {items.length}</span>
       </div>
       <ul className="mt-2 divide-y divide-warm-200">
@@ -361,7 +361,7 @@ function OpenItems({ rows, onOpen }: { rows: PortfolioRow[]; onOpen: (r: Portfol
             <span className={`mt-0.5 flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-[12px] font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
             <div className="min-w-0 flex-1">
               <button type="button" onClick={() => onOpen(r)} className="text-left text-[14px] font-semibold text-accent-700 hover:underline">{r.title}</button>
-              <p className="text-[13.5px] leading-snug text-warm-700">{fmtDates(a.text)}</p>
+              <p className="text-[13px] leading-snug text-warm-700">{fmtDates(a.text)}</p>
             </div>
           </li>
         ))}
@@ -401,28 +401,28 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
           <Monogram title={r.title} />
           <div className="min-w-0">
             {/* The whole card opens the project; the link's box covers it */}
-            <button type="button" onClick={() => onOpen(r)} className="text-left text-[16px] font-semibold tracking-[-0.01em] text-navy-950 leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
+            <button type="button" onClick={() => onOpen(r)} className="text-left text-[16px] font-semibold tracking-[-0.01em] text-ink leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
               {r.title}
             </button>
-            <div className="text-[12.5px] text-warm-600 mt-0.5 truncate">{sourceLine(r)}</div>
+            <div className="text-[12px] text-warm-600 mt-0.5 truncate">{sourceLine(r)}</div>
           </div>
           </div>
           <PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} />
         </div>
         <div className={wide ? 'lg:flex-1 lg:min-w-0' : ''}>
         <div className={`mt-3 ${wide ? 'lg:mt-0' : ''}`}><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
-        {why && <p className="mt-2 text-[12.5px] leading-snug text-warm-700 line-clamp-2" title={why}>{why}</p>}
+        {why && <p className="mt-2 text-[12px] leading-snug text-warm-700 line-clamp-2" title={why}>{why}</p>}
         </div>
         {draft ? (
           <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
             <div className="text-[12px] font-medium text-warm-600">Next step</div>
-            <div className="text-[15px] font-semibold text-navy-950 mt-0.5">Finish the interview to generate the schedule</div>
+            <div className="text-[14px] font-semibold text-ink mt-0.5">Finish the interview to generate the schedule</div>
           </div>
         ) : (
           <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
             <div className="text-[12px] font-medium text-warm-600">Forecast finish</div>
             <div className="flex flex-wrap items-baseline gap-x-2.5 mt-0.5">
-              <span className="text-[22px] font-semibold tracking-[-0.02em] text-navy-950 tabular-nums">{fmtDate(r.finish)}</span>
+              <span className="text-[20px] font-semibold tracking-[-0.02em] text-ink tabular-nums">{fmtDate(r.finish)}</span>
               {v && <span className={`text-[13px] font-semibold ${v.cls}`}>{v.text}</span>}
               {!v && pastDays != null && <span className="text-[13px] font-semibold text-status-at-risk">{pastDays} {pastDays === 1 ? 'day' : 'days'} ago, not finished</span>}
             </div>
@@ -454,7 +454,7 @@ const COLS: { id: Col; label: string; num?: boolean }[] = [
 function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: PortfolioRow[]; col: { c: Col; dir: 1 | -1 } | null; setCol: (c: { c: Col; dir: 1 | -1 } | null) => void } & CardProps) {
   return (
     <div className="rounded-[14px] border border-warm-200 bg-white overflow-x-auto">
-      <table className="w-full text-[13.5px]">
+      <table className="w-full text-[13px]">
         <caption className="sr-only">Projects. Select a column heading to sort.</caption>
         <thead>
           <tr className="border-b border-warm-200 text-left">
@@ -465,7 +465,7 @@ function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: Portfo
               return (
                 <th key={c.id} scope="col" aria-sort={active ? (col!.dir === 1 ? 'ascending' : 'descending') : 'none'} className={`px-3 py-3 font-semibold text-warm-600 whitespace-nowrap ${c.num ? 'text-right' : ''}`}>
                   <button type="button" onClick={() => setCol(active ? (col!.dir === 1 ? { c: c.id, dir: -1 } : null) : { c: c.id, dir: 1 })}
-                    className={`inline-flex items-center gap-1 hover:text-navy-950 ${active ? 'text-navy-950' : ''}`}>
+                    className={`inline-flex items-center gap-1 hover:text-ink ${active ? 'text-ink' : ''}`}>
                     {c.label}<Icon size={13} aria-hidden className={active ? '' : 'opacity-40'} />
                   </button>
                 </th>
@@ -481,11 +481,11 @@ function ProjectTable({ rows, onOpen, pins, onPin, col, setCol }: { rows: Portfo
               <tr key={key(r)} className="border-b border-warm-200 last:border-0 hover:bg-warm-50 transition-colors">
                 <td className="pl-4"><PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} /></td>
                 <td className="px-3 py-3 min-w-[220px]">
-                  <button type="button" onClick={() => onOpen(r)} className="text-left font-semibold text-navy-950 hover:underline">{r.title}</button>
+                  <button type="button" onClick={() => onOpen(r)} className="text-left font-semibold text-ink hover:underline">{r.title}</button>
                   <div className="text-[12px] text-warm-600">{sourceLine(r)}</div>
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap"><span className="inline-flex items-center gap-1.5 text-warm-700"><span className={`w-2 h-2 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></td>
-                <td className="px-3 py-3 text-right tabular-nums text-navy-950 font-medium whitespace-nowrap">{fmtDate(r.finish)}</td>
+                <td className="px-3 py-3 text-right tabular-nums text-ink font-medium whitespace-nowrap">{fmtDate(r.finish)}</td>
                 <td className={`px-3 py-3 text-right whitespace-nowrap font-medium ${v?.cls ?? 'text-warm-600'}`}>{v?.text ?? '—'}</td>
                 <td className={`px-3 py-3 text-right tabular-nums whitespace-nowrap ${isStale(r) ? 'text-status-attention font-semibold' : 'text-warm-700'}`}>{r.dataDate ? fmtDate(r.dataDate) : '—'}</td>
                 <td className="px-3 py-3 text-right tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(r.start)}</td>
@@ -510,18 +510,18 @@ function DataLocationPicker({ loc }: { loc: DataLocation }) {
   return (
     <div className="mt-2">
       <button type="button" aria-expanded={open} aria-controls={pid} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-full border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-navy-950">
+        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-full border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-ink">
         <Cloud size={14} aria-hidden className="flex-shrink-0" />
         <span className="sr-only">Data storage: </span>
-        <span className="truncate font-semibold text-navy-950">{loc.label}</span>
+        <span className="truncate font-semibold text-ink">{loc.label}</span>
         <ChevronDown size={14} aria-hidden className={`flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       <div id={pid} role="region" aria-label="Data storage" data-open={open} className="disclosure-panel" inert={!open || undefined}>
         <div className="disclosure-inner">
           <div className="mt-2 max-w-xl rounded-2xl border border-warm-200 bg-white p-4 text-[13px] leading-relaxed">
             <dl className="space-y-2">
-              <div><dt className="font-semibold text-navy-950">Stored in</dt><dd className="text-warm-700">{loc.database}</dd></div>
-              <div><dt className="font-semibold text-navy-950">Document search</dt><dd className="text-warm-700">{loc.documentSearch}</dd></div>
+              <div><dt className="font-semibold text-ink">Stored in</dt><dd className="text-warm-700">{loc.database}</dd></div>
+              <div><dt className="font-semibold text-ink">Document search</dt><dd className="text-warm-700">{loc.documentSearch}</dd></div>
             </dl>
             <Link href="/dashboard/org#cloud-storage" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-accent-700">
               Connect AWS, Azure or Google Cloud

@@ -20,14 +20,14 @@ export interface EmailContent {
 }
 
 const T = {
-  page: '#F4F6F6',
+  page: '#F4F5F6',
   card: '#FFFFFF',
   line: '#E2E6E6',
-  heading: '#06141B',
-  text: '#253745',
-  muted: '#3F4E5A',
-  accent: '#2563eb',
-  accentHover: '#1d4ed8',
+  heading: '#1D2125',
+  text: '#33383D',
+  muted: '#4B5056',
+  accent: '#2B63C1',
+  accentHover: '#1F4E9E',
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

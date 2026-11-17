@@ -38,14 +38,14 @@ export function ImportExceptions({ report, title = 'Import exceptions', defaultO
           <dl className="flex flex-wrap gap-1.5 text-[12px]" aria-label="Counts by entity">
             {EXCEPTION_ENTITIES.filter(e => sum.byEntity[e]).map(e => (
               <div key={e} className="flex gap-1 bg-warm-200 rounded px-1.5 py-0.5">
-                <dt className="text-warm-600">{ENTITY_LABEL[e]}</dt><dd className="text-navy-950 font-medium tabular-nums">{sum.byEntity[e]!.toLocaleString()}</dd>
+                <dt className="text-warm-600">{ENTITY_LABEL[e]}</dt><dd className="text-ink font-medium tabular-nums">{sum.byEntity[e]!.toLocaleString()}</dd>
               </div>
             ))}
           </dl>
           <dl className="flex flex-wrap gap-1.5 text-[12px]" aria-label="Counts by disposition">
             {EXCEPTION_DISPOSITIONS.filter(d => sum.byDisposition[d]).map(d => (
               <div key={d} className="flex gap-1 border border-warm-300 rounded px-1.5 py-0.5">
-                <dt className="text-warm-600">{DISPOSITION_LABEL[d]}</dt><dd className="text-navy-950 font-medium tabular-nums">{sum.byDisposition[d]!.toLocaleString()}</dd>
+                <dt className="text-warm-600">{DISPOSITION_LABEL[d]}</dt><dd className="text-ink font-medium tabular-nums">{sum.byDisposition[d]!.toLocaleString()}</dd>
               </div>
             ))}
           </dl>

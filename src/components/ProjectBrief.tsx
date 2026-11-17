@@ -140,14 +140,14 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
 
       {data.alerts.length > 0 && (
         <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
-          <h2 id="alerts-h" className="text-[16px] font-semibold text-navy-950">Needs attention today ({data.alerts.filter(a => a.level === 'act').length} to act on, {data.alerts.filter(a => a.level === 'watch').length} to watch)</h2>
-          <ul className="mt-2 divide-y divide-warm-200 [&>li]:py-2 [&>li]:text-[13.5px]">
+          <h2 id="alerts-h" className="text-[16px] font-semibold text-ink">Needs attention today ({data.alerts.filter(a => a.level === 'act').length} to act on, {data.alerts.filter(a => a.level === 'watch').length} to watch)</h2>
+          <ul className="mt-2 divide-y divide-warm-200 [&>li]:py-2 [&>li]:text-[13px]">
             {data.alerts.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
                 <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
                 {/* The kind of item is its own column on a wide screen, so the list can be scanned down its left edge. */}
-                <span className="hidden md:block flex-shrink-0 w-[112px] font-semibold text-navy-950">{ALERT_SUBJECT[a.section] ?? ''}</span>
-                <span className="flex-1 min-w-0" title={a.short ? fmtDates(a.text) : undefined}>{ALERT_SUBJECT[a.section] && <span className="md:hidden font-semibold text-navy-950">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.short ?? a.text)}</span>
+                <span className="hidden md:block flex-shrink-0 w-[112px] font-semibold text-ink">{ALERT_SUBJECT[a.section] ?? ''}</span>
+                <span className="flex-1 min-w-0" title={a.short ? fmtDates(a.text) : undefined}>{ALERT_SUBJECT[a.section] && <span className="md:hidden font-semibold text-ink">{ALERT_SUBJECT[a.section]}. </span>}{fmtDates(a.short ?? a.text)}</span>
                 {ALERT_CARD[a.section] && <button type="button" onClick={() => show(ALERT_CARD[a.section])} className="flex-shrink-0 inline-flex items-center gap-0.5 text-[13px] font-semibold text-accent-600 hover:underline">Details<span aria-hidden="true">›</span></button>}
               </li>
             ))}
@@ -163,7 +163,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
           <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
           <List title={`Under way (${b.today.inProgressCount})`} rows={b.today.inProgress.slice(0, 6)} empty="Nothing is in progress." dateLabel="finish" action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
-          {b.today.inProgressCount > 6 && <p className="text-[12.5px] text-warm-600">and {b.today.inProgressCount - 6} more under way; the Gantt chart lists them all.</p>}
+          {b.today.inProgressCount > 6 && <p className="text-[12px] text-warm-600">and {b.today.inProgressCount - 6} more under way; the Gantt chart lists them all.</p>}
         </Card>}
           {has.overdue && <Card id="overdue" open={isOpen('overdue')} onToggle={() => toggle('overdue')} meta={b.overdue.finishCount + b.overdue.startCount ? `${b.overdue.finishCount + b.overdue.startCount} overdue` : 'None'} icon={<AlertTriangle size={15} />} title="Should have happened by now" sub={`${b.overdue.finishCount} finish${b.overdue.finishCount === 1 ? '' : 'es'} and ${b.overdue.startCount} start${b.overdue.startCount === 1 ? '' : 's'} without actual dates`}>
           <List title="Should have finished" rows={b.overdue.shouldHaveFinished} empty="Nothing is past its finish." late action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
@@ -188,15 +188,15 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">What moves the finish</h2>
         <div className="grid md:grid-cols-2 gap-3 items-start">
           <Card id="driving" open={isOpen('driving')} onToggle={() => toggle('driving')} meta={b.driving.today ? b.driving.today.code : 'No driving path'} icon={<Route size={15} />} title="What is driving the project" sub="The open activities that set the finish date, in order">
-          {b.driving.today ? <p className="text-[14px] text-navy-950"><strong>Driving today:</strong> {b.driving.today.code} {b.driving.today.name}{b.driving.today.date ? `, finish ${fmtDate(b.driving.today.date)}` : ''}</p> : <p className="text-[13px] text-warm-600">No driving path: the schedule has no logic RunF9 can calculate.</p>}
+          {b.driving.today ? <p className="text-[14px] text-ink"><strong>Driving today:</strong> {b.driving.today.code} {b.driving.today.name}{b.driving.today.date ? `, finish ${fmtDate(b.driving.today.date)}` : ''}</p> : <p className="text-[13px] text-warm-600">No driving path: the schedule has no logic RunF9 can calculate.</p>}
           {b.driving.path.length > 1 && <ol className="list-decimal pl-5 text-[13px] text-warm-700 space-y-0.5">{b.driving.path.map(r => <li key={r.id}>{r.code} {r.name}{r.date ? ` · ${fmtDate(r.date)}` : ''}</li>)}</ol>}
           <Link href="/dashboard/timeline" className="text-[13px] font-medium text-accent-600 hover:underline">Open the schedule</Link>
         </Card>
           <Card id="whatif" open={isOpen('whatif')} onToggle={() => toggle('whatif')} meta={count(b.whatIfs.length, 'what-if', 'what-ifs')} icon={<Sparkles size={15} />} title="What-if, run today" sub="Recalculated on the real network; nothing is saved">
           {b.whatIfs.length === 0 ? <p className="text-[13px] text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
-            <li key={i} className="text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</li>
+            <li key={i} className="text-[13px] text-warm-700"><span className="block text-[12px] font-semibold text-ink">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
-          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12.5px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet under Health, Delays: the result can differ, because added work sits where the document ties it.</p>}
+          {b.whatIfs.some(w => w.title.startsWith('Correspondence') || w.title.startsWith('Register')) && <p className="text-[12px] text-warm-600">These lengthen the named activity only. If the change adds new work, model it as a fragnet under Health, Delays: the result can differ, because added work sits where the document ties it.</p>}
           <form className="flex flex-wrap items-end gap-2 pt-1" onSubmit={e => { e.preventDefault(); if (whatIf.activity.trim()) setRanWhatIf({ ...whatIf }) }}>
             <datalist id="wi-acts">{data.activities.slice(0, 2000).map(a => <option key={a.id} value={a.code}>{a.name}</option>)}</datalist>
             <label className="text-[12px] text-warm-600">If this activity<input list="wi-acts" value={whatIf.activity} onChange={e => setWhatIf(w => ({ ...w, activity: e.target.value }))} placeholder="Activity ID" className={`${input} block mt-0.5 w-36`} /></label>
@@ -205,17 +205,17 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </form>
           <div aria-live="polite">
             {b.whatIfs.filter(w => w.title.startsWith('Your what-if')).map((w, i) => (
-              <p key={i} ref={el => { if (el && shownWhatIf.current !== w.text) { shownWhatIf.current = w.text; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } }} className="rounded-lg border border-accent-600/40 bg-white p-3 text-[13.5px] text-warm-700"><span className="block text-[12px] font-semibold text-navy-950">{w.title}</span>{fmtDates(w.text)}</p>
+              <p key={i} ref={el => { if (el && shownWhatIf.current !== w.text) { shownWhatIf.current = w.text; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } }} className="rounded-lg border border-accent-600/40 bg-white p-3 text-[13px] text-warm-700"><span className="block text-[12px] font-semibold text-ink">{w.title}</span>{fmtDates(w.text)}</p>
             ))}
           </div>
         </Card>
           {has.risks && <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Risks the schedule shows" sub="Calculated from the schedule: what could move the finish">
           {b.risks.length === 0 ? <p className="text-[13px] text-warm-600">No schedule risk today.</p> : <ul className="space-y-2">{b.risks.map((r, i) => (
-            <li key={i} className="text-[13.5px] text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-bold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>
+            <li key={i} className="text-[13px] text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-semibold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>
           ))}</ul>}
         </Card>}
           {has.issues && <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Issues the schedule shows" sub="Calculated from the schedule: what is already wrong">
-          {b.issues.length === 0 ? <p className="text-[13px] text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-[13.5px] text-warm-700">{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>)}</ul>}
+          {b.issues.length === 0 ? <p className="text-[13px] text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-[13px] text-warm-700">{fmtDates(r.text)} <span className="text-[12px] text-warm-600">({r.source})</span></li>)}</ul>}
         </Card>}
         </div>
       </section>
@@ -230,10 +230,10 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         ) : (
           <ul className="space-y-2">{b.signals.slice(0, 10).map((s, i) => (
             <li key={i} className="rounded-lg border border-warm-200 p-3 text-[13px]">
-              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-bold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
+              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-semibold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
               <q className="text-warm-700">{s.quote}</q>
               <span className="block text-[12px] text-warm-600 mt-1">{s.citation.includes(s.title) ? s.citation : `${s.title} ${s.citation}`}{s.activity ? ` · about ${s.activity.code} ${s.activity.name}` : ''}{s.days ? ` · ${s.days} work day${s.days === 1 ? '' : 's'}` : ''}</span>
-              {canWrite && s.kind !== 'commitment' && (items.some(it => it.sourceQuote === s.quote) ? <span className="mt-1.5 block text-[12.5px] text-warm-600">In the register</span> : <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12.5px] font-medium text-accent-600 hover:underline" onClick={async () => {
+              {canWrite && s.kind !== 'commitment' && (items.some(it => it.sourceQuote === s.quote) ? <span className="mt-1.5 block text-[12px] text-warm-600">In the register</span> : <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12px] font-medium text-accent-600 hover:underline" onClick={async () => {
                 setBusy(`sig${i}`)
                 const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/register`, { kind: s.kind === 'change' ? 'pco' : s.kind === 'delay' ? 'issue' : 'risk', title: s.quote.slice(0, 180), impactDays: s.days, activityCodes: s.activity ? [s.activity.code] : [], sourceDocumentId: s.documentId, sourceQuote: s.quote })
                 setBusy('')
@@ -249,7 +249,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           ) : (
             <ul className="space-y-2.5">{data.watch.contract.map((c, i) => (
               <li key={i} className={`rounded-lg border p-3 text-[13px] ${c.active ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-warm-200'}`}>
-                <span className="font-medium text-navy-950">{fmtDates(c.text)}</span>
+                <span className="font-medium text-ink">{fmtDates(c.text)}</span>
                 <q className="mt-1 block text-warm-700">{c.quote}</q>
                 <span className="mt-1 block text-[12px] text-warm-600">{c.citation.includes(c.title) ? c.citation : `${c.title} ${c.citation}`}</span>
                 {(can('ai.use') || aiOff) && <ExplainClause key={`${sid}:${c.title}:${c.quote.slice(0, 40)}`} scheduleId={sid!} title={c.title} quote={c.quote} aiOff={aiOff} />}
@@ -257,23 +257,23 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
             ))}</ul>
           )}
           {data.watch.read.contract > 0 && (
-            <p className="text-[12.5px] text-warm-600">These are the clauses that state a number of days, an amount or a frequency. For obligations worded less directly, <Link href={`/dashboard/ask?schedule=${encodeURIComponent(sid!)}&docs=1&unreviewed=1&q=${encodeURIComponent('List every obligation in the contract documents that carries a deadline, a notice requirement, a submittal or a penalty, with the clause each comes from, and say which ones the current schedule status triggers.')}`} className="font-medium text-accent-600 hover:underline">ask AI to read the contract</Link>; its answer cites each clause.</p>
+            <p className="text-[12px] text-warm-600">These are the clauses that state a number of days, an amount or a frequency. For obligations worded less directly, <Link href={`/dashboard/ask?schedule=${encodeURIComponent(sid!)}&docs=1&unreviewed=1&q=${encodeURIComponent('List every obligation in the contract documents that carries a deadline, a notice requirement, a submittal or a penalty, with the clause each comes from, and say which ones the current schedule status triggers.')}`} className="font-medium text-accent-600 hover:underline">ask AI to read the contract</Link>; its answer cites each clause.</p>
           )}
         </Card>}
           {has.field && <Card id="field" open={isOpen('field')} onToggle={() => toggle('field')} meta={count(data.watch.field.length + data.watch.notInSchedule.length, 'mismatch', 'mismatches')} icon={<HardHat size={15} />} title="The field and the drawings against the schedule" sub="What the daily reports and the design documents say that the schedule does not">
           <div>
-            <h4 className="text-[13px] font-semibold text-navy-950">In the ground, not in the schedule</h4>
+            <h4 className="text-[13px] font-semibold text-ink">In the ground, not in the schedule</h4>
             {data.watch.field.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.field ? 'The daily reports agree with the schedule.' : 'Add daily field reports under Project records to compare the work on site with the schedule.'}</p> : (
               <ul className="space-y-2">{data.watch.field.map((f, i) => (
-                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{f.text}</span><q className="block">{f.quote}</q><span className="block text-[12px] text-warm-600">{f.citation.includes(f.title) ? f.citation : `${f.title} ${f.citation}`}</span></li>
+                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-ink">{f.text}</span><q className="block">{f.quote}</q><span className="block text-[12px] text-warm-600">{f.citation.includes(f.title) ? f.citation : `${f.title} ${f.citation}`}</span></li>
               ))}</ul>
             )}
           </div>
           <div>
-            <h4 className="text-[13px] font-semibold text-navy-950">In the drawings and specifications, not in the schedule</h4>
+            <h4 className="text-[13px] font-semibold text-ink">In the drawings and specifications, not in the schedule</h4>
             {data.watch.notInSchedule.length === 0 ? <p className="text-[13px] text-warm-600">{data.watch.read.design ? 'Every kind of work the design documents name has an activity.' : 'Add drawings and specifications under Project records to check that their scope is in the schedule.'}</p> : (
               <ul className="space-y-2">{data.watch.notInSchedule.map((g, i) => (
-                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{g.label}: no activity covers it.</span><q className="block">{g.quote}</q><span className="block text-[12px] text-warm-600">{g.citation.includes(g.title) ? g.citation : `${g.title} ${g.citation}`}</span></li>
+                <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-ink">{g.label}: no activity covers it.</span><q className="block">{g.quote}</q><span className="block text-[12px] text-warm-600">{g.citation.includes(g.title) ? g.citation : `${g.title} ${g.citation}`}</span></li>
               ))}</ul>
             )}
           </div>
@@ -291,18 +291,18 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
             <Register sid={sid!} items={items} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
           </Card>
           {has.changed && <Card id="changed" open={isOpen('changed')} onToggle={() => toggle('changed')} meta={count(b.changed.edits.length, 'change')} icon={<GitBranch size={15} />} title="What changed" sub="Changes made in RunF9 in the last 7 days, and since the previous update">
-        {b.changed.finishMovedDays != null && <p className="text-[13.5px] text-navy-950">With all RunF9 edits, the finish is <strong>{Math.abs(b.changed.finishMovedDays)} day{Math.abs(b.changed.finishMovedDays) === 1 ? '' : 's'} {b.changed.finishMovedDays > 0 ? 'later' : 'earlier'}</strong> than the schedule as submitted.</p>}
+        {b.changed.finishMovedDays != null && <p className="text-[13px] text-ink">With all RunF9 edits, the finish is <strong>{Math.abs(b.changed.finishMovedDays)} day{Math.abs(b.changed.finishMovedDays) === 1 ? '' : 's'} {b.changed.finishMovedDays > 0 ? 'later' : 'earlier'}</strong> than the schedule as submitted.</p>}
         {b.changed.edits.length === 0 ? <p className="text-[13px] text-warm-600">No changes were made in RunF9 in the last 7 days.</p> : (
           <ul className="space-y-1.5">{b.changed.edits.map((c, i) => (
             <li key={i} className="rounded-lg border-l-2 border-accent-500 bg-accent-100 px-3 py-2 text-[13px] text-warm-700">
-              <span className="font-semibold text-navy-950">{fmtDates(c.what)}</span>: {fmtDates(c.before)} → {fmtDates(c.after)}
+              <span className="font-semibold text-ink">{fmtDates(c.what)}</span>: {fmtDates(c.before)} → {fmtDates(c.after)}
               <span className="block text-[12px] text-warm-600">{c.by}, {fmtDay(c.at)} · {c.reason}</span>
             </li>
           ))}</ul>
         )}
         {impact && impact.movedCount > 0 && b.changed.edits.length > 0 && (
           <div>
-            <p className="text-[12.5px] font-semibold text-navy-950">What these changes move ({impact.movedCount} open {impact.movedCount === 1 ? 'activity' : 'activities'})</p>
+            <p className="text-[12px] font-semibold text-ink">What these changes move ({impact.movedCount} open {impact.movedCount === 1 ? 'activity' : 'activities'})</p>
             <ul className="text-[13px] text-warm-700">{impact.moved.slice(0, 6).map(m => <li key={m.id}><span className="font-mono text-[12px] text-warm-600">{m.code}</span> {m.name}: finish {m.finishDays === 0 ? 'unchanged' : `${Math.abs(m.finishDays)} day${Math.abs(m.finishDays) === 1 ? '' : 's'} ${m.finishDays > 0 ? 'later' : 'earlier'}`}</li>)}</ul>
             <Link href="/dashboard/timeline" className="text-[13px] font-medium text-accent-600 hover:underline">See them marked on the schedule</Link>
           </div>
@@ -312,14 +312,14 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         )}
       </Card>}
           {has.missing && <Card id="missing" open={isOpen('missing')} onToggle={() => toggle('missing')} meta={count(b.missing.scope.length + b.missing.proposals.length + (b.missing.looseEnds ? 1 : 0), 'item')} icon={<PlayCircle size={15} />} title="What is missing" sub="Scope and logic the schedule should probably have">
-          {b.missing.scope.length > 0 && <div><p className="text-[12.5px] font-semibold text-navy-950">Not found in any activity name or WBS (confirm it is covered):</p><ul className="list-disc pl-5 text-[13px] text-warm-700">{b.missing.scope.map(x => <li key={x}>{x}</li>)}</ul></div>}
+          {b.missing.scope.length > 0 && <div><p className="text-[12px] font-semibold text-ink">Not found in any activity name or WBS (confirm it is covered):</p><ul className="list-disc pl-5 text-[13px] text-warm-700">{b.missing.scope.map(x => <li key={x}>{x}</li>)}</ul></div>}
           {b.missing.looseEnds > 0 && <p className="text-[13px] text-warm-700">{b.missing.looseEnds} open activit{b.missing.looseEnds === 1 ? 'y has' : 'ies have'} no predecessor or no successor, so a delay there cannot reach the finish date.</p>}
-          {b.missing.proposals.length > 0 && <ul className="space-y-1.5">{b.missing.proposals.map((p, i) => <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{p.text}</span><span className="block text-[12px] text-warm-600">{p.reason}</span></li>)}</ul>}
+          {b.missing.proposals.length > 0 && <ul className="space-y-1.5">{b.missing.proposals.map((p, i) => <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-ink">{p.text}</span><span className="block text-[12px] text-warm-600">{p.reason}</span></li>)}</ul>}
           {b.missing.scope.length === 0 && b.missing.looseEnds === 0 && <p className="text-[13px] text-warm-600">Nothing obvious is missing.</p>}
           <Link href="/dashboard/quality" className="text-[13px] font-medium text-accent-600 hover:underline">Review and add the links in Quality</Link>
         </Card>}
           {has.logic && <Card id="logic" open={isOpen('logic')} onToggle={() => toggle('logic')} meta={count(b.logic.length, 'link')} icon={<GitBranch size={15} />} title="Logic that does not make sense" sub="Links that run against the usual order of work">
-          {b.logic.length === 0 ? <p className="text-[13px] text-warm-600">No link runs against the usual order of work.</p> : <ul className="space-y-1.5">{b.logic.map((p, i) => <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-navy-950">{p.text}</span><span className="block text-[12px] text-warm-600">{p.reason}</span></li>)}</ul>}
+          {b.logic.length === 0 ? <p className="text-[13px] text-warm-600">No link runs against the usual order of work.</p> : <ul className="space-y-1.5">{b.logic.map((p, i) => <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-ink">{p.text}</span><span className="block text-[12px] text-warm-600">{p.reason}</span></li>)}</ul>}
         </Card>}
           <Card id="brief" open={isOpen('brief')} onToggle={() => toggle('brief')} meta={`${audienceLabel} version`} icon={<Mail size={15} />} title="Daily brief to send" sub="The same facts, written for the reader you choose">
             <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
@@ -355,7 +355,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </label>
         )}
         <div className="mt-3">
-          <p className="text-[12.5px] text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
+          <p className="text-[12px] text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
           <ul className="space-y-2">
             {b.audiences[audience].map((l, i) => <li key={i} className="flex gap-2 text-[14px] text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
           </ul>
@@ -376,7 +376,7 @@ function Card({ id, icon, title, sub, meta, open, onToggle, children }: { id: st
       <h3>
         <button type="button" aria-expanded={open} aria-controls={`card-${id}-body`} onClick={onToggle} className="w-full flex items-center gap-2.5 text-left px-4 md:px-5 py-3 min-h-[56px] rounded-[14px] hover:bg-warm-50">
           <span aria-hidden className="inline-flex flex-shrink-0 items-center justify-center w-7 h-7 rounded-lg bg-accent-100 text-accent-600">{icon}</span>
-          <span className="flex-1 min-w-0 text-[15px] font-semibold text-navy-950">{title}</span>
+          <span className="flex-1 min-w-0 text-[14px] font-semibold text-ink">{title}</span>
           {meta && <span className="text-[13px] text-warm-700 tabular-nums text-right">{meta}</span>}
           <ChevronDown size={17} aria-hidden className={`flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
@@ -399,13 +399,13 @@ function RowBtn({ label, onClick, busy, disabled }: { label: string; onClick: ()
 function List({ title, rows, empty, late, showNote, dateLabel, plain, action }: { title: string; rows: BriefRow[]; empty: string; late?: boolean; showNote?: boolean; dateLabel?: string; /** Dates only: no float (work that is already done) */ plain?: boolean; action?: (r: BriefRow) => React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-[13px] font-semibold text-navy-950">{title}</h4>
+      <h4 className="text-[13px] font-semibold text-ink">{title}</h4>
       {rows.length === 0 ? <p className="text-[13px] text-warm-600">{empty}</p> : (
         <ul className="divide-y divide-warm-200">
           {rows.map(r => (
             <li key={r.id} className="py-1.5 flex items-start justify-between gap-3 text-[13px]">
               <span className="min-w-0"><span className="font-mono text-[12px] text-warm-600">{r.code}</span> <span className="text-warm-700">{r.name}</span>
-                {r.critical && <span className="ml-1.5 text-[12px] font-bold text-status-at-risk">CRITICAL</span>}
+                {r.critical && <span className="ml-1.5 text-[12px] font-semibold text-status-at-risk">CRITICAL</span>}
                 <span className="block text-[12px] text-warm-600">{r.date ? `${showNote && r.note && !/float/.test(r.note) ? `${r.note} ` : dateLabel ? `${dateLabel} ` : ''}${fmtDate(r.date)}` : ''}{late && r.daysLate ? ` · ${r.daysLate} day${r.daysLate === 1 ? '' : 's'} late` : ''}{showNote && r.note && /float/.test(r.note) ? ` · ${r.note}` : ''}{!plain && !r.critical && r.float != null && !showNote ? ` · float ${r.float}d` : ''}</span>
               </span>
               {action?.(r)}
@@ -445,9 +445,9 @@ function Register({ sid, items, canWrite, activities, onChanged, today }: { sid:
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-[12.5px] text-warm-600">Entered by your team, separate from what RunF9 calculates above: risks, issues, PCOs, change requests, change orders and contract amendments. Give an item an activity and a number of days and it joins tomorrow’s what-if runs.</p>
+          <p className="text-[12px] text-warm-600">Entered by your team, separate from what RunF9 calculates above: risks, issues, PCOs, change requests, change orders and contract amendments. Give an item an activity and a number of days and it joins tomorrow’s what-if runs.</p>
         </div>
-        {items.some(i => i.status === 'closed') && <label className="text-[12.5px] text-warm-700"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} /> Show closed</label>}
+        {items.some(i => i.status === 'closed') && <label className="text-[12px] text-warm-700"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} /> Show closed</label>}
       </div>
       {err && <Alert tone="error">{err}</Alert>}
       {shown.length === 0 ? <p className="text-[13px] text-warm-600">No items yet.</p> : (
@@ -455,7 +455,7 @@ function Register({ sid, items, canWrite, activities, onChanged, today }: { sid:
           {(all ? shown : shown.slice(0, 3)).map(i => (
             <li key={i.id} className="py-2 flex items-start justify-between gap-3 text-[13px]">
               <span className="min-w-0">
-                <span className="mr-1.5 inline-block px-2 py-0.5 rounded-full bg-warm-100 text-[12px] font-semibold text-navy-950">{KIND_LABEL[i.kind]}</span>
+                <span className="mr-1.5 inline-block px-2 py-0.5 rounded-full bg-warm-100 text-[12px] font-semibold text-ink">{KIND_LABEL[i.kind]}</span>
                 <span className={i.status === 'closed' ? 'text-warm-600 line-through' : 'text-warm-700'}>{i.title}</span>
                 <span className="block text-[12px] text-warm-600">{[i.owner && `owner ${i.owner}`, i.dueDate && `due ${fmtDate(i.dueDate)}${i.status === 'open' && i.dueDate < today ? ' (overdue)' : ''}`, i.impactDays != null && `${i.impactDays} work day${Math.abs(i.impactDays) === 1 ? '' : 's'}`, i.activityCodes?.length ? i.activityCodes.join(', ') : null, i.sourceDocumentId ? 'from a project document' : null, `added ${fmtDay(i.createdAt)}${i.createdByName ? ` by ${i.createdByName}` : ''}`].filter(Boolean).join(' · ')}</span>
               </span>
@@ -500,17 +500,17 @@ function ExplainClause({ scheduleId, title, quote, aiOff }: { scheduleId: string
       setState({ busy: false, answer, error: r.ok && answer ? '' : String(r.data.error || 'The clause could not be explained. Try again in a moment.') })
     } catch { setState({ busy: false, answer: '', error: 'Could not reach RunF9. Check your connection and try again.' }) }
   }
-  if (aiOff) return <p className="mt-1 text-[12.5px] text-warm-600">AI is turned off, so this clause is quoted but not explained. An admin can turn AI on under Organization.</p>
+  if (aiOff) return <p className="mt-1 text-[12px] text-warm-600">AI is turned off, so this clause is quoted but not explained. An admin can turn AI on under Organization.</p>
   return (
     <div className="mt-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <button type="button" onClick={ask} disabled={state.busy} className="text-[12.5px] font-medium text-accent-600 hover:underline disabled:opacity-60">
+        <button type="button" onClick={ask} disabled={state.busy} className="text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">
           {state.busy ? <><Loader2 size={12} className="inline animate-spin -mt-0.5 mr-1" aria-hidden />Reading the contract…</> : state.answer ? 'Explain again' : 'Explain this clause'}
         </button>
-        <Link className="text-[12.5px] text-warm-600 hover:underline" href={`/dashboard/ask?schedule=${encodeURIComponent(scheduleId)}&docs=1&unreviewed=1&q=${encodeURIComponent(question)}`}>Ask a follow-up in Ask AI</Link>
+        <Link className="text-[12px] text-warm-600 hover:underline" href={`/dashboard/ask?schedule=${encodeURIComponent(scheduleId)}&docs=1&unreviewed=1&q=${encodeURIComponent(question)}`}>Ask a follow-up in Ask AI</Link>
       </div>
       <div aria-live="polite">
-        {state.error && <p className="mt-1 text-[12.5px] text-status-at-risk">{state.error}</p>}
+        {state.error && <p className="mt-1 text-[12px] text-status-at-risk">{state.error}</p>}
         {state.answer && (
           <div className="mt-2 rounded-md border border-warm-200 bg-white p-3 text-[13px] text-warm-700">
             <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-warm-600">What this means for the project (AI, from your documents)</p>

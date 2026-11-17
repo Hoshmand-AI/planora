@@ -73,7 +73,7 @@ export function Workspaces({ members }: { members: Member[] }) {
           <li key={w.id} className="border border-warm-200 rounded-md p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-medium text-navy-950 text-[14px]">{w.name}</span>
+                <span className="font-medium text-ink text-[14px]">{w.name}</span>
                 <span className="text-[12px] text-warm-600"> · {w.walled ? 'Restricted: members only' : 'Open to the organization'} · {w.scheduleCount} schedule(s), {w.planCount} plan(s)</span>
               </div>
               <div className="flex gap-1">
@@ -104,12 +104,12 @@ export function Workspaces({ members }: { members: Member[] }) {
         ))}
       </ul>
 
-      <h3 className="text-[13.5px] font-medium text-navy-950 mb-1">Limit members to their workspaces</h3>
-      <p className="text-[12.5px] text-warm-600 mb-2">A limited member sees only the schedules and plans in workspaces they belong to, including on exports, reports, comparisons, the portfolio and firm history.</p>
+      <h3 className="text-[13px] font-medium text-ink mb-1">Limit members to their workspaces</h3>
+      <p className="text-[12px] text-warm-600 mb-2">A limited member sees only the schedules and plans in workspaces they belong to, including on exports, reports, comparisons, the portfolio and firm history.</p>
       <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md mb-5">
         {members.map(m => (
           <li key={m.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
-            <span><span className="text-navy-950 font-medium">{m.name}</span> <span className="text-warm-600">· <span className="capitalize">{m.role}</span></span></span>
+            <span><span className="text-ink font-medium">{m.name}</span> <span className="text-warm-600">· <span className="capitalize">{m.role}</span></span></span>
             {SEES_ALL.includes(m.role)
               ? <span className="text-[12px] text-warm-600">Sees every workspace</span>
               : <label className="flex items-center gap-2 text-warm-700"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={restricted.has(m.id)} disabled={busy === `r:${m.id}`}
@@ -120,8 +120,8 @@ export function Workspaces({ members }: { members: Member[] }) {
 
       {!!data.workspaces.length && (
         <>
-          <h3 className="text-[13.5px] font-medium text-navy-950 mb-1">Schedules and plans</h3>
-          <p className="text-[12.5px] text-warm-600 mb-2">Moving an uploaded schedule moves every update of that project; moving a plan moves the schedules published from it.</p>
+          <h3 className="text-[13px] font-medium text-ink mb-1">Schedules and plans</h3>
+          <p className="text-[12px] text-warm-600 mb-2">Moving an uploaded schedule moves every update of that project; moving a plan moves the schedules published from it.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <caption className="sr-only">Workspace of each schedule and plan</caption>
@@ -131,7 +131,7 @@ export function Workspaces({ members }: { members: Member[] }) {
               <tbody>
                 {([['schedule', data.items.schedules], ['plan', data.items.plans]] as const).flatMap(([type, items]) => items.map(it => (
                   <tr key={`${type}:${it.id}`} className="border-b border-warm-100">
-                    <td className="py-2 pr-3 text-navy-950">{it.name}<span className="text-warm-600 text-[12px]"> · {type === 'schedule' ? 'Uploaded schedule' : 'Plan'}</span></td>
+                    <td className="py-2 pr-3 text-ink">{it.name}<span className="text-warm-600 text-[12px]"> · {type === 'schedule' ? 'Uploaded schedule' : 'Plan'}</span></td>
                     <td className="py-2">
                       <select aria-label={`Workspace for ${it.name}`} className={selectClass} value={it.workspaceId ?? ''} disabled={busy === `a:${it.id}`}
                         onChange={e => act(`a:${it.id}`, { action: 'assign', itemType: type, itemId: it.id, workspaceId: e.target.value || null }, `${it.name} moved.`)}>

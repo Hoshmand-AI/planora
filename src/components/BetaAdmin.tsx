@@ -19,7 +19,7 @@ interface BetaUser {
 interface Data { signup: { mode: string; accessRequestEmail: string | null }; emailDelivery: boolean; inviteDays: number; invites: Invite[]; users: BetaUser[] }
 
 const STATUS: Record<Invite['status'], { label: string; cls: string }> = {
-  pending: { label: 'Pending', cls: 'bg-accent-100 text-navy-950' },
+  pending: { label: 'Pending', cls: 'bg-accent-100 text-ink' },
   accepted: { label: 'Accepted', cls: 'bg-status-on-track-bg text-status-on-track' },
   revoked: { label: 'Revoked', cls: 'bg-warm-200 text-warm-700' },
   expired: { label: 'Expired', cls: 'bg-status-attention-bg text-status-attention' },
@@ -68,7 +68,7 @@ export function BetaAdmin() {
       {note('top')}
       <div>
         <h1 className="page-title">Beta access</h1>
-        <p className="text-[13.5px] text-warm-600">
+        <p className="text-[13px] text-warm-600">
           {data.signup.mode === 'invite_only'
             ? 'RunF9 is in private beta: sign-up needs an invitation, and signing in needs beta access.'
             : 'Self sign-up is open (RUNF9_SIGNUP=open), so the beta gate is off. Invitations still work.'}
@@ -90,7 +90,7 @@ export function BetaAdmin() {
         {link && (
           <div className="mt-3">
             <div className="flex gap-2 items-center bg-warm-100 border border-warm-200 rounded-md p-2.5">
-              <code className="flex-1 text-[12px] break-all text-navy-950" aria-label="Invitation link">{link.url}</code>
+              <code className="flex-1 text-[12px] break-all text-ink" aria-label="Invitation link">{link.url}</code>
               <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(link.url)}><Copy size={13} className="inline mr-1" aria-hidden="true" />Copy</Button>
             </div>
             <p className="text-[12px] text-warm-600 mt-1.5">{link.emailed ? 'Also emailed to the invitee.' : 'Not emailed: send this link yourself.'} It is shown only once.</p>
@@ -112,7 +112,7 @@ export function BetaAdmin() {
               <tbody>
                 {data.invites.map(i => (
                   <tr key={i.id} className="border-b border-warm-200 last:border-0 align-top">
-                    <td className="py-2 pr-3"><div className="text-navy-950 font-medium">{i.email}</div><div className="text-warm-600 text-[12px]">{i.acceptedOrgName || i.company || '—'}</div></td>
+                    <td className="py-2 pr-3"><div className="text-ink font-medium">{i.email}</div><div className="text-warm-600 text-[12px]">{i.acceptedOrgName || i.company || '—'}</div></td>
                     <td className="py-2 pr-3"><span className={`inline-block text-[12px] font-semibold px-2 py-0.5 rounded-md ${STATUS[i.status].cls}`}>{STATUS[i.status].label}</span></td>
                     <td className="py-2 pr-3 text-warm-700">{fmtDay(i.createdAt)}<div className="text-warm-600 text-[12px]">{i.createdByEmail}</div></td>
                     <td className="py-2 pr-3 text-warm-700">{i.acceptedAt ? `Accepted ${fmtDay(i.acceptedAt)}` : i.revokedAt ? `Revoked ${fmtDay(i.revokedAt)}` : fmtDay(i.expiresAt)}</td>
@@ -145,10 +145,10 @@ export function BetaAdmin() {
             <tbody>
               {users.map(u => (
                 <tr key={u.id} className="border-b border-warm-200 last:border-0 align-top">
-                  <td className="py-2 pr-3"><div className="text-navy-950 font-medium">{u.name}</div><div className="text-warm-600 text-[12px]">{u.email}{u.disabled ? ' · removed from organization' : ''}</div></td>
+                  <td className="py-2 pr-3"><div className="text-ink font-medium">{u.name}</div><div className="text-warm-600 text-[12px]">{u.email}{u.disabled ? ' · removed from organization' : ''}</div></td>
                   <td className="py-2 pr-3 text-warm-700">{u.orgName}<div className="text-warm-600 text-[12px] capitalize">{u.role}</div>
                     <label className="mt-1 flex items-center gap-1.5 text-[12px] text-warm-600">Plan
-                      <select className="border border-warm-300 rounded px-1.5 py-0.5 bg-white text-navy-950" value={u.orgPlan} disabled={busy === 'users'} aria-label={`Plan for ${u.orgName}`}
+                      <select className="border border-warm-300 rounded px-1.5 py-0.5 bg-white text-ink" value={u.orgPlan} disabled={busy === 'users'} aria-label={`Plan for ${u.orgName}`}
                         onChange={async e => {
                           const plan = e.target.value
                           if (!window.confirm(`Put ${u.orgName} on the ${plan === 'pro' ? 'Pro' : plan === 'enterprise' ? 'Enterprise' : 'Free'} plan? It applies to everyone in that organization at once.`)) return

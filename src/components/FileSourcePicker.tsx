@@ -62,7 +62,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
   const exts = accept.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
   const importable = (key: string) => !exts.length || exts.some(x => key.toLowerCase().endsWith(x))
   const crumbs = listing ? listing.prefix.slice(listing.base.length).split('/').filter(Boolean) : []
-  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-lg px-3 py-2 text-[13.5px] text-warm-700'
+  const fieldClass = inputClassName ?? 'w-full border border-warm-300 bg-warm-100 rounded-lg px-3 py-2 text-[13px] text-warm-700'
 
   return (
     <div className="space-y-4">
@@ -89,7 +89,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
         <div className="rounded-lg border border-warm-300 bg-white">
           <input type="hidden" name="sourceConnectionId" value={from} />
           <input type="text" name="sourceKey" value={picked} onChange={() => {}} required tabIndex={-1} aria-hidden="true" className="sr-only" />
-          <nav aria-label="Folder" className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-warm-200 text-[12.5px]">
+          <nav aria-label="Folder" className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-warm-200 text-[12px]">
             <button type="button" className="font-semibold text-accent-600 hover:underline" onClick={() => listing && browse(from, listing.base)}>{readable.find(c => c.id === from)?.name}</button>
             {crumbs.map((c, i) => (
               <span key={i} className="flex items-center gap-1">
@@ -107,7 +107,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
               <ul>
                 {listing.folders.map(f => (
                   <li key={f}>
-                    <button type="button" onClick={() => browse(from, f)} className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] text-navy-950 hover:bg-warm-50">
+                    <button type="button" onClick={() => browse(from, f)} className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-warm-50">
                       <Folder size={14} aria-hidden className="text-warm-600" /> {f.slice(listing.prefix.length).replace(/\/$/, '')}
                     </button>
                   </li>
@@ -117,7 +117,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
                   return (
                     <li key={f.key}>
                       <button type="button" disabled={!ok} aria-pressed={picked === f.key} onClick={() => setPicked(f.key)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] ${picked === f.key ? 'bg-accent-100 text-navy-950 font-semibold' : ok ? 'text-navy-950 hover:bg-warm-50' : 'text-warm-500 cursor-not-allowed'}`}>
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] ${picked === f.key ? 'bg-accent-100 text-ink font-semibold' : ok ? 'text-ink hover:bg-warm-50' : 'text-warm-500 cursor-not-allowed'}`}>
                         <FileText size={14} aria-hidden className="text-warm-600 flex-shrink-0" />
                         <span className="truncate flex-1">{f.key.slice(listing.prefix.length)}</span>
                         <span className="text-[12px] text-warm-600 tabular-nums">{fmtSize(f.size)}</span>
@@ -129,7 +129,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
               </ul>
             )}
           </div>
-          <p className="px-3 py-2 border-t border-warm-200 text-[12px] text-warm-600">{picked ? <>Selected: <span className="font-semibold text-navy-950">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
+          <p className="px-3 py-2 border-t border-warm-200 text-[12px] text-warm-600">{picked ? <>Selected: <span className="font-semibold text-ink">{picked.split('/').pop()}</span></> : 'Choose a file.'}{hint ? ` ${hint}` : ''}</p>
         </div>
       )}
 
@@ -148,7 +148,7 @@ export function FileSourcePicker({ accept, hint, keepLabel = 'RunF9 (default)', 
 function SourceChip({ active, onClick, icon, label, title }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; title?: string }) {
   return (
     <button type="button" aria-pressed={active} onClick={onClick} title={title}
-      className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold border ${active ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-navy-950 border-warm-300 hover:border-navy-900'}`}>
+      className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold border ${active ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
       {icon}{label}
     </button>
   )

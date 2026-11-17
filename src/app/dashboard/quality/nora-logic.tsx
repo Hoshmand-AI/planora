@@ -76,7 +76,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     return (
       <MoodTile mood="worried" as="section" className="flex items-center gap-3">
         <Robot mood="worried" size={48} />
-        <p role="alert" className="text-[13.5px] text-warm-700">{error}</p>
+        <p role="alert" className="text-[13px] text-warm-700">{error}</p>
       </MoodTile>
     )
   }
@@ -84,7 +84,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     return (
       <MoodTile mood="working" as="section" className="flex items-center gap-3">
         <Robot mood="working" size={48} />
-        <p className="text-[13.5px] text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Reading the activity names and tracing the logic…</p>
+        <p className="text-[13px] text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Reading the activity names and tracing the logic…</p>
       </MoodTile>
     )
   }
@@ -105,20 +105,20 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
         <Robot mood={h.mood} size={56} className="flex-shrink-0 -mt-1" />
         <div className="min-w-0 flex-1">
           <h2 id="nora-logic-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-600">Logic suggestions</h2>
-          <p className="text-[15px] font-medium text-navy-950 mt-0.5">{h.title}</p>
-          <p className="text-[12.5px] text-warm-600 mt-0.5">{h.sub}</p>
+          <p className="text-[14px] font-medium text-ink mt-0.5">{h.title}</p>
+          <p className="text-[12px] text-warm-600 mt-0.5">{h.sub}</p>
         </div>
       </MoodTile>
 
       {top.length > 0 && (
         <div>
-          <h3 className="text-[12px] font-semibold text-navy-950 mb-1.5">Waiting for you</h3>
+          <h3 className="text-[12px] font-semibold text-ink mb-1.5">Waiting for you</h3>
           <ol className="space-y-2">
             {top.map(s => <SuggestionCard key={s.id} s={s} scheduleId={scheduleId} canApply={canApply} onApplied={applied} />)}
           </ol>
         </div>
       )}
-      <div aria-live="polite">{status && <p role="status" className="text-[12.5px] text-status-on-track">{status}</p>}</div>
+      <div aria-live="polite">{status && <p role="status" className="text-[12px] text-status-on-track">{status}</p>}</div>
 
       {(data.suggestions.length > top.length || data.unresolved.length > 0) && (
         <Disclosure tone="card" title={`Show all suggestions`} meta={`${data.suggestions.length} suggestion${data.suggestions.length === 1 ? '' : 's'}${data.unresolved.length ? ` · ${data.unresolved.length} without one` : ''}`}>
@@ -130,12 +130,12 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
             )}
             {data.suggestions.some(s => s.action !== 'add_link') && (
               <div>
-                <h3 className="text-[12.5px] font-semibold text-navy-950 mb-1">Links to look over (optional)</h3>
-                <ul className="divide-y divide-warm-200 text-[12.5px]">
+                <h3 className="text-[12px] font-semibold text-ink mb-1">Links to look over (optional)</h3>
+                <ul className="divide-y divide-warm-200 text-[12px]">
                   {data.suggestions.filter(s => s.action !== 'add_link').map(s => (
                     <li key={s.id} className="py-2">
                       <span className="text-[12px] font-semibold uppercase tracking-wide text-warm-600">{SUGGESTION_KIND_LABEL[s.kind]}</span>
-                      <p className="text-navy-950"><LinkText s={s} /></p>
+                      <p className="text-ink"><LinkText s={s} /></p>
                       <p className="text-warm-600">{s.reason}</p>
                     </li>
                   ))}
@@ -144,9 +144,9 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
             )}
             {data.unresolved.length > 0 && (
               <div>
-                <h3 className="text-[12.5px] font-semibold text-navy-950 mb-1">Loose ends without a suggestion</h3>
+                <h3 className="text-[12px] font-semibold text-ink mb-1">Loose ends without a suggestion</h3>
                 <p className="text-[12px] text-warm-600 mb-1">RunF9 could not tell what kind of work these are, or every likely link would have created a loop. Link them in your scheduling tool or in RunF9&apos;s edits.</p>
-                <ul className="text-[12.5px] text-warm-700 space-y-0.5">
+                <ul className="text-[12px] text-warm-700 space-y-0.5">
                   {data.unresolved.map(u => <li key={`${u.id}-${u.missing}`}><span className="font-mono text-warm-600">{u.code}</span> {u.name} <span className="text-warm-600">· no {u.missing}</span></li>)}
                 </ul>
               </div>
@@ -157,7 +157,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
 
       {data.suggestions.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <button type="button" onClick={download} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-navy-950">
+          <button type="button" onClick={download} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink">
             <Download size={13} aria-hidden /> Download all as CSV
           </button>
           <span className="text-[12px] text-warm-600">
@@ -175,7 +175,7 @@ function LinkText({ s }: { s: LogicSuggestion }) {
       <span className="font-mono text-[12px] text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
       <ArrowRight size={12} className="inline mx-1 -mt-0.5 text-warm-500" aria-label="then" />
       <span className="font-mono text-[12px] text-warm-600">{s.successor.code}</span> {s.successor.name}
-      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[12px] text-navy-950">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
+      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[12px] text-ink">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
       {s.firm && <span className="ml-1.5 text-[12px] font-semibold uppercase text-accent-600">your firm&apos;s pattern</span>}
     </>
   )
@@ -203,9 +203,9 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
     <li className={`bg-white/80 border border-warm-200 rounded-xl ${compact ? 'px-3.5 py-2.5' : 'px-4 py-3'}`}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] text-warm-600">{s.problem}</p>
-          <p className="text-[13.5px] text-navy-950 mt-0.5"><span className="font-semibold">Link </span><LinkText s={s} /></p>
-          <p className="text-[12.5px] text-warm-700 mt-0.5">{s.reason} <span className="text-warm-600">· {level(s.confidence)} ({Math.round(s.confidence * 100)}%)</span></p>
+          <p className="text-[12px] text-warm-600">{s.problem}</p>
+          <p className="text-[13px] text-ink mt-0.5"><span className="font-semibold">Link </span><LinkText s={s} /></p>
+          <p className="text-[12px] text-warm-700 mt-0.5">{s.reason} <span className="text-warm-600">· {level(s.confidence)} ({Math.round(s.confidence * 100)}%)</span></p>
         </div>
         {canApply && !confirming && (
           <button type="button" onClick={() => setConfirming(true)} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold flex-shrink-0">Add this link</button>
@@ -219,7 +219,7 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
           <p className="text-[12px] text-warm-600">Adds a {LINK_TYPE_NAME[s.type] ?? s.type} link{s.lag ? ` with a ${Math.abs(s.lag)}-day ${s.lag > 0 ? 'lag' : 'lead'}` : ''} to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
-            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-navy-950">Cancel</button>
+            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-ink">Cancel</button>
           </div>
           {err && <p role="alert" className="text-[12px] text-status-at-risk">{err}</p>}
         </div>

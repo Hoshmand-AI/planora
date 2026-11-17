@@ -32,7 +32,7 @@ export function MoreNumbers({ rows, align = 'right' }: { rows: NumberRow[]; alig
   return (
     <div ref={wrap} className="relative">
       <button ref={btn} type="button" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-medium text-warm-600 hover:text-navy-950 hover:bg-white/70">
+        className="pressable inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-warm-600 hover:text-ink hover:bg-white/70">
         More numbers <ChevronDown size={13} aria-hidden className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -42,11 +42,11 @@ export function MoreNumbers({ rows, align = 'right' }: { rows: NumberRow[]; alig
             {rows.map(r => (
               <li key={r.key} className="flex items-start gap-4 px-3 py-2.5">
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium text-navy-950">{r.label}</div>
+                  <div className="text-[13px] font-medium text-ink">{r.label}</div>
                   <div className="text-[12px] text-warm-500 mt-0.5 leading-snug">{r.explain}</div>
                 </div>
                 <div className="text-right flex-shrink-0 max-w-[48%]">
-                  <div className={`text-[13.5px] font-semibold tabular-nums ${r.tone === 'bad' ? 'text-status-at-risk' : r.tone === 'warn' ? 'text-status-attention' : 'text-navy-950'}`}>{r.value}</div>
+                  <div className={`text-[13px] font-semibold tabular-nums ${r.tone === 'bad' ? 'text-status-at-risk' : r.tone === 'warn' ? 'text-status-attention' : 'text-ink'}`}>{r.value}</div>
                   {r.go && <button type="button" onClick={() => { setOpen(false); r.go!.onClick() }} className="text-[12px] text-accent-600 hover:underline mt-0.5">{r.go.label}</button>}
                 </div>
               </li>

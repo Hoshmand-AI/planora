@@ -9,7 +9,7 @@ import { ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchCheck, KeyRou
 import { Reveal } from './motion'
 import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
 
-const H2 = 'text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]'
+const H2 = 'text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]'
 const LEAD = 'text-[17px] md:text-[19px] text-warm-600 mt-4 leading-snug'
 
 /** Accessible tabs: arrow keys, Home and End move between them (WAI-ARIA tabs pattern). */
@@ -34,7 +34,7 @@ function TabList({ label, items, prefix, panel, tabs, className = '' }: { label:
           key={x.id} ref={el => { tabs.refs.current[i] = el }} type="button" role="tab" id={`${prefix}-tab-${x.id}`}
           aria-selected={i === tabs.active} aria-controls={panel} tabIndex={i === tabs.active ? 0 : -1}
           onClick={() => tabs.setActive(i)}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === tabs.active ? 'bg-white text-navy-950 shadow-sm' : 'text-warm-600 hover:text-navy-950'}`}
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === tabs.active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
         >{x.tab}</button>
       ))}
     </div>
@@ -105,7 +105,7 @@ function LiveBrief() {
                 {b.signals.map(g => (
                   <li key={g.quote} className="rounded-xl border border-warm-200 p-4">
                     <span className={`inline-block text-[12px] font-semibold uppercase tracking-wide rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
-                    <p className="text-[15.5px] text-navy-950 leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
+                    <p className="text-[15.5px] text-ink leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
                     <p className="text-[14px] text-warm-600 mt-1.5">{g.source}{g.activity ? ` · about ${g.activity}` : ''}{g.days ? ` · ${g.days} work days` : ''}</p>
                   </li>
                 ))}
@@ -115,7 +115,7 @@ function LiveBrief() {
               <ul className="divide-y divide-warm-200 border-y border-warm-200">
                 {b.whatIfs.map(w => (
                   <li key={w.title} className="py-3.5">
-                    <p className="text-[15px] font-semibold text-navy-950 leading-snug">{w.title}</p>
+                    <p className="text-[15px] font-semibold text-ink leading-snug">{w.title}</p>
                     <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1">{w.text}</p>
                   </li>
                 ))}
@@ -190,14 +190,14 @@ export function Proof() {
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-20">
-        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-navy-950 text-center">Don’t take our word for it. Check the work.</h2>
+        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-ink text-center">Don’t take our word for it. Check the work.</h2>
         <ul className="mt-10 grid md:grid-cols-3 gap-5">
           {cards.map(({ icon: Icon, title, text, href, cta }) => (
             <li key={title} className="rounded-2xl border border-warm-200 bg-warm-50 p-6 md:p-7 flex flex-col">
               <span className="w-11 h-11 rounded-xl bg-navy-950 text-white flex items-center justify-center"><Icon size={21} strokeWidth={1.7} aria-hidden /></span>
-              <h3 className="text-[19px] font-semibold text-navy-950 mt-5 tracking-[-0.01em]">{title}</h3>
+              <h3 className="text-[19px] font-semibold text-ink mt-5 tracking-[-0.01em]">{title}</h3>
               <p className="text-[16px] text-warm-700 leading-relaxed mt-2 flex-1">{text}</p>
-              <a href={href} className="pressable mt-6 inline-flex items-center justify-center self-start rounded-full border border-warm-300 bg-white px-5 py-2.5 text-[15px] font-semibold text-navy-950 hover:border-navy-900">{cta}</a>
+              <a href={href} className="pressable mt-6 inline-flex items-center justify-center self-start rounded-full border border-warm-300 bg-white px-5 py-2.5 text-[15px] font-semibold text-ink hover:border-navy-900">{cta}</a>
             </li>
           ))}
         </ul>
@@ -233,7 +233,7 @@ export function Audiences() {
           <div id="who-panel" role="tabpanel" aria-labelledby={`who-tab-${a.id}`} className="mt-10">
             <div key={a.id} className="rise-in grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 items-center">
               <div>
-                <h3 className="text-[26px] md:text-[34px] font-semibold tracking-[-0.03em] text-navy-950 leading-tight">{a.title}</h3>
+                <h3 className="text-[26px] md:text-[34px] font-semibold tracking-[-0.03em] text-ink leading-tight">{a.title}</h3>
                 <ul className="mt-6 space-y-4">
                   {a.points.map(p => (
                     <li key={p} className="flex items-start gap-3 text-[16px] text-warm-700 leading-relaxed">
@@ -277,7 +277,7 @@ export function Integrations() {
         {FILES.map(([ext, name, text], i) => (
           <Reveal as="li" key={name} delay={i * 70} className="rounded-2xl bg-white border border-warm-200 p-6">
             <span aria-hidden className="inline-flex items-center justify-center h-12 min-w-[64px] px-3 rounded-xl bg-navy-950 text-white font-mono text-[15px] font-semibold">{ext}</span>
-            <h3 className="text-[19px] font-semibold text-navy-950 tracking-[-0.01em] mt-5">{name}</h3>
+            <h3 className="text-[19px] font-semibold text-ink tracking-[-0.01em] mt-5">{name}</h3>
             <p className="text-[16px] text-warm-700 leading-relaxed mt-2">{text}</p>
           </Reveal>
         ))}
@@ -285,14 +285,14 @@ export function Integrations() {
       <ul className="mt-4 grid sm:grid-cols-2 gap-x-10 gap-y-6 rounded-2xl bg-warm-100 border border-warm-200 p-6 md:p-8">
         {ALSO.map(([name, text]) => (
           <li key={name}>
-            <h3 className="text-[16.5px] font-semibold text-navy-950">{name}</h3>
+            <h3 className="text-[16.5px] font-semibold text-ink">{name}</h3>
             <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1">{text}</p>
           </li>
         ))}
       </ul>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[15px] text-warm-700">
-        <span className="font-semibold text-navy-950">Planned, not yet available:</span>
-        {['Procore', 'Kahua'].map(n => <span key={n} className="rounded-full border border-warm-300 bg-white px-3.5 py-1 font-medium text-navy-950">{n}</span>)}
+        <span className="font-semibold text-ink">Planned, not yet available:</span>
+        {['Procore', 'Kahua'].map(n => <span key={n} className="rounded-full border border-warm-300 bg-white px-3.5 py-1 font-medium text-ink">{n}</span>)}
         <span>Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
       </div>
     </section>
@@ -365,7 +365,7 @@ export function Faq() {
       <div className="border-t border-warm-200 mt-10">
         {FAQ.map(([q, a]) => (
           <details key={q} className="group border-b border-warm-200">
-            <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-navy-950">
+            <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-ink">
               {q}
               <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
             </summary>

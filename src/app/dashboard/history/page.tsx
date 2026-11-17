@@ -57,7 +57,7 @@ export default function HistoryPage() {
       {error ? <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p> : null}
       <div>
         <h1 className="page-title">Firm insights</h1>
-        <p className="text-[13.5px] text-warm-500 mt-1 max-w-3xl"><Lock size={13} className="inline mr-1.5 -mt-0.5" />{data.privacy} Workspace: <span className="font-medium text-navy-950">{data.organization?.name}</span></p>
+        <p className="text-[13px] text-warm-500 mt-1 max-w-3xl"><Lock size={13} className="inline mr-1.5 -mt-0.5" />{data.privacy} Workspace: <span className="font-medium text-ink">{data.organization?.name}</span></p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -76,12 +76,12 @@ export default function HistoryPage() {
           </EmptyState>
         ) : (
           <div tabIndex={0} role="region" aria-label="Past schedules" className="overflow-x-auto">
-            <table className="w-full text-[12.5px] min-w-[640px]">
+            <table className="w-full text-[12px] min-w-[640px]">
               <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-400"><th className="py-1.5">Schedule</th><th className="py-1.5">Facility type</th><th className="py-1.5">State</th><th className="py-1.5">Gross sf</th><th className="py-1.5 text-right">Activities</th></tr></thead>
               <tbody>
                 {data.schedules.map(s => (
                   <tr key={s.id} className="border-t border-warm-200">
-                    <td className="py-2 pr-2 text-navy-950">{s.name} <span className="text-warm-500">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
+                    <td className="py-2 pr-2 text-ink">{s.name} <span className="text-warm-500">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
                       <span className="block text-[12px] text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
                     <td className="py-2 pr-2">
                       <select disabled={!canTag} aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-[12px]">
@@ -105,12 +105,12 @@ export default function HistoryPage() {
         <div className="bg-warm-100 border border-warm-200 rounded-lg p-5">
           <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">What your projects actually took</div>
           {data.categories.length === 0 ? <p className="text-[13px] text-warm-500">No activities with actual start and finish dates yet.</p> : (
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[12px]">
               <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-400"><th className="py-1">Work</th><th className="py-1 text-right">Projects</th><th className="py-1 text-right">P20 / median / P80 days</th><th className="py-1 text-right">Overrun</th></tr></thead>
               <tbody>
                 {data.categories.map(c => (
                   <tr key={c.category} className="border-t border-warm-200">
-                    <td className="py-1.5 text-navy-950">{label(c.category)}</td>
+                    <td className="py-1.5 text-ink">{label(c.category)}</td>
                     <td className="py-1.5 text-right tabular-nums">{c.projects}</td>
                     <td className="py-1.5 text-right tabular-nums text-warm-600">{Math.round(c.actualP20)} / {Math.round(c.actualMedian)} / {Math.round(c.actualP80)}</td>
                     <td className="py-1.5 text-right tabular-nums">{c.overrunMedian ? `×${c.overrunMedian.toFixed(2)}` : '—'}</td>
@@ -126,12 +126,12 @@ export default function HistoryPage() {
           <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Backtest: would RunF9 have predicted your real projects?</div>
           <p className="text-[12px] text-warm-500 mb-2">For each completed project, RunF9 rebuilds the construction schedule from its facility type and size using only your <em>other</em> projects (leave-one-out), then compares to what actually happened.</p>
           {bt.projects.length === 0 ? <p className="text-[13px] text-warm-500">Not enough tagged, completed projects yet.</p> : (
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[12px]">
               <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-400"><th className="py-1">Project</th><th className="py-1 text-right">Actual</th><th className="py-1 text-right">Predicted</th><th className="py-1 text-right">Error</th></tr></thead>
               <tbody>
                 {bt.projects.map(p => (
                   <tr key={p.scheduleId} className="border-t border-warm-200">
-                    <td className="py-1.5 text-navy-950">{p.name}</td>
+                    <td className="py-1.5 text-ink">{p.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{p.actualDays}d</td>
                     <td className="py-1.5 text-right tabular-nums">{p.predictedDays}d</td>
                     <td className={`py-1.5 text-right tabular-nums font-semibold ${Math.abs(p.errorPct) > 20 ? 'text-status-at-risk' : Math.abs(p.errorPct) > 10 ? 'text-status-attention' : 'text-status-on-track'}`}>{p.errorPct > 0 ? '+' : ''}{p.errorPct}%</td>
@@ -151,7 +151,7 @@ function Card({ label, value, sub }: { label: string; value: string; sub: string
   return (
     <div className="bg-warm-100 border border-warm-200 rounded-lg p-4">
       <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">{label}</div>
-      <div className="text-[20px] font-semibold text-navy-950 tabular-nums mt-1">{value}</div>
+      <div className="text-[20px] font-semibold text-ink tabular-nums mt-1">{value}</div>
       <div className="text-[12px] text-warm-400 mt-0.5">{sub}</div>
     </div>
   )
@@ -163,18 +163,18 @@ function SequencingCard({ seq }: { seq: FirmSequencing }) {
   return (
     <section aria-labelledby="seq-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
       <h2 id="seq-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-600 mb-1">How your firm sequences work</h2>
-      <p className="text-[12.5px] text-warm-600 mb-3 max-w-3xl">Learned from the logic of {seq.projectCount} past project{seq.projectCount === 1 ? '' : 's'}: which kinds of work your schedules tie together, and how. Logic suggestions on new schedules favour these ties and use your link type and lag.{seq.overlapShare != null ? ` ${Math.round(seq.overlapShare * 100)}% of your ties between trades overlap the work (start-to-start or finish-to-finish).` : ''}</p>
+      <p className="text-[12px] text-warm-600 mb-3 max-w-3xl">Learned from the logic of {seq.projectCount} past project{seq.projectCount === 1 ? '' : 's'}: which kinds of work your schedules tie together, and how. Logic suggestions on new schedules favour these ties and use your link type and lag.{seq.overlapShare != null ? ` ${Math.round(seq.overlapShare * 100)}% of your ties between trades overlap the work (start-to-start or finish-to-finish).` : ''}</p>
       {seq.patterns.length === 0 ? <p className="text-[13px] text-warm-600">{seq.projectCount < 2 ? 'Needs at least two past projects with logic to learn from.' : 'No tie appears in at least two of your projects yet.'}</p> : (
         <>
-          {own.length > 0 && <p className="text-[12.5px] text-navy-950 mb-2"><span className="font-semibold">Your own habits</span> (differ from the general trade order): {own.slice(0, 4).map(p => `${p.fromLabel} → ${p.toLabel} ${linkText(p.type, p.lag)}`).join('; ')}.</p>}
+          {own.length > 0 && <p className="text-[12px] text-ink mb-2"><span className="font-semibold">Your own habits</span> (differ from the general trade order): {own.slice(0, 4).map(p => `${p.fromLabel} → ${p.toLabel} ${linkText(p.type, p.lag)}`).join('; ')}.</p>}
           <div tabIndex={0} role="region" aria-label="Sequencing patterns" className="overflow-x-auto">
-            <table className="w-full text-[12.5px] min-w-[520px]">
+            <table className="w-full text-[12px] min-w-[520px]">
               <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600"><th className="py-1">From</th><th className="py-1">To</th><th className="py-1">Usually</th><th className="py-1 text-right">Projects</th></tr></thead>
               <tbody>
                 {seq.patterns.slice(0, 25).map(p => (
                   <tr key={`${p.from}>${p.to}`} className="border-t border-warm-200">
-                    <td className="py-1.5 text-navy-950">{cap(p.fromLabel)}</td>
-                    <td className="py-1.5 text-navy-950">{cap(p.toLabel)}</td>
+                    <td className="py-1.5 text-ink">{cap(p.fromLabel)}</td>
+                    <td className="py-1.5 text-ink">{cap(p.toLabel)}</td>
                     <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-[12px] font-semibold uppercase text-accent-600">your habit</span>}</td>
                     <td className="py-1.5 text-right tabular-nums">{p.projects} of {p.of}</td>
                   </tr>

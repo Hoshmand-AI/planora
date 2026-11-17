@@ -95,7 +95,7 @@ export default function ReportsPage() {
             <div className="w-8 h-8 bg-navy-900 rounded-md flex items-center justify-center">
               <Icon size={14} className="text-accent-400" aria-hidden />
             </div>
-            <h2 className="font-display text-[20px] text-navy-950">{rt?.title}</h2>
+            <h2 className="font-display text-[20px] text-ink">{rt?.title}</h2>
           </div>
           <button onClick={() => setReport(null)} aria-label="Close report" className="text-warm-500 hover:text-warm-700"><X size={18} aria-hidden /></button>
         </div>
@@ -119,7 +119,7 @@ export default function ReportsPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6">
       <h2 className="sr-only">Reports</h2>
-      <p className="text-[13.5px] text-warm-600 mb-3">{reportMethod(llm)}.</p>
+      <p className="text-[13px] text-warm-600 mb-3">{reportMethod(llm)}.</p>
       <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-warm-700">
         <label htmlFor={docsId} className="flex items-center gap-1.5">
           <input id={docsId} type="checkbox" checked={useDocs} onChange={e => setUseDocs(e.target.checked)} />
@@ -149,10 +149,10 @@ export default function ReportsPage() {
               }
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-semibold text-navy-950 mb-1">{rt.title}</div>
+              <div className="text-[14px] font-semibold text-ink mb-1">{rt.title}</div>
               <div className="text-[13px] text-warm-600 leading-relaxed">{rt.desc}</div>
             </div>
-            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-lg border border-warm-300 bg-white group-hover:bg-warm-100 text-navy-950 text-[13px] font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
+            <span aria-hidden="true" className="flex-shrink-0 self-center rounded-lg border border-warm-300 bg-white group-hover:bg-warm-100 text-ink text-[13px] font-medium px-4 py-1.5">{generating === rt.id ? 'Working…' : 'Generate'}</span>
           </button>
         ))}
       </div>

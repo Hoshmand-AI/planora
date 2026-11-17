@@ -54,23 +54,23 @@ export function Integrations() {
         <div className="mb-4 border border-status-attention bg-status-attention-bg rounded-md p-3">
           <p className="text-[13px] text-warm-700 font-medium">{secret.label} Copy it now: it won&apos;t be shown again.</p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 break-all text-[12.5px] bg-warm-50 border border-warm-200 rounded px-2 py-1.5 text-navy-950">{secret.value}</code>
+            <code className="flex-1 break-all text-[12px] bg-warm-50 border border-warm-200 rounded px-2 py-1.5 text-ink">{secret.value}</code>
             <Button variant="secondary" aria-label="Copy" onClick={() => navigator.clipboard?.writeText(secret.value)}><Copy size={13} /></Button>
           </div>
           <Button variant="ghost" className="mt-2" onClick={() => setSecret(null)}>I&apos;ve stored it safely</Button>
         </div>
       )}
 
-      <h3 className="text-[13px] font-semibold text-navy-950 mb-2">API keys</h3>
+      <h3 className="text-[13px] font-semibold text-ink mb-2">API keys</h3>
       {data.keys.length > 0 ? (
         <div tabIndex={0} role="region" aria-label="API keys" className="relative overflow-x-auto mb-3">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-[12px]">
             <caption className="sr-only">API keys</caption>
             <thead><tr className="text-left text-warm-500"><th scope="col" className="py-1.5 pr-3 font-medium">Name</th><th scope="col" className="pr-3 font-medium">Key</th><th scope="col" className="pr-3 font-medium">Role</th><th scope="col" className="pr-3 font-medium">Last used</th><th scope="col" className="pr-3 font-medium">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {data.keys.map(k => (
                 <tr key={k.id} className="border-t border-warm-200 text-warm-700">
-                  <td className="py-1.5 pr-3 font-medium text-navy-950">{k.name}</td>
+                  <td className="py-1.5 pr-3 font-medium text-ink">{k.name}</td>
                   <td className="pr-3 font-mono">{k.prefix}…</td>
                   <td className="pr-3">{k.role === 'viewer' ? 'Read-only' : 'Scheduler'}</td>
                   <td className="pr-3">{k.lastUsedAt ? fmtDateTime(k.lastUsedAt) : 'Never'}</td>
@@ -81,7 +81,7 @@ export function Integrations() {
             </tbody>
           </table>
         </div>
-      ) : <p className="text-[12.5px] text-warm-500 mb-3">No API keys yet.</p>}
+      ) : <p className="text-[12px] text-warm-500 mb-3">No API keys yet.</p>}
       <form className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end mb-6" onSubmit={async e => {
         e.preventDefault()
         const d = await act('key', { action: 'create_key', name: key.name, role: key.role, expiresInDays: key.expiresInDays ? Number(key.expiresInDays) : null }, 'API key created.')
@@ -93,14 +93,14 @@ export function Integrations() {
         <Button type="submit" disabled={busy === 'key' || !data.available}>Create key</Button>
       </form>
 
-      <h3 className="text-[13px] font-semibold text-navy-950 mb-2">Webhooks</h3>
+      <h3 className="text-[13px] font-semibold text-ink mb-2">Webhooks</h3>
       {data.webhooks.length > 0 ? (
         <ul className="space-y-2 mb-3">
           {data.webhooks.map(h => (
-            <li key={h.id} className="border border-warm-200 rounded-md p-3 text-[12.5px] text-warm-700">
+            <li key={h.id} className="border border-warm-200 rounded-md p-3 text-[12px] text-warm-700">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-mono break-all text-navy-950">{h.url}</div>
+                  <div className="font-mono break-all text-ink">{h.url}</div>
                   <div className="mt-0.5">{h.events.join(', ')}</div>
                   <div className="mt-0.5 text-warm-600">
                     {h.disabledAt ? <span className="text-status-at-risk font-medium">Disabled after {h.consecutiveFailures} failed deliveries. </span> : null}
@@ -116,7 +116,7 @@ export function Integrations() {
             </li>
           ))}
         </ul>
-      ) : <p className="text-[12.5px] text-warm-500 mb-3">No webhooks yet.</p>}
+      ) : <p className="text-[12px] text-warm-500 mb-3">No webhooks yet.</p>}
       <form className="space-y-3" onSubmit={async e => {
         e.preventDefault()
         const d = await act('hook', { action: 'create_webhook', url: hook.url, events: hook.events }, 'Webhook added.')
@@ -127,9 +127,9 @@ export function Integrations() {
           <legend className="block text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-1.5">Events</legend>
           <div className="grid sm:grid-cols-2 gap-1.5">
             {data.events.map(ev => (
-              <label key={ev.id} className="flex items-start gap-2 text-[12.5px] text-warm-700">
+              <label key={ev.id} className="flex items-start gap-2 text-[12px] text-warm-700">
                 <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-500" checked={hook.events.includes(ev.id)} onChange={e => setHook({ ...hook, events: e.target.checked ? [...hook.events, ev.id] : hook.events.filter(x => x !== ev.id) })} />
-                <span><span className="font-mono text-navy-950">{ev.id}</span> · {ev.label}</span>
+                <span><span className="font-mono text-ink">{ev.id}</span> · {ev.label}</span>
               </label>
             ))}
           </div>

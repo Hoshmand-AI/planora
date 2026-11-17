@@ -61,10 +61,10 @@ export function AskTextHost() {
       onClick={e => { if (e.target === ref.current && downOnBackdrop.current) finish(null) }}
       className="rounded-xl border border-warm-200 bg-white p-0 w-[min(440px,calc(100vw-32px))] shadow-xl backdrop:bg-navy-950/40">
       <form className="p-5" onSubmit={e => { e.preventDefault(); if (pending.required && !text) return; finish(text) }}>
-        <h2 id={titleId} className="text-[16px] font-semibold text-navy-950 mb-3">{pending.title}</h2>
+        <h2 id={titleId} className="text-[16px] font-semibold text-ink mb-3">{pending.title}</h2>
         <label htmlFor={inputId} className="block text-[13px] text-warm-700 mb-1.5">{pending.label}</label>
         <input id={inputId} autoFocus value={value} onChange={e => setValue(e.target.value)} maxLength={500} placeholder={pending.placeholder}
-          className="w-full border border-warm-300 rounded-md px-3 py-2 text-[16px] md:text-[14px] text-navy-950 placeholder:text-warm-500 focus:outline-none focus:ring-2 focus:ring-accent-500" />
+          className="w-full border border-warm-300 rounded-md px-3 py-2 text-[16px] md:text-[14px] text-ink placeholder:text-warm-500 focus:outline-none focus:ring-2 focus:ring-accent-500" />
         <div className="flex justify-end gap-2 mt-4">
           <button type="button" onClick={() => finish(null)} className="px-4 py-2 rounded-lg text-[14px] font-medium text-warm-700 hover:bg-warm-100">Cancel</button>
           <button type="submit" disabled={!!pending.required && !text} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-accent-600 hover:bg-accent-700 text-white">{pending.confirmLabel ?? 'Save'}</button>

@@ -104,7 +104,7 @@ function Summary({ data }: { data: Analysis }) {
       {items.map(([k, v]) => (
         <div key={k} className="bg-white border border-warm-200 rounded-xl px-3 py-2">
           <dt className="text-[12px] text-warm-600 truncate">{k}</dt>
-          <dd className="text-[18px] font-semibold text-navy-950 tabular-nums">{v}</dd>
+          <dd className="text-[18px] font-semibold text-ink tabular-nums">{v}</dd>
         </div>
       ))}
     </dl>
@@ -114,7 +114,7 @@ function Summary({ data }: { data: Analysis }) {
 function ResourceTable({ resources, current, onSelect }: { resources: ResourceSummary[]; current: string | null; onSelect: (id: string) => void }) {
   return (
     <section aria-labelledby="res-list">
-      <h3 id="res-list" className="text-[14px] font-semibold text-navy-950">Resources: peak demand vs available</h3>
+      <h3 id="res-list" className="text-[14px] font-semibold text-ink">Resources: peak demand vs available</h3>
       <Hint label="How days are counted" className="mb-2">Over-allocated days are counted from the data date on. A peak above the limit that has already passed is shown, not counted.</Hint>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] text-warm-700">
@@ -126,7 +126,7 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
           <tbody>
             {resources.map(r => (
               <tr key={r.id} className={`border-b border-warm-200 ${r.id === current ? 'bg-accent-100' : ''}`}>
-                <th scope="row" className="py-1.5 pr-3 text-left font-medium text-navy-950">{r.code}<span className="block text-[12px] font-normal text-warm-600">{r.name}</span></th>
+                <th scope="row" className="py-1.5 pr-3 text-left font-medium text-ink">{r.code}<span className="block text-[12px] font-normal text-warm-600">{r.name}</span></th>
                 <td className="pr-3 capitalize">{r.kind}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}{/* "from the file" is the normal case and is not repeated on every row; anything else is said. */}{r.availabilitySource !== 'file' && <span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span>}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
@@ -153,7 +153,7 @@ function HistogramSection({ r, bucket }: { r: ResourceSummary; bucket: Histogram
   return (
     <section aria-labelledby="res-hist">
       <div className="flex items-center justify-between mb-2">
-        <h3 id="res-hist" className="text-[14px] font-semibold text-navy-950">Histogram: {r.code} — {r.name} <span className="font-normal text-warm-600">({r.unit} per {BUCKET_WORD[bucket]})</span></h3>
+        <h3 id="res-hist" className="text-[14px] font-semibold text-ink">Histogram: {r.code} — {r.name} <span className="font-normal text-warm-600">({r.unit} per {BUCKET_WORD[bucket]})</span></h3>
         <Button variant="secondary" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}>{asTable ? 'Show chart' : 'Show as table'}</Button>
       </div>
       {!bars.length ? <p className="text-[13px] text-warm-600">No load in this view. Pick the resource with “Show histogram” to load its daily histogram.</p>
@@ -184,8 +184,8 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         </defs>
         {ticks.map(t => (
           <g key={t}>
-            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#CCD0CF" strokeWidth="1" />
-            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#3F4E5A">{t}</text>
+            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#D3D6D9" strokeWidth="1" />
+            <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#4B5056">{t}</text>
           </g>
         ))}
         {bars.map((b, i) => {
@@ -195,27 +195,27 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
           return (
             <g key={b.start} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />
-              {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : b.remaining === 0 ? '#9BA8AB' : '#3b82f6'} />}
+              {b.demand > 0 && <rect x={x} y={y(b.demand)} width={w} height={Math.max(0, y(0) - y(b.demand))} rx={Math.min(4, w / 2)} fill={isOver ? `url(#${pid}-hatch)` : b.remaining === 0 ? '#A2A7AC' : '#4A82D6'} />}
               {isOver && <text x={x + w / 2} y={y(b.demand) - 4} textAnchor="middle" fontSize="12" fontWeight="700" fill="#A64848">!</text>}
-              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#3F4E5A">{fmtDate(b.start).slice(0, 5)}</text>}
+              {i % labelEvery === 0 && <text x={L + i * bw + bw / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#4B5056">{fmtDate(b.start).slice(0, 5)}</text>}
             </g>
           )
         })}
-        {line && <path d={line} fill="none" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" />}
+        {line && <path d={line} fill="none" stroke="#1D2125" strokeWidth="2" strokeDasharray="5 3" />}
       </svg>
       {h && (
         <div className="absolute top-1 right-1 bg-white border border-warm-300 rounded-md px-2 py-1 text-[12px] text-warm-700 shadow-sm pointer-events-none">
-          <div className="font-semibold text-navy-950">{BUCKET_WORD[bucket]} of {fmtDate(h.start)}</div>
+          <div className="font-semibold text-ink">{BUCKET_WORD[bucket]} of {fmtDate(h.start)}</div>
           <div>Demand {n(h.demand)} {unit} (peak day {n(h.peakDaily)})</div>
           <div>Available {n(h.available)} {unit}</div>
           {h.overAllocatedDays > 0 && <div className="text-status-at-risk font-semibold">Over-allocated on {h.overAllocatedDays} day{h.overAllocatedDays === 1 ? '' : 's'}</div>}
         </div>
       )}
       <figcaption className="flex flex-wrap gap-4 text-[12px] text-warm-700 mt-1">
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#3b82f6" /></svg>Demand ahead</span>
-        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#9BA8AB" /></svg>Already worked</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#4A82D6" /></svg>Demand ahead</span>
+        <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#A2A7AC" /></svg>Already worked</span>
         <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>Has a day over the daily limit</span>
-        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#06141B" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
+        <span className="flex items-center gap-1.5"><svg width="18" height="10" aria-hidden><line x1="0" x2="18" y1="5" y2="5" stroke="#1D2125" strokeWidth="2" strokeDasharray="5 3" /></svg>Available</span>
       </figcaption>
     </figure>
   )
@@ -224,7 +224,7 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
 function HistogramTable({ bars, unit }: { bars: HistogramBar[]; unit: string }) {
   return (
     <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
-      <table className="w-full text-[12.5px] text-warm-700">
+      <table className="w-full text-[12px] text-warm-700">
         <caption className="sr-only">Demand and availability by period ({unit})</caption>
         <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
           <th scope="col" className="py-1 pr-3">From</th><th scope="col" className="pr-3">To</th><th scope="col" className="pr-3 text-right">Demand</th>
@@ -246,12 +246,12 @@ function HistogramTable({ bars, unit }: { bars: HistogramBar[]; unit: string }) 
 function OverAllocations({ periods, title = 'Over-allocations' }: { periods: OverAllocationPeriod[]; title?: string }) {
   return (
     <section aria-label={title}>
-      <h3 className="text-[14px] font-semibold text-navy-950 mb-2">{title} ({periods.length})</h3>
+      <h3 className="text-[14px] font-semibold text-ink mb-2">{title} ({periods.length})</h3>
       {!periods.length ? <p className="text-[13px] text-warm-600">No resource is over-allocated from the data date on.</p> : (
         <ul className="space-y-2 text-[13px] text-warm-700">
           {periods.slice(0, 50).map(p => (
             <li key={`${p.resourceId}-${p.from}`} className="border-l-2 border-status-at-risk pl-3">
-              <span className="font-semibold text-navy-950">{p.resourceCode}</span> {fmtDate(p.from)}{p.to !== p.from ? ` – ${fmtDate(p.to)}` : ''}: {p.days} day{p.days === 1 ? '' : 's'} over, peak {n(p.peakDemand)} vs {n(p.available)} available (up to {n(p.maxExcess)} over).
+              <span className="font-semibold text-ink">{p.resourceCode}</span> {fmtDate(p.from)}{p.to !== p.from ? ` – ${fmtDate(p.to)}` : ''}: {p.days} day{p.days === 1 ? '' : 's'} over, peak {n(p.peakDemand)} vs {n(p.available)} available (up to {n(p.maxExcess)} over).
               <span className="block text-[12px] text-warm-600">Contributing: {p.activities.slice(0, 8).map(a => `${a.code} ${a.name} (${n(a.unitsPerDay)}/day)`).join('; ')}{p.activities.length > 8 ? `; and ${p.activities.length - 8} more` : ''}</span>
             </li>
           ))}
@@ -272,7 +272,7 @@ function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSum
   const set = (v: number) => setStaffing({ ...staffing, [rid]: Math.max(0, Math.round(v * 100) / 100) })
   return (
     <section aria-labelledby="res-staff" className="border border-warm-200 rounded-md p-3 bg-warm-50">
-      <h3 id="res-staff" className="text-[14px] font-semibold text-navy-950 mb-1">Staffing what-if</h3>
+      <h3 id="res-staff" className="text-[14px] font-semibold text-ink mb-1">Staffing what-if</h3>
       <Hint className="mb-2">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact. Nothing is saved.</Hint>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[12px] text-warm-700">Resource
@@ -336,7 +336,7 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
   const res = preview?.result
   return (
     <section aria-labelledby="res-level" className="border border-warm-200 rounded-md p-3">
-      <h3 id="res-level" className="text-[14px] font-semibold text-navy-950 mb-1">Resource leveling</h3>
+      <h3 id="res-level" className="text-[14px] font-semibold text-ink mb-1">Resource leveling</h3>
       {!hasLogic ? <p className="text-[13px] text-warm-600">This schedule has no activity relationships, so it cannot be recalculated to level resources.</p> : (
         <>
           <Hint label="How leveling works" className="mb-2">Delays not-started work so no resource is over its limit. Priority: least total float keeps the resource, then the earliest late start, then the activity ID. Work in progress, actuals, the data date and constraints are never moved. Delays become Start On or After dates in a scenario labelled “Leveled scenario”; the schedule as submitted is unchanged.</Hint>
@@ -371,7 +371,7 @@ function LevelingResults({ p }: { p: Preview }) {
   const fin = (d: number) => (d === 0 ? 'no change' : `${d > 0 ? '+' : ''}${d} calendar day${Math.abs(d) === 1 ? '' : 's'}`)
   return (
     <div className="mt-3 space-y-3 text-[13px] text-warm-700">
-      <h4 className="font-semibold text-navy-950">{r.label} — {r.mode === 'smooth' ? 'smoothing (within float)' : r.allowFinishExtension ? 'leveling, finish may extend' : 'leveling within float'}</h4>
+      <h4 className="font-semibold text-ink">{r.label} — {r.mode === 'smooth' ? 'smoothing (within float)' : r.allowFinishExtension ? 'leveling, finish may extend' : 'leveling within float'}</h4>
       <table className="text-[13px]">
         <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600"><th scope="col" className="pr-4">Measure</th><th scope="col" className="pr-4">Before</th><th scope="col">After</th></tr></thead>
         <tbody>
@@ -383,15 +383,15 @@ function LevelingResults({ p }: { p: Preview }) {
         </tbody>
       </table>
       <div>
-        <h5 className="font-semibold text-navy-950 mb-1">Delays introduced ({r.delays.length})</h5>
+        <h5 className="font-semibold text-ink mb-1">Delays introduced ({r.delays.length})</h5>
         {!r.delays.length ? <p className="text-warm-600">No activity needs to wait.</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
+          <div className="overflow-x-auto"><table className="w-full text-[12px]">
             <thead><tr className="text-left text-[12px] uppercase tracking-wider text-warm-600 border-b border-warm-200">
               <th scope="col" className="py-1 pr-3">Activity</th><th scope="col" className="pr-3">Start before</th><th scope="col" className="pr-3">Start after</th><th scope="col" className="pr-3 text-right">Delay (work days)</th><th scope="col" className="pr-3">Within float</th><th scope="col">Resources</th>
             </tr></thead>
             <tbody>{r.delays.map(d => (
               <tr key={d.activityId} className="border-b border-warm-200">
-                <td className="py-1 pr-3"><span className="font-medium text-navy-950">{d.code}</span> {d.name}</td>
+                <td className="py-1 pr-3"><span className="font-medium text-ink">{d.code}</span> {d.name}</td>
                 <td className="pr-3 tabular-nums">{fmtDate(d.fromStart)}</td><td className="pr-3 tabular-nums">{fmtDate(d.toStart)}</td>
                 <td className="pr-3 text-right tabular-nums">{d.workDays}</td><td className="pr-3">{d.withinFloat ? 'Yes' : 'No — moves later work'}</td><td>{d.resources.join(', ')}</td>
               </tr>
@@ -401,8 +401,8 @@ function LevelingResults({ p }: { p: Preview }) {
         {r.knockOn.length > 0 && <p className="text-[12px] text-warm-600 mt-1">Moved by logic as a result: {r.knockOn.slice(0, 15).map(k => `${k.code} (+${k.calendarDays}d)`).join(', ')}{r.knockOn.length > 15 ? ', …' : ''}</p>}
       </div>
       {r.unresolved.length > 0 && (
-        <div><h5 className="font-semibold text-navy-950 mb-1">Not resolved</h5>
-          <ul className="list-disc pl-5 text-[12.5px]">{r.unresolved.slice(0, 15).map((u, i) => <li key={i}>{u.resourceCode} from {fmtDate(u.date)}: {u.reason}</li>)}</ul></div>
+        <div><h5 className="font-semibold text-ink mb-1">Not resolved</h5>
+          <ul className="list-disc pl-5 text-[12px]">{r.unresolved.slice(0, 15).map((u, i) => <li key={i}>{u.resourceCode} from {fmtDate(u.date)}: {u.reason}</li>)}</ul></div>
       )}
       <OverAllocations periods={r.remaining} title="Remaining over-allocations after leveling" />
       {r.assumptions.length > 0 && <ul className="list-disc pl-5 text-[12px] text-warm-600">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>}

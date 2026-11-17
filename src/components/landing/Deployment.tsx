@@ -97,7 +97,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
   return (
     <section id="deployment" aria-labelledby="deployment-h" className="max-w-[1240px] mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
       <Reveal className="text-center mb-10 md:mb-12">
-        <h2 id="deployment-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Run it where your data lives.</h2>
+        <h2 id="deployment-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Run it where your data lives.</h2>
         <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>
       </Reveal>
       <Reveal className="max-w-[880px] mx-auto">
@@ -107,7 +107,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
               key={x.id} ref={el => { tabs.current[i] = el }} type="button" role="tab" id={`dep-tab-${x.id}`}
               aria-selected={i === active} aria-controls="dep-panel" tabIndex={i === active ? 0 : -1}
               onClick={() => setActive(i)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === active ? 'bg-white text-navy-950 shadow-sm' : 'text-warm-600 hover:text-navy-950'}`}
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
             >{x.tab}</button>
           ))}
         </div>
@@ -115,7 +115,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
           <div key={o.id} className="rise-in">
             <div className="flex flex-wrap items-center gap-3">
               {o.id === 'onprem' ? <Server size={22} className="text-accent-600" aria-hidden /> : <Cloud size={22} className="text-accent-600" aria-hidden />}
-              <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-navy-950">{o.title}</h3>
+              <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-ink">{o.title}</h3>
               <span className={`text-[12.5px] font-semibold rounded-full px-2.5 py-1 ${o.status === 'Available now' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-accent-100 text-accent-700'}`}>{o.status}</span>
             </div>
             <dl className="mt-6 grid gap-5 md:grid-cols-3">
