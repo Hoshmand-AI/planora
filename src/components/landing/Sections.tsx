@@ -9,7 +9,7 @@ import { ArrowRight, ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchC
 import { Reveal } from './motion'
 import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
 
-const H2 = 'text-h2 md:text-h1 font-bold tracking-[-0.03em] text-ink leading-[1.1]'
+const H2 = 'text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]'
 const LEAD = 'text-lead text-warm-600 mt-4 leading-snug'
 
 /** Accessible tabs: arrow keys, Home and End move between them (WAI-ARIA tabs pattern). */
@@ -141,7 +141,7 @@ export function DailyBrief() {
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="text-center max-w-[820px] mx-auto">
           <p className="text-small font-semibold text-accent-400">The Daily Brief</p>
-          <h2 id="today-h" className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-white leading-[1.1] mt-3">Every morning, what changed and what to do about it.</h2>
+          <h2 id="today-h" className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-white leading-[1.1] mt-3">Every morning, what changed and what to do about it.</h2>
           <p className="text-lead text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
         </Reveal>
 
@@ -192,10 +192,10 @@ export function Proof() {
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
       <div className="max-w-[1240px] mx-auto px-6 py-14 md:py-16 grid md:grid-cols-3 gap-x-12 gap-y-8">
-        <h2 id="proof-h" className="text-h3 md:text-h2 font-semibold tracking-[-0.02em] text-ink leading-tight">Don’t take our word for it. Check the work.</h2>
+        <h2 id="proof-h" className="text-h2 font-semibold tracking-[-0.02em] text-ink leading-tight">Don’t take our word for it. Check the work.</h2>
         {items.map(({ title, text, href, cta }) => (
           <div key={title} className="border-t border-warm-300 pt-5">
-            <h3 className="text-lead font-semibold text-ink tracking-[-0.01em]">{title}</h3>
+            <h3 className="text-h3 font-semibold text-ink tracking-[-0.01em]">{title}</h3>
             <p className="text-copy text-warm-700 leading-relaxed mt-2">{text}</p>
             <a href={href} className="pressable mt-3 inline-flex items-center gap-1.5 text-small font-semibold text-accent-700 underline-offset-4 hover:underline">{cta}<ArrowRight size={16} aria-hidden /></a>
           </div>
@@ -232,7 +232,7 @@ export function Audiences() {
           <div id="who-panel" role="tabpanel" aria-labelledby={`who-tab-${a.id}`} className="mt-10">
             <div key={a.id} className="rise-in grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 items-center">
               <div>
-                <h3 className="text-h3 md:text-h2 font-semibold tracking-[-0.02em] text-ink leading-tight">{a.title}</h3>
+                <h3 className="text-h3 md:text-h2 font-semibold tracking-[-0.01em] md:tracking-[-0.02em] text-ink leading-tight">{a.title}</h3>
                 <ul className="mt-6 space-y-4">
                   {a.points.map(p => (
                     <li key={p} className="flex items-start gap-3 text-copy text-warm-700 leading-relaxed">
@@ -315,7 +315,7 @@ export function Security({ contactHref }: { contactHref: string }) {
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="max-w-[720px]">
           <p className="flex items-center gap-2 text-small font-semibold text-accent-400"><Lock size={15} aria-hidden />Security</p>
-          <h2 id="security-h" className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-white leading-[1.1] mt-3">Security you can check for yourself.</h2>
+          <h2 id="security-h" className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-white leading-[1.1] mt-3">Security you can check for yourself.</h2>
           <p className="text-lead text-navy-200 mt-4 leading-snug">Each control below is enforced in code and tested on every change. We will run the tests in front of your security team.</p>
         </Reveal>
         <ul className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
@@ -329,11 +329,11 @@ export function Security({ contactHref }: { contactHref: string }) {
         </ul>
         <div className="mt-14 grid md:grid-cols-2 gap-5">
           <div className="rounded-2xl border border-navy-800 bg-navy-900 p-6 md:p-7">
-            <h3 className="text-lead font-semibold text-white">What we do not have yet</h3>
+            <h3 className="text-h3 font-semibold tracking-[-0.01em] text-white">What we do not have yet</h3>
             <p className="text-copy text-navy-200 leading-relaxed mt-2">RunF9 has not completed a SOC 2 audit and is not FedRAMP authorized. For work that needs either, run RunF9 inside your own boundary.</p>
           </div>
           <div className="rounded-2xl border border-navy-800 bg-navy-900 p-6 md:p-7">
-            <h3 className="text-lead font-semibold text-white">Documents for your review</h3>
+            <h3 className="text-h3 font-semibold tracking-[-0.01em] text-white">Documents for your review</h3>
             <p className="text-copy text-navy-200 leading-relaxed mt-2">Our security overview, control matrix and NIST SP 800-171 mapping are available: <a href={contactHref} className="text-white underline">ask us for them</a>.</p>
           </div>
         </div>

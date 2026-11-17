@@ -125,7 +125,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             inviteOnly ? [<>2,300+</>, 'automated tests run on every change to RunF9'] : [<>$0</>, 'to start. No credit card'],
           ].map(([value, label], i) => (
             <Reveal key={String(label)} delay={i * 90}>
-              <div className="text-h2 md:text-h1 font-semibold tracking-[-0.03em] text-ink tabular-nums leading-none">{value}</div>
+              <div className="text-h2 font-semibold tracking-[-0.02em] text-ink tabular-nums leading-none">{value}</div>
               <div className="text-small text-warm-700 mt-2 leading-snug max-w-[220px] mx-auto">{label}</div>
             </Reveal>
           ))}
@@ -170,7 +170,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Build. Check. Forecast. */}
       <section id="features" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
-          <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-ink leading-[1.1]">Everything a scheduler does. Shown, not hidden.</h2>
+          <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-lead text-warm-600 mt-4 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
         </Reveal>
         <Pillars />
@@ -186,8 +186,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
         <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
           <Reveal>
-            <h2 className="text-h2 md:text-h1 font-semibold tracking-[-0.03em] text-ink leading-[1.1]">Reports, written from your numbers.</h2>
-            <p className="text-copy text-warm-700 leading-relaxed mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
+            <h2 className="text-h2 md:text-h1 font-semibold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Reports, written from your numbers.</h2>
+            <p className="text-lead text-warm-600 leading-snug mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
             <ul className="mt-6 space-y-3">
               {[
                 ['Executive Schedule Summary', 'status, key dates, findings and recommendations'],
@@ -218,7 +218,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Pricing */}
       <section id="pricing" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center mb-14 md:mb-16">
-          <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-ink leading-[1.1]">Simple, transparent pricing.</h2>
+          <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Simple, transparent pricing.</h2>
           <p className="text-lead text-warm-600 mt-4">{inviteOnly ? 'RunF9 is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-5">
@@ -228,7 +228,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (SAML, OpenID Connect) and SCIM', 'Enforced 2-step & approval policies', 'Deploy in your AWS, Azure or Google Cloud account, or air-gapped', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
           ].map((p, i) => (
             <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 flex flex-col ${p.featured ? 'bg-navy-950 text-white shadow-[0_30px_60px_-30px_rgba(29,33,37,0.55)]' : 'bg-white border border-warm-200'}`}>
-              <div className={`text-copy font-semibold ${p.featured ? 'text-white' : 'text-ink'}`}>{p.name}</div>
+              <div className={`text-h3 font-semibold tracking-[-0.01em] ${p.featured ? 'text-white' : 'text-ink'}`}>{p.name}</div>
               <div className={`mt-2 text-h2 font-bold tracking-[-0.02em] leading-none ${p.featured ? 'text-white' : 'text-ink'}`}>{p.price}<span className={`text-small font-medium tracking-normal ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.per}</span></div>
               {/* The same height on every card, so the buttons and the lists line up across the row. */}
               <p className={`text-small mt-3 md:min-h-[42px] ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.blurb}</p>
@@ -250,7 +250,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
         <Reveal className="max-w-[1240px] mx-auto rounded-[36px] bg-navy-950 px-8 py-20 md:py-28 text-center relative overflow-hidden">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
-            <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-white leading-[1.1]">Use RunF9 on your next schedule</h2>
+            <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-white leading-[1.1]">Use RunF9 on your next schedule</h2>
             <p className="text-lead text-navy-200 mt-4 max-w-[620px] mx-auto">Start with the interview, or upload a P6 or MS Project file and see the DCMA 14-Point results in seconds.</p>
             <Cta href={primaryHref} className={`${primaryBtn} mt-8 px-7 py-3.5 text-copy`}>{inviteOnly ? 'Request access' : 'Get started free'}</Cta>
             <p className="text-small text-navy-200 mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>

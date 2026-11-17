@@ -121,8 +121,9 @@ export default function HeroSchedule() {
 
         {/* The answer */}
         <div className="bg-navy-950 text-white p-5 md:p-7 flex flex-col">
-          <p className="text-fine text-navy-200">Will we finish on time?</p>
-          <p className="text-h2 font-semibold tracking-[-0.02em] leading-none mt-1.5 tabular-nums">{SCH.finish}</p>
+          {/* As in the product: the figure first, what it is under it, then the verdict. */}
+          <p className="text-h2 font-semibold tracking-[-0.02em] leading-none tabular-nums">{SCH.finish}</p>
+          <p className="text-fine text-navy-200 mt-1.5">Forecast finish</p>
           <p className="mt-3 self-start rounded-full bg-status-at-risk-bg text-status-at-risk text-fine font-semibold px-3 py-1">{SCH.daysLate} days after the required {SCH.required}</p>
           <dl className="mt-4 grid grid-cols-3 lg:grid-cols-1 gap-2">
             {tiles.map(([value, label]) => (

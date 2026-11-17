@@ -23,11 +23,11 @@ export default function SampleReportPage() {
       <main className="max-w-[920px] mx-auto px-6 py-10 md:py-14">
         <p className="text-fine font-semibold text-accent-700">Sample report</p>
         <h1 className="text-h2 md:text-h1 font-semibold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-tight mt-2">What RunF9 writes from a schedule</h1>
-        <p className="text-copy text-warm-700 leading-relaxed mt-4 max-w-[720px]">
+        <p className="text-lead text-warm-700 leading-snug mt-4 max-w-[720px]">
           This is the Executive Schedule Summary RunF9 produced for the sample data center project that every account can open. It was written with AI switched off, from the schedule file alone, and is shown exactly as generated. The project is a sample, not a customer&rsquo;s.
         </p>
         <div className="mt-8 rounded-[20px] border border-warm-200 bg-white p-5 md:p-9 overflow-x-auto">
-          <Markdown text={SAMPLE_REPORT_MD} />
+          <Markdown text={SAMPLE_REPORT_MD} className="text-body text-warm-700 leading-relaxed" />
         </div>
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <Link href="/#pricing" className="pressable inline-flex items-center justify-center rounded-full bg-accent-600 px-6 py-3 text-small font-semibold text-white hover:bg-accent-700">See plans and request access</Link>

@@ -39,7 +39,7 @@ export function UpdatesAndDelays() {
     <section id="updates" className="bg-accent-100 border-y border-warm-200 scroll-mt-12">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
       <Reveal className="max-w-[760px]">
-        <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-ink leading-[1.1]">Every update. Every delay.</h2>
+        <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Every update. Every delay.</h2>
         <p className="text-lead text-warm-600 mt-4 leading-snug">The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates.</p>
       </Reveal>
       <div className="grid md:grid-cols-2 gap-5 mt-12">

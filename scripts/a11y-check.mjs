@@ -44,7 +44,7 @@ await post(`/api/plans/${plan.id}/generate`, {})
 const sample = (await (await post('/api/plans', { sample: true })).json()).plan
 
 const PAGES = [
-  ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'],
+  ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'], ['Sample report', '/sample-report'], ['Password reset', '/auth/reset'], ['Not found', '/no-such-page'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'], ['Organization: plan and data', '/dashboard/org?tab=plan'], ['Organization: security', '/dashboard/org?tab=security'], ['Organization: integrations', '/dashboard/org?tab=integrations'], ['Organization: audit log', '/dashboard/org?tab=audit'],
   ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm insights', '/dashboard/history'],

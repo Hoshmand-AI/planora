@@ -31,6 +31,8 @@ const sources = files(path.join(process.cwd(), 'src')).map(f => ({ file: path.re
 describe('type scale', () => {
   it('has the documented sizes: five for the app, eight for public pages', () => {
     expect(Object.keys(scale).sort()).toEqual([...APP, ...PUBLIC].sort())
+    // Nothing is added beside it: an `extend` would bring a size the rest of this test does not know.
+    expect((config.theme as { extend?: { fontSize?: unknown } }).extend?.fontSize).toBeUndefined()
     expect(APP.map(px)).toEqual([20, 16, 14, 13, 12])
     expect(PUBLIC.map(px)).toEqual([64, 40, 28, 20, 18, 16, 14, 13])
     // Each step down is smaller than the one above it.
@@ -42,12 +44,20 @@ describe('type scale', () => {
     const allowed = new Set(Object.values(scale).map(v => Number.parseFloat(v)))
     for (const { file, text } of sources) {
       // `text-[17px]`, `text-[1.1rem]`: an arbitrary size. (`text-[#123456]` and `text-[color:…]` are colors.)
-      for (const m of text.matchAll(/\btext-\[\s*[0-9.]+(px|rem|em|pt|%|vw)?\s*\]/g)) off.push(`${file}: ${m[0]}`)
+      for (const m of text.matchAll(/\btext-\[(?!#|color:)[^\]]*\]/g)) off.push(`${file}: ${m[0]}`)
       // Tailwind's default names are not defined in this project, so they would style nothing.
       for (const m of text.matchAll(/(?<![\w-])text-(xs|sm|base|lg|xl|[2-9]xl)(?![\w-])/g)) off.push(`${file}: ${m[0]}`)
       // Inline sizes (SVG chart text, a stylesheet rule) must be on the scale too.
       for (const m of text.matchAll(/\bfontSize\s*[=:]\s*\{?\s*["']?([0-9.]+)/g)) if (!allowed.has(Number(m[1]))) off.push(`${file}: fontSize ${m[1]}`)
-      for (const m of text.matchAll(/font-size:\s*([0-9.]+)px/g)) if (!allowed.has(Number(m[1]))) off.push(`${file}: font-size ${m[1]}px`)
+      // In a stylesheet a size is a pixel value on the scale, a token, or the one rule that keeps iOS from zooming a field.
+      if (file.endsWith('.css')) {
+        for (const m of text.matchAll(/font-size:\s*([^;}]+)/g)) {
+          const v = m[1].replace(/\s*!important\s*$/, '').trim()
+          const px = /^(\d+(?:\.\d+)?)px$/.exec(v)
+          if (!(px && allowed.has(Number(px[1]))) && !/^theme\('fontSize\.\w+'\)$/.test(v) && v !== 'max(16px, 1em)') off.push(`${file}: font-size ${v}`)
+        }
+        for (const m of text.matchAll(/(?<![\w-])font:\s*[^;}]+/g)) off.push(`${file}: ${m[0]} (set the size with font-size)`)
+      }
     }
     expect(off).toEqual([])
   })
@@ -71,6 +81,8 @@ describe('type scale', () => {
       // The title size is reached through `.page-title` only, so every use of it is a page's h1.
       for (const m of text.matchAll(/(?<![\w-])text-title(?![\w-])/g)) off.push(`${file}: ${m[0]} (use the page-title class on the h1)`)
       for (const m of text.matchAll(/<(\w+)[^>]*\bpage-title\b/g)) if (m[1] !== 'h1') off.push(`${file}: page-title on <${m[1]}>`)
+      // And every h1 is the page title, so none inherits a size by accident.
+      for (const m of text.matchAll(/<h1\b[^>]*>/g)) if (!/\bpage-title\b|sr-only/.test(m[0])) off.push(`${file}: an h1 without page-title`)
     }
     expect(off).toEqual([])
   })

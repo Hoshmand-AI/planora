@@ -20,7 +20,7 @@ export default function DeployPage() {
       </nav>
       <main className="max-w-[960px] mx-auto px-6 py-12">
         <h1 className="text-h2 md:text-h1 font-semibold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-tight">Run RunF9 in your own cloud</h1>
-        <p className="text-copy text-warm-700 mt-3 max-w-[720px] leading-relaxed">
+        <p className="text-lead text-warm-700 mt-3 max-w-[720px] leading-snug">
           One template installs the whole of RunF9 in your account: the app, its PostgreSQL database, your schedules, analysis, documents and the document-search index.
           Nothing is stored with RunF9, and you choose the AI (your cloud&apos;s own, or none). For a client that requires a different cloud, deploy one copy in each.
         </p>
