@@ -12,6 +12,11 @@ import {
   MessageSquare,
   FileText,
   Wrench,
+  Home,
+  LayoutDashboard,
+  CalendarRange,
+  Activity,
+  FolderOpen,
 } from 'lucide-react'
 import { fmtDate } from '@/lib/format'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
@@ -86,8 +91,31 @@ export const PROJECT_TABS: { href: string; label: string; hint: string; views?: 
     views: [{ href: '/dashboard/quality', label: 'Schedule quality' }, { href: '/dashboard/time-impact', label: 'Delays' }] },
   { href: '/dashboard/documents', label: 'Project records', hint: 'Emails, minutes, daily reports and contract documents. RunF9 reads them for anything that affects the schedule.' },
   { href: '/dashboard/reports',   label: 'Reports',         hint: 'What you send to the owner.',
-    views: [{ href: '/dashboard/reports', label: 'Reports' }, { href: '/dashboard/earned-value', label: 'Earned value' }] },
+    views: [{ href: '/dashboard/reports', label: 'Written reports' }, { href: '/dashboard/earned-value', label: 'Earned value' }] },
 ]
+const TAB_ICON: Record<string, typeof LayoutGrid> = {
+  '/dashboard/project': LayoutDashboard, '/dashboard/timeline': CalendarRange, '/dashboard/quality': Activity,
+  '/dashboard/documents': FolderOpen, '/dashboard/reports': FileText,
+}
+/** One row of the sidebar: an icon and a name; the current one is tinted with a bar on its left edge. */
+const sideItem = (active: boolean, open: boolean) =>
+  `relative flex items-center gap-3 py-2 rounded-lg text-[14px] transition-colors ${open ? 'px-3' : 'justify-center px-0'} ${active ? "bg-accent-100 text-navy-950 font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent-600 before:content-['']" : 'text-warm-700 font-medium hover:bg-warm-100 hover:text-navy-950'}`
+/** The name of the page a path shows, for the top bar. */
+const pageLabel = (pathname: string) => {
+  for (const t of PROJECT_TABS) {
+    const v = t.views?.find(x => pathname.startsWith(x.href))
+    if (v) return `${t.label} · ${v.label}`
+    if (pathname.startsWith(t.href)) return t.label
+  }
+  if (pathname.startsWith('/dashboard/ask')) return 'Ask'
+  if (pathname.startsWith('/dashboard/tools')) return 'Analysis tools'
+  if (pathname.startsWith('/dashboard/account')) return 'Account and security'
+  if (pathname.startsWith('/dashboard/plan')) return 'New project'
+  if (pathname.startsWith('/dashboard/history')) return 'Firm insights'
+  if (pathname.startsWith('/dashboard/org')) return 'Organization'
+  if (pathname.startsWith('/dashboard/platform')) return 'Platform'
+  return 'Projects'
+}
 const tabPaths = (t: (typeof PROJECT_TABS)[number]) => [t.href, ...(t.views ?? []).map(v => v.href)]
 /** Pages that work on one project: they show the project header and tabs. Ask and the analysis tools are reached from the header. */
 const SCHEDULE_PAGES = [...PROJECT_TABS.flatMap(tabPaths), '/dashboard/ask', '/dashboard/tools']
@@ -459,13 +487,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Sidebar (desktop) ─────────────────────────────── */}
-        <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-navy-900 text-white sticky top-0 h-screen py-5 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
+        <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-white text-navy-950 border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
           <div className={`flex items-center pb-6 flex-shrink-0 ${sidebarOpen ? 'justify-between pl-2.5' : 'flex-col gap-3'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects">
-              <Logo variant="light" size="text-[21px]" mark={!sidebarOpen} />
+              <Logo variant="dark" size="text-[21px]" mark={!sidebarOpen} />
             </Link>
             <button type="button" onClick={toggleSidebar} aria-expanded={sidebarOpen} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              className="grid place-items-center w-9 h-9 rounded-lg text-warm-200 hover:bg-navy-800 hover:text-white transition-colors">
+              className="grid place-items-center w-9 h-9 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-navy-950 transition-colors">
               {sidebarOpen ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={18} aria-hidden="true" />}
               <span className="sr-only">{sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}</span>
             </button>
@@ -476,18 +504,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               return (
                 <div key={n.href}>
                   <Link href={n.href} aria-current={active ? 'page' : undefined} title={sidebarOpen ? undefined : n.label}
-                    className={`relative flex items-center gap-3 py-2.5 rounded-xl text-[14.5px] transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-0'} ${active ? 'bg-navy-800 text-white font-semibold' : 'text-warm-200 font-medium hover:bg-navy-800/70 hover:text-white'}`}>
-                    {active && <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent-400" />}
-                    <n.icon size={sidebarOpen ? 17 : 19} aria-hidden="true" className={active ? 'text-accent-400' : undefined} /><span className={sidebarOpen ? undefined : 'sr-only'}>{n.label}</span>
+                    className={sideItem(active && !(inProject && n.href === '/dashboard'), sidebarOpen)}>
+                    <n.icon size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>{n.label}</span>
                   </Link>
-                  {sidebarOpen && n.href === '/dashboard' && recent.length > 0 && (
+                  {sidebarOpen && n.href === '/dashboard' && recent.length > 0 && !(inProject && selectedSchedule) && (
                     <ul aria-label="Recent projects" className="mt-1 mb-2 ml-[38px] flex flex-col">
                       {recent.map(s => {
                         const here = inProject && selectedSchedule?.id === s.id
                         return (
                           <li key={s.id}>
                             <Link href={`/dashboard/project?schedule=${s.id}`} onClick={() => setSelectedSchedule(s)} aria-current={here ? 'page' : undefined}
-                              className={`block truncate py-1.5 text-[13.5px] transition-colors ${here ? 'text-white font-semibold' : 'text-warm-200 hover:text-white'}`}>{s.name}</Link>
+                              className={`block truncate py-1.5 text-[13.5px] transition-colors ${here ? 'text-navy-950 font-semibold' : 'text-warm-600 hover:text-navy-950'}`}>{s.name}</Link>
                           </li>
                         )
                       })}
@@ -497,22 +524,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )
             })}
           </nav>
-          <div className="mt-auto pt-4 border-t border-navy-800 flex flex-col gap-2">
+          {/* The open project's pages are a list in the sidebar, like the rest of the app's destinations (they were tabs across the top). */}
+          {inProject && selectedSchedule && (
+            <div className="mt-3 pt-3 border-t border-warm-200 min-h-0 overflow-y-auto">
+              {sidebarOpen && <p className="px-3 pb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-warm-600 truncate" title={selectedSchedule.name}>{selectedSchedule.name}</p>}
+              <nav aria-label="Project" className="flex flex-col gap-0.5">
+                {PROJECT_TABS.map(t => {
+                  const here = tabPaths(t).some(h => pathname.startsWith(h))
+                  const Icon = TAB_ICON[t.href] ?? FileText
+                  return (
+                    <Fragment key={t.href}>
+                      <div className="relative">
+                        <Link href={`${t.href}?schedule=${selectedSchedule.id}`} aria-current={here ? 'page' : undefined} title={sidebarOpen ? undefined : t.label} className={sideItem(here, sidebarOpen)}>
+                          <Icon size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>{t.label}</span>
+                        </Link>
+                        {/* How many things need action today: beside the link, not inside it, so it is still named "Overview". */}
+                        {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className={`pointer-events-none absolute min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-bold leading-[18px] text-white ${sidebarOpen ? 'right-2.5 top-1/2 -translate-y-1/2' : 'right-1 top-0.5'}`}>{todayCount}</span>}
+                      </div>
+                      {here && t.views && sidebarOpen && (
+                        <nav aria-label={`${t.label} views`} className="ml-[38px] mb-1 flex flex-col border-l border-warm-200">
+                          {t.views.map(v => {
+                            const on = pathname.startsWith(v.href)
+                            return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'true' : undefined}
+                              className={`-ml-px border-l-2 pl-3 py-1.5 text-[13.5px] transition-colors ${on ? 'border-accent-600 text-navy-950 font-semibold' : 'border-transparent text-warm-600 hover:text-navy-950'}`}>{v.label}</Link>
+                          })}
+                        </nav>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </nav>
+              <div className="mt-0.5 flex flex-col gap-0.5">
+                <Link href={`/dashboard/ask?schedule=${selectedSchedule.id}`} aria-current={pathname.startsWith('/dashboard/ask') ? 'page' : undefined} title={sidebarOpen ? undefined : 'Ask'} className={sideItem(pathname.startsWith('/dashboard/ask'), sidebarOpen)}>
+                  <MessageSquare size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>Ask</span>
+                </Link>
+                {selectedSchedule.sourceType !== 'generated' && (
+                  <Link href={`/dashboard/tools?schedule=${selectedSchedule.id}`} aria-current={pathname.startsWith('/dashboard/tools') ? 'page' : undefined} title={sidebarOpen ? undefined : 'Analysis tools'} className={sideItem(pathname.startsWith('/dashboard/tools'), sidebarOpen)}>
+                    <Wrench size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>Analysis tools</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="mt-auto pt-4 border-t border-warm-200 flex flex-col gap-2">
             {llm && (
               <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only: scheduling, CPM, quality checks and reports still work')}
-                className={`flex items-center gap-2 text-[12px] font-medium text-warm-200 ${sidebarOpen ? 'px-3' : 'justify-center [&>span:last-child]:sr-only'}`}>
+                className={`flex items-center gap-2 text-[12px] font-medium text-warm-600 ${sidebarOpen ? 'px-3' : 'justify-center [&>span:last-child]:sr-only'}`}>
                 {llm.airgapped ? <Lock size={11} aria-hidden="true" /> : <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${llm.mode === 'offline' ? 'bg-warm-300' : 'bg-accent-400'}`} />}
                 <span>{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}</span>
               </span>
             )}
             {/* The accessible name includes the visible name and firm (WCAG 2.5.3 label in name). */}
             <button type="button" onClick={() => setShowSettings(true)}
-              className={`flex items-center gap-3 py-2 rounded-xl text-left hover:bg-navy-800 transition-colors ${sidebarOpen ? 'px-2.5' : 'justify-center px-0'}`}>
+              className={`flex items-center gap-3 py-2 rounded-lg text-left hover:bg-warm-100 transition-colors ${sidebarOpen ? 'px-2.5' : 'justify-center px-0'}`}>
               <span className="sr-only">Account menu: </span>
-              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-950 text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
               <span className={sidebarOpen ? 'min-w-0' : 'sr-only'}>
                 <span className="block text-[13.5px] font-semibold truncate">{user.name}</span>
-                {org && <span className="block text-[12px] text-warm-200 truncate">{org.name}</span>}
+                {org && <span className="block text-[12px] text-warm-600 truncate">{org.name}</span>}
               </span>
             </button>
           </div>
@@ -527,22 +596,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-bold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
           </header>
 
-          {/* ── Project header: one project's name, status and tabs ── */}
+          {/* ── Top bar (desktop): a thin navy bar that says where you are ── */}
+          <div className="hidden md:flex sticky top-0 z-30 h-12 flex-shrink-0 items-center gap-4 bg-navy-950 px-5 lg:px-8 text-[13px] text-navy-200">
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2">
+              <Link href="/dashboard" aria-label="All projects" className="flex-shrink-0 rounded p-1 hover:text-white"><Home size={15} aria-hidden="true" /></Link>
+              <span aria-hidden="true">/</span>
+              {inProject && selectedSchedule ? (
+                <>
+                  <Link href="/dashboard" className="flex-shrink-0 hover:text-white">Projects</Link>
+                  <span aria-hidden="true">/</span>
+                  <button type="button" data-compact onClick={() => setShowScheduleList(true)} aria-label={`${selectedSchedule.name}: switch project`} className="inline-flex min-w-0 items-center gap-1 font-semibold text-white hover:underline">
+                    <span className="truncate">{selectedSchedule.name}</span><ChevronDown size={13} aria-hidden="true" className="flex-shrink-0" />
+                  </button>
+                  <span aria-hidden="true">/</span>
+                  <span className="flex-shrink-0 text-white">{pageLabel(pathname)}</span>
+                </>
+              ) : <span className="font-semibold text-white">{pageLabel(pathname)}</span>}
+            </nav>
+          </div>
+
+          {/* ── Project header: one project's name and status (its pages are in the sidebar; on a phone they are tabs here) ── */}
           {inProject && (
-            <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
+            <div className="bg-white border-b border-warm-200 z-20">
               <div className="relative max-w-6xl mx-auto px-5 md:px-8 pt-2 md:pt-5">
                 {selectedSchedule ? (
                   <div className="flex items-center md:items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <nav aria-label="Breadcrumb" className="text-[13px] text-warm-600 max-md:hidden">
-                        <Link href="/dashboard" className="hover:text-navy-950">Projects</Link>
-                        <span aria-hidden="true"> / </span>
-                        <button type="button" data-compact onClick={() => setShowScheduleList(true)} className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[28px] hover:text-navy-950" aria-label={`Switch project (current: ${selectedSchedule.name})`}>
-                          Switch project <ChevronDown size={12} aria-hidden="true" />
-                        </button>
-                        {/* The upload's facts ride on the breadcrumb line, so the header is one row shorter. */}
-                        <span className="ml-3 pl-3 border-l border-warm-300">{selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}</span>
-                      </nav>
+                      <p className="text-[13px] text-warm-600 max-md:hidden">{selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}</p>
                       {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
                       <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
                         <Link href="/dashboard" aria-label="All projects" className="md:hidden flex-shrink-0 -ml-2 inline-flex items-center justify-center w-9 h-11 text-navy-950"><ChevronDown size={20} className="rotate-90" aria-hidden="true" /></Link>
@@ -559,10 +639,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       const addRecord = () => router.push(`/dashboard/documents?schedule=${selectedSchedule.id}&add=1`)
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Link href={`/dashboard/ask?schedule=${selectedSchedule.id}`} aria-current={pathname.startsWith('/dashboard/ask') ? 'page' : undefined}
-                            className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 h-9 text-[13px] font-semibold hover:bg-warm-100">
-                            <MessageSquare size={14} aria-hidden="true" /> Ask
-                          </Link>
                           {/* One place to bring anything into the project: no tab asks for an upload on its own. */}
                           {owns && (
                             <div className="hidden md:block">
@@ -592,7 +668,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 {/* Tabs scroll sideways on narrow screens: the right edge fades to show there are more, and the current tab is scrolled into view */}
                 {/* A chevron at the right edge on narrow screens says the strip scrolls; a fade alone was too faint to read as "more". */}
-                <div className="relative">
+                <div className="relative md:hidden">
                 <span aria-hidden="true" className="lg:hidden pointer-events-none absolute -right-2 bottom-px top-3 z-10 flex items-center pl-8 pr-2 bg-[linear-gradient(to_left,#fff_55%,transparent)] text-warm-600"><ChevronDown size={16} className="-rotate-90" /></span>
                 <nav ref={tabsRef} aria-label="Project" className="relative flex gap-1 overflow-x-auto -mx-1 mt-3 pr-8 lg:pr-0">
                   {PROJECT_TABS.map(t => {
@@ -617,7 +693,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   if (!t || !selectedSchedule) return null
                   if (!t.views) return t.href === '/dashboard/documents' ? <p className="py-2 border-t border-warm-200 text-[13px] text-warm-600 max-md:hidden">{t.hint}</p> : null
                   return (
-                    <div className="xl:absolute xl:right-8 xl:bottom-1.5 max-xl:py-2 max-xl:border-t max-xl:border-warm-200 z-10">
+                    <div className={`py-2 border-t border-warm-200 ${sidebarOpen ? 'md:hidden' : ''}`}>
                       <nav aria-label={`${t.label} views`} className="inline-flex gap-1 rounded-lg bg-warm-100 p-0.5">
                         {t.views.map(v => {
                           const on = pathname.startsWith(v.href)
