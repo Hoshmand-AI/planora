@@ -42,6 +42,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
   const [items, setItems] = useState<RegisterItem[]>([])
   const [impact, setImpact] = useState<{ moved: { id: string; code: string; name: string; startDays: number; finishDays: number }[]; movedCount: number } | null>(null)
   const [err, setErr] = useState('')
+  const [showWatch, setShowWatch] = useState(false)
   const [asOf, setAsOf] = useState(todayIso)
   const [audience, setAudience] = useState<Audience>('pm')
   const [whatIf, setWhatIf] = useState<{ activity: string; days: string }>({ activity: '', days: '5' })
@@ -138,11 +139,15 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     <div className="space-y-5">
       {err && <Alert tone="error">{err}</Alert>}
 
-      {data.alerts.length > 0 && (
+      {data.alerts.length > 0 && (() => {
+        // What to act on is listed; what only needs watching is one press away, unless there is nothing to act on.
+        const act = data.alerts.filter(a => a.level === 'act'), watch = data.alerts.filter(a => a.level !== 'act')
+        const listed = act.length && !showWatch ? act : [...act, ...watch]
+        return (
         <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
-          <h2 id="alerts-h" className="text-[16px] font-semibold text-ink">Needs attention today ({data.alerts.filter(a => a.level === 'act').length} to act on, {data.alerts.filter(a => a.level === 'watch').length} to watch)</h2>
+          <h2 id="alerts-h" className="text-[16px] font-semibold text-ink">Needs attention today <span className="ml-1 text-[13px] font-normal text-warm-600">{act.length ? `${act.length} to act on` : `${watch.length} to watch`}</span></h2>
           <ul className="mt-2 divide-y divide-warm-200 [&>li]:py-2 [&>li]:text-[13px]">
-            {data.alerts.map((a, i) => (
+            {listed.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-[14px] text-warm-700">
                 <span className={`mt-0.5 h-fit w-[56px] text-center flex-shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
                 {/* The kind of item is its own column on a wide screen, so the list can be scanned down its left edge. */}
@@ -152,8 +157,10 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
               </li>
             ))}
           </ul>
+          {act.length > 0 && watch.length > 0 && <button type="button" aria-expanded={showWatch} onClick={() => setShowWatch(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{showWatch ? 'Show only what to act on' : `Show ${watch.length} more to watch`}</button>}
         </section>
-      )}
+        )
+      })()}
 
       {(has.today || has.overdue || has.since || has.lookahead) && (
         <section aria-label="Today on site" className="space-y-3">
@@ -230,7 +237,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         ) : (
           <ul className="space-y-2">{b.signals.slice(0, 10).map((s, i) => (
             <li key={i} className="rounded-lg border border-warm-200 p-3 text-[13px]">
-              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-[12px] font-semibold uppercase ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
+              <span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded-full text-[12px] font-semibold capitalize ${s.kind === 'delay' ? 'bg-status-at-risk-bg text-status-at-risk' : s.kind === 'commitment' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-status-attention-bg text-status-attention'}`}>{s.kind}</span>
               <q className="text-warm-700">{s.quote}</q>
               <span className="block text-[12px] text-warm-600 mt-1">{s.citation.includes(s.title) ? s.citation : `${s.title} ${s.citation}`}{s.activity ? ` · about ${s.activity.code} ${s.activity.name}` : ''}{s.days ? ` · ${s.days} work day${s.days === 1 ? '' : 's'}` : ''}</span>
               {canWrite && s.kind !== 'commitment' && (items.some(it => it.sourceQuote === s.quote) ? <span className="mt-1.5 block text-[12px] text-warm-600">In the register</span> : <button type="button" disabled={busy === `sig${i}`} className="mt-1.5 text-[12px] font-medium text-accent-600 hover:underline" onClick={async () => {
@@ -519,7 +526,7 @@ function ExplainClause({ scheduleId, title, quote, aiOff }: { scheduleId: string
         {state.error && <p className="mt-1 text-[12px] text-status-at-risk">{state.error}</p>}
         {state.answer && (
           <div className="mt-2 rounded-md border border-warm-200 bg-white p-3 text-[13px] text-warm-700">
-            <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-warm-600">What this means for the project (AI, from your documents)</p>
+            <p className="mb-1 text-[12px] font-semibold text-warm-600">What this means for the project (AI, from your documents)</p>
             <Markdown text={state.answer} />
             <p className="mt-2 text-[12px] text-warm-600">Written by an AI model from the cited passages. Read the clause itself before acting on it; this is not legal advice.</p>
           </div>

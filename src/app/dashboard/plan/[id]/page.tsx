@@ -384,6 +384,9 @@ export default function PlanPage() {
 
 /* ─── Shared bits ────────────────────────────────────── */
 
+/** A stored value ("on track", "missing") as a label: first letter capital, nothing shouted. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
 /**
  * The one P50/P80 forecast this page shows: Monte Carlo once it has run for this version, otherwise
  * the rule-based estimate, labeled as such (mirrors headlineForecast() in lib/planning/evaluation).
@@ -426,7 +429,7 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
       <div className="text-ink">{label}</div><div className="text-[12px] text-warm-400">{sub}</div>
     </a>
   )
-  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
+  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[12px] font-semibold text-warm-400">{title}</div>
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
@@ -675,13 +678,13 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           <td colSpan={8} className="px-2 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1">Why this duration</div>
+                <div className="text-[12px] font-semibold text-warm-400 mb-1">Why this duration</div>
                 <p className="text-[13px] text-warm-700">{fmtDates(a.rationale.summary)}</p>
                 <Sources sources={a.rationale.sources} />
                 {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-[12px] text-warm-500 mt-1.5">Assumes: {fmtDates(x)}</p>)}
                 {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
 
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
+                <div className="text-[12px] font-semibold text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
                 {preds.length === 0 && <p className="text-[12px] text-warm-500">No predecessors (project start).</p>}
                 {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
                 {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
@@ -689,7 +692,7 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
 
               <div className="space-y-3">
                 {canWrite && <>
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">Override (your call wins)</div>
+                <div className="text-[12px] font-semibold text-warm-400">Override (your call wins)</div>
                 <input value={reason} onChange={e => setReason(e.target.value)} aria-label={`Reason for changing ${a.code}`} placeholder="Reason (required, kept in the audit trail)"
                   className="w-full bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700" />
                 {a.type !== 'milestone' && (
@@ -812,7 +815,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
                   <td className="py-1.5 pr-2 text-ink">{c.name}</td>
                   <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
                   <td className="py-1.5 pr-2 text-warm-500">{c.threshold}</td>
-                  <td className={`py-1.5 font-semibold uppercase text-[12px] ${resultStyle(c.result)}`}>{c.result}</td>
+                  <td className={`py-1.5 text-[12px] ${c.result === 'fail' ? 'font-semibold text-status-at-risk' : c.result === 'warn' ? 'font-semibold text-status-attention' : 'text-warm-600'}`}>{c.result === 'pass' ? 'Pass' : c.result === 'fail' ? 'Fail' : c.result === 'warn' ? 'Warning' : 'Not applicable'}</td>
                 </tr>
               ))}
             </tbody>
@@ -829,7 +832,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
                     <td className="py-1.5 text-ink">{r.code} {r.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
                     <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
-                    <td className={`py-1.5 pl-2 text-[12px] font-semibold uppercase ${r.verdict === 'optimistic' ? 'text-status-at-risk' : r.verdict === 'conservative' ? 'text-status-info' : 'text-status-on-track'}`}>{r.verdict.replace('_', ' ')}</td>
+                    <td className={`py-1.5 pl-2 text-[12px] ${r.verdict === 'optimistic' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(r.verdict.replace('_', ' '))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -841,7 +844,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <ul className="space-y-1">
             {ev.coverage.map((c, i) => (
               <li key={i} className="text-[12px] flex gap-2">
-                <span className={`font-semibold uppercase text-[12px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'text-status-at-risk' : c.status === 'scheduled' ? 'text-status-on-track' : 'text-warm-500'}`}>{c.status}</span>
+                <span className={`text-[12px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(c.status)}</span>
                 <span><span className="text-ink">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
               </li>
             ))}
@@ -854,7 +857,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <p className="text-[12px] text-warm-600 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
-            <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[12px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
+            <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="text-[12px] font-semibold">{cap(r.verdict.replace(/_/g, ' '))}</span>
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
@@ -902,7 +905,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, onRecov
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
         <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
+        {g.decision && <span className="text-[12px] text-warm-600">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (

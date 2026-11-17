@@ -492,7 +492,7 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
 function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-warm-50 border border-warm-200 rounded-lg p-3">
-      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-600">{label}</div>
+      <div className="text-[12px] font-semibold text-warm-600">{label}</div>
       <div className="text-[20px] font-semibold text-ink tabular-nums">{value}</div>
       <div className="text-[12px] text-warm-700">{sub}</div>
     </div>

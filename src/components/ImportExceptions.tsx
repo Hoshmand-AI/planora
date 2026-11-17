@@ -26,7 +26,7 @@ export function ImportExceptions({ report, title = 'Import exceptions', defaultO
   const records = report.records
   return (
     <section aria-label={title} className="space-y-2">
-      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400">{title}</div>
+      <div className="text-[12px] font-semibold text-warm-400">{title}</div>
       {records.length === 0 ? (
         <p className="text-[12px] text-warm-500">Everything in the file was mapped; nothing was dropped, converted or defaulted.</p>
       ) : (

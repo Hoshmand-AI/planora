@@ -128,6 +128,8 @@ export default function TimelinePage() {
         start: starts[0] ?? null, finish: finishes[finishes.length - 1] ?? null,
         pct: total > 0 ? Math.round((done / total) * 100) : 0,
         critical: acts.filter(a => a.isCritical && progressOf(a) !== 'complete').length,
+        // Finished work is history: its group starts folded, with its dates and "100% done" on the summary row.
+        allDone: acts.length > 0 && acts.every(a => progressOf(a) === 'complete'),
       }
     }).sort((x, y) => (x.start || '9').localeCompare(y.start || '9'))
   }, [work, filter, query, onlyChanged, marks])
@@ -142,7 +144,7 @@ export default function TimelinePage() {
 
   const filtering = filter !== 'all' || !!query.trim() || onlyChanged
   // Phases start open when filtering (to show the matches) or when the schedule is small; large ones start as a phase summary.
-  const isOpen = (name: string) => open[name] ?? (filtering || work.length <= PAGE)
+  const isOpen = (name: string, allDone = false) => open[name] ?? (filtering || (work.length <= PAGE && !allDone))
   const pos = (iso: string) => span ? ((t(iso) - span.lo) / span.range) * 100 : 0
   const dataDate = selectedSchedule.dataDate?.slice(0, 10) ?? null
   const ddLeft = dataDate && span && t(dataDate) >= span.lo && t(dataDate) <= span.hi ? pos(dataDate) : null
@@ -243,7 +245,7 @@ export default function TimelinePage() {
               </div>
 
               {groups.map(g => {
-                const expanded = isOpen(g.name)
+                const expanded = isOpen(g.name, g.allDone)
                 const rows = full[g.name] ? g.acts : g.acts.slice(0, PAGE)
                 return (
                   <div key={g.name} className="border-b border-warm-200 last:border-0">
@@ -308,7 +310,7 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
       <div className={`sticky left-0 z-10 self-stretch flex items-center gap-2 transition-colors max-md:flex-1 md:w-[260px] wide:w-[360px] cols:w-[628px] flex-shrink-0 pl-4 md:pl-10 wide:pl-4 cols:pl-4 pr-4 min-w-0 ${active ? 'bg-accent-100' : 'bg-white group-hover:bg-warm-50'}`}>
         <span className="hidden wide:block cols:block flex-shrink-0 w-[64px] tabular-nums text-[12px] text-warm-600">{a.activityId}</span>
         <span className="flex-1 min-w-0">
-        <span className="block truncate text-[13px] text-ink">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-semibold uppercase tracking-wide text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
+        <span className="block truncate text-[13px] text-ink">{mark && <span className="mr-1.5 inline-block rounded bg-accent-600 px-1 py-px align-[1px] text-[12px] font-semibold text-white">{mark.changed ? 'Changed' : `${mark.days! > 0 ? '+' : ''}${mark.days}d`}</span>}{a.name}</span>
         <span className="block wide:hidden cols:hidden text-[12px] text-warm-600 tabular-nums truncate"><span aria-hidden="true" className={`md:hidden inline-block w-2 h-2 rounded-full mr-1.5 ${color}`} />{a.activityId}<span className="md:hidden">{s ? ` · ${fmtDate(s)}${f && !milestone ? ` to ${fmtDate(f)}` : ''}` : ''}</span>{a.totalFloat != null && prog !== 'complete' ? <span className={`cols:hidden ${a.totalFloat < 0 ? 'max-md:text-status-at-risk max-md:font-semibold' : ''}`}>{` · float ${a.totalFloat}d`}</span> : null}</span>
         {/* The bar's meaning in words, so its length and color are not the only signal */}
         <span className="sr-only">{`, ${s ? `${milestone ? 'on' : 'from'} ${fmtDate(s)}` : 'no dates'}${s && f && !milestone ? ` to ${fmtDate(f)}` : ''}${prog === 'complete' ? ', complete' : a.isCritical ? ', critical' : ''}`}</span>

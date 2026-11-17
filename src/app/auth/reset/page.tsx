@@ -80,7 +80,7 @@ function ResetForm() {
           ) : token && !linkDead ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="new-password" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">New password</label>
+                <label htmlFor="new-password" className="block text-[12px] font-semibold text-warm-400 mb-1.5">New password</label>
                 <div className="relative">
                   <input
                     id="new-password" autoComplete="new-password" aria-describedby="password-hint" autoFocus

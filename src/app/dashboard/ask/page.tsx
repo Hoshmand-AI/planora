@@ -120,7 +120,7 @@ export default function AskPage() {
               <p className="text-[13px] text-warm-600">{aiOff ? <>Get the schedule facts for <span className="font-medium text-warm-700">{selectedSchedule.name}</span>: status, critical path and what starts next.</> : <>Ask anything about <span className="font-medium text-warm-700">{selectedSchedule.name}</span> in plain English.</>}</p>
               {aiOff && <p className="text-[13px] text-warm-600 mt-2">AI is off for this organization, so the reply is a readout, not a written answer.</p>}
             </div>
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Suggested questions</div>
+            <div className="text-[12px] font-semibold text-warm-400 mb-2">Suggested questions</div>
             <div className="space-y-1.5">
               {SUGGESTED.map(q => (
                 <button key={q} onClick={() => handleSend(q)} disabled={!canAsk || loading}

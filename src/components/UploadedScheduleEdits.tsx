@@ -139,7 +139,7 @@ export function EditsPanel({ scheduleId, canEdit, onChanged, refreshKey }: { sch
           <thead><tr><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Reason</th><th className={th}>By</th>{canEdit && data.editable && <th className={th}><span className="sr-only">Revert</span></th>}</tr></thead>
           <tbody>{applied.map(e => (
             <tr key={e.id} className={e.status === 'skipped' ? 'text-warm-500' : ''}>
-              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[12px] font-semibold uppercase text-accent-600">recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[12px] font-semibold uppercase text-accent-600">plain English</span>}{e.status === 'skipped' && <span className="block text-[12px] text-status-attention">Not applied: {e.note}</span>}</td>
+              <td className={td}>{e.label}{e.source === 'recovery' && <span className="ml-1 text-[12px] text-warm-600">· recovery</span>}{e.source === 'instruction' && <span className="ml-1 text-[12px] text-warm-600">· plain English</span>}{e.status === 'skipped' && <span className="block text-[12px] text-status-attention">Not applied: {e.note}</span>}</td>
               <td className={td}>{fmtDates(e.before)}</td><td className={td}>{fmtDates(e.after)}</td><td className={td}>{e.reason}</td>
               <td className={td}>{e.byName || 'Member'}<span className="block text-warm-500">{fmtDay(e.at)}</span></td>
               {canEdit && data.editable && <td className={td}><button type="button" disabled={busy} onClick={() => revert(e)} className="text-accent-600 hover:underline">Revert</button></td>}

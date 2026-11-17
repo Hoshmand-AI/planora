@@ -223,7 +223,7 @@ function AuthForm() {
           {forgot && !challenge ? (
             <form onSubmit={handleForgot} className="space-y-4">
               <div>
-                <label htmlFor="reset-email" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
+                <label htmlFor="reset-email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Email</label>
                 <input id="reset-email" type="email" autoComplete="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
                   className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400" />
               </div>
@@ -240,7 +240,7 @@ function AuthForm() {
           ) : ssoMode && !challenge ? (
             <form onSubmit={handleSso} className="space-y-4">
               <div>
-                <label htmlFor="sso-email" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Work email</label>
+                <label htmlFor="sso-email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Work email</label>
                 <input id="sso-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
                   className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400" />
               </div>
@@ -252,7 +252,7 @@ function AuthForm() {
           ) : challenge ? (
             <form onSubmit={handleCode} className="space-y-4">
               <div>
-                <label htmlFor="mfa-code" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Verification code</label>
+                <label htmlFor="mfa-code" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Verification code</label>
                 <input
                   id="mfa-code" value={code} onChange={e => setCode(e.target.value)} required autoFocus
                   inputMode="text" autoComplete="one-time-code" placeholder="123456" maxLength={20}
@@ -271,7 +271,7 @@ function AuthForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label htmlFor="name" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Name</label>
+                <label htmlFor="name" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Name</label>
                 <input
                   id="name" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} required
                   placeholder="Your name"
@@ -281,7 +281,7 @@ function AuthForm() {
             )}
             {mode === 'signup' && !invitation?.orgName && (
               <div>
-                <label htmlFor="company" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Firm</label>
+                <label htmlFor="company" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Firm</label>
                 <input
                   id="company" type="text" value={company} onChange={e => setCompany(e.target.value)}
                   placeholder="Your company (private workspace)"
@@ -290,7 +290,7 @@ function AuthForm() {
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
+              <label htmlFor="email" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Email</label>
               <input
                 id="email" autoComplete="email" readOnly={(!!invitation?.email || betaInvited) && mode === 'signup'}
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
@@ -300,7 +300,7 @@ function AuthForm() {
             </div>
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
-                <label htmlFor="password" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400">Password</label>
+                <label htmlFor="password" className="block text-[12px] font-semibold text-warm-400">Password</label>
                 {mode === 'signin' && (
                   <button type="button" onClick={openForgot} className="text-[12px] font-medium text-accent-600 hover:underline">Forgot password?</button>
                 )}

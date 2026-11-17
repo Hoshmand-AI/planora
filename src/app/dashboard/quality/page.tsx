@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckGuidance } from '@/lib/analysis/dcma-guidance'
-import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Loader2, ShieldCheck, AlertTriangle, Info, XCircle, CheckCircle2, ChevronRight } from 'lucide-react'
 import { askText } from '@/components/AskText'
 import { useApp } from '../layout'
 import type { DataQuestion, DcmaReport, WorkCalendar } from '@/lib/planning/types'
@@ -30,7 +30,6 @@ interface Quality {
 type Dispose = (itemId: string, disposition: FindingDisposition, justification: string) => Promise<string | null>
 
 const SEV_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
-const SEV_STYLE = { error: 'border-status-at-risk', warning: 'border-status-attention', info: 'border-status-info' }
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function QualityPage() {
@@ -126,7 +125,6 @@ export default function QualityPage() {
 
   const open = data.dataQuestions.filter(q => !q.response)
   const shown = hideAnswered ? open : data.dataQuestions
-  const resultStyle = (r: string) => r === 'pass' ? 'text-status-on-track' : r === 'fail' ? 'text-status-at-risk' : r === 'warn' ? 'text-status-attention' : 'text-warm-400'
 
   const failing = data.dcma.checks.filter(c => c.result === 'fail').length
   const reviewer = can('plan.review') && data.schedule.sourceType !== 'generated'
@@ -146,13 +144,13 @@ export default function QualityPage() {
   const grade = gradeOf(data.dcma, open.length)
   const importNotes = data.schedule.warnings.length + (data.schedule.importExceptions ? 1 : 0)
   return (
-    <div id="quality-panel-checks" className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
+    <div className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
       <div className="pt-4"><QualityTabs tab={tab} onChange={setTab} /></div>
       {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
 
       <div className="space-y-6 mt-5">
         {/* Three short tabs, not nine stacked sections: the checks, what to fix, then the review and the data questions. */}
-        <div hidden={tab !== 'checks'} className="space-y-6">
+        <div role="tabpanel" id="quality-panel-checks" aria-labelledby="quality-tab-checks" hidden={tab !== 'checks'} className="space-y-6">
         {/* The score beside the checks to fix. Each fact is said once: the checks that need work are listed here, not again as cards below. */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4 items-start">
           <section aria-label="Quality score" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6">
@@ -259,22 +257,12 @@ export default function QualityPage() {
         </Disclosure>
         </div>
 
-        <div hidden={tab !== 'review'} className="space-y-6">
-        {data.brief && (
-          <Disclosure tone="card" title="About this project" meta="also on Overview">
-            <p className="text-[13px] text-warm-700">{data.brief.summary}</p>
-          </Disclosure>
-        )}
 
-        <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
-        </div>
-
-        <div hidden={tab !== 'fix'} className="space-y-6">
+        <div role="tabpanel" id="quality-panel-fix" aria-labelledby="quality-tab-fix" hidden={tab !== 'fix'} className="space-y-6">
         {guidance.length === 0 && <p className="text-[14px] text-warm-700">Nothing to fix: every applicable check passes.</p>}
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
-            <h2 id="what-to-fix-h" className="text-[14px] font-semibold text-ink">What to fix <span className="font-normal text-warm-600">· {guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
-            <p className="text-[12px] text-warm-600 mt-0.5 mb-2.5">Failing checks come first. Fix in P6 / MS Project and re-upload, or edit durations, logic and constraints in RunF9 (with a reason) from the Overview tab.</p>
+            <h2 id="what-to-fix-h" className="text-[16px] font-semibold text-ink mb-3">What to fix <span className="ml-1 text-[13px] font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
@@ -284,23 +272,24 @@ export default function QualityPage() {
         <NoraLogicPanel key={data.schedule.id} scheduleId={data.schedule.id} canEdit={can('schedule.write')} />
         </div>
 
-        <div hidden={tab !== 'review'} className="space-y-6">
+        <div role="tabpanel" id="quality-panel-review" aria-labelledby="quality-tab-review" hidden={tab !== 'review'} className="space-y-6">
+        <SubmissionPanel review={review} reviewer={reviewer} onSave={(disposition, comments) => postReview({ submission: disposition, comments })} />
 
         <section aria-labelledby="data-questions-h" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="data-questions-h" className="text-[14px] font-semibold text-ink">RunF9&apos;s questions about this file <span className="font-normal text-warm-600">· {open.length} open</span></h2>
+            <h2 id="data-questions-h" className="text-[16px] font-semibold text-ink">Questions about this file <span className="ml-1 text-[13px] font-normal text-warm-600">{open.length} open</span></h2>
             <label className="text-[12px] text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
           </div>
-          {shown.length === 0 && <div className="bg-warm-100 border border-warm-200 rounded-lg p-5 text-[13px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
+          {shown.length === 0 && <div className="bg-white border border-warm-200 rounded-[14px] p-5 text-[13px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
           {shown.map(q => {
             const Icon = SEV_ICON[q.severity]
             return (
-              <div key={q.id} className={`bg-warm-100 border border-warm-200 border-l-2 ${SEV_STYLE[q.severity]} rounded-lg p-4`}>
+              <div key={q.id} className="bg-white border border-warm-200 rounded-[14px] p-4">
                 <div className="flex gap-2">
-                  <Icon size={15} className="flex-shrink-0 mt-0.5 text-warm-500" />
+                  <Icon size={15} aria-hidden="true" className={`flex-shrink-0 mt-0.5 ${q.severity === 'error' ? 'text-status-at-risk' : 'text-warm-600'}`} />
                   <div className="flex-1">
                     <div className="text-[13px] text-ink">{fmtDates(q.question)}</div>
-                    <div className="text-[12px] text-warm-500 mt-1">{fmtDates(q.detail)}</div>
+                    <div className="text-[12px] text-warm-600 mt-1">{fmtDates(q.detail)}</div>
                     {q.response ? (
                       <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
                     ) : !can('schedule.write') ? null : (
@@ -386,33 +375,37 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
   // Only the first open item starts expanded, so the list reads as a short to-do list.
   const [open, setOpen] = useState(startOpen)
   const [note, setNote] = useState('')
+  // The justification field opens when someone chooses to accept the finding, not before.
+  const [accepting, setAccepting] = useState(false)
+  const quiet = 'pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink disabled:opacity-50'
   return (
-    <div className={`border rounded-lg ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-warm-100 border-status-attention/50'}`}>
+    <div className={`border border-warm-200 rounded-[14px] ${g.decision ? 'bg-warm-50' : 'bg-white'}`}>
       <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <span className={`text-[12px] font-semibold uppercase ${check.result === 'fail' ? 'text-status-at-risk' : 'text-status-attention'}`}>#{g.id} {check.result}</span>
-        <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[12px] font-semibold uppercase text-status-on-track">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
-        {disposition && <span className="text-[12px] font-semibold uppercase text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition]}</span>}
-        {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
+        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[12px] font-semibold ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{check.result === 'fail' ? 'Fails' : 'Warning'}</span>
+        <span className="text-[14px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-600">— {check.metric} (target {check.threshold})</span></span>
+        {g.decision && <span className="text-[12px] text-warm-600">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
+        {disposition && <span className="text-[12px] text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition].toLowerCase()}</span>}
+        <ChevronRight size={15} aria-hidden="true" className={`flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="px-5 pb-4 space-y-2.5">
           <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
           {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
-          {g.actions.some(a => a.kind === 'link') && (
-            <div className="flex flex-wrap gap-2">
-       {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</Link> : null)}
+          {check.offenders.length > 0 && <p className="text-[12px] text-warm-600">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
+          {g.decision && <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>}
+          {/* One filled button, the way to the fix; the two decisions sit beside it, outlined. */}
+          {(g.actions.some(a => a.kind === 'link') || (!g.decision && canDecide)) && (
+            <div className="flex flex-wrap gap-2 items-center pt-1">
+              {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</Link> : null)}
+              {!g.decision && canDecide && <button type="button" onClick={() => onDecide(g.id, 'will_fix', note)} className={quiet}>I&apos;ll fix it in P6 / MSP</button>}
+              {!g.decision && canDecide && <button type="button" aria-expanded={accepting} onClick={() => setAccepting(v => !v)} className={quiet}>Accept with justification…</button>}
             </div>
           )}
-          {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
-          {g.decision ? (
-            <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>
-          ) : !canDecide ? null : (
+          {accepting && !g.decision && canDecide && (
             <div className="flex flex-wrap gap-2 items-center">
-              <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Justification, if accepting as-is" className="flex-1 min-w-[220px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-              <button disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink">Accept with justification</button>
-              <button onClick={() => onDecide(g.id, 'will_fix', note)} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">I&apos;ll fix it in P6 / MSP</button>
+              <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Why this is acceptable as it is (at least 10 characters)" className="flex-1 min-w-[220px] bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
+              <button type="button" disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className={quiet}>Record acceptance</button>
             </div>
           )}
           <ReviewControl itemId={`dcma:${g.id}`} label={`DCMA #${g.id} ${check.name}`} disposition={disposition} reviewer={reviewer} onDispose={onDispose} />
@@ -430,6 +423,8 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   if (!reviewer && !disposition) return null
+  // Nothing recorded yet: one quiet link, so a list of findings is not a list of open forms.
+  if (!disposition && !editing) return <button type="button" onClick={() => setEditing(true)} className="mt-1 text-[12px] font-semibold text-accent-600 hover:underline">Add a reviewer disposition</button>
   const save = async () => {
     if (!choice) return
     setBusy(true); setErr('')
@@ -443,18 +438,19 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
         <p className="text-[12px] text-warm-700">
           <span className="font-semibold text-ink">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
           {disposition.justification ? ` — “${disposition.justification}”` : ''}
-          <span className="text-warm-500"> · {disposition.reviewer ?? 'reviewer'}, {fmtDay(disposition.createdAt)}</span>
+          <span className="text-warm-600"> · {disposition.reviewer ?? 'reviewer'}, {fmtDay(disposition.createdAt)}</span>
           {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink">Change</button>}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-warm-500">Reviewer</span>
+          <span className="text-[12px] font-medium text-ink">Reviewer</span>
           <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-lg px-2 py-1 text-[12px] text-ink">
             <option value="" disabled>Choose…</option>
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
           <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1 text-[12px]" />
-          <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Save</button>
+          <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink disabled:opacity-50">Save</button>
+          {!disposition && <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-warm-600 hover:underline">Cancel</button>}
           {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
         </div>
       )}
@@ -480,14 +476,14 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
     if (e) setErr(e); else setEditing(false)
   }
   return (
-    <section aria-labelledby="submission-h" className="bg-warm-100 border border-warm-200 rounded-lg p-5">
-      <h2 id="submission-h" className="text-[12px] font-semibold uppercase tracking-wider text-warm-500 mb-2">Submission review</h2>
+    <section aria-labelledby="submission-h" className="bg-white border border-warm-200 rounded-[14px] p-5">
+      <h2 id="submission-h" className="text-[16px] font-semibold text-ink mb-2">Submission review</h2>
       {s && !editing ? (
         <div className="text-[13px] text-warm-700 space-y-1">
-          <p><span className="font-semibold text-ink">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-500">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
+          <p><span className="font-semibold text-ink">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-600">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
             {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink text-[12px]">Change</button>}</p>
           {s.comments && <p className="whitespace-pre-wrap">{s.comments}</p>}
-          <p className="text-[12px] text-warm-500">Findings and questions dispositioned: {counts}</p>
+          <p className="text-[12px] text-warm-600">Findings and questions dispositioned: {counts}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -497,11 +493,11 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
               <option value="" disabled>Choose a disposition…</option>
               {SUBMISSION_DISPOSITIONS.map(d => <option key={d} value={d}>{SUBMISSION_LABELS[d]}</option>)}
             </select>
-            <span className="text-[12px] text-warm-500">{counts}</span>
+            <span className="text-[12px] text-warm-600">{counts}</span>
           </div>
-          <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={!choice || choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={busy || !choice} onClick={save} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Record disposition</button>
+          {choice && <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />}
+          <div className={`items-center gap-2 ${choice || editing ? 'flex' : 'hidden'}`}>
+            <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold disabled:opacity-50">Record disposition</button>
             {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-ink">Cancel</button>}
             {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
           </div>
@@ -552,12 +548,3 @@ function ScoreRing({ passed, applicable }: { passed: number; applicable: number 
   )
 }
 
-function Card({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="bg-white border border-warm-200 rounded-xl px-3 py-2">
-      <div className="text-[12px] text-warm-600">{label}</div>
-      <div className={`${value.length > 14 ? 'text-[14px] leading-snug' : 'text-[18px]'} font-semibold text-ink tabular-nums break-words`}>{value}</div>
-      <div className="text-[12px] text-warm-600">{sub}</div>
-    </div>
-  )
-}
