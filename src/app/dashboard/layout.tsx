@@ -530,7 +530,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ── Project header: one project's name, status and tabs ── */}
           {inProject && (
             <div className="bg-white border-b border-warm-200 md:sticky md:top-0 z-20">
-              <div className="max-w-6xl mx-auto px-5 md:px-8 pt-2 md:pt-5">
+              <div className="relative max-w-6xl mx-auto px-5 md:px-8 pt-2 md:pt-5">
                 {selectedSchedule ? (
                   <div className="flex items-center md:items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -560,7 +560,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Link href={`/dashboard/ask?schedule=${selectedSchedule.id}`} aria-current={pathname.startsWith('/dashboard/ask') ? 'page' : undefined}
-                            className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 h-10 text-[13px] font-semibold hover:bg-warm-100">
+                            className="pressable hidden md:inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 px-4 h-9 text-[13px] font-semibold hover:bg-warm-100">
                             <MessageSquare size={14} aria-hidden="true" /> Ask
                           </Link>
                           {/* One place to bring anything into the project: no tab asks for an upload on its own. */}
@@ -611,23 +611,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   })}
                 </nav>
                 </div>
-                {/* What this tab is for, and its views when it has more than one. */}
+                {/* A tab's views: on the tab row's right on a wide screen, a row of their own where the tabs need the width. Project records keeps one line saying what it holds. */}
                 {(() => {
                   const t = PROJECT_TABS.find(x => tabPaths(x).some(h => pathname.startsWith(h)))
                   if (!t || !selectedSchedule) return null
+                  if (!t.views) return t.href === '/dashboard/documents' ? <p className="py-2 border-t border-warm-200 text-[13px] text-warm-600 max-md:hidden">{t.hint}</p> : null
                   return (
-                    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 py-2 border-t border-warm-200 ${t.views ? '' : 'max-md:hidden'}`}>
-                      {t.views && (
-                        <nav aria-label={`${t.label} views`} className="flex gap-1 rounded-lg bg-warm-100 p-0.5">
-                          {t.views.map(v => {
-                            const on = pathname.startsWith(v.href)
-                            return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
-                              className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-navy-950 shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-navy-950'}`}>{v.label}</Link>
-                          })}
-                        </nav>
-                      )}
-                      {/* A tab with views already has a row of its own; the line of explanation is for the tabs that do not. */}
-                      {!t.views && <p className="text-[13px] text-warm-600 max-md:hidden">{t.hint}</p>}
+                    <div className="xl:absolute xl:right-8 xl:bottom-1.5 max-xl:py-2 max-xl:border-t max-xl:border-warm-200 z-10">
+                      <nav aria-label={`${t.label} views`} className="inline-flex gap-1 rounded-lg bg-warm-100 p-0.5">
+                        {t.views.map(v => {
+                          const on = pathname.startsWith(v.href)
+                          return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
+                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-navy-950 shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-navy-950'}`}>{v.label}</Link>
+                        })}
+                      </nav>
                     </div>
                   )
                 })()}

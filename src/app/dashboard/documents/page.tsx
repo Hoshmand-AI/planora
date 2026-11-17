@@ -105,7 +105,7 @@ export default function DocumentsPage() {
             <div className="py-10 text-center">
               <p className="text-[16px] font-semibold text-navy-950">No records yet</p>
               <p className="mt-1 text-[14px] text-warm-600">{can('schedule.write') ? 'Start with the contract or the scheduling specification.' : 'Nothing has been added to this project.'}</p>
-              {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+              {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
             </div>
           )
           : (
@@ -171,7 +171,7 @@ export default function DocumentsPage() {
           Records are shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 min-h-[40px]"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+        {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}

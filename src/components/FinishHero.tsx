@@ -79,7 +79,7 @@ export function FinishHero({ status, forecastFinish, mustFinishBy, baselineFinis
             {target && <Tick left={at(target.date)} color={TARGET} />}
             {forecast && <Tick left={at(forecast)} color={FORECAST} />}
           </div>
-          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-[13px]">
+          <dl className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-6 gap-y-1.5 text-[13px]">
             {start && <Item label="Start" date={start} />}
             {dd && <Item label="Data date" date={dd} dot={DATA_DATE} />}
             {target && <Item label={target.label} date={target.date} dot={TARGET} />}

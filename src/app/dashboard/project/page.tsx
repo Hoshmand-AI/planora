@@ -119,9 +119,9 @@ export default function ProjectPage() {
           {m ? <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
             : <CounterTile mood="idle" value="—" label="complete" sub="Progress (by duration)" />}
           <CounterTile mood={varianceTone}
-            value={!m ? '—' : varianceDays == null ? 'n/a' : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
+            value={!m ? '—' : varianceDays == null ? <span className="text-[17px] font-semibold text-warm-600">No baseline</span> : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Variance vs baseline"
-            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? 'no usable baseline' : baselineHeader ? `calendar days · baseline: ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days'} />
+            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? 'mark an upload as Baseline to measure it' : baselineHeader ? `calendar days · baseline: ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
             value={!m || (criticalPath && !criticalPath.determined) ? '—' : String(criticalCount)} label="Critical activities"
             sub={!m ? (metricsError ? 'not available' : 'loading…') : criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />

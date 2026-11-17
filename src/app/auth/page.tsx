@@ -140,8 +140,23 @@ function AuthForm() {
   }
 
   return (
-    <div className="min-h-screen bg-warm-50 flex flex-col">
-      <nav className="h-16 flex items-center px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-warm-50 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* On a wide screen the left half says what RunF9 is, so the page is not a bare form. */}
+      <aside className="hidden lg:flex flex-col justify-between bg-navy-950 text-white p-12 xl:p-16">
+        <Link href="/" aria-label="RunF9 home"><Logo variant="light" size="text-[26px]" /></Link>
+        <div>
+          <p className="text-[44px] xl:text-[56px] font-bold tracking-[-0.045em] leading-[1.02]">Construction schedules, calculated and explained.</p>
+          <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-500 mt-8 mb-6" />
+          <ul className="space-y-3 text-[16px] text-navy-200">
+            <li>All 14 DCMA checks on every schedule.</li>
+            <li>Every update compared, every delay modeled.</li>
+            <li>A daily brief for the project manager, the field and the client.</li>
+          </ul>
+        </div>
+        <p className="text-[13px] text-navy-200">Arithmetic, not AI: every figure traces to an activity.</p>
+      </aside>
+      <div className="flex flex-col min-h-screen lg:min-h-0">
+      <nav className="lg:hidden h-16 flex items-center px-6 border-b border-warm-200 bg-white">
         <Link href="/" aria-label="RunF9 home">
           <Logo variant="dark" size="text-[22px]" />
         </Link>
@@ -210,7 +225,7 @@ function AuthForm() {
               <div>
                 <label htmlFor="reset-email" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Email</label>
                 <input id="reset-email" type="email" autoComplete="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
               </div>
               <div role="status" aria-live="polite">
                 {resetNote && (
@@ -227,7 +242,7 @@ function AuthForm() {
               <div>
                 <label htmlFor="sso-email" className="block text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-1.5">Work email</label>
                 <input id="sso-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400" />
               </div>
               <button type="submit" disabled={loading} className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 pressable shadow-sm">
                 {loading ? 'Redirecting…' : 'Continue with single sign-on'}
@@ -241,7 +256,7 @@ function AuthForm() {
                 <input
                   id="mfa-code" value={code} onChange={e => setCode(e.target.value)} required autoFocus
                   inputMode="text" autoComplete="one-time-code" placeholder="123456" maxLength={20}
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[18px] tracking-[0.2em] text-warm-700 placeholder:text-warm-400 font-mono"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[18px] tracking-[0.2em] text-warm-700 placeholder:text-warm-400 font-mono"
                 />
               </div>
               <button type="submit" disabled={loading}
@@ -260,7 +275,7 @@ function AuthForm() {
                 <input
                   id="name" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} required
                   placeholder="Your name"
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
                 />
               </div>
             )}
@@ -270,7 +285,7 @@ function AuthForm() {
                 <input
                   id="company" type="text" value={company} onChange={e => setCompany(e.target.value)}
                   placeholder="Your company (private workspace)"
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
                 />
               </div>
             )}
@@ -280,7 +295,7 @@ function AuthForm() {
                 id="email" autoComplete="email" readOnly={(!!invitation?.email || betaInvited) && mode === 'signup'}
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
                 placeholder="you@company.com"
-                className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
+                className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400"
               />
             </div>
             <div>
@@ -295,7 +310,7 @@ function AuthForm() {
                   id="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
                   type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={mode === 'signup' ? 12 : 1}
                   placeholder={mode === 'signup' ? 'At least 12 characters' : 'Your password'}
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400 pr-10"
+                  className="w-full bg-white border border-warm-300 rounded-lg px-4 min-h-[44px] py-2.5 text-[15px] text-warm-700 placeholder:text-warm-400 pr-10"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-warm-400 hover:text-warm-600">
                   {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
@@ -305,7 +320,7 @@ function AuthForm() {
             </div>
             <button type="submit" disabled={loading}
               className="w-full bg-accent-600 text-white py-3 rounded-md text-[15px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
-              {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create Account'}
+              {loading ? 'Please wait...' : mode === 'signin' ? 'Sign in' : invitation?.orgName ? 'Join organization' : betaInvited ? 'Create firm account' : 'Create account'}
             </button>
           </form>
           )}
@@ -334,6 +349,7 @@ function AuthForm() {
             <Link href="/privacy" className="underline hover:text-warm-600">Privacy Policy</Link>.
           </p>
         </div>
+      </div>
       </div>
     </div>
   )

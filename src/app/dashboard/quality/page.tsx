@@ -229,7 +229,7 @@ export default function QualityPage() {
             {data.dcma.checks.filter(c => showAllChecks || needWork.includes(c) || c.id === selected).map((c, i) => (
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
-                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}${c.result === 'fail' ? 'border-2 border-status-at-risk' : c.result === 'warn' ? 'border-2 border-status-attention' : 'border border-warm-200'}`}>
+                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}border border-warm-200 ${c.result === 'fail' ? 'border-t-[3px] border-t-status-at-risk' : c.result === 'warn' ? 'border-t-[3px] border-t-status-attention' : ''}`}>
                 <span className="text-[12px] font-bold text-warm-500 tabular-nums">{c.id}</span>
                 <span className="text-[13.5px] font-semibold text-navy-950 leading-tight min-h-[2.4em]">{c.name}</span>
                 <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[19px] tracking-[-0.02em]'} font-bold tabular-nums ${resultStyle(c.result)}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>

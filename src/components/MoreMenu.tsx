@@ -52,7 +52,7 @@ export function MoreMenu({ label, items, trigger }: { label: string; items: More
   return (
     <div ref={wrap} className="relative flex-shrink-0">
       <button ref={button} type="button" aria-label={trigger ? undefined : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(o => !o)}
-        className={`pressable inline-flex items-center justify-center rounded-lg border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 ${trigger ? 'gap-1.5 px-4 h-10 text-[13px] font-semibold' : 'w-9 h-9'}`}>
+        className={`pressable inline-flex items-center justify-center rounded-lg border border-warm-300 bg-white text-navy-950 hover:bg-warm-100 ${trigger ? 'gap-1.5 px-4 h-9 text-[13px] font-semibold' : 'w-9 h-9'}`}>
         {trigger ?? <MoreHorizontal size={18} aria-hidden="true" />}
       </button>
       {(open || shown) && (
