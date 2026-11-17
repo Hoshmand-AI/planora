@@ -74,7 +74,7 @@ export default function HeroSchedule() {
               <div className="text-fine text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
             </div>
             <div className="text-fine text-warm-700 flex items-center gap-4" aria-hidden="true">
-              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-done align-middle" /> completed</span>
+              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-done align-middle" /> actual</span>
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-todo align-middle" /> remaining</span>
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-critical align-middle" /> critical</span>
               <span><span className="inline-block w-0 h-3.5 border-l border-dashed border-navy-700 align-middle" /> data date</span>

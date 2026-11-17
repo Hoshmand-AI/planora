@@ -48,7 +48,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
   const [cmpMsg, setCmpMsg] = useState<string>('')
   const [base, setBase] = useState<string>('')
   // The uploads the project keeps to compare against (its baseline, and one more such as last month's update).
-  const [kept, setKept] = useState<{ baselineId: string | null; comparisonId: string | null }>({ baselineId: null, comparisonId: null })
+  const [kept, setKept] = useState<{ baselineId: string | null; comparisonId: string | null; comparisonApplies?: boolean }>({ baselineId: null, comparisonId: null })
   const [keptMsg, setKeptMsg] = useState('')
   async function keep(change: { baselineScheduleId?: string | null; comparisonScheduleId?: string | null }) {
     setKeptMsg('')
@@ -154,7 +154,7 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         {others.length > 0 && (
           <label className="block text-body text-warm-700 mb-3">Compare against{' '}
             <select className="ml-1 rounded-lg border border-warm-300 px-2 h-9 bg-white text-body text-ink" value={base} onChange={e => setBase(e.target.value)}>
-              <option value="">{kept.comparisonId && kept.comparisonId !== scheduleId ? 'the stored comparison schedule' : 'previous update (earlier data date)'}</option>
+              <option value="">{kept.comparisonApplies ? 'the stored comparison schedule' : 'previous update (earlier data date)'}</option>
               {kept.baselineId && kept.baselineId !== scheduleId && <option value="baseline">the stored baseline</option>}
               {others.map(s => <option key={s.id} value={s.id}>{s.version}{s.dataDate ? ` (data date ${fmtDate(s.dataDate)})` : ''}</option>)}
             </select>

@@ -112,7 +112,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section aria-label="RunF9 in numbers" className="border-y border-warm-200 bg-white">
         <div className="max-w-[1240px] mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
           {[
-            [<>DCMA + GAO</>, 'checks drawn from the DCMA 14-Point Assessment and the GAO Schedule Assessment Guide, run on every schedule'],
+            [<>DCMA + GAO</>, 'all 14 DCMA 14-Point checks on every schedule, and checks drawn from the GAO Schedule Assessment Guide in the Standards view'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
             [<>0 days</>, 'of drift after a P6 or MS Project round trip, in our test set'],
             inviteOnly ? [<>2,300+</>, 'automated tests run on every change to RunF9'] : [<>$0</>, 'to start. No credit card'],
@@ -135,12 +135,12 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <p className="text-copy text-warm-700 mb-6 text-center">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
             <div className="border-t border-warm-200">
               {[
-                ['DCMA and GAO checks', 'Every schedule is run through all fourteen metrics of the DCMA 14-Point Assessment and through checks drawn from the ten best practices of the GAO Schedule Assessment Guide (GAO-16-89G). Each finding names its source and the limit it was measured against, and each check has a unit test that makes it pass and fail. A check that needs data the file does not have (a baseline, for example) is reported as not applicable, never as passed. Time impact analysis follows AACE International Recommended Practice 52R-06, and the earned value checks are oriented to ANSI/EIA-748. Results are indicators for a scheduler’s review, not a determination of contract compliance. RunF9 is not affiliated with or endorsed by DCMA, GAO, AACE International or any other body named here.'],
+                ['DCMA and GAO checks', 'Every schedule is run through all fourteen metrics of the DCMA 14-Point Assessment when it is uploaded, and the Standards view adds checks drawn from the ten best practices of the GAO Schedule Assessment Guide (GAO-16-89G). Each finding names its source and the limit it was measured against, and each check has a unit test that makes it pass and fail. A check that needs data the file does not have (a baseline, for example) is reported as not applicable, never as passed. Time impact analysis follows AACE International Recommended Practice 52R-06, and the earned value checks are oriented to ANSI/EIA-748. Results are indicators for a scheduler’s review, not a determination of contract compliance. RunF9 is not affiliated with or endorsed by DCMA, GAO, AACE International or any other body named here.'],
                 ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
                 ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
                 inviteOnly
                   ? ['2,300+ automated tests', 'RunF9 has more than 2,300 automated tests, covering the scheduling engine, the checks, the file formats, security and tenant separation. They all run on every code change, together with end-to-end suites against a live server, and a change that fails any of them is not released.']
-                  : ['$0 to start', 'Signing up is open on this deployment and asks for no payment details.'],
+                  : ['$0 to start', 'Signing up is open on this deployment and asks for no payment details. A new organization starts free, with no time limit: up to 3 uploaded schedules, unlimited interview-built schedules, the Executive Summary report, 10 AI requests a day and export to P6, MS Project and CSV. The other reports, PDF and Excel export, Monte Carlo risk analysis, API keys and single sign-on come with a license. The server enforces these limits.'],
               ].map(([term, def], i) => (
                 <details key={term} open={i === 0} className="group border-b border-warm-200">
                   <summary className="flex items-center justify-between gap-4 py-4 cursor-pointer list-none text-copy font-semibold text-ink">
@@ -212,7 +212,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <section id="pricing" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center mb-12 md:mb-14">
           <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Priced for your organization.</h2>
-          <p className="text-lead text-warm-600 mt-4 max-w-[760px] mx-auto leading-snug">RunF9 is licensed per organization. The price depends on how many projects and people use it and on where it runs: our cloud, your cloud account, or air-gapped.</p>
+          <p className="text-lead text-warm-600 mt-4 max-w-[760px] mx-auto leading-snug">RunF9 is licensed per organization. The price depends on how many projects and people use it and on where it runs: our cloud, your cloud account, or air-gapped.{!inviteOnly && ' You can start free with up to 3 uploaded schedules; the list below is what a license can include.'}</p>
         </Reveal>
         <Reveal className="rounded-[28px] bg-navy-950 text-white p-8 md:p-12 grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 shadow-[0_30px_60px_-30px_rgba(29,33,37,0.55)]">
           <div>
@@ -222,12 +222,13 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <p className="text-small text-navy-200 mt-4">Or write to <a href={questionHref} className="underline text-white">the founder</a> with any question.</p>
           </div>
           <div>
-            <p className="text-small font-semibold text-accent-400">Every organization gets</p>
+            <p className="text-small font-semibold text-accent-400">What a license can include</p>
             <ul className="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-3">
               {['Unlimited schedules, updates and interview-built plans', 'Every check, report and export: P6, MS Project, PDF and Excel', 'The Daily Brief for the project manager, the field and the client', 'Delay analysis, what-ifs and Monte Carlo schedule risk', 'Site captures and the site map on any phone', 'Single sign-on (SAML, OpenID Connect) and SCIM', 'Roles, 2-step verification, approval policies and the audit log', 'Your cloud account (AWS, Azure, Google Cloud) or air-gapped', 'Data export, retention and deletion controls', 'Support by email from the founder'].map(f => (
                 <li key={f} className="flex items-start gap-2.5 text-small text-white"><CheckCircle size={17} className="text-accent-400 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>
               ))}
             </ul>
+            <p className="text-small text-navy-200 mt-5">Your quote sets which of these are switched on for your organization.</p>
           </div>
         </Reveal>
       </section>
@@ -240,7 +241,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
             <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-white leading-[1.1]">Use RunF9 on your next schedule</h2>
-            <p className="text-lead text-navy-200 mt-4 max-w-[620px] mx-auto">Start with the interview, or upload a schedule and see the DCMA and GAO check results in seconds.</p>
+            <p className="text-lead text-navy-200 mt-4 max-w-[620px] mx-auto">Start with the interview, or upload a schedule and see the DCMA 14-Point results in seconds.</p>
             <Cta href={primaryHref} className={`${primaryBtn} mt-8 px-7 py-3.5 text-copy`}>{inviteOnly ? 'Request access' : 'Get started free'}</Cta>
             <p className="text-small text-navy-200 mt-5">{inviteOnly ? <>Private beta · by invitation. Already invited? <Link href="/auth" className="underline text-white">Sign in</Link>.</> : 'No credit card required.'}</p>
           </div>

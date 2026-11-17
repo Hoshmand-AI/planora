@@ -14,6 +14,8 @@ import type { ParsedSchedule } from './types'
 
 const MAX_SLIDES = 400
 const MAX_TABLE_ROWS = 20_000
+// All the slides of a deck together may unpack to this much; one Word body is already capped by the ZIP reader.
+const MAX_DECK_XML_BYTES = 60 * 1024 * 1024
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
 const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, e: string) => {
@@ -24,34 +26,81 @@ const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos)
   return ENTITIES[e.toLowerCase()] ?? ''
 })
 
-/** The text of one table cell: its paragraphs joined by a space. `ns` is the XML prefix (w for Word, a for PowerPoint). */
-function cellText(cell: string, ns: 'w' | 'a'): string {
-  const paras = cell.match(new RegExp(`<${ns}:p[\\s>][\\s\\S]*?</${ns}:p>`, 'g')) || []
-  return paras.map(p => [...p.matchAll(new RegExp(`<${ns}:t(?:\\s[^>]*)?>([\\s\\S]*?)</${ns}:t>`, 'g'))].map(m => decode(m[1])).join('')).join(' ').replace(/\s+/g, ' ').trim()
+/**
+ * The outermost `<tag …>…</tag>` elements of `xml`, in order; an element of the same tag nested inside one stays
+ * inside it. One pass over the text, whatever it holds: an element that is never closed gives nothing.
+ */
+function elements(xml: string, tag: string): string[] {
+  const out: string[] = []
+  const re = new RegExp(`<(/?)${tag}(?=[\\s>/])[^>]*>`, 'g')
+  let depth = 0, start = 0
+  for (let m = re.exec(xml); m; m = re.exec(xml)) {
+    if (m[1]) {
+      if (depth > 0 && --depth === 0) out.push(xml.slice(start, m.index + m[0].length))
+    } else if (!m[0].endsWith('/>')) {
+      if (depth++ === 0) start = m.index
+    }
+  }
+  return out
+}
+/** What an element holds, without its own opening and closing tags. */
+const inner = (el: string) => el.slice(el.indexOf('>') + 1, el.lastIndexOf('<'))
+
+/** The text runs of one paragraph, in order; a tab mark becomes a tab when `tabs` is set. One pass. */
+function runText(p: string, ns: 'w' | 'a', tabs: boolean): string {
+  const re = new RegExp(`<${ns}:t(?=[\\s>/])[^>]*>|</${ns}:t>|<${ns}:tab/>`, 'g')
+  let out = '', from = -1
+  for (let m = re.exec(p); m; m = re.exec(p)) {
+    if (m[0][1] === '/') { if (from >= 0) { out += decode(p.slice(from, m.index)); from = -1 } }
+    else if (m[0].endsWith(':tab/>')) { if (tabs && from < 0) out += '\t' }
+    else if (!m[0].endsWith('/>') && from < 0) from = m.index + m[0].length
+  }
+  return out
 }
 
-/** Every table in a Word body or a PowerPoint slide, as rows of cell text. */
-export function ooxmlTables(xml: string, ns: 'w' | 'a'): string[][][] {
+/** The text of one table cell: its paragraphs joined by a space. `ns` is the XML prefix (w for Word, a for PowerPoint). */
+function cellText(cell: string, ns: 'w' | 'a'): string {
+  return elements(cell, `${ns}:p`).map(p => runText(p, ns, false)).join(' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Every table in a Word body or a PowerPoint slide, as rows of cell text. A table inside a cell is a table of its own. */
+export function ooxmlTables(xml: string, ns: 'w' | 'a', depth = 0): string[][][] {
   const tables: string[][][] = []
-  for (const t of xml.match(new RegExp(`<${ns}:tbl[\\s>][\\s\\S]*?</${ns}:tbl>`, 'g')) || []) {
-    const rows: string[][] = []
-    for (const r of t.match(new RegExp(`<${ns}:tr[\\s>][\\s\\S]*?</${ns}:tr>`, 'g')) || []) {
-      const cells = (r.match(new RegExp(`<${ns}:tc[\\s>][\\s\\S]*?</${ns}:tc>`, 'g')) || []).map(c => cellText(c, ns))
+  for (const t of elements(xml, `${ns}:tbl`)) {
+    const rows: string[][] = [], nested: string[][][] = []
+    for (const r of elements(inner(t), `${ns}:tr`)) {
+      const cells: string[] = []
+      for (const c of elements(inner(r), `${ns}:tc`)) {
+        let body = inner(c)
+        // A table inside this cell is read on its own, and its text is not this cell's text.
+        const inside = elements(body, `${ns}:tbl`)
+        if (inside.length) {
+          for (const n of inside) { body = body.replace(n, ''); if (depth < 4) for (const nt of ooxmlTables(n, ns, depth + 1)) nested.push(nt) }
+        }
+        cells.push(cellText(body, ns))
+        // Word writes a cell merged across columns once, with its span; PowerPoint writes the covered cells itself.
+        if (ns === 'w') {
+          const at = body.indexOf('<w:gridSpan')
+          const span = at < 0 ? 1 : Number(/w:val="(\d+)"/.exec(body.slice(at, at + 80))?.[1] ?? 1)
+          for (let i = 1; i < Math.min(span, 64); i++) cells.push('')
+        }
+      }
       if (cells.some(Boolean)) rows.push(cells)
       if (rows.length > MAX_TABLE_ROWS) break
     }
     if (rows.length >= 2) tables.push(rows)
+    for (const n of nested) tables.push(n)
   }
   return tables
 }
 
 /** The plain lines of a slide or a document body, one per paragraph. */
 function ooxmlLines(xml: string, ns: 'w' | 'a'): string[] {
-  const paras = xml.match(new RegExp(`<${ns}:p[\\s>][\\s\\S]*?</${ns}:p>`, 'g')) || []
-  return paras.map(p => [...p.matchAll(new RegExp(`<${ns}:t(?:\\s[^>]*)?>([\\s\\S]*?)</${ns}:t>|<${ns}:tab/>`, 'g'))].map(m => (m[1] !== undefined ? decode(m[1]) : '\t')).join('')).filter(l => l.trim())
+  return elements(xml, `${ns}:p`).map(p => runText(p, ns, true)).filter(l => l.trim())
 }
 
-const csvCell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+// Quoted whenever the text holds anything the spreadsheet reader could take for a column separator.
+const csvCell = (v: string) => (/[",;\t\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
 const toCsv = (rows: string[][]) => rows.map(r => r.map(csvCell).join(',')).join('\n')
 
 /**
@@ -63,7 +112,7 @@ export function joinContinuedTables(tables: string[][][]): string[][][] {
   for (const t of tables) {
     const key = t[0].map(c => c.toLowerCase()).join('\u0001')
     const first = byHeader.get(key)
-    if (first) first.push(...t.slice(1))
+    if (first) { for (const r of t.slice(1)) first.push(r) }
     else { const copy = t.map(r => [...r]); byHeader.set(key, copy); joined.push(copy) }
   }
   return joined
@@ -77,19 +126,24 @@ function readParts(data: Buffer, kind: 'docx' | 'pptx'): { tables: string[][][];
     return { tables: ooxmlTables(text, 'w'), lines: ooxmlLines(text, 'w') }
   }
   const tables: string[][][] = [], lines: string[] = []
-  let found = 0
+  let found = 0, total = 0
   for (let n = 1; n <= MAX_SLIDES; n++) {
     const xml = readZipEntry(data, `ppt/slides/slide${n}.xml`)
     // Slides are numbered from 1; a deck can skip a number after a slide is deleted, so a few misses are allowed.
     if (!xml) { if (n - found > 20) break; continue }
     found = n
+    total += xml.length
+    if (total > MAX_DECK_XML_BYTES) throw new DocxReadError('This .docx document is too large to read.')
     const text = xml.toString('utf8')
-    tables.push(...ooxmlTables(text, 'a'))
-    lines.push(...ooxmlLines(text, 'a'))
+    for (const t of ooxmlTables(text, 'a')) tables.push(t)
+    for (const l of ooxmlLines(text, 'a')) lines.push(l)
   }
   if (!found) throw new DocxReadError('This file is not a PowerPoint .pptx presentation.')
   return { tables, lines }
 }
+
+/** The tables of a Word document or a PowerPoint deck, continued tables joined (for the cost and resource readers). */
+export const officeTables = (data: Buffer, kind: 'docx' | 'pptx'): string[][][] => joinContinuedTables(readParts(data, kind).tables)
 
 /** Reads a schedule from a Word document or a PowerPoint deck. */
 export async function parseOfficeDocument(data: Buffer, fileName: string, scheduleId: string, kind: 'docx' | 'pptx'): Promise<ParsedSchedule> {

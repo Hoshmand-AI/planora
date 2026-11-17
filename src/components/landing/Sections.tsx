@@ -221,7 +221,7 @@ const AUDIENCES = [
   { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Overview · What-if', alt: 'What-if results on the Overview page in RunF9: a pending change order, a utility delay, a delay reported in meeting minutes and the best recovery option, each with the days it moves the finish.',
     points: ['A brief every morning: what drives the finish, what is overdue and what starts today.', 'Each open change is run against the schedule before you price it or send notice.', 'When a date slips, recovery options are re-scheduled on the real network and priced from your labor cost.'] },
   { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'checks', label: 'RunF9 · Health · What to fix', alt: 'A failed DCMA check in RunF9 for the sample data center: negative float, with what it means, why it matters, how to fix it and the activities to look at.',
-    points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'DCMA and GAO checks on every submission, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
+    points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'All 14 DCMA checks on every submission, GAO checks in the Standards view, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
   { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Gantt chart', alt: 'The Gantt chart in RunF9 for the sample data center: work areas and their activities, with completed work in blue, remaining work in green, the critical path in red, and the baseline and the data date marked.',
     points: ['Reads and writes P6 and MS Project files, so your client’s tools do not change.', 'Time Impact Analysis with hashed inputs and results: the same inputs reproduce the same answer.', 'Each client’s projects sit in their own workspace, and each client’s files can stay in that client’s cloud.'] },
   { id: 'federal', tab: 'Federal and defense work', title: 'Built for projects that cannot leave your boundary.', shot: 'earned-value', label: 'RunF9 · Earned value', alt: 'The Earned value page in RunF9: SPI, CPI, schedule and cost variance, estimate at completion and the cumulative cost curve.',
@@ -302,7 +302,7 @@ export function Integrations() {
       <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-small text-warm-700">
         <span className="font-semibold text-ink">Coming soon:</span>
         {['Procore', 'Kahua'].map(n => <span key={n} className="rounded-full border border-warm-300 bg-white px-3.5 py-1 font-medium text-ink">{n}</span>)}
-        <span>Connections to both are being built. Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
+        <span>Not available yet. Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
       </div>
     </section>
   )

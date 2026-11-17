@@ -148,7 +148,7 @@ function AuthForm() {
           <p className="text-h1 font-semibold tracking-[-0.03em] leading-[1.1]">Construction schedules, analyzed and explained.</p>
           <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-500 mt-8 mb-6" />
           <ul className="space-y-3 text-copy text-navy-200">
-            <li>DCMA and GAO checks on every schedule.</li>
+            <li>All 14 DCMA checks on every schedule, plus GAO checks.</li>
             <li>Every update compared, every delay modeled.</li>
             <li>A daily brief for the project manager, the field and the client.</li>
           </ul>

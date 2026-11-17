@@ -13,7 +13,8 @@ import { fmtDate } from '@/lib/format'
  *   GET  → { baseline, comparison, series, canEdit }
  *   PUT  { baselineScheduleId?: id | null, comparisonScheduleId?: id | null }   → the same shape
  * The baseline is the upload every update is measured against (variance, BEI, missed tasks, reports, the trend);
- * it is applied to every upload of the project dated on or after it, and to each new upload as it arrives.
+ * it is applied to every upload of the project dated on or after it that has no baseline of its own chosen, and to
+ * each new upload as it arrives.
  * The comparison schedule (for example last month's update) is what "what changed" compares with unless another
  * is picked. Both must be uploads of this project. Changing either needs schedule.write and is audited.
  */
@@ -64,17 +65,24 @@ export const PUT = api<{ id: string }>({ permission: 'schedule.write' }, async (
     for (const u of series) {
       const applies = !!base && u.id !== base.id && (!base.dataDate || !u.dataDate || base.dataDate <= u.dataDate)
       const want = applies ? base!.id : null
-      if ((u.baselineScheduleId ?? null) === want) continue
-      // Only this project's own designation is replaced: an upload measured against some other chosen upload keeps it.
-      if (!applies && (u.baselineScheduleId ?? null) !== roles.baselineScheduleId) continue
+      const cur = u.baselineScheduleId ?? null
+      if (cur === want) continue
+      // Only this project's own designation is replaced: an upload a scheduler measured against some other chosen
+      // upload keeps it, whether or not the new baseline applies to it.
+      if (cur !== null && cur !== roles.baselineScheduleId) continue
       await setScheduleBaseline(u.id, auth.orgId, want)
       touched.push(u.id)
     }
-    // Recalculate so the stored headline of each upload (lists, the portfolio) reflects the new baseline.
-    for (const id of touched.slice(0, 40)) await loadScheduleData(id, auth.orgId).catch(() => null)
+    // The change is saved: record it before the slow part, so a request that runs out of time is still audited.
     await audit({ action: 'schedule.project_baseline', targetType: 'schedule', targetId: schedule.id, detail: {
       name: schedule.name, before: roles.baselineScheduleId, after: baseline, baseline: base ? { version: base.version, dataDate: base.dataDate ? fmtDate(base.dataDate) : null } : null, uploadsRemeasured: touched.length,
     } })
+    // Recalculate so the stored headline of each upload (lists, the portfolio) reflects the new baseline: newest
+    // first, a few at a time, within a time budget. Any left over are recalculated when they are next opened.
+    const queue = [...touched].reverse(), deadline = Date.now() + 20_000
+    while (queue.length && Date.now() < deadline) {
+      await Promise.all(queue.splice(0, 4).map(id => loadScheduleData(id, auth.orgId).catch(() => null)))
+    }
   }
   if (comparison !== undefined && comparison !== roles.comparisonScheduleId) {
     const c = series.find(s => s.id === comparison) ?? null

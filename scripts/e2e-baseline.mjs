@@ -112,6 +112,15 @@ ok(vsBase.status === 200 && vsBase.data.comparison?.before?.id === s1, 'and with
 const vsPick = await a.get(`/api/schedules/compare?id=${s2}&base=${s1}`)
 ok(vsPick.status === 200 && vsPick.data.comparison?.before?.id === s1, 'any other upload can still be picked')
 
+// An upload dated before the stored comparison schedule keeps the previous update; the roles are reported as stored.
+const cmpLater = await a.put(rolesUrl, { comparisonScheduleId: s1 })
+ok(cmpLater.status === 200, 'Update 1 can be stored as the comparison schedule')
+const early = await a.get(`/api/schedules/compare?id=${s0}`)
+ok(early.status === 200 && early.data.comparison?.before?.id !== s1 && early.data.kept?.comparisonId === s1 && early.data.kept?.comparisonApplies === false, 'an earlier upload is never compared backwards with a later stored one', early.data.comparison?.before ?? early.data.kept)
+const own = await a.get(`/api/schedules/compare?id=${s1}`)
+ok(own.status === 200 && own.data.kept?.comparisonId === s1 && own.data.kept?.baselineId === s1, 'opening the stored upload itself still reports it as stored', own.data.kept)
+ok((await a.put(rolesUrl, { comparisonScheduleId: s0 })).status === 200, 'the comparison schedule is put back')
+
 const u3 = await upload(a, 'Tower.csv', csv(21), { version: 'Update 3' })
 ok(u3.status === 200 && u3.data.schedule?.baselineScheduleId === s1, 'a new upload of the project is measured against the stored baseline without anyone setting it', u3.data.schedule ?? u3.data)
 

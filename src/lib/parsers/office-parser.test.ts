@@ -85,3 +85,30 @@ describe('tables in the file', () => {
     expect(ooxmlTables(wTable([['A', 'B'], ['', ''], ['1', '2']]) + wTable([['only']]), 'w')).toEqual([[['A', 'B'], ['1', '2']]])
   })
 })
+
+describe('awkward Word and PowerPoint tables', () => {
+  it('keeps the columns of a row with a cell merged across two columns', () => {
+    const merged = `<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>Site works</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr>`
+    const [t] = ooxmlTables(`<w:tbl><w:tr>${['ID', 'Name', 'Duration'].map(c => `<w:tc><w:p><w:r><w:t>${c}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>${merged}</w:tbl>`, 'w')
+    expect(t[1]).toEqual(['Site works', '', '10'])
+  })
+  it('reads a table inside a cell on its own and keeps the rows after it', () => {
+    const innerT = wTable([['x', 'y'], ['1', '2']])
+    const outer = `<w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>c</w:t></w:r></w:p>${innerT}</w:tc><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>e</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>f</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+    const tables = ooxmlTables(outer, 'w')
+    expect(tables[0]).toEqual([['A', 'B'], ['c', 'd'], ['e', 'f']])
+    expect(tables[1]).toEqual([['x', 'y'], ['1', '2']])
+  })
+  it('keeps names that hold semicolons whole', async () => {
+    const rows = ROWS.map(r => [r[0], `${r[1]}; phase 1; zone A; level 2`, ...r.slice(2)])
+    const s = await parseOfficeDocument(docx(wTable([HEAD, ...rows])), 'S.docx', 'sched', 'docx')
+    expect(s.activities).toHaveLength(3)
+    expect(s.activities[1].name).toBe('Excavate footings; phase 1; zone A; level 2')
+  })
+  it('gets through a body of opening tags that are never closed quickly', () => {
+    const xml = '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>'.repeat(60_000)
+    const t0 = performance.now()
+    expect(ooxmlTables(xml, 'w')).toEqual([])
+    expect(performance.now() - t0).toBeLessThan(2000)
+  })
+})
