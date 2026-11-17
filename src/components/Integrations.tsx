@@ -1,6 +1,8 @@
 'use client'
 
 // Organization → Integrations: API keys and webhooks. Secrets are shown once, right after creation.
+// Each list is shown first; the form that adds to it opens from a button (it was always open, so the page
+// showed two forms and two filled buttons before anything had been created).
 
 import { useCallback, useEffect, useState } from 'react'
 import { Copy } from 'lucide-react'
@@ -20,6 +22,7 @@ export function Integrations() {
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null)
   const [key, setKey] = useState({ name: '', role: 'viewer', expiresInDays: '365' })
   const [hook, setHook] = useState<{ url: string; events: string[] }>({ url: '', events: ['plan.publish', 'plan.review'] })
+  const [adding, setAdding] = useState<'key' | 'hook' | null>(null)
 
   const [loadErr, setLoadErr] = useState(false)
   const load = useCallback(async () => {
@@ -61,7 +64,10 @@ export function Integrations() {
         </div>
       )}
 
-      <h3 className="text-[13px] font-semibold text-ink mb-2">API keys</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h3 className="text-[13px] font-semibold text-ink">API keys</h3>
+        {adding !== 'key' && <Button variant="secondary" disabled={!data.available} onClick={() => setAdding('key')}>New API key</Button>}
+      </div>
       {data.keys.length > 0 ? (
         <div tabIndex={0} role="region" aria-label="API keys" className="relative overflow-x-auto mb-3">
           <table className="w-full text-[12px]">
@@ -81,23 +87,29 @@ export function Integrations() {
             </tbody>
           </table>
         </div>
-      ) : <p className="text-[12px] text-warm-500 mb-3">No API keys yet.</p>}
-      <form className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end mb-6" onSubmit={async e => {
+      ) : adding !== 'key' && <p className="text-[13px] text-warm-600 mb-3">No API keys yet.</p>}
+      {adding === 'key' && (
+      <form className="grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-end mb-3" onSubmit={async e => {
         e.preventDefault()
         const d = await act('key', { action: 'create_key', name: key.name, role: key.role, expiresInDays: key.expiresInDays ? Number(key.expiresInDays) : null }, 'API key created.')
-        if (d) { setSecret({ label: `API key “${key.name}” created.`, value: String(d.secret) }); setKey({ ...key, name: '' }) }
+        if (d) { setSecret({ label: `API key “${key.name}” created.`, value: String(d.secret) }); setKey({ ...key, name: '' }); setAdding(null) }
       }}>
         <Field label="Key name">{p => <input {...p} required maxLength={80} className={inputClass} placeholder="e.g. Power BI" value={key.name} onChange={e => setKey({ ...key, name: e.target.value })} />}</Field>
         <Field label="Access">{p => <select {...p} className={inputClass} value={key.role} onChange={e => setKey({ ...key, role: e.target.value })}><option value="viewer">Read-only</option><option value="scheduler">Scheduler (answer, generate)</option></select>}</Field>
         <Field label="Expires">{p => <select {...p} className={inputClass} value={key.expiresInDays} onChange={e => setKey({ ...key, expiresInDays: e.target.value })}><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option><option value="">Never</option></select>}</Field>
         <Button type="submit" disabled={busy === 'key' || !data.available}>Create key</Button>
+        <Button type="button" variant="secondary" onClick={() => setAdding(null)}>Cancel</Button>
       </form>
+      )}
 
-      <h3 className="text-[13px] font-semibold text-ink mb-2">Webhooks</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2 mt-6 pt-5 border-t border-warm-200">
+        <h3 className="text-[13px] font-semibold text-ink">Webhooks</h3>
+        {adding !== 'hook' && <Button variant="secondary" disabled={!data.available} onClick={() => setAdding('hook')}>New webhook</Button>}
+      </div>
       {data.webhooks.length > 0 ? (
-        <ul className="space-y-2 mb-3">
+        <ul className="mb-3 divide-y divide-warm-200 border-y border-warm-200">
           {data.webhooks.map(h => (
-            <li key={h.id} className="border border-warm-200 rounded-md p-3 text-[12px] text-warm-700">
+            <li key={h.id} className="py-3 text-[12px] text-warm-700">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-mono break-all text-ink">{h.url}</div>
@@ -116,26 +128,31 @@ export function Integrations() {
             </li>
           ))}
         </ul>
-      ) : <p className="text-[12px] text-warm-500 mb-3">No webhooks yet.</p>}
+      ) : adding !== 'hook' && <p className="text-[13px] text-warm-600">No webhooks yet.</p>}
+      {adding === 'hook' && (
       <form className="space-y-3" onSubmit={async e => {
         e.preventDefault()
         const d = await act('hook', { action: 'create_webhook', url: hook.url, events: hook.events }, 'Webhook added.')
-        if (d) { setSecret({ label: 'Webhook signing secret created.', value: String(d.secret) }); setHook({ ...hook, url: '' }) }
+        if (d) { setSecret({ label: 'Webhook signing secret created.', value: String(d.secret) }); setHook({ ...hook, url: '' }); setAdding(null) }
       }}>
         <Field label="Endpoint URL (HTTPS)">{p => <input {...p} required type="url" className={inputClass} placeholder="https://hooks.example.com/runf9" value={hook.url} onChange={e => setHook({ ...hook, url: e.target.value })} />}</Field>
         <fieldset>
-          <legend className="block text-[12px] font-semibold text-warm-500 mb-1.5">Events</legend>
-          <div className="grid sm:grid-cols-2 gap-1.5">
+          <legend className="block text-[12px] font-semibold text-warm-600 mb-1.5">Events</legend>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
             {data.events.map(ev => (
-              <label key={ev.id} className="flex items-start gap-2 text-[12px] text-warm-700">
+              <label key={ev.id} className="flex items-start gap-2 py-1 text-[12px] text-warm-700">
                 <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-500" checked={hook.events.includes(ev.id)} onChange={e => setHook({ ...hook, events: e.target.checked ? [...hook.events, ev.id] : hook.events.filter(x => x !== ev.id) })} />
                 <span><span className="font-mono text-ink">{ev.id}</span> · {ev.label}</span>
               </label>
             ))}
           </div>
         </fieldset>
-        <Button type="submit" disabled={busy === 'hook' || !data.available}>Add webhook</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={busy === 'hook' || !data.available}>Add webhook</Button>
+          <Button type="button" variant="secondary" onClick={() => setAdding(null)}>Cancel</Button>
+        </div>
       </form>
+      )}
     </Section>
   )
 }

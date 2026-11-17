@@ -95,6 +95,7 @@ export default function OrgPage() {
   const [verify, setVerify] = useState<{ ok: boolean; count: number; brokenAt?: { seq: number; reason: string } } | null>(null)
   const [verifyErr, setVerifyErr] = useState('')
   const [owner, setOwner] = useState({ userId: '', password: '', code: '', confirm: '' })
+  const [ownerForm, setOwnerForm] = useState<'transfer' | 'delete' | null>(null)
   const [sso, setSso] = useState({ enabled: false, issuer: '', clientId: '', clientSecret: '', domains: '', defaultRole: 'viewer', enforce: false })
   const [ssoHelp, setSsoHelp] = useState<{ value: string; hosts: string[] } | null>(null)
 
@@ -189,31 +190,54 @@ export default function OrgPage() {
       )}
 
       {isOwner && (
-        <Section title="Ownership and deletion" tone="danger" description="Confirm with your password (and authenticator code if you use one).">
+        // Two rare, serious actions: each opens its own short form from a button, so the page does not end in a
+        // red form that is always open.
+        <Section title="Ownership and deletion" description="Hand the organization to another member, or delete it with all of its data. Each asks for your password first.">
           {note('owner')}
-          <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <Field label="Password">{p => <input {...p} type="password" autoComplete="current-password" className={inputClass} value={owner.password} onChange={e => setOwner({ ...owner, password: e.target.value })} />}</Field>
-            <Field label="Authenticator code (if on)">{p => <input {...p} inputMode="numeric" className={inputClass} value={owner.code} onChange={e => setOwner({ ...owner, code: e.target.value })} />}</Field>
-          </div>
-          <div className="flex flex-wrap gap-2 items-end mb-5">
-            <Field label="Transfer ownership to">{p => (
-              <select {...p} className={inputClass} value={owner.userId} onChange={e => setOwner({ ...owner, userId: e.target.value })}>
-                <option value="">Choose a member…</option>
-                {data.members.filter(m => m.id !== data.you.id).map(m => <option key={m.id} value={m.id}>{m.name} ({m.email})</option>)}
-              </select>
-            )}</Field>
-            <Button variant="secondary" disabled={!owner.userId || busy === 'owner'} onClick={async () => {
-              if (!confirm('Transfer ownership? You will become an admin.')) return
-              if (await act('owner', { action: 'transfer_ownership', userId: owner.userId, password: owner.password, code: owner.code }, 'Ownership transferred.')) { setOwner({ userId: '', password: '', code: '', confirm: '' }); load() }
-            }}>Transfer</Button>
-          </div>
-          <div className="flex flex-wrap gap-2 items-end">
-            <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
-            <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
-              if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
-              if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'
-            }}>Delete organization</Button>
-          </div>
+          {ownerForm === null && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setOwnerForm('transfer')}>Transfer ownership…</Button>
+              <Button variant="secondary" className="text-status-at-risk" onClick={() => setOwnerForm('delete')}>Delete organization…</Button>
+            </div>
+          )}
+          {ownerForm !== null && (
+            <div className="max-w-xl space-y-3">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field label="Password">{p => <input {...p} type="password" autoComplete="current-password" className={inputClass} value={owner.password} onChange={e => setOwner({ ...owner, password: e.target.value })} />}</Field>
+                <Field label="Authenticator code (if on)">{p => <input {...p} inputMode="numeric" className={inputClass} value={owner.code} onChange={e => setOwner({ ...owner, code: e.target.value })} />}</Field>
+              </div>
+              {ownerForm === 'transfer' ? (
+                <>
+                  <Field label="Transfer ownership to">{p => (
+                    <select {...p} className={inputClass} value={owner.userId} onChange={e => setOwner({ ...owner, userId: e.target.value })}>
+                      <option value="">Choose a member…</option>
+                      {data.members.filter(m => m.id !== data.you.id).map(m => <option key={m.id} value={m.id}>{m.name} ({m.email})</option>)}
+                    </select>
+                  )}</Field>
+                  <p className="text-[12px] text-warm-600">You will become an admin.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button disabled={!owner.userId || busy === 'owner'} onClick={async () => {
+                      if (!confirm('Transfer ownership? You will become an admin.')) return
+                      if (await act('owner', { action: 'transfer_ownership', userId: owner.userId, password: owner.password, code: owner.code }, 'Ownership transferred.')) { setOwner({ userId: '', password: '', code: '', confirm: '' }); setOwnerForm(null); load() }
+                    }}>Transfer ownership</Button>
+                    <Button variant="secondary" onClick={() => { setOwnerForm(null); setOwner({ userId: '', password: '', code: '', confirm: '' }) }}>Cancel</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Field label="Type the organization name to delete it">{p => <input {...p} placeholder={data.org.name} className={inputClass} value={owner.confirm} onChange={e => setOwner({ ...owner, confirm: e.target.value })} />}</Field>
+                  <p className="text-[12px] text-status-at-risk">This deletes every member, plan, schedule and record of this organization. It cannot be undone.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="danger" disabled={owner.confirm !== data.org.name || busy === 'owner'} onClick={async () => {
+                      if (!confirm('Delete the organization and ALL of its data permanently? This cannot be undone.')) return
+                      if (await act('owner', { action: 'delete_org', password: owner.password, code: owner.code, confirm: owner.confirm })) window.location.href = '/'
+                    }}>Delete organization</Button>
+                    <Button variant="secondary" onClick={() => { setOwnerForm(null); setOwner({ userId: '', password: '', code: '', confirm: '' }) }}>Cancel</Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </Section>
       )}
       </div>

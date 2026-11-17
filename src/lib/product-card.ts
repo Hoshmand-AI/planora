@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-17', title: 'A new account opens on one screen with one button, and the Organization forms you rarely need open only when you ask for them' },
   { date: '2026-11-17', title: 'A simpler start: the interview shows one question and one button at a time, and the risk analysis opens with its dates and a chart of the likely finishes' },
   { date: '2026-11-17', title: 'Earned value, Resources and Standards open with the answer first: charts drawn at reading size, and the detail folded until you ask' },
   { date: '2026-11-17', title: 'Quieter pages: each fact is shown once, one main button per screen, and detail stays folded until you ask for it' },
