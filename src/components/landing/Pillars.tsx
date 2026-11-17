@@ -31,15 +31,15 @@ export default function Pillars() {
         }}>
         {PILLARS.map((p, i) => (
           <button key={p.key} type="button" role="tab" id={`pillar-tab-${p.key}`} aria-selected={at === i} aria-controls={`pillar-panel-${p.key}`} tabIndex={at === i ? 0 : -1} onClick={() => setAt(i)}
-            className={`pressable text-left rounded-2xl md:rounded-3xl px-4 py-4 md:px-7 md:py-6 transition-colors ${at === i ? 'bg-navy-950 text-white' : 'bg-white text-navy-950 border border-warm-200 hover:border-navy-900'}`}>
-            <span className="block text-[24px] md:text-[40px] font-bold tracking-[-0.04em] leading-none">{p.title}</span>
-            <span className={`hidden md:block text-[15px] mt-2 ${at === i ? 'text-navy-200' : 'text-warm-700'}`}>{p.lead}</span>
+            className={`pressable text-left rounded-2xl md:rounded-3xl px-4 py-3 md:px-6 md:py-4 transition-colors md:flex md:items-baseline md:gap-3 ${at === i ? 'bg-navy-950 text-white' : 'bg-white text-navy-950 border border-warm-200 hover:border-navy-900'}`}>
+            <span className="block text-[22px] md:text-[30px] font-bold tracking-[-0.04em] leading-none">{p.title}</span>
+            <span className={`hidden lg:block text-[14px] ${at === i ? 'text-navy-200' : 'text-warm-700'}`}>{p.lead}</span>
           </button>
         ))}
       </div>
       {PILLARS.map((p, i) => (
         <div key={p.key} role="tabpanel" id={`pillar-panel-${p.key}`} aria-labelledby={`pillar-tab-${p.key}`} hidden={at !== i}
-          className={`${at === i ? 'grid' : 'hidden'} mt-10 md:mt-14 grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center`}>
+          className={`${at === i ? 'grid' : 'hidden'} mt-10 md:mt-14 grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-start`}>
           <div>
             <h3 className="text-[26px] md:text-[34px] font-bold tracking-[-0.03em] text-navy-950 leading-tight">{p.lead}</h3>
             <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-3">{p.text}</p>

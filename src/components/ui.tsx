@@ -15,7 +15,7 @@ export function Section({ title, description, children, tone = 'default', id }: 
   const rest = text && first !== text ? text.slice(cut) : ''
   const long = text ? !!rest.trim() : !!description
   return (
-    <section id={id} aria-labelledby={hid} className={`border rounded-lg p-5 bg-warm-50 ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
+    <section id={id} aria-labelledby={hid} className={`border rounded-[14px] p-5 md:p-6 bg-white ${tone === 'danger' ? 'border-status-at-risk/30' : 'border-warm-200'}`}>
       <h2 id={hid} className={`text-[15px] font-semibold mb-1 ${tone === 'danger' ? 'text-status-at-risk' : 'text-navy-950'}`}>{title}</h2>
       {description && (
         <div className="mb-4 flex items-start gap-2">
@@ -54,8 +54,8 @@ export function Hint({ label = 'How this works', children, className = '' }: { l
 
 /** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
 export const buttonClass = {
-  primary: 'px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
-  secondary: 'px-4 py-2 rounded-lg border border-warm-300 bg-white text-navy-950 text-[13px] font-medium hover:bg-warm-100 transition-colors',
+  primary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
+  secondary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-navy-950 text-[13px] font-medium hover:bg-warm-100 transition-colors',
 }
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
@@ -65,7 +65,7 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]
-  return <button {...props} className={`${variant === 'ghost' ? '' : 'px-4 py-2 rounded-lg'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
+  return <button {...props} className={`${variant === 'ghost' ? '' : 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
 }
 
 export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' | 'warning'; children: React.ReactNode }) {
