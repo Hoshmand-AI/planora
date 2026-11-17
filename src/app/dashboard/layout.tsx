@@ -18,8 +18,10 @@ import {
   CalendarRange,
   Activity,
   FolderOpen,
+  Camera,
 } from 'lucide-react'
 import { fmtDate } from '@/lib/format'
+import { siteCaptureEnabled } from '@/lib/site/capture'
 import { PROJECT_TYPES, PROJECT_TYPE_LABELS } from '@/lib/planning/types'
 import { Logo } from '@/components/Logo'
 import { WorkspaceSelect } from '@/components/WorkspaceSelect'
@@ -90,13 +92,14 @@ export const PROJECT_TABS: { href: string; label: string; hint: string; views?: 
     views: [{ href: '/dashboard/timeline', label: 'Gantt' }, { href: '/dashboard/resources', label: 'Resources' }] },
   { href: '/dashboard/quality',   label: 'Health',          hint: 'What is wrong with the schedule, and what delayed it.',
     views: [{ href: '/dashboard/quality', label: 'Schedule quality' }, { href: '/dashboard/time-impact', label: 'Delays' }] },
+  { href: '/dashboard/site',      label: 'Site',            hint: 'What was seen on site: photos and notes, by place and activity.' },
   { href: '/dashboard/documents', label: 'Project records', hint: 'Emails, minutes, daily reports and contract documents. RunF9 reads them for anything that affects the schedule.' },
   { href: '/dashboard/reports',   label: 'Reports',         hint: 'What you send to the owner.',
     views: [{ href: '/dashboard/reports', label: 'Written reports' }, { href: '/dashboard/earned-value', label: 'Earned value' }] },
 ]
 const TAB_ICON: Record<string, typeof LayoutGrid> = {
   '/dashboard/project': LayoutDashboard, '/dashboard/timeline': CalendarRange, '/dashboard/quality': Activity,
-  '/dashboard/documents': FolderOpen, '/dashboard/reports': FileText,
+  '/dashboard/site': Camera, '/dashboard/documents': FolderOpen, '/dashboard/reports': FileText,
 }
 /** One row of the sidebar: an icon and a name; the current one is tinted with a bar on its left edge. */
 const sideItem = (active: boolean, open: boolean) =>
@@ -385,7 +388,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let live = true
     // The viewer's own date (the server's clock is UTC), and only refetched on a project switch or when the Overview tab is entered or left.
     const d = new Date(), asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}`).then(r => (r.ok ? r.json() : null))
+    fetch(`/api/schedules/${encodeURIComponent(selectedSchedule.id)}/brief?asOf=${asOf}&tz=${d.getTimezoneOffset()}`).then(r => (r.ok ? r.json() : null))
       .then(d => { if (live && d) setTodayCount((d.alerts as { level: string }[]).filter(a => a.level === 'act').length) }).catch(() => {})
     return () => { live = false }
   }, [selectedSchedule, user, mfaSetupRequired, onToday])
@@ -647,6 +650,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {(() => {
                       const owns = can('schedule.write') && selectedSchedule.sourceType !== 'generated'
                       const addRecord = () => router.push(`/dashboard/documents?schedule=${selectedSchedule.id}&add=1`)
+                      // Already on the Site page, the address would not change: ask the page itself to open a capture.
+                      const addCapture = () => (pathname === '/dashboard/site' ? window.dispatchEvent(new Event('runf9:new-capture')) : router.push(`/dashboard/site?schedule=${selectedSchedule.id}&new=1`))
+                      const captureOn = siteCaptureEnabled() && can('site.capture')
                       return (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {/* One place to bring anything into the project: no tab asks for an upload on its own. */}
@@ -655,9 +661,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               <MoreMenu label="Add to project" trigger={<><Plus size={14} aria-hidden="true" /> Add to project</>} items={[
                                 { label: 'Schedule update (P6 or Microsoft Project file)', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" /> },
                                 { label: 'Project record (email, minutes, daily report, contract)', onSelect: addRecord, icon: <FileText size={15} aria-hidden="true" /> },
+                                ...(captureOn ? [{ label: 'Site capture (photo and note)', onSelect: addCapture, icon: <Camera size={15} aria-hidden="true" /> }] : []),
                               ]} />
                             </div>
                           )}
+                          {/* On a phone, one tap from any page of the project starts a capture. */}
+                          {captureOn && <button type="button" onClick={addCapture} aria-label="New site capture" className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-warm-300 bg-white text-ink"><Camera size={16} aria-hidden="true" /></button>}
                           <MoreMenu label="More actions for this project" items={[
                             { label: 'Switch project', onSelect: openProjectList, icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
                             { label: 'Ask about this project', onSelect: () => router.push(`/dashboard/ask?schedule=${selectedSchedule.id}`), icon: <MessageSquare size={15} aria-hidden="true" />, className: 'md:hidden' },
@@ -665,6 +674,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               { label: 'Add a schedule update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
                               { label: 'Add a project record', onSelect: addRecord, icon: <FileText size={15} aria-hidden="true" />, className: 'md:hidden' },
                             ] : []),
+                            ...(captureOn ? [{ label: 'New site capture', onSelect: addCapture, icon: <Camera size={15} aria-hidden="true" />, className: owns ? 'md:hidden' : '' }] : []),
                             ...(selectedSchedule.sourceType !== 'generated' ? [{ label: 'Analysis tools', onSelect: () => router.push(`/dashboard/tools?schedule=${selectedSchedule.id}`), icon: <Wrench size={15} aria-hidden="true" /> }] : []),
                             { label: 'Account and settings', onSelect: () => setShowSettings(true), className: 'md:hidden' },
                             ...(owns ? [{ label: 'Delete this upload', onSelect: deleteUpload, icon: <Trash2 size={15} aria-hidden="true" />, danger: true }] : []),

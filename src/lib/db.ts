@@ -504,7 +504,22 @@ export async function deleteSchedule(id: string, orgId: string): Promise<boolean
   await initSchema()
   const ws = await workspaceScope('workspace_id', 3)
   const res = await query(`DELETE FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
-  return (res.rowCount ?? 0) > 0
+  if (!(res.rowCount ?? 0)) return false
+  await purgeOrphanSiteData(orgId)
+  return true
+}
+
+/**
+ * Site captures are filed under the project (see registerKey), not under one upload. When the project's last
+ * upload is gone nothing could list or delete them any more, so they go with it: their photos and voice notes too.
+ */
+export async function purgeOrphanSiteData(orgId: string): Promise<number> {
+  const res = await query(`DELETE FROM site_captures c WHERE c.org_id=$1 AND NOT EXISTS (
+    SELECT 1 FROM schedules s WHERE s.org_id=$1 AND c.project_key =
+      CASE WHEN s.project_key IS NULL OR s.project_key = '' THEN 'schedule:' || s.id
+           WHEN s.workspace_id IS NOT NULL THEN 'ws:' || s.workspace_id || '|' || s.project_key
+           ELSE s.project_key END)`, [orgId])
+  return res.rowCount ?? 0
 }
 
 /* ─── Activities & relationships ────────────────────── */
@@ -971,7 +986,11 @@ export async function exportOrganization(orgId: string) {
   const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
   // The project register (risks, issues, change items).
   const projectRegister = (await query('SELECT * FROM project_items WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
-  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, retrievalLog, auditEvents: audit }
+  // Site captures: who, when, where, what was said and which activities; each photo and voice note is listed with its
+  // size and SHA-256 (the files themselves are downloaded from the project's Site page, not put inside this JSON).
+  const { exportCaptures } = await import('@/lib/server/site-captures')
+  const siteCaptures = await exportCaptures(orgId)
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -992,6 +1011,9 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_items WHERE org_id=$1', [orgId])
+    // Site captures: the photos and voice notes first, then the captures (tombstones included).
+    await q('DELETE FROM site_capture_media WHERE org_id=$1', [orgId])
+    await q('DELETE FROM site_captures WHERE org_id=$1', [orgId])
     await q('DELETE FROM brief_subscriptions WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
@@ -1038,6 +1060,7 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
     await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q("UPDATE project_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
+    await q("UPDATE site_captures SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q('DELETE FROM brief_subscriptions WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])

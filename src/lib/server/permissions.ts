@@ -1,6 +1,6 @@
 // Role-based access control. Every API route declares the permission it needs; least privilege by default.
 
-export const ROLES = ['owner', 'admin', 'scheduler', 'reviewer', 'viewer'] as const
+export const ROLES = ['owner', 'admin', 'scheduler', 'reviewer', 'field', 'viewer'] as const
 export type Role = typeof ROLES[number]
 
 export type Permission =
@@ -8,6 +8,7 @@ export type Permission =
   | 'ai.use'          // Ask AI / AI reports / AI follow-up questions (spends model budget)
   | 'plan.write'      // create plans, answer, generate, override, recover, decide on DCMA findings
   | 'schedule.write'  // upload, tag, delete schedules; answer data questions
+  | 'site.capture'    // record what was seen on site: photos, a voice note, a status against activities
   | 'plan.review'     // record an expert review (approve / reject)
   | 'plan.publish'    // publish a plan as a baseline schedule
   | 'audit.read'      // read and verify the organization audit log
@@ -15,15 +16,17 @@ export type Permission =
   | 'org.own'         // ownership transfer, organization deletion
 
 const MATRIX: Record<Role, Permission[]> = {
-  owner: ['read', 'ai.use', 'plan.write', 'schedule.write', 'plan.review', 'plan.publish', 'audit.read', 'org.manage', 'org.own'],
-  admin: ['read', 'ai.use', 'plan.write', 'schedule.write', 'plan.review', 'plan.publish', 'audit.read', 'org.manage'],
-  scheduler: ['read', 'ai.use', 'plan.write', 'schedule.write', 'plan.publish'],
-  reviewer: ['read', 'ai.use', 'plan.review', 'audit.read'],
+  owner: ['read', 'ai.use', 'plan.write', 'schedule.write', 'site.capture', 'plan.review', 'plan.publish', 'audit.read', 'org.manage', 'org.own'],
+  admin: ['read', 'ai.use', 'plan.write', 'schedule.write', 'site.capture', 'plan.review', 'plan.publish', 'audit.read', 'org.manage'],
+  scheduler: ['read', 'ai.use', 'plan.write', 'schedule.write', 'site.capture', 'plan.publish'],
+  reviewer: ['read', 'ai.use', 'site.capture', 'plan.review', 'audit.read'],
+  // On site with a phone: sees the projects and records what is there. Cannot change a schedule.
+  field: ['read', 'site.capture'],
   viewer: ['read'],
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
-  owner: 'Owner', admin: 'Admin', scheduler: 'Scheduler', reviewer: 'Reviewer', viewer: 'Viewer',
+  owner: 'Owner', admin: 'Admin', scheduler: 'Scheduler', reviewer: 'Reviewer', field: 'Field', viewer: 'Viewer',
 }
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
@@ -31,6 +34,7 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: 'Manage members, settings and the audit log, plus all scheduling work.',
   scheduler: 'Build, change, upload and publish schedules.',
   reviewer: 'Read everything, record expert reviews and read the audit log. Cannot change schedules.',
+  field: 'Read everything and add site captures from a phone: photos, voice notes and what is done or not. Cannot change schedules.',
   viewer: 'Read-only access to plans, schedules and reports.',
 }
 

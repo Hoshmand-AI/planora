@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-17', title: 'Site captures: take a photo on your phone, say what it shows, and it is filed with the place, the time and the activity' },
   { date: '2026-11-17', title: 'One scale of text sizes: the page title is the largest, and each level down the page is one step smaller' },
   { date: '2026-11-17', title: 'A new account opens on one screen with one button, and the Organization forms you rarely need open only when you ask for them' },
   { date: '2026-11-17', title: 'A simpler start: the interview shows one question and one button at a time, and the risk analysis opens with its dates and a chart of the likely finishes' },

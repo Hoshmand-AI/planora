@@ -42,6 +42,8 @@ third party, telemetry, font or script CDNs (fonts are bundled), or calling home
 the browser, the Content-Security-Policy on every page (`next.config.js`) lets the page load scripts,
 styles and fonts only from RunF9 itself and connect only back to RunF9 (`connect-src 'self'`).
 
+**Site captures** (photos, voice notes and the phone's position) go from the member's phone to RunF9 and nowhere else. They are not sent to an AI model, a map service or a speech service: a voice note is stored as audio, and words are typed or dictated with the phone's own keyboard. The camera, microphone and location are used only when a member starts a capture, and a deployment can keep them blocked entirely (`RUNF9_SITE_CAPTURE=off`).
+
 ## Proof: the no-egress check
 
 `scripts/e2e-no-egress.mjs` runs on every change in CI. It:

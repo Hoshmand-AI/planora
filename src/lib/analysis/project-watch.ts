@@ -5,11 +5,11 @@
 //  - the field against the schedule: work the daily reports describe that the schedule shows differently.
 // Every finding carries the sentence it rests on and where that sentence is. Pure.
 
-import { BUILDING_SCOPE, DATA_CENTER_SCOPE } from './daily-brief'
+import { BUILDING_SCOPE, DATA_CENTER_SCOPE, localDay, type SiteObservation } from './daily-brief'
 import { CIVIL_PROJECT_TYPES } from '@/lib/planning/types'
 
 export interface WatchChunk { documentId: string; title: string; docType: string; citation: string; text: string }
-export interface WatchActivity { id: string; code: string; name: string; wbs?: string | null; started: boolean; done: boolean }
+export interface WatchActivity { id: string; code: string; name: string; wbs?: string | null; started: boolean; done: boolean; actualStart?: string | null; actualFinish?: string | null }
 interface Source { quote: string; title: string; citation: string; documentId: string }
 
 export interface ContractItem extends Source {
@@ -26,7 +26,7 @@ export interface ContractItem extends Source {
   appliesTo?: string | null
 }
 export interface ScopeGap extends Source { label: string }
-export interface FieldMismatch extends Source { activity: { id: string; code: string; name: string }; reported: 'working' | 'finished'; schedule: 'not started' | 'in progress'; text: string }
+export interface FieldMismatch extends Source { activity: { id: string; code: string; name: string }; reported: 'working' | 'finished' | 'not started'; schedule: 'not started' | 'in progress' | 'complete'; text: string }
 export interface ProjectWatch { contract: ContractItem[]; notInSchedule: ScopeGap[]; field: FieldMismatch[]; read: { contract: number; design: number; field: number } }
 
 export const CONTRACT_DOC_TYPES: readonly string[] = ['contract', 'scheduling_spec', 'owner_requirement', 'change_order']
@@ -94,7 +94,12 @@ export interface WatchContext {
   target?: string | null
 }
 
-export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], ctx: WatchContext): ProjectWatch {
+/**
+ * `observations` are the project's site captures. Each carries its status and its activities as data (the person
+ * picked them), so nothing is guessed from its words: a capture that says an activity is under way, done or not
+ * started is compared with what the schedule records for that activity.
+ */
+export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], ctx: WatchContext, observations: SiteObservation[] = [], tzOffsetMinutes = 0): ProjectWatch {
   const contractChunks = chunks.filter(c => CONTRACT_DOC_TYPES.includes(c.docType))
   const designChunks = chunks.filter(c => DESIGN_DOC_TYPES.includes(c.docType))
   const fieldChunks = chunks.filter(c => FIELD_DOC_TYPES.includes(c.docType))
@@ -167,6 +172,31 @@ export function projectWatch(chunks: WatchChunk[], activities: WatchActivity[], 
   const codes = new Map(activities.map(a => [a.code.toLowerCase(), a]))
   const field: FieldMismatch[] = []
   const seen = new Set<string>()
+  // Site captures first, newest first: the latest thing seen on an activity is the one finding it gets.
+  for (const o of [...observations].sort((x, y) => y.takenAt.localeCompare(x.takenAt))) {
+    if (o.status === 'issue') continue
+    const where = o.location ? ` in ${o.location}` : ''
+    const source: Source = { quote: (o.text || (o.photos ? 'Photo, no note.' : 'Voice note.')).slice(0, 320), title: `Site capture by ${o.takenBy}${o.location ? `, ${o.location}` : ''}`, citation: localDay(o.takenAt, tzOffsetMinutes) ?? o.takenAt.slice(0, 10), documentId: o.id }
+    for (const code of o.activityCodes) {
+      const a = codes.get(code.toLowerCase())
+      if (!a || seen.has(a.id)) continue
+      const ref = { id: a.id, code: a.code, name: a.name }
+      const label = `${a.code} ${a.name}`
+      if (o.status === 'not_started') {
+        // Seen not started, while the schedule had it under way or done ON THAT DAY. Work that began after the
+        // capture was taken does not contradict it, and leaves the activity open to newer evidence.
+        const on = localDay(o.takenAt, tzOffsetMinutes) ?? o.takenAt.slice(0, 10)
+        const startedAfter = !!a.actualStart && a.actualStart.slice(0, 10) > on, finishedAfter = !!a.actualFinish && a.actualFinish.slice(0, 10) > on
+        if (a.done && !finishedAfter && !startedAfter) { seen.add(a.id); field.push({ ...source, activity: ref, reported: 'not started', schedule: 'complete', text: `A site capture${where} shows ${label} not started; the schedule shows it complete. Check the actual dates.` }) }
+        else if (!a.done && a.started && !startedAfter) { seen.add(a.id); field.push({ ...source, activity: ref, reported: 'not started', schedule: 'in progress', text: `A site capture${where} shows ${label} not started; the schedule shows it in progress. Check the actual start.` }) }
+        else if (!a.started && !a.done) seen.add(a.id)
+      } else if (a.done) seen.add(a.id)
+      else if (!a.started) { seen.add(a.id); field.push({ ...source, activity: ref, reported: o.status === 'complete' ? 'finished' : 'working', schedule: 'not started', text: `A site capture${where} shows ${o.status === 'complete' ? 'finished work' : 'work under way'} on ${label}; the schedule shows it not started. Record the actual start.` }) }
+      else if (o.status === 'complete') { seen.add(a.id); field.push({ ...source, activity: ref, reported: 'finished', schedule: 'in progress', text: `A site capture${where} shows ${label} finished; the schedule shows it in progress. Confirm and record the actual finish.` }) }
+      // Seen under way and under way in the schedule: they agree, and that is the newest word on this activity.
+      else seen.add(a.id)
+    }
+  }
   for (const c of fieldChunks) for (const s of sentences(c.text)) {
     if (NO_WORK.test(s)) continue
     const partial = PARTIAL.test(s) && !/\b100\s?%/.test(s)

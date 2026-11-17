@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ChevronDown, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
+import { AlertTriangle, Camera, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ChevronDown, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
 import { Disclosure } from '@/components/Disclosure'
 import { Alert, postJson, buttonClass } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
@@ -25,10 +25,10 @@ const AUDIENCES: { id: Audience; label: string; hint: string }[] = [
   { id: 'client', label: 'Client', hint: 'Status against the required date' },
 ]
 // The card behind each kind of attention item.
-const ALERT_CARD: Record<string, string> = { deadline: 'driving', overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field' }
+const ALERT_CARD: Record<string, string> = { deadline: 'driving', overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field', site: 'site' }
 // Today is five short parts, not one long page: what to act on now, then the detail behind it, each a tab.
 // A two-word subject in front of each attention item, so the list can be scanned before it is read.
-const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: 'Overdue', contract: 'Contract', field: 'Field report', register: 'Register', signals: 'Reported delays', documents: 'Scope', today: 'Today', lookahead: 'Coming up' }
+const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: 'Overdue', contract: 'Contract', field: 'Field report', register: 'Register', signals: 'Reported delays', documents: 'Scope', today: 'Today', lookahead: 'Coming up', site: 'Site' }
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
 const input = 'border border-warm-300 rounded-lg px-2.5 py-1.5 bg-white text-body text-warm-700'
 const btn = buttonClass.secondary
@@ -65,7 +65,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     if (!sid) return
     const mine = ++seq.current
     setErr('')
-    const q = new URLSearchParams({ asOf })
+    const q = new URLSearchParams({ asOf, tz: String(new Date().getTimezoneOffset()) })
     if (ranWhatIf?.activity) { q.set('whatIfActivity', ranWhatIf.activity); q.set('whatIfDays', ranWhatIf.days) }
     try {
       const [b, r] = await Promise.all([fetch(`/api/schedules/${encodeURIComponent(sid)}/brief?${q}`), fetch(`/api/schedules/${encodeURIComponent(sid)}/register`)])
@@ -127,6 +127,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     today: b.today.starting.length + b.today.finishing.length + b.today.inProgressCount > 0,
     overdue: b.overdue.finishCount + b.overdue.startCount > 0,
     since: b.yesterday.completed.length + b.yesterday.started.length > 0,
+    site: (b.site?.count ?? 0) > 0,
     lookahead: b.lookahead.week.length + b.lookahead.month.length + b.lookahead.becomingCritical.length + b.lookahead.milestones.length > 0,
     risks: b.risks.length > 0, issues: b.issues.length > 0,
     signals: b.signals.length > 0, contract: data.watch.contract.length > 0, field: data.watch.field.length + data.watch.notInSchedule.length > 0,
@@ -162,7 +163,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         )
       })()}
 
-      {(has.today || has.overdue || has.since || has.lookahead) && (
+      {(has.today || has.overdue || has.since || has.site || has.lookahead) && (
         <section aria-label="Today on site" className="space-y-3">
         <h2 className="text-heading font-semibold text-ink pt-1">Today on site</h2>
         <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
@@ -180,6 +181,16 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {has.since && <Card id="since" open={isOpen('since')} onToggle={() => toggle('since')} meta={`${b.yesterday.completed.length} finished · ${b.yesterday.started.length} started`} icon={<CheckCircle2 size={15} />} title={`Since ${fmtDate(b.yesterday.date)}`} sub="Completed and started, from actual dates">
           <List title="Completed" rows={b.yesterday.completed} empty="No actual finishes recorded." plain />
           <List title="Started" rows={b.yesterday.started} empty="No actual starts recorded." plain />
+        </Card>}
+          {has.site && <Card id="site" open={isOpen('site')} onToggle={() => toggle('site')} meta={`${b.site.count} ${b.site.count === 1 ? 'capture' : 'captures'}${b.site.problems ? ` · ${b.site.problems} ${b.site.problems === 1 ? 'problem' : 'problems'}` : ''}`} icon={<Camera size={15} />} title={`Recorded on site since ${fmtDate(b.site.since)}`} sub="What people on site photographed and noted, with the place and the activity.">
+          <ul className="space-y-2">{b.site.observations.map(o => (
+            <li key={o.id} className="text-body text-warm-700">
+              <span className="font-medium text-ink">{o.status === 'issue' ? 'Problem' : o.status === 'complete' ? 'Done' : o.status === 'not_started' ? 'Not started' : 'In progress'}{o.location ? ` · ${o.location}` : ''}</span>
+              {o.text ? <span className="block whitespace-pre-line">{o.text}</span> : <span className="block text-warm-600">{o.photos ? 'Photo, no note.' : 'Voice note.'}</span>}
+              <span className="block text-caption text-warm-600">{o.activities.map(a => `${a.code} ${a.name}`).join('; ')}{o.activities.length ? ' · ' : ''}{o.by}</span>
+            </li>
+          ))}</ul>
+          <Link href={`/dashboard/site?schedule=${encodeURIComponent(sid!)}`} className="inline-block text-body font-semibold text-accent-600 hover:underline">Open the photos on the Site page</Link>
         </Card>}
           {has.lookahead && <Card id="lookahead" open={isOpen('lookahead')} onToggle={() => toggle('lookahead')} meta={`${b.lookahead.week.length} this week · ${b.lookahead.month.length} this month`} icon={<CalendarClock size={15} />} title="At risk in the next week and month" sub="Critical and near-critical work, and float that is running out">
           <List title="Next 7 days" rows={b.lookahead.week} empty="No critical or near-critical work in the next 7 days." showNote />
@@ -352,7 +363,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           </button>
           <button type="button" className={btn} disabled={busy === 'mail'} onClick={async () => {
             setBusy('mail'); setMailed('')
-            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf })
+            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf, tz: new Date().getTimezoneOffset() })
             setBusy(''); setMailed(r.ok ? 'Sent to your email.' : r.data.error || 'The email could not be sent.')
           }}><Mail size={13} className="inline mr-1 -mt-0.5" aria-hidden />{busy === 'mail' ? 'Sending…' : 'Email it to me'}</button>
             </div>

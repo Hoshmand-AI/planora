@@ -15,12 +15,15 @@ import { loadDailyBrief } from '@/lib/server/brief-service'
  * open change items, recent changes with their effect, missing scope and logic findings, the day's
  * what-if runs and signals from correspondence, plus a version for the PM, the field and the client.
  * Calculated (no AI call) on the living schedule: the upload with the edits made in RunF9.
- *   GET ?asOf=YYYY-MM-DD (default today) &whatIfActivity=<activity ID>&whatIfDays=<work days>
+ *   GET ?asOf=YYYY-MM-DD (default today) &tz=<minutes behind UTC> &whatIfActivity=<activity ID>&whatIfDays=<work days>
  */
+/** Minutes the reader's clock is behind UTC (JavaScript's getTimezoneOffset), so "today" on site is the reader's today. */
+const tzOffset = (v: unknown): number => { const n = Number(v); return v !== null && v !== '' && Number.isInteger(n) && n >= -840 && n <= 720 ? n : 0 }
+
 export const GET = api<{ id: string }>({ permission: 'read', apiKey: true }, async (req, { params, auth }) => {
   const sp = req.nextUrl.searchParams
   const act = (sp.get('whatIfActivity') || '').slice(0, 80), days = Number(sp.get('whatIfDays'))
-  const out = await loadDailyBrief(params.id, auth.orgId, { asOf: sp.get('asOf'), whatIf: act && Number.isFinite(days) && days > 0 ? { activity: act, days } : null })
+  const out = await loadDailyBrief(params.id, auth.orgId, { asOf: sp.get('asOf'), tzOffsetMinutes: tzOffset(sp.get('tz')), whatIf: act && Number.isFinite(days) && days > 0 ? { activity: act, days } : null })
   if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const sub = auth.userId ? await getSubscription(auth.orgId, auth.userId, registerKey((await getScheduleById(params.id, auth.orgId))!)) : null
   return NextResponse.json({ ...out, email: { available: emailConfigured(), everyMorning: sub?.audience ?? null } })
@@ -38,7 +41,7 @@ export const POST = api<{ id: string }>({ permission: 'read' }, async (req, { pa
   if (isRestrictedClassification(await scheduleClassification(params.id, auth.orgId))) return NextResponse.json({ error: 'This project is marked CUI or classified, so its brief is not sent by email. Read it here.', code: 'restricted' }, { status: 409 })
   const rl = await hit(`brief-email:${auth.userId}`, 12, 60 * 60)
   if (!rl.ok) throw new ApiError(429, 'Too many briefs emailed this hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
-  const out = await loadDailyBrief(params.id, auth.orgId, { asOf: typeof b.asOf === 'string' ? b.asOf : null })
+  const out = await loadDailyBrief(params.id, auth.orgId, { asOf: typeof b.asOf === 'string' ? b.asOf : null, tzOffsetMinutes: tzOffset(b.tz) })
   if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const r = await sendEmail({ to: auth.email, subject: briefEmailSubject(out), text: briefEmailText(out, audience, appOrigin(req)) })
   if (!r.sent) return NextResponse.json({ error: 'The email could not be sent. Try again, or use "Copy to send".', code: 'email_failed' }, { status: 502 })

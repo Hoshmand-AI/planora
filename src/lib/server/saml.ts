@@ -426,7 +426,7 @@ function attrValues(profile: Profile, names: string[]): string[] {
   return []
 }
 
-const ROLE_RANK: Role[] = ['admin', 'scheduler', 'reviewer', 'viewer']
+const ROLE_RANK: Role[] = ['admin', 'scheduler', 'reviewer', 'field', 'viewer']
 /** The most privileged role any of the member's groups maps to, or null if none match. */
 export function roleForGroups(groups: string[], mapping: GroupRole[]): Role | null {
   const set = new Set(groups.map(g => g.toLowerCase()))

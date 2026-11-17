@@ -176,7 +176,7 @@ export function EnterpriseIdentity({ roles, hideUnavailable = false }: { roles: 
               <Field label="Groups attribute" hint="Blank: groups, memberOf or the standard claim.">{p => <input {...p} className={inputClass} value={form.groups} onChange={e => setForm({ ...form, groups: e.target.value })} />}</Field>
               <Field label="Role for new members">{p => <select {...p} className={inputClass} value={form.defaultRole} onChange={e => setForm({ ...form, defaultRole: e.target.value })}>{assignable.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select>}</Field>
             </div>
-            <Field label="Group to role mapping" hint="One per line: IdP group = role (admin, scheduler, reviewer or viewer). Applied at every sign-in; owners are never changed.">{p => (
+            <Field label="Group to role mapping" hint="One per line: IdP group = role (admin, scheduler, reviewer, field or viewer). Applied at every sign-in; owners are never changed.">{p => (
               <textarea {...p} rows={3} className={`${inputClass} font-mono text-caption`} placeholder="RunF9 Admins = admin" value={form.groupRoles} onChange={e => setForm({ ...form, groupRoles: e.target.value })} />
             )}</Field>
             {(saml.saml.verification || help) && (

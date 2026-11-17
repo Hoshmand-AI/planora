@@ -911,6 +911,61 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS project_mailboxes_project_idx ON project_mailboxes(org_id, project_key);
     `,
   },
+  {
+    id: 27, name: 'site_captures',
+    sql: `
+    -- Site captures: what someone saw on site. A photo, a spoken note and a few words, stamped with who,
+    -- when and where (the phone's position with its own accuracy, a level, a room) and tied to schedule
+    -- activities by their IDs. Filed under the project (its update series inside its workspace, like the
+    -- register), so a capture carries across uploads. Additive: older code ignores both tables.
+    CREATE TABLE IF NOT EXISTS site_captures (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      schedule_id TEXT,
+      status TEXT NOT NULL CHECK (status IN ('progress', 'complete', 'not_started', 'issue')),
+      note TEXT NOT NULL DEFAULT '',
+      activity_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      level TEXT,
+      room TEXT,
+      place_source TEXT NOT NULL DEFAULT 'none' CHECK (place_source IN ('none', 'picked', 'code', 'position')),
+      lat DOUBLE PRECISION,
+      lng DOUBLE PRECISION,
+      accuracy_m REAL,
+      altitude_m REAL,
+      heading_deg REAL,
+      taken_at TIMESTAMPTZ NOT NULL,
+      classification TEXT,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at TIMESTAMPTZ,
+      -- The id the phone gave the capture before sending it: a retry of the same capture is recognised by it.
+      client_id TEXT,
+      UNIQUE (id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS site_captures_project_idx ON site_captures(org_id, project_key, taken_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS site_captures_client_idx ON site_captures(org_id, project_key, client_id) WHERE client_id IS NOT NULL;
+    -- The photos and the voice note of a capture, kept as bytes (a photo is resized on the phone before
+    -- it is sent). They belong to their capture: deleting it deletes them.
+    CREATE TABLE IF NOT EXISTS site_capture_media (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      capture_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('photo', 'audio')),
+      content_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      seconds REAL,
+      content BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      FOREIGN KEY (capture_id, org_id) REFERENCES site_captures(id, org_id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS site_capture_media_capture_idx ON site_capture_media(org_id, capture_id);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

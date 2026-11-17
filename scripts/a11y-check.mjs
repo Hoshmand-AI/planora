@@ -67,6 +67,7 @@ const PAGES = [
   // With an uploaded schedule: Home lists both projects (cards, then the table view) and the project page opens.
   ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
   ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
+  ['Project site captures', '/dashboard/site', async () => { await page.getByRole('heading', { name: /Site captures/ }).waitFor() }],
   ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]:visible'); await page.waitForSelector('text=What is driving the project') }],
   ['Old Today link (lands on Overview)', '/dashboard/today', async () => { await page.locator('#finish-h').waitFor() }],
   ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
