@@ -147,14 +147,12 @@ export function ProjectsDashboard() {
     router.push(r.href)
   }
   const togglePin = (r: PortfolioRow) => setPins(pins.includes(key(r)) ? pins.filter(k => k !== key(r)) : [...pins, key(r)])
-  const first = (user?.name || '').trim().split(/\s+/)[0]
 
   if (error) return <div className="px-5 md:px-6 py-8"><p role="alert" className="text-[14px] text-status-at-risk">{error}</p></div>
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-[13px] font-medium text-warm-600">{first ? `Hi ${first}` : 'Welcome'}</p>
         <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
@@ -299,10 +297,10 @@ export function ProjectsDashboard() {
         </div>
       ) : view === 'table' || !viewLoaded ? (
         view === 'table' ? <ProjectTable rows={shown} onOpen={open} pins={pins} onPin={togglePin} col={col} setCol={setCol} /> : null
-      ) : grouped ? (
+      ) : grouped && rows.length >= 4 ? (
         <div className="space-y-8">
           {pinned.length > 0 && <Group title="Pinned" rows={pinned} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
-          {urgent.length > 0 && <Group title="Act on these first" note={`${urgent.length} ${urgent.length === 1 ? 'project' : 'projects'}, most urgent first`} rows={urgent} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
+          {urgent.length > 0 && <Group title="Act on these first" rows={urgent} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
           {rest.length > 0 && <Group title={urgent.length || pinned.length ? 'Everything else' : 'All projects'} rows={rest} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
         </div>
       ) : (
@@ -411,7 +409,6 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
         </div>
         <div className={wide ? 'lg:flex-1 lg:min-w-0' : ''}>
         <div className={`mt-3 ${wide ? 'lg:mt-0' : ''}`}><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
-        {why && <p className="mt-2 text-[12px] leading-snug text-warm-700 line-clamp-2" title={why}>{why}</p>}
         </div>
         {draft ? (
           <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>

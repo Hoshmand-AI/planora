@@ -157,8 +157,8 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
 
       {(has.today || has.overdue || has.since || has.lookahead) && (
         <section aria-label="Today on site" className="space-y-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">Today on site</h2>
-        <div className="grid md:grid-cols-2 gap-3 items-start">
+        <h2 className="text-[14px] font-semibold text-ink pt-1">Today on site</h2>
+        <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           {has.today && <Card id="today" open={isOpen('today')} onToggle={() => toggle('today')} meta={`${b.today.starting.length} to start · ${b.today.finishing.length} to finish · ${b.today.inProgressCount} under way`} icon={<CalendarCheck size={15} />} title="Today" sub="What the schedule says happens today">
           <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
           <List title="Finishes today" rows={b.today.finishing} empty="Nothing is scheduled to finish." action={canWrite ? r => <RowBtn busy={busy === r.id + 'finish'} disabled={!!busy} onClick={() => progress(r, 'finish')} label="Mark finished" /> : undefined} />
@@ -185,8 +185,8 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
       )}
 
       <section aria-label="What moves the finish" className="space-y-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">What moves the finish</h2>
-        <div className="grid md:grid-cols-2 gap-3 items-start">
+        <h2 className="text-[14px] font-semibold text-ink pt-1">What moves the finish</h2>
+        <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           <Card id="driving" open={isOpen('driving')} onToggle={() => toggle('driving')} meta={b.driving.today ? b.driving.today.code : 'No driving path'} icon={<Route size={15} />} title="What is driving the project" sub="The open activities that set the finish date, in order">
           {b.driving.today ? <p className="text-[14px] text-ink"><strong>Driving today:</strong> {b.driving.today.code} {b.driving.today.name}{b.driving.today.date ? `, finish ${fmtDate(b.driving.today.date)}` : ''}</p> : <p className="text-[13px] text-warm-600">No driving path: the schedule has no logic RunF9 can calculate.</p>}
           {b.driving.path.length > 1 && <ol className="list-decimal pl-5 text-[13px] text-warm-700 space-y-0.5">{b.driving.path.map(r => <li key={r.id}>{r.code} {r.name}{r.date ? ` · ${fmtDate(r.date)}` : ''}</li>)}</ol>}
@@ -222,8 +222,8 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
 
       {(has.signals || has.contract || has.field) ? (
       <section aria-label="From the project records" className="space-y-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">From the project records</h2>
-        <div className="grid md:grid-cols-2 gap-3 items-start">
+        <h2 className="text-[14px] font-semibold text-ink pt-1">From the project records</h2>
+        <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           {has.signals && <Card id="signals" open={isOpen('signals')} onToggle={() => toggle('signals')} meta={count(b.signals.length, 'sentence')} icon={<Mail size={15} />} title="From emails, meetings and field reports" sub="Sentences in this project’s correspondence that affect the schedule, quoted with their source">
         {b.signals.length === 0 ? (
           <p className="text-[13px] text-warm-600">Nothing yet. Add emails, meeting minutes or transcripts and daily field reports under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link> (type “Email / letter”, “Meeting minutes / transcript” or “Daily field report”); RunF9 reads them for delays, changes, risks and commitments and ties them to activities.</p>
@@ -281,12 +281,19 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         </div>
       </section>
       ) : (
-        <p className="text-[13px] text-warm-600">Nothing from the project records yet. Add emails, meeting minutes, daily field reports and the contract under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link>; RunF9 reads them for delays, changes, notice periods and work on site that the schedule does not show.</p>
+        <section aria-label="From the project records" className="space-y-3">
+          <h2 className="text-[14px] font-semibold text-ink pt-1">From the project records</h2>
+          <Link href="/dashboard/documents?add=1" className="flex items-center gap-3 rounded-[14px] border border-warm-200 bg-white px-4 md:px-5 py-2.5 min-h-[48px] hover:bg-warm-50">
+            <span aria-hidden className="inline-flex flex-shrink-0 items-center justify-center w-5 text-warm-600"><Mail size={15} /></span>
+            <span className="flex-1 min-w-0 text-[14px] font-medium text-ink">No records yet</span>
+            <span className="text-[13px] font-semibold text-accent-600">Add emails, minutes or the contract</span>
+          </Link>
+        </section>
       )}
 
       <section aria-label="Register and changes" className="space-y-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-600 pt-1">Register and changes</h2>
-        <div className="grid md:grid-cols-2 gap-3 items-start">
+        <h2 className="text-[14px] font-semibold text-ink pt-1">Register and changes</h2>
+        <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           <Card id="register" open={isOpen('register')} onToggle={() => toggle('register')} meta={`${openItems.length} open`} icon={<Flag size={15} />} title="Register: risks, issues and changes">
             <Register sid={sid!} items={items} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
           </Card>
@@ -321,7 +328,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {has.logic && <Card id="logic" open={isOpen('logic')} onToggle={() => toggle('logic')} meta={count(b.logic.length, 'link')} icon={<GitBranch size={15} />} title="Logic that does not make sense" sub="Links that run against the usual order of work">
           {b.logic.length === 0 ? <p className="text-[13px] text-warm-600">No link runs against the usual order of work.</p> : <ul className="space-y-1.5">{b.logic.map((p, i) => <li key={i} className="text-[13px] text-warm-700"><span className="font-medium text-ink">{p.text}</span><span className="block text-[12px] text-warm-600">{p.reason}</span></li>)}</ul>}
         </Card>}
-          <Card id="brief" open={isOpen('brief')} onToggle={() => toggle('brief')} meta={`${audienceLabel} version`} icon={<Mail size={15} />} title="Daily brief to send" sub="The same facts, written for the reader you choose">
+          <Card id="brief" open={isOpen('brief')} onToggle={() => toggle('brief')} meta={`${audienceLabel} version`} icon={<Mail size={15} />} title="Daily brief to send" sub="The same facts, written for the reader you choose. Calculated from the schedule, the register and the records of this project; no AI model writes it, so every line traces to an activity, an item or a quoted passage.">
             <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
               <label className="text-[12px] text-warm-600"><span>Written for</span>
                 <select value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} block mt-0.5 min-h-[36px]`}>
@@ -364,7 +371,6 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         </div>
       </section>
 
-      <p className="text-[12px] text-warm-600">This brief is calculated from the schedule, the register and the documents of this project. No AI model writes it, so every line traces to an activity, an item or a quoted passage.</p>
     </div>
   )
 }
@@ -372,13 +378,13 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
 
 function Card({ id, icon, title, sub, meta, open, onToggle, children }: { id: string; icon: React.ReactNode; title: string; sub?: string; meta?: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <section id={`card-${id}`} className="rounded-[14px] border border-warm-200 bg-white min-w-0 scroll-mt-32">
+    <section id={`card-${id}`} className="min-w-0 scroll-mt-32 first:rounded-t-[14px] last:rounded-b-[14px]">
       <h3>
-        <button type="button" aria-expanded={open} aria-controls={`card-${id}-body`} onClick={onToggle} className="w-full flex items-center gap-2.5 text-left px-4 md:px-5 py-3 min-h-[56px] rounded-[14px] hover:bg-warm-50">
-          <span aria-hidden className="inline-flex flex-shrink-0 items-center justify-center w-7 h-7 rounded-lg bg-accent-100 text-accent-600">{icon}</span>
-          <span className="flex-1 min-w-0 text-[14px] font-semibold text-ink">{title}</span>
-          {meta && <span className="text-[13px] text-warm-700 tabular-nums text-right">{meta}</span>}
-          <ChevronDown size={17} aria-hidden className={`flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <button type="button" aria-expanded={open} aria-controls={`card-${id}-body`} onClick={onToggle} className="w-full flex items-center gap-3 text-left px-4 md:px-5 py-2.5 min-h-[48px] rounded-[inherit] hover:bg-warm-50 focus-visible:[outline-offset:-2px]">
+          <span aria-hidden className="inline-flex flex-shrink-0 items-center justify-center w-5 text-warm-600">{icon}</span>
+          <span className="flex-1 min-w-0 text-[14px] font-medium text-ink">{title}</span>
+          {meta && <span className="text-[13px] text-warm-600 tabular-nums text-right">{meta}</span>}
+          <ChevronDown size={16} aria-hidden className={`flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       </h3>
       {open && (

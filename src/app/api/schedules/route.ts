@@ -104,7 +104,12 @@ export const GET = api({ permission: 'read', apiKey: true }, async (req, { auth:
         // For the overview's timeline ribbon: first start, the required finish (if any) and the finish milestone's baseline.
         projectStart: activities.map(a => a.actualStart || a.earlyStart).filter((d): d is string => !!d).sort()[0] ?? null,
         mustFinishBy: analysis.mustFinishBy ?? null,
-        baselineFinish: analysis.varianceDays != null && analysis.forecastFinish ? (analysis.finishMilestone?.baselineFinish ?? addDaysIso(analysis.forecastFinish, -analysis.varianceDays)) : null,
+        // The baseline the overview compares its forecast with. Variance is measured on the finish (contract) milestone; when that
+        // milestone is not the last activity, its baseline date is not comparable with the project's forecast finish, so the
+        // baseline is the forecast less the variance: the headline and the variance tile then always say the same number of days.
+        baselineFinish: analysis.varianceDays != null && analysis.forecastFinish
+          ? ((!analysis.finishMilestone?.forecastFinish || analysis.finishMilestone.forecastFinish.slice(0, 10) === analysis.forecastFinish.slice(0, 10) ? analysis.finishMilestone?.baselineFinish : null) ?? addDaysIso(analysis.forecastFinish, -analysis.varianceDays))
+          : null,
         status: analysis.status,
         statusReasons: analysis.statusReasons,
         minFloat: analysis.minFloat,

@@ -44,7 +44,7 @@ export function UpdatesAndDelays() {
       </Reveal>
       <div className="grid md:grid-cols-2 gap-5 mt-12">
         {CARDS.map(({ id, icon: Icon, title, lead, points, foot }, i) => (
-          <Reveal key={id} delay={i * 90} className="rounded-[22px] border border-warm-200 bg-white p-6 md:p-8 shadow-[0_1px_2px_rgb(6_20_27/0.06),0_14px_32px_-24px_rgb(6_20_27/0.16)]">
+          <Reveal key={id} delay={i * 90} className="rounded-[22px] border border-warm-200 bg-white p-6 md:p-8 shadow-[0_1px_2px_rgb(29_33_37/0.06),0_14px_32px_-24px_rgb(29_33_37/0.16)]">
             <div id={`updates-${id}`} className="flex items-center gap-3">
               <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent-100 text-accent-700"><Icon size={20} aria-hidden /></span>
               <h3 className="text-[20px] font-semibold text-ink tracking-[-0.01em]">{title}</h3>

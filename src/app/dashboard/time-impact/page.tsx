@@ -135,9 +135,9 @@ export default function TimeImpactPage() {
       {err && <Alert tone="error">{err}</Alert>}
 
       <div className="grid md:grid-cols-[260px_1fr] gap-5 items-start">
-        <section aria-labelledby="events-h" className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-3">
+        <section aria-labelledby="events-h" className="bg-white border border-warm-200 rounded-[14px] p-4 space-y-3">
           <h2 id="events-h" className="text-[14px] font-semibold text-ink">Delay events</h2>
-          {data.events.length === 0 ? <p className="text-[13px] text-warm-600">No delay event has been entered here yet. Delays mentioned in emails, minutes and field reports are listed on Today; enter one here to measure its effect on the finish.</p> : (
+          {data.events.length === 0 ? <p className="text-[13px] text-warm-600">None yet.</p> : (
             <ul className="space-y-1">
               {data.events.map(e => (
                 <li key={e.id}>
@@ -151,18 +151,16 @@ export default function TimeImpactPage() {
             </ul>
           )}
           {canWrite && (
-            <form onSubmit={create} className="space-y-2 pt-2 border-t border-warm-200">
+            <form onSubmit={create} className={`space-y-2 ${data.events.length ? 'pt-2 border-t border-warm-200' : ''}`}>
               <label htmlFor="new-ev" className="block text-[12px] font-semibold text-warm-700">New delay event</label>
               <input id="new-ev" className={`${input} w-full`} value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Differing site condition" maxLength={200} />
               <button type="submit" className={primary} disabled={busy || newTitle.trim().length < 3}>Add event</button>
             </form>
           )}
-          {canWrite && (
+          {canWrite && docs !== null && docs.length > 0 && (
             <div className="space-y-2 pt-3 border-t border-warm-200">
               <label htmlFor="draft-doc" className="block text-[12px] font-semibold text-warm-700">Draft from a change document</label>
-              {docs === null ? <p className="text-[12px] text-warm-600">Loading documents…</p> : docs.length === 0 ? (
-                <p className="text-[12px] text-warm-600">Add the change order or RFI on the <Link href="/dashboard/documents" className="underline">Project records</Link> page first.</p>
-              ) : (
+              {(
                 <>
                   <select id="draft-doc" className={`${input} w-full`} value={docId} onChange={e => setDocId(e.target.value)}>
                     <option value="">Choose a document…</option>
@@ -181,21 +179,19 @@ export default function TimeImpactPage() {
         {draft ? <DraftReview draft={draft} busy={busy} onCreate={createFromDraft} onDiscard={() => setDraft(null)} />
           : event ? <EventPanel key={event.id} scheduleId={data.schedule.id} event={event} overview={data} canWrite={canWrite} canAi={can('ai.use') && !aiOff} onChanged={load} />
           : (
-            /* The empty pane says what happens here, in three steps, and what a fragnet is. */
+            /* The empty pane says what happens here, in three short steps. */
             <div className="rounded-[14px] border border-warm-200 bg-white p-5">
-              <h3 className="text-[14px] font-semibold text-ink">Measure what a delay does to the finish</h3>
-              <ol className="mt-3 grid gap-3 sm:grid-cols-3 text-[13px] text-warm-700">
-                {[['1', 'Name the event', 'A late delivery, a change order, a stop-work: give it a name and the date it began.'],
-                  ['2', 'Describe the added work', 'The few activities and links the event adds to the schedule. Schedulers call this a fragnet.'],
-                  ['3', 'Run the analysis', 'RunF9 inserts it at the data date, recalculates, and shows each milestone before and after.']].map(([n, t, d]) => (
-                  <li key={n} className="rounded-xl bg-warm-100 px-3 py-2.5">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-navy-900 text-white text-[12px] font-semibold">{n}</span>
-                    <span className="block mt-1.5 font-semibold text-ink">{t}</span>
-                    <span className="block text-warm-700">{d}</span>
+              <h3 className="text-[16px] font-semibold text-ink">Measure what a delay does to the finish</h3>
+              <ol className="mt-3 space-y-2 text-[13px] text-warm-700 max-w-2xl">
+                {[['Name the event', 'a late delivery, a change order, a stop-work.'],
+                  ['Describe the added work', <>the few activities and links it adds (a fragnet). With a change order under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link>, RunF9 drafts it.</>],
+                  ['Run the analysis', 'each milestone is shown before and after.']].map(([t, d], n) => (
+                  <li key={n} className="flex gap-3">
+                    <span aria-hidden="true" className="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full border border-warm-300 text-[12px] font-semibold text-ink">{n + 1}</span>
+                    <span><span className="font-semibold text-ink">{t}: </span>{d}</span>
                   </li>
                 ))}
               </ol>
-              <p className="mt-3 text-[13px] text-warm-600">{canWrite ? 'Add an event on the left to start.' : 'Select an event on the left to see its analysis.'}</p>
             </div>
           )}
       </div>

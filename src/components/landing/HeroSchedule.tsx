@@ -64,7 +64,7 @@ export default function HeroSchedule() {
   ]
 
   return (
-    <div className="rounded-[20px] md:rounded-[26px] border border-warm-200 bg-white shadow-[0_50px_100px_-45px_rgba(6,20,27,0.5)] overflow-hidden text-left">
+    <div className="rounded-[20px] md:rounded-[26px] border border-warm-200 bg-white shadow-[0_50px_100px_-45px_rgba(29,33,37,0.5)] overflow-hidden text-left">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px]">
         {/* The schedule */}
         <figure className="p-5 md:p-8 min-w-0">

@@ -191,7 +191,7 @@ button:not([data-compact]), [role='tab']:not([data-compact]), summary:not([data-
 }
 
 /* Frosted app bar: the page scrolls softly beneath it */
-.glass-bar { background: rgb(17 33 45 / 0.86); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); }
+.glass-bar { background: rgb(12 35 64 / 0.92); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); }
 /* People who ask for less transparency or more contrast get a solid bar */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .glass-bar { background: var(--navy-950); -webkit-backdrop-filter: none; backdrop-filter: none; }

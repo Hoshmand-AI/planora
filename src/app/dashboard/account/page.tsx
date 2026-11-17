@@ -51,6 +51,8 @@ function AccountPage() {
 
   const [name, setName] = useState('')
   const [pw, setPw] = useState({ current: '', next: '', code: '' })
+  // Forms that are rarely used open on request: the page is a list of settings, not a stack of open forms.
+  const [openForm, setOpenForm] = useState<'password' | 'delete' | null>(null)
   const [enroll, setEnroll] = useState<{ secret: string; uri: string; qrSvg: string } | null>(null)
   const [enrollCode, setEnrollCode] = useState('')
   const [codes, setCodes] = useState<string[] | null>(null)
@@ -178,16 +180,16 @@ function AccountPage() {
 
       <Section title="Password" description="Changing your password signs you out on every other device.">
         {note('password')}
-        <form className="grid sm:grid-cols-2 gap-3" onSubmit={async e => {
+        {openForm !== 'password' ? <Button variant="secondary" onClick={() => setOpenForm('password')}>Change password</Button> : <form className="grid sm:grid-cols-2 gap-3" onSubmit={async e => {
           e.preventDefault()
           const d = await act('password', { action: 'change_password', currentPassword: pw.current, newPassword: pw.next, code: pw.code }, 'Password changed.')
-          if (d) { setPw({ current: '', next: '', code: '' }); load() }
+          if (d) { setPw({ current: '', next: '', code: '' }); setOpenForm(null); load() }
         }}>
           <Field label="Current password">{p => <input {...p} type="password" required autoComplete="current-password" className={inputClass} value={pw.current} onChange={e => setPw({ ...pw, current: e.target.value })} />}</Field>
           <Field label="New password" hint="At least 12 characters; a phrase of a few unrelated words works well.">{p => <input {...p} type="password" required minLength={12} autoComplete="new-password" className={inputClass} value={pw.next} onChange={e => setPw({ ...pw, next: e.target.value })} />}</Field>
           {data.mfa.enabled && <Field label="Authenticator code">{p => <input {...p} inputMode="numeric" autoComplete="one-time-code" className={inputClass} value={pw.code} onChange={e => setPw({ ...pw, code: e.target.value })} />}</Field>}
-          <div className="sm:col-span-2"><Button type="submit" disabled={busy === 'password'}>Change password</Button></div>
-        </form>
+          <div className="sm:col-span-2 flex gap-2"><Button type="submit" disabled={busy === 'password'}>Change password</Button><Button type="button" variant="secondary" onClick={() => setOpenForm(null)}>Cancel</Button></div>
+        </form>}
       </Section>
 
       <Section title="Where you're signed in" description={`Sessions end after ${data.sessionIdleHours} hours without activity, or after 7 days.`}>
@@ -219,7 +221,7 @@ function AccountPage() {
 
       <Section title="Delete account" tone="danger" description="Permanently deletes your account, sessions and Ask AI history. Your projects stay with your organization and are reassigned to its owner. If you're the last member, the whole organization and all its data are deleted.">
         {note('delete')}
-        <form className="grid sm:grid-cols-2 gap-3" onSubmit={async e => {
+        {openForm !== 'delete' ? <Button variant="secondary" className="text-status-at-risk" onClick={() => setOpenForm('delete')}>Delete my account…</Button> : <form className="grid sm:grid-cols-2 gap-3" onSubmit={async e => {
           e.preventDefault()
           if (!confirm('Delete your account permanently? This cannot be undone.')) return
           const d = await act('delete', { action: 'delete_account', currentPassword: del.password, code: del.code, confirm: del.confirm })
@@ -228,8 +230,8 @@ function AccountPage() {
           <Field label="Type your email address to confirm">{p => <input {...p} required placeholder={data.user.email} className={inputClass} value={del.confirm} onChange={e => setDel({ ...del, confirm: e.target.value })} />}</Field>
           <Field label="Password">{p => <input {...p} type="password" required autoComplete="current-password" className={inputClass} value={del.password} onChange={e => setDel({ ...del, password: e.target.value })} />}</Field>
           {data.mfa.enabled && <Field label="Authenticator code">{p => <input {...p} inputMode="numeric" className={inputClass} value={del.code} onChange={e => setDel({ ...del, code: e.target.value })} />}</Field>}
-          <div className="sm:col-span-2"><Button type="submit" variant="danger" disabled={busy === 'delete' || del.confirm !== data.user.email}>Delete my account</Button></div>
-        </form>
+          <div className="sm:col-span-2 flex gap-2"><Button type="submit" variant="danger" disabled={busy === 'delete' || del.confirm !== data.user.email}>Delete my account</Button><Button type="button" variant="secondary" onClick={() => setOpenForm(null)}>Cancel</Button></div>
+        </form>}
       </Section>
     </div>
   )

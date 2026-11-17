@@ -171,8 +171,10 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
           </div>
           {ad.baselineFinish && (
             <div className="text-[13px] text-warm-600 mt-2">
-              Forecast finish <span className="font-semibold text-ink tabular-nums">{fmtDate(ad.baselineFinish)}</span>
-              {ad.finishUncertaintyDays > 0 && !settled && <span className="text-warm-500"> · could still move about ±{ad.finishUncertaintyDays} days</span>}
+              {hasSchedule
+                ? (ad.finishUncertaintyDays > 0 && !settled ? <>The finish could still move about ±{ad.finishUncertaintyDays} days</> : <>The open questions can&apos;t move the finish much</>)
+                : <>Forecast finish <span className="font-semibold text-ink tabular-nums">{fmtDate(ad.baselineFinish)}</span>
+                  {ad.finishUncertaintyDays > 0 && !settled && <span className="text-warm-500"> · could still move about ±{ad.finishUncertaintyDays} days</span>}</>}
             </div>
           )}
         </div>
@@ -232,7 +234,7 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
   })
 
   return (
-    <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-12px_rgba(29,33,37,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13px] text-ink">{insight?.swingDays ? 'This one matters: it can move your finish.' : 'Next question — quick one.'}</div>
         <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-warm-500 mt-0.5">
@@ -335,7 +337,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
     if (Object.keys(out).length) onSave(out)
   }
   return (
-    <div className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-12px_rgba(6,20,27,0.12)] px-6 py-6 md:px-8 md:py-7">
+    <div className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-12px_rgba(29,33,37,0.12)] px-6 py-6 md:px-8 md:py-7">
       <Interviewer>
         <div className="text-[13px] text-ink">A few that go together — answer the ones you know.</div>
         <div className="text-[12px] text-warm-500 mt-0.5">{group.label} · together they move the finish up to <span className="font-semibold text-ink tabular-nums">{group.swingDays} days</span></div>
