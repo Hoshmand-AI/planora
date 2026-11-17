@@ -346,6 +346,13 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
   const draft = r.source === 'built' && r.status === 'not_started'
   const pct = r.percentComplete == null || draft ? null : Math.max(0, Math.min(100, Math.round(r.percentComplete)))
   const why = needsYou(r) ? reason(r) : null
+  // A forecast finish that is already behind us, on work that is not complete, is not a forecast: say how long ago it was.
+  const pastDays = (() => {
+    if (draft || !r.finish || r.status === 'complete' || (pct != null && pct >= 100)) return null
+    const [y, m, d] = r.finish.slice(0, 10).split('-').map(Number), now = new Date()
+    const n = Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(y, m - 1, d)) / 86_400_000)
+    return n > 0 ? n : null
+  })()
   return (
     <li className="rise-in" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
       <div className={`card-lift group relative h-full rounded-[14px] border border-warm-200 bg-white p-5 flex flex-col hover:border-warm-300 ${wide ? 'lg:flex-row lg:items-center lg:gap-10 lg:px-7 lg:py-6' : ''}`}>
@@ -374,6 +381,7 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
             <div className="flex flex-wrap items-baseline gap-x-2.5 mt-0.5">
               <span className="text-[22px] font-semibold tracking-[-0.02em] text-navy-950 tabular-nums">{fmtDate(r.finish)}</span>
               {v && <span className={`text-[13px] font-semibold ${v.cls}`}>{v.text}</span>}
+              {!v && pastDays != null && <span className="text-[13px] font-semibold text-status-at-risk">{pastDays} {pastDays === 1 ? 'day' : 'days'} ago, not finished</span>}
             </div>
           </div>
         )}

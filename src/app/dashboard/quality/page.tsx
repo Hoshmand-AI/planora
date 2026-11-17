@@ -225,7 +225,7 @@ export default function QualityPage() {
               <button type="button" aria-expanded={allChecks} onClick={() => setAllChecks(v => !v)} className="ml-auto text-[13px] font-semibold text-accent-600 hover:underline">{allChecks ? 'Show only the ones that need work' : `Show all ${data.dcma.checks.length} checks`}</button>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          <div className={`grid grid-cols-2 gap-2.5 ${showAllChecks ? 'sm:grid-cols-4 lg:grid-cols-7' : 'sm:grid-cols-3 lg:grid-cols-5'}`}>
             {data.dcma.checks.filter(c => showAllChecks || needWork.includes(c) || c.id === selected).map((c, i) => (
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}

@@ -79,7 +79,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero: one large statement on the left, the reason and one action on the right, then the product itself */}
-      <header className="relative pt-10 md:pt-16 pb-20 md:pb-28 overflow-hidden">
+      <header className="relative pt-8 md:pt-10 pb-20 md:pb-28 overflow-hidden">
         {/* A soft wash of the accent behind the headline; decorative */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[720px] bg-[radial-gradient(ellipse_60%_55%_at_20%_0%,rgba(37,99,235,0.10),transparent_70%)]" />
         <div className="relative max-w-[1240px] mx-auto px-6">
@@ -87,7 +87,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             {inviteOnly ? 'Construction schedule analysis · private beta, by invitation' : 'Construction schedule analysis'}
           </p>
           <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-x-16 gap-y-8 lg:items-end">
-            <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[76px] xl:text-[92px] xl:leading-[0.98] font-bold tracking-[-0.05em] text-navy-950">
+            <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[72px] xl:text-[84px] xl:leading-[0.98] font-bold tracking-[-0.05em] text-navy-950">
               Construction schedules, calculated and explained.
             </h1>
             <div className="hero-rise [animation-delay:140ms] lg:pb-3">
@@ -102,7 +102,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </div>
           </div>
         </div>
-        <div className="relative hero-rise [animation-delay:320ms] max-w-[1240px] mx-auto px-6 mt-12 md:mt-16">
+        <div className="relative hero-rise [animation-delay:320ms] max-w-[1240px] mx-auto px-6 mt-10 md:mt-12">
           <HeroSchedule />
         </div>
       </header>
