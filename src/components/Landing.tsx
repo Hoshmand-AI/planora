@@ -34,6 +34,14 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
     return () => window.removeEventListener('keydown', onKey)
   }, [menuOpen])
   const [scrolled, setScrolled] = useState(false)
+  // The evidence list is folded under the numbers; a link to #evidence from anywhere on the page opens it.
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  useEffect(() => {
+    const sync = () => { if (window.location.hash === '#evidence') setEvidenceOpen(true) }
+    sync()
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
   // Request access: email the beta team (RUNF9_ACCESS_REQUEST_EMAIL, else the support address this page
   // already lists). Never the sign-up page: without an invitation it is a dead end for a prospect.
   const requestHref = `mailto:${accessRequestEmail || 'support@hoshmand.ai'}?subject=${encodeURIComponent('RunF9 private beta: access request')}`
@@ -86,19 +94,19 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           <p className="hero-rise text-[15px] md:text-[17px] font-medium text-warm-700 tracking-[-0.01em] mb-3 md:mb-4">
             {inviteOnly ? 'Construction schedule analysis · private beta, by invitation' : 'Construction schedule analysis'}
           </p>
-          <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-x-16 gap-y-8 lg:items-end">
-            <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[72px] xl:text-[84px] xl:leading-[0.98] font-bold tracking-[-0.05em] text-navy-950">
-              Construction schedules, calculated and explained.
-            </h1>
-            <div className="hero-rise [animation-delay:140ms] lg:pb-3">
+          <h1 className="hero-rise text-[44px] leading-[1.02] sm:text-[60px] md:text-[72px] xl:text-[84px] xl:leading-[1] font-bold tracking-[-0.05em] text-navy-950 max-w-[1150px]">
+            Construction schedules, calculated and explained.
+          </h1>
+          <div className="hero-rise [animation-delay:140ms] mt-7 md:mt-9 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-x-16 gap-y-7">
+            <div>
               <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-600 mb-5" />
-              <p className="text-[18px] md:text-[20px] leading-[1.45] text-warm-700 tracking-[-0.01em] max-w-[520px]">
+              <p className="text-[18px] md:text-[20px] leading-[1.45] text-warm-700 tracking-[-0.01em] max-w-[640px]">
                 Upload a P6 or MS Project schedule, or build one from a short interview. RunF9 checks it, compares every update, models delays and briefs your team every morning.
               </p>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-7">
-                <Cta href={primaryHref} className={`${primaryBtn} gap-2 px-8 py-4 text-[17px] shadow-[0_14px_30px_-14px_rgba(37,99,235,0.7)]`}>{primaryLabel}<ArrowRight size={18} aria-hidden /></Cta>
-                <a href="#today" className="pressable text-[16px] font-semibold text-navy-950 underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
-              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:pb-1 flex-shrink-0">
+              <Cta href={primaryHref} className={`${primaryBtn} gap-2 px-8 py-4 text-[17px] shadow-[0_14px_30px_-14px_rgba(37,99,235,0.7)]`}>{primaryLabel}<ArrowRight size={18} aria-hidden /></Cta>
+              <a href="#today" className="pressable text-[16px] font-semibold text-navy-950 underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
             </div>
           </div>
         </div>
@@ -122,7 +130,36 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             </Reveal>
           ))}
         </div>
-        <div className="text-center pb-10 -mt-4"><a href="#evidence" className="text-[15px] font-medium text-accent-700 underline underline-offset-4">Where these numbers come from</a></div>
+        {/* How each figure can be checked: folded under the figures it explains (it was a section of its own near the foot of the page). */}
+        <div id="evidence" className="max-w-[860px] mx-auto px-6 pb-10 -mt-4 scroll-mt-24">
+          <div className="text-center">
+            <button type="button" aria-expanded={evidenceOpen} aria-controls="evidence-panel" onClick={() => setEvidenceOpen(v => !v)}
+              className="pressable inline-flex items-center gap-1.5 text-[15px] font-medium text-accent-700 underline underline-offset-4">
+              Where these numbers come from<ChevronDown size={16} aria-hidden className={`transition-transform duration-300 ${evidenceOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+          <div id="evidence-panel" hidden={!evidenceOpen} className="mt-6 text-left">
+            <p className="text-[16px] text-warm-700 mb-6 text-center">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
+            <div className="border-t border-warm-200">
+              {[
+                ['All 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
+                ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
+                ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
+                inviteOnly
+                  ? ['2,300+ automated tests', 'RunF9 has more than 2,300 automated tests, covering the scheduling engine, the checks, the file formats, security and tenant separation. They all run on every code change, together with end-to-end suites against a live server, and a change that fails any of them is not released.']
+                  : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
+              ].map(([term, def], i) => (
+                <details key={term} open={i === 0} className="group border-b border-warm-200">
+                  <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-navy-950">
+                    {term}
+                    <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
+                  </summary>
+                  <p className="text-[16px] text-warm-700 leading-relaxed pb-6 -mt-1">{def}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <Proof />
@@ -228,32 +265,6 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </section>
 
       <Faq />
-
-      {/* Evidence: how each figure on this page can be checked */}
-      <section id="evidence" className="max-w-[860px] mx-auto px-6 pb-16 md:pb-24 scroll-mt-24">
-        <Reveal className="text-center">
-          <h2 className="text-[28px] md:text-[36px] font-semibold tracking-[-0.03em] text-navy-950">Where these numbers come from</h2>
-          <p className="text-[16px] text-warm-700 mt-3 mb-8">Every figure on this page is reproducible. Customers and auditors can ask us to run the tests below in front of them.</p>
-        </Reveal>
-        <div className="border-t border-warm-200">
-          {[
-            ['All 14 DCMA checks', 'All fourteen checks of the DCMA 14-Point Assessment are implemented, each with a unit test that makes it pass and fail. Checks that need data a file doesn’t have (for example baselines) are reported as not applicable, never as passed.'],
-            ['100,000 activities', 'An automated performance test schedules synthetic networks of 10,000, 50,000 and 100,000 activities, with mixed relationship types, lags and two calendars, on every code change. It measures the CPM calculation, not file upload.'],
-            ['0 days after a round trip', 'Five test schedules (different calendars, delivery methods and a required finish) are exported to P6 XER and MS Project XML, imported back and re-scheduled from scratch. Every activity’s early start, early finish and total float must match exactly. This proves RunF9’s files keep the logic intact; a side-by-side comparison with P6 and MS Project calculating the same reference projects is planned and will be published here.'],
-            inviteOnly
-              ? ['2,300+ automated tests', 'RunF9 has more than 2,300 automated tests, covering the scheduling engine, the checks, the file formats, security and tenant separation. They all run on every code change, together with end-to-end suites against a live server, and a change that fails any of them is not released.']
-              : ['$0 to start', 'The Free plan has no time limit and asks for no payment details. Plan limits are listed in the pricing table and enforced by the server.'],
-          ].map(([term, def], i) => (
-            <details key={term} open={i === 0} className="group border-b border-warm-200">
-              <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-navy-950">
-                {term}
-                <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
-              </summary>
-              <p className="text-[16px] text-warm-700 leading-relaxed pb-6 -mt-1">{def}</p>
-            </details>
-          ))}
-        </div>
-      </section>
 
       {/* Closing call to action */}
       <section className="px-6 pb-16 md:pb-24">
