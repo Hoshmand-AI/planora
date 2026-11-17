@@ -37,9 +37,9 @@ const CARDS = [
 export function UpdatesAndDelays() {
   return (
     <section id="updates" className="bg-accent-100 border-y border-warm-200 scroll-mt-12">
-      <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
+      <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
       <Reveal className="max-w-[760px]">
-        <h2 className="text-[32px] md:text-[48px] font-semibold tracking-[-0.04em] text-navy-950 leading-[1.05]">Every update. Every delay.</h2>
+        <h2 className="text-[32px] md:text-[48px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Every update. Every delay.</h2>
         <p className="text-[17px] md:text-[19px] text-warm-600 mt-4 leading-snug">The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates.</p>
       </Reveal>
       <div className="grid md:grid-cols-2 gap-5 mt-12">
