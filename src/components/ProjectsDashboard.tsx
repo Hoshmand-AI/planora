@@ -115,6 +115,8 @@ export function ProjectsDashboard() {
     stale: rows.filter(isStale).length,
     on_track: rows.filter(r => r.status === 'on_track' || r.status === 'complete').length,
   }), [rows])
+  // With a handful of projects everything is on screen: search and sort appear once there is something to find.
+  const few = rows.length < 6
 
   const shown = useMemo(() => {
     const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
@@ -216,6 +218,17 @@ export function ProjectsDashboard() {
   const pinned = grouped ? shown.filter(r => pins.includes(key(r))) : []
   const rest = grouped ? shown.filter(r => !needsYou(r) && !pins.includes(key(r))) : shown
 
+  const viewSwitch = (
+        <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
+          {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
+            <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-navy-950'}`}>
+              <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
+            </button>
+          ))}
+        </div>
+  )
+
   return (
     <div className="px-5 md:px-6 py-6 md:py-8 space-y-6">
       {header}
@@ -223,6 +236,7 @@ export function ProjectsDashboard() {
       {/* Summary strip: each number is a filter */}
       {/* With a handful of projects the five big counters are mostly zeros, so the filters are a row of chips instead. */}
       {counts.all < 6 ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div role="group" aria-label="Filter projects by status" className="flex flex-wrap gap-1.5">
           {FILTERS.filter(f => f.id === 'all' || counts[f.id] > 0).map(f => {
             const on = filter === f.id
@@ -234,8 +248,10 @@ export function ProjectsDashboard() {
             )
           })}
         </div>
+        {viewSwitch}
+        </div>
       ) : (
-      <div role="group" aria-label="Filter projects by status" className="grid grid-cols-3 gap-2 md:grid-cols-5 md:gap-2.5">
+      <div role="group" aria-label="Filter projects by status" title={counts.stale > 0 ? 'A project that needs an update is also counted under its status, so the groups can add up to more than the total.' : undefined} className="grid grid-cols-3 gap-2 md:grid-cols-5 md:gap-2.5">
         {FILTERS.map(f => {
           const on = filter === f.id
           const n = counts[f.id]
@@ -250,10 +266,9 @@ export function ProjectsDashboard() {
         })}
       </div>
       )}
-      {counts.stale > 0 && <p className="-mt-3 text-[12px] text-warm-600">A project that needs an update can also be counted under its status, so the groups can add up to more than the total.</p>}
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2.5">
+      {/* Toolbar: search, sort and the view switch, once there are enough projects to need them. */}
+      <div className={`flex flex-wrap items-center gap-2.5 ${few ? 'hidden' : ''}`}>
         <div className="relative flex-1 min-w-[220px]">
           <Search size={16} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-500" />
           <label htmlFor="project-search" className="sr-only">Search projects</label>
@@ -272,14 +287,7 @@ export function ProjectsDashboard() {
             <option value="name">Name</option>
           </select>
         </div>
-        <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
-          {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
-            <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-navy-950'}`}>
-              <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
-            </button>
-          ))}
-        </div>
+        {!few && viewSwitch}
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">{shown.length} {shown.length === 1 ? 'project' : 'projects'} shown</p>

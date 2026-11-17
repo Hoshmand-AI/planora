@@ -53,7 +53,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
   return (
     <div className="min-h-screen bg-warm-50 text-warm-600">
       {/* Navbar: translucent, quiet, the logo carries it */}
-      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white/80 backdrop-blur-xl border-warm-200' : 'bg-warm-50 border-transparent'}`}>
+      <nav className={`sticky top-0 z-50 transition-[background-color,border-color] duration-300 border-b ${scrolled || menuOpen ? 'bg-white border-warm-200' : 'bg-warm-50 border-transparent'}`}>
         <div className="max-w-[1240px] mx-auto px-6 h-[76px] md:h-[84px] flex items-center justify-between">
           <Link href="/" aria-label="RunF9 home" className="flex items-center">
             <Logo variant="dark" size="text-[26px]" />
@@ -79,10 +79,10 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       </nav>
 
       {/* Hero: one large statement on the left, the reason and one action on the right, then the product itself */}
-      <header className="relative px-6 pt-10 md:pt-16 pb-20 md:pb-28 overflow-hidden">
+      <header className="relative pt-10 md:pt-16 pb-20 md:pb-28 overflow-hidden">
         {/* A soft wash of the accent behind the headline; decorative */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[720px] bg-[radial-gradient(ellipse_60%_55%_at_20%_0%,rgba(37,99,235,0.10),transparent_70%)]" />
-        <div className="relative max-w-[1240px] mx-auto">
+        <div className="relative max-w-[1240px] mx-auto px-6">
           <p className="hero-rise text-[15px] md:text-[17px] font-medium text-warm-700 tracking-[-0.01em] mb-3 md:mb-4">
             {inviteOnly ? 'Construction schedule analysis · private beta, by invitation' : 'Construction schedule analysis'}
           </p>
@@ -99,18 +99,17 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                 <Cta href={primaryHref} className={`${primaryBtn} gap-2 px-8 py-4 text-[17px] shadow-[0_14px_30px_-14px_rgba(37,99,235,0.7)]`}>{primaryLabel}<ArrowRight size={18} aria-hidden /></Cta>
                 <a href="#today" className="pressable text-[16px] font-semibold text-navy-950 underline decoration-warm-300 decoration-2 underline-offset-[6px] hover:decoration-accent-600">See the Daily Brief</a>
               </div>
-              <Link href="/sample-report" className="pressable inline-block mt-4 text-[15px] font-medium text-accent-700 hover:underline underline-offset-4">Read a sample report</Link>
             </div>
           </div>
         </div>
-        <div className="relative hero-rise [animation-delay:320ms] max-w-[1240px] mx-auto mt-12 md:mt-16">
+        <div className="relative hero-rise [animation-delay:320ms] max-w-[1240px] mx-auto px-6 mt-12 md:mt-16">
           <HeroSchedule />
         </div>
       </header>
 
       {/* Facts: each figure is backed by an automated test or the product's own limits (see "Where these numbers come from") */}
       <section aria-label="RunF9 in numbers" className="border-y border-warm-200 bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
+        <div className="max-w-[1240px] mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 text-center">
           {[
             [<>All 14</>, 'DCMA 14-Point checks built in and run on every schedule'],
             [<CountUp key="n" value={100000} />, 'activities scheduled by our CPM engine in automated tests'],
@@ -132,7 +131,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <DailyBrief />
 
       {/* Build. Check. Forecast. */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
+      <section id="features" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto mb-20 md:mb-28">
           <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Everything a scheduler does. Shown, not hidden.</h2>
           <p className="text-[18px] md:text-[20px] text-warm-600 mt-5 leading-snug">RunF9 does the repetitive parts of scheduling and shows its work, so you can review and defend the result.</p>
@@ -147,7 +146,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <Audiences />
 
       {/* How it works: four steps */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
+      <section id="how-it-works" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center max-w-[760px] mx-auto">
           <h2 className="text-[36px] md:text-[52px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Four steps to a finish date you can defend.</h2>
         </Reveal>
@@ -169,7 +168,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Reports */}
       <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
+        <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
           <Reveal>
             <h2 className="text-[32px] md:text-[44px] font-semibold tracking-[-0.035em] text-navy-950 leading-tight">Reports, written from your numbers.</h2>
             <p className="text-[16px] md:text-[17px] text-warm-700 leading-relaxed mt-4">Each report is built from the schedule’s calculated figures and says where every number came from. With AI off, RunF9 writes it by rule; with AI on, the model drafts the wording and the figures stay the engine’s.</p>
@@ -201,27 +200,28 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       <Security contactHref={contactHref} />
 
       {/* Pricing */}
-      <section id="pricing" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-12">
+      <section id="pricing" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
         <Reveal className="text-center mb-14 md:mb-16">
           <h2 className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-navy-950 leading-[1.05]">Simple, transparent pricing.</h2>
           <p className="text-[17px] md:text-[19px] text-warm-600 mt-4">{inviteOnly ? 'RunF9 is in private beta: firms join by invitation. These are the plans we will offer.' : 'Start free. Upgrade when you need more.'}</p>
         </Reveal>
-        <div className="grid md:grid-cols-3 gap-5 max-w-[1040px] mx-auto">
+        <div className="grid md:grid-cols-3 gap-5">
           {[
             { name: 'Free', price: '$0', per: '/month', blurb: 'For trying RunF9 on real projects.', yes: ['Up to 3 uploaded schedules', 'Unlimited interview-built schedules', 'Executive Summary report', '10 AI requests/day', 'Export to P6, MS Project & CSV', 'Roles, 2-step verification & audit log'], no: ['Critical Path, Variance & QA/QC reports', 'Export to PDF & Excel', 'API keys & webhooks'], cta: inviteOnly ? 'Request access' : 'Start free', href: primaryHref, featured: false },
             { name: 'Pro', price: '$49', per: '/month', blurb: 'For schedulers and consultants who need every report and export.', yes: ['Unlimited uploaded schedules', 'All report types', 'Up to 1,000 AI requests/day', 'Export to P6, MS Project, PDF & Excel', 'Monte Carlo schedule risk analysis', 'API keys & signed webhooks', 'Roles, 2-step verification & audit log'], no: [], cta: inviteOnly ? 'Request access' : 'Start free, then upgrade', href: primaryHref, featured: true },
             { name: 'Enterprise', price: 'Custom', per: '', blurb: 'For organizations deploying across teams.', yes: ['Everything in Pro', 'Single sign-on (SAML, OpenID Connect) and SCIM', 'Enforced 2-step & approval policies', 'Deploy in your AWS, Azure or Google Cloud account, or air-gapped', 'Data export, retention & deletion controls', 'Support by email from the founder'], no: [], cta: 'Contact sales', href: 'mailto:support@hoshmand.ai', featured: false },
           ].map((p, i) => (
-            <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 bg-white border flex flex-col ${p.featured ? 'border-accent-600 shadow-[0_30px_60px_-30px_rgba(37,99,235,0.35)]' : 'border-warm-200'}`}>
-              <div className="text-[15px] font-semibold text-navy-950">{p.name}</div>
-              <div className="mt-3 text-[44px] font-semibold tracking-[-0.04em] text-navy-950 leading-none">{p.price}<span className="text-[16px] font-medium tracking-normal text-warm-600">{p.per}</span></div>
-              <p className="text-[15px] text-warm-600 mt-3 mb-6">{p.blurb}</p>
-              <ul className="space-y-3 mb-8 flex-1">
-                {p.yes.map(f => <li key={f} className="flex items-start gap-2.5 text-[15.5px] text-warm-700"><CheckCircle size={17} className="text-accent-600 flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
+            <Reveal key={p.name} delay={i * 100} className={`rounded-[28px] p-8 flex flex-col ${p.featured ? 'bg-navy-950 text-white shadow-[0_30px_60px_-30px_rgba(6,20,27,0.55)]' : 'bg-white border border-warm-200'}`}>
+              <div className={`text-[15px] font-semibold ${p.featured ? 'text-white' : 'text-navy-950'}`}>{p.name}</div>
+              <div className={`mt-3 text-[48px] font-bold tracking-[-0.045em] leading-none ${p.featured ? 'text-white' : 'text-navy-950'}`}>{p.price}<span className={`text-[16px] font-medium tracking-normal ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.per}</span></div>
+              {/* The same height on every card, so the buttons and the lists line up across the row. */}
+              <p className={`text-[15px] mt-3 md:min-h-[46px] ${p.featured ? 'text-navy-200' : 'text-warm-600'}`}>{p.blurb}</p>
+              <Cta href={p.href} className={`mt-5 mb-7 ${p.featured ? 'pressable inline-flex items-center justify-center rounded-full bg-white text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors' : 'pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors'}`}>{p.cta}</Cta>
+              <ul className="space-y-3 flex-1">
+                {p.yes.map(f => <li key={f} className={`flex items-start gap-2.5 text-[15.5px] ${p.featured ? 'text-white' : 'text-warm-700'}`}><CheckCircle size={17} className={`${p.featured ? 'text-accent-400' : 'text-accent-600'} flex-shrink-0 mt-0.5`} aria-hidden />{f}</li>)}
                 {p.no.length > 0 && <li className="pt-3 text-[13px] font-semibold uppercase tracking-wider text-warm-600">Not included</li>}
                 {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[15.5px] text-warm-600"><X size={17} className="flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
               </ul>
-              <Cta href={p.href} className={p.featured ? `${primaryBtn} px-4 py-3 text-[15px] text-center` : `pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-navy-950 font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors`}>{p.cta}</Cta>
             </Reveal>
           ))}
         </div>
@@ -257,7 +257,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Closing call to action */}
       <section className="px-6 pb-16 md:pb-24">
-        <Reveal className="max-w-6xl mx-auto rounded-[36px] bg-navy-950 px-8 py-20 md:py-28 text-center relative overflow-hidden">
+        <Reveal className="max-w-[1240px] mx-auto rounded-[36px] bg-navy-950 px-8 py-20 md:py-28 text-center relative overflow-hidden">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.28),transparent_60%)]" />
           <div className="relative">
             <h2 className="text-[36px] md:text-[60px] font-bold tracking-[-0.045em] text-white leading-[1.04]">Use RunF9 on your next schedule</h2>
@@ -270,7 +270,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
 
       {/* Footer */}
       <footer className="border-t border-warm-200 bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10">
+        <div className="max-w-[1240px] mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10">
           <div className="col-span-2 md:col-span-1">
             <Logo variant="dark" size="text-[22px]" />
             <p className="text-[14px] text-warm-600 mt-4 max-w-[280px] leading-relaxed">Construction scheduling, explained. Built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field.</p>
@@ -293,7 +293,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             <Link href="/terms" className={footLink}>Terms of Service</Link>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-6 pb-8 text-[13px] text-warm-600">© 2026 RunF9. Built by Hoshmand AI. All rights reserved.</div>
+        <div className="max-w-[1240px] mx-auto px-6 pb-8 text-[13px] text-warm-600">© 2026 RunF9. Built by Hoshmand AI. All rights reserved.</div>
       </footer>
     </div>
   )

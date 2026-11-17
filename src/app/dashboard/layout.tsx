@@ -626,7 +626,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           })}
                         </nav>
                       )}
-                      <p className="text-[13px] text-warm-600 max-md:hidden">{t.hint}</p>
+                      {/* A tab with views already has a row of its own; the line of explanation is for the tabs that do not. */}
+                      {!t.views && <p className="text-[13px] text-warm-600 max-md:hidden">{t.hint}</p>}
                     </div>
                   )
                 })()}
@@ -656,7 +657,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 Your projects could not be loaded. <button type="button" onClick={() => { refreshSchedules() }} className="underline font-medium">Try again</button>
               </p>
             )}
-            <div key={pathname} className={`max-w-6xl mx-auto md:px-3 page-enter ${fillScreen ? 'w-full flex-1 flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
+            <div key={pathname} className={`max-w-6xl mx-auto page-enter ${fillScreen ? 'w-full flex-1 flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
               {children}
               <AskTextHost />
             </div>

@@ -219,7 +219,7 @@ export default function QualityPage() {
         {/* All checks at a glance: failing ones outlined in red; select one for its detail */}
         <section aria-labelledby="dcma-h" className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">{showAllChecks ? `All ${data.dcma.checks.length} DCMA checks` : `Checks that need work (${needWork.length} of ${data.dcma.checks.length})`}</h2>
+            <h2 id="dcma-h" className="text-[17px] font-semibold text-navy-950">{showAllChecks ? `All ${data.dcma.checks.length} DCMA checks` : `Checks that need work (${needWork.length})`}</h2>
             <span className="text-[13px] text-warm-600">select one to see what it found</span>
             {needWork.length > 0 && needWork.length < data.dcma.checks.length && (
               <button type="button" aria-expanded={allChecks} onClick={() => setAllChecks(v => !v)} className="ml-auto text-[13px] font-semibold text-accent-600 hover:underline">{allChecks ? 'Show only the ones that need work' : `Show all ${data.dcma.checks.length} checks`}</button>
