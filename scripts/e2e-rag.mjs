@@ -100,7 +100,18 @@ async function main() {
   r = await A.req('POST', docs(sA), form('x.txt', 'Some text', { docType: 'bogus' }))
   ok(r.status === 400, 'An unknown document type is refused')
 
+  /* ── Reading one document ── */
+  r = await A.get(`${docs(sA)}/${docId}`)
+  ok(r.status === 200 && r.data.passages.length === r.data.document.chunkCount && r.data.passages.every((x, i) => x.ordinal === i), 'A document opens as its passages, in order', r.data)
+  ok(r.data.passages.filter(x => x.flagged).length === 1 && r.data.passages.find(x => x.flagged).flagReasons.length > 0, 'The flagged passage is marked when the document is read')
+
   /* ── Tenant isolation ── */
+  r = await B.get(docs(sA))
+  ok(r.status === 404, "Firm B can't list Firm A's documents (404)")
+  r = await B.get(`${docs(sA)}/${docId}`)
+  ok(r.status === 404, "Firm B can't read Firm A's document (404)")
+  r = await B.get(`${docs(sB)}/${docId}`)
+  ok(r.status === 404, "Firm B can't read Firm A's document through its own project (404)")
   r = await B.get(docs(sA))
   ok(r.status === 404, "Firm B can't list Firm A's documents (404)")
   r = await B.post(`${docs(sA)}/search`, { query: 'activity duration', includeUnreviewed: true })
