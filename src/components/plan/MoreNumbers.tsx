@@ -32,7 +32,7 @@ export function MoreNumbers({ rows, align = 'right' }: { rows: NumberRow[]; alig
   return (
     <div ref={wrap} className="relative">
       <button ref={btn} type="button" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-warm-600 hover:text-ink hover:bg-white/70">
+        className="pressable inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[13px] font-medium text-warm-600 hover:text-ink hover:bg-warm-100">
         More numbers <ChevronDown size={13} aria-hidden className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (

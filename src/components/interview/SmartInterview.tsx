@@ -12,7 +12,6 @@ import type { Answer, Assumption, ElicitationResult, Question, SourceRef } from 
 import type { AdaptiveInterview } from '@/lib/planning/adaptive'
 import { Disclosure } from '@/components/Disclosure'
 import { fmtDate, fmtDates } from '@/lib/format'
-import { MoodTile, Robot } from '@/components/Robot'
 
 export const SECTION_LABEL: Record<string, string> = {
   project: 'Project', design: 'Design', permits: 'Permits', procurement: 'Long-lead', site: 'Site', milestones: 'Milestone targets',
@@ -28,6 +27,9 @@ const SHORT: Record<string, string> = {
   issued: 'Issued', submitted: 'In review', not_submitted: 'Not submitted', not_required: 'Not needed',
 }
 
+/** The one filled button of a question: it goes grey until there is something to send. */
+const CONTINUE = 'pressable inline-flex items-center justify-center rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-11 text-[14px] font-semibold disabled:bg-warm-200 disabled:text-warm-600'
+
 export interface AnsweredItem { id: string; prompt: string; section: string; label: string; status: string; value: Answer['value'] | null; note: string | null; custom: boolean }
 
 export interface SmartInterviewProps {
@@ -35,6 +37,8 @@ export interface SmartInterviewProps {
   adaptive: AdaptiveInterview
   answered: AnsweredItem[]
   hasSchedule: boolean
+  /** Answers given or changed after the schedule was last built: the rebuild button is filled when there are some. */
+  changedSinceBuild: number
   canWrite: boolean
   busy: string | null
   llm: { mode: 'cloud' | 'local' | 'offline'; error?: string }
@@ -66,34 +70,30 @@ export function SmartInterview(p: SmartInterviewProps) {
 
   return (
     <div className="max-w-[760px] mx-auto">
-      <StatusHeader ad={ad} progress={progress} hasSchedule={p.hasSchedule} canWrite={p.canWrite} busy={p.busy} onGenerate={p.onGenerate} />
+      <StatusHeader ad={ad} progress={progress} hasSchedule={p.hasSchedule} changed={p.changedSinceBuild} canWrite={p.canWrite} busy={p.busy} onGenerate={p.onGenerate} />
 
       {el.conflicts.length > 0 && (
-        <div role="status" className="mt-4 rounded-2xl border border-status-attention/50 bg-status-attention-bg px-5 py-4 text-[13px] text-warm-700">
+        <div role="status" className="mt-4 rounded-lg border border-status-attention/50 bg-status-attention-bg px-5 py-4 text-[13px] text-warm-700">
           <div className="font-semibold text-ink mb-1">{el.conflicts.length === 1 ? 'Two answers don\u2019t fit together' : 'Some answers don\u2019t fit together'}</div>
           <ul className="space-y-1">{el.conflicts.map((c, i) => <li key={i}>{fmtDates(c)}</li>)}</ul>
+          {!current && <p className="mt-2">Fix these first: the schedule is only as good as its dates. Open “Answered” below to change them.</p>}
         </div>
       )}
 
+      {/* When nothing is left to ask, the status card above already says so: no second card repeats it. */}
+      {current && (
       <div className="mt-5">
-        {!current ? (
-          <MoodTile mood="done" className="rise-in !rounded-[14px] !px-6 !py-8 text-center">
-            <Robot mood="done" size={84} className="mx-auto mb-2" />
-            <div className="text-[18px] font-semibold text-ink tracking-[-0.01em]">Nothing left that changes your finish date</div>
-            <p className="text-[14px] text-warm-600 mt-1.5 max-w-[460px] mx-auto">
-              {el.conflicts.length > 0 ? 'Fix the answers flagged above first — the schedule is only as good as its dates.' : p.hasSchedule ? 'Nice work — your schedule stands on your answers.' : 'Nice work — you have everything RunF9 needs to build your schedule.'} Optional details below refine the basis of schedule. They&apos;re there when you have them.
-            </p>
-          </MoodTile>
-        ) : group ? (
+        {group ? (
           <GroupCard key={group.id} group={group} questions={ad.ask.filter(q => group.questionIds.includes(q.id))} busy={!!p.busy} disabled={!p.canWrite} onSave={p.onAnswerMany} />
         ) : (
           <FocusCard key={current.id} q={current} insight={ad.insights[current.id]} busy={p.busy === `answer:${current.id}`} disabled={!p.canWrite} onAnswer={p.onAnswer} />
         )}
       </div>
+      )}
 
       {upNext.length > 0 && (
         <div className="mt-6">
-          <div className="text-[12px] font-medium text-warm-500 mb-2">Up next</div>
+          <div className="text-[12px] font-medium text-warm-600 mb-2">Up next</div>
           <ol className="space-y-1.5">
             {upNext.slice(0, 3).map(n => (
               <li key={n.key} className="flex items-baseline gap-3 text-[13px]">
@@ -110,7 +110,7 @@ export function SmartInterview(p: SmartInterviewProps) {
         {ad.optional.length > 0 && (
           <Disclosure title="Optional details" meta={`${ad.optional.length} · won't move your finish`}>
             <p className="text-[13px] text-warm-500 mb-3">We tried every answer to these against your schedule. None moves the finish by {ad.thresholdDays} days or more, so they&apos;re here when you want to be precise.</p>
-            <div className="space-y-3">
+            <div className="divide-y divide-warm-200 border-y border-warm-200">
               {ad.optional.slice(0, 40).map(q => <CompactQuestion key={q.id} q={q} reason={ad.insights[q.id]?.reason} busy={p.busy === `answer:${q.id}`} disabled={!p.canWrite} onAnswer={p.onAnswer} />)}
             </div>
           </Disclosure>
@@ -159,29 +159,42 @@ export function SmartInterview(p: SmartInterviewProps) {
 
 /* ─── Status: how settled is the finish date ─────────── */
 
-function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }: { ad: AdaptiveInterview; progress: number; hasSchedule: boolean; canWrite: boolean; busy: string | null; onGenerate: () => void }) {
+function StatusHeader({ ad, progress, hasSchedule, changed, canWrite, busy, onGenerate }: { ad: AdaptiveInterview; progress: number; hasSchedule: boolean; changed: number; canWrite: boolean; busy: string | null; onGenerate: () => void }) {
   const settled = ad.enoughToBuild
+  const nothingOpen = ad.ask.length === 0
+  // Building is offered once, here. The button is filled only when building is the next step: the brief is ready
+  // and there is no schedule yet, or answers changed since the schedule was built and nothing is left to ask.
+  const loud = hasSchedule ? changed > 0 && nothingOpen : settled
+  const label = hasSchedule ? 'Rebuild with my answers' : settled ? 'Build my schedule' : 'Build now'
+  const look = loud
+    ? 'pressable inline-flex items-center gap-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 h-10 text-[14px] font-semibold disabled:opacity-50'
+    : 'pressable inline-flex items-center gap-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-10 text-[14px] font-medium disabled:opacity-50'
   return (
     <section aria-label="Interview progress" className="rounded-[14px] bg-white border border-warm-200 px-6 py-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <div className="text-[12px] text-warm-500">{settled ? 'Your brief is ready' : 'Questions that can still move your finish'}</div>
+          <div className="text-[13px] text-warm-600">{settled ? 'Your brief is ready' : 'Questions that can still move your finish'}</div>
           <div className="text-[28px] leading-none font-semibold text-ink tracking-[-0.02em] mt-1.5 tabular-nums">
             {settled ? 'Enough to build' : ad.remainingThatMatter}
           </div>
-          {ad.baselineFinish && (
+          {hasSchedule ? (
             <div className="text-[13px] text-warm-600 mt-2">
-              {hasSchedule
-                ? (ad.finishUncertaintyDays > 0 && !settled ? <>The finish could still move about ±{ad.finishUncertaintyDays} days</> : <>The open questions can&apos;t move the finish much</>)
-                : <>Forecast finish <span className="font-semibold text-ink tabular-nums">{fmtDate(ad.baselineFinish)}</span>
-                  {ad.finishUncertaintyDays > 0 && !settled && <span className="text-warm-500"> · could still move about ±{ad.finishUncertaintyDays} days</span>}</>}
+              {changed > 0 ? <>{changed} answer{changed === 1 ? '' : 's'} changed since the schedule was built</>
+                : !settled && ad.finishUncertaintyDays > 0 ? <>The finish could still move about ±{ad.finishUncertaintyDays} days</>
+                : nothingOpen ? <>Nothing left would change your finish date</>
+                : <>The open questions can&apos;t move the finish much</>}
             </div>
-          )}
+          ) : ad.baselineFinish ? (
+            <div className="text-[13px] text-warm-600 mt-2">
+              Forecast finish <span className="font-semibold text-ink tabular-nums">{fmtDate(ad.baselineFinish)}</span>
+              {ad.finishUncertaintyDays > 0 && !settled && <> · could still move about ±{ad.finishUncertaintyDays} days</>}
+            </div>
+          ) : null}
         </div>
-        {canWrite && (settled || hasSchedule) && (
-     <button onClick={onGenerate} disabled={!!busy} className="pressable inline-flex items-center gap-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold hover:bg-accent-600 hover:bg-accent-700">
+        {canWrite && (
+          <button onClick={onGenerate} disabled={!!busy} className={look}>
             {busy === 'generate' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : null}
-            {hasSchedule ? 'Rebuild with my answers' : 'Build my schedule'} <ArrowRight size={15} aria-hidden />
+            {label}{loud ? <ArrowRight size={15} aria-hidden /> : null}
           </button>
         )}
       </div>
@@ -189,25 +202,13 @@ function StatusHeader({ ad, progress, hasSchedule, canWrite, busy, onGenerate }:
         <div className="meter-fill h-full rounded-full bg-accent-600" style={{ width: `${Math.max(4, Math.round(progress * 100))}%` }} />
       </div>
       {!settled && !hasSchedule && canWrite && (
-        <p className="text-[12px] text-warm-500 mt-3">You can build at any time; anything still open becomes a stated assumption with contingency. <button onClick={onGenerate} disabled={!!busy} className="font-medium text-accent-600 hover:underline">Build now</button></p>
+        <p className="text-[12px] text-warm-600 mt-3">Anything still open when you build becomes a stated assumption with contingency.</p>
       )}
     </section>
   )
 }
 
 /* ─── The one question in focus ──────────────────────── */
-
-/** The interviewer: a small status mark beside a speech bubble that carries the text. */
-function Interviewer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <Robot mood="waiting" size={46} className="flex-shrink-0 -ml-1" />
-      <div className="relative min-w-0 rounded-2xl rounded-bl-md bg-warm-100 px-3.5 py-2">
-        <span className="sr-only">RunF9: </span>{children}
-      </div>
-    </div>
-  )
-}
 
 function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insight?: { swingDays: number | null; reason: string }; busy: boolean; disabled: boolean; onAnswer: SmartInterviewProps['onAnswer'] }) {
   const [value, setValue] = useState('')
@@ -234,24 +235,22 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
   })
 
   return (
-    <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-12px_rgba(29,33,37,0.12)] px-6 py-6 md:px-8 md:py-7">
-      <Interviewer>
-        <div className="text-[13px] text-ink">{insight?.swingDays ? 'This one matters: it can move your finish.' : 'Next question — quick one.'}</div>
-        <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-warm-500 mt-0.5">
-          <span>{SECTION_LABEL[q.section] || q.section}</span>
-          {insight?.swingDays ? <><span aria-hidden>·</span><span>moves the finish up to <span className="font-semibold text-ink tabular-nums">{insight.swingDays} days</span></span></> : null}
-          {q.id.startsWith('ai.') && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Sparkles size={11} aria-hidden /> AI follow-up</span></>}
-        </div>
-      </Interviewer>
-      <h2 className="text-[20px] md:text-[23px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-4">{q.prompt}</h2>
+    <div ref={ref} className="rise-in rounded-[14px] bg-white border border-warm-200 px-6 py-6 md:px-8 md:py-7">
+      {/* Where the question belongs and how far its answer can move the finish: one quiet line above it. */}
+      <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-warm-600">
+        <span>{SECTION_LABEL[q.section] || q.section}</span>
+        {insight?.swingDays ? <><span aria-hidden>·</span><span>can move the finish up to <span className="font-semibold text-ink tabular-nums">{insight.swingDays} days</span></span></> : null}
+        {q.id.startsWith('ai.') && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Sparkles size={11} aria-hidden /> AI follow-up</span></>}
+      </p>
+      <h2 className="text-[20px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-1.5">{q.prompt}</h2>
 
       <div className="mt-5">
         {choices && (
           <div className={`grid gap-2 ${choices.length > 5 ? 'sm:grid-cols-2' : ''}`} role="group" aria-label="Answers">
             {choices.map((o, i) => (
               <button key={String(o.value)} disabled={busy || disabled} onClick={() => submit(o.value)}
-                className="pressable group flex items-center gap-3 w-full text-left rounded-2xl border border-warm-300 bg-warm-50 hover:border-navy-900 hover:bg-white px-4 py-3 disabled:opacity-50">
-                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-[12px] text-warm-500 font-sans group-hover:border-navy-900 group-hover:text-ink">{i + 1}</kbd>}
+                className="pressable group flex items-center gap-3 w-full text-left rounded-lg border border-warm-300 bg-white hover:border-navy-900 hover:bg-warm-50 px-4 py-3 disabled:opacity-50">
+                {i < 9 && <kbd className="hidden md:flex w-6 h-6 items-center justify-center rounded-md border border-warm-300 text-[12px] text-warm-600 font-sans group-hover:border-navy-900 group-hover:text-ink">{i + 1}</kbd>}
                 <span className="text-[14px] text-ink">{o.label}</span>
               </button>
             ))}
@@ -261,16 +260,23 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
             )}
           </div>
         )}
-        {q.kind === 'choice' && !choices && (
-          <div className="flex flex-wrap gap-2">
-            <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-lg border border-warm-300 bg-warm-50 px-3 py-2.5 text-[14px] text-ink">
-              <option value="">Choose…</option>
-              {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-      <button disabled={busy || disabled || !value} onClick={() => submit(value)} className="pressable rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold">Continue</button>
-            {q.allowOther && <div className="w-full"><TextAnswer kind="text" placeholder={q.id === 'project.state' ? 'Not in the US? e.g. Toronto, Ontario, Canada' : q.otherPrompt || 'Or type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} /></div>}
+        {q.kind === 'choice' && !choices && (other ? (
+          <div>
+            <TextAnswer kind="text" placeholder={q.id === 'project.state' ? 'e.g. Toronto, Ontario, Canada' : q.otherPrompt || 'Type your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(v)} autoFocus />
+            <button type="button" disabled={busy || disabled} onClick={() => setOther(false)} className="mt-2 text-[13px] text-accent-600 hover:underline">Choose from the list</button>
           </div>
-        )}
+        ) : (
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <select value={value} onChange={e => setValue(e.target.value)} aria-label={q.prompt} className="flex-1 min-w-[220px] rounded-lg border border-warm-300 bg-white px-3 h-11 text-[14px] text-ink">
+                <option value="">Choose…</option>
+                {q.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button disabled={busy || disabled || !value} onClick={() => submit(value)} className={CONTINUE}>Continue</button>
+            </div>
+            {q.allowOther && <button type="button" disabled={busy || disabled} onClick={() => setOther(true)} className="mt-2 text-[13px] text-accent-600 hover:underline">{q.id === 'project.state' ? 'Not in the US?' : 'Something else…'}</button>}
+          </div>
+        ))}
         {(q.kind === 'number' || q.kind === 'date' || q.kind === 'text') && (
           <TextAnswer kind={q.kind} unit={q.unit} placeholder={q.unit || 'Your answer'} busy={busy} disabled={disabled} onSubmit={v => submit(q.kind === 'number' ? Number(v) : v)} />
         )}
@@ -296,8 +302,8 @@ function FocusCard({ q, insight, busy, disabled, onAnswer }: { q: Question; insi
         <Disclosure title="Add detail in your own words">
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} maxLength={1000} aria-label="Detail for this answer"
             placeholder={q.section === 'permits' ? 'e.g. Issued for foundations only; superstructure still in review' : q.section === 'procurement' ? 'e.g. Needed, but the utility is designing a new substation' : 'e.g. Mostly yes, except the east wing'}
-            className="w-full rounded-xl border border-warm-300 bg-warm-50 px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400" />
-          <p className="text-[12px] text-warm-500 mt-1">Saved with whichever answer you choose; it goes into the Basis of Schedule and flags the related activities.</p>
+            className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-[14px] text-ink placeholder:text-warm-600" />
+          <p className="text-[12px] text-warm-600 mt-1">Saved with whichever answer you choose; it goes into the Basis of Schedule and flags the related activities.</p>
         </Disclosure>
       </div>
     </div>
@@ -310,9 +316,9 @@ function TextAnswer({ kind, unit, placeholder, busy, disabled, onSubmit, autoFoc
     <form onSubmit={e => { e.preventDefault(); if (v.trim()) onSubmit(v.trim()) }} className="flex flex-wrap gap-2 items-center">
       <input autoFocus={autoFocus} type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'} value={v} onChange={e => setV(e.target.value)} min={kind === 'number' ? 0 : undefined} max={unit === '%' ? 100 : undefined}
         placeholder={placeholder} aria-label={placeholder}
-        className={`rounded-xl border border-warm-300 bg-warm-50 px-3 py-2.5 text-[14px] text-ink placeholder:text-warm-400 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
-      {unit && kind === 'number' && <span className="text-[13px] text-warm-500">{unit}</span>}
-   <button disabled={busy || disabled || !v.trim()} className="pressable rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2.5 text-[14px] font-semibold">Continue</button>
+        className={`rounded-lg border border-warm-300 bg-white px-3 h-11 text-[14px] text-ink placeholder:text-warm-600 ${kind === 'text' ? 'flex-1 min-w-[240px]' : 'w-48'}`} />
+      {unit && kind === 'number' && <span className="text-[13px] text-warm-600">{unit}</span>}
+      <button disabled={busy || disabled || !v.trim()} className={CONTINUE}>Continue</button>
     </form>
   )
 }
@@ -337,12 +343,9 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
     if (Object.keys(out).length) onSave(out)
   }
   return (
-    <div className="rise-in rounded-[14px] bg-white border border-warm-200 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-12px_rgba(29,33,37,0.12)] px-6 py-6 md:px-8 md:py-7">
-      <Interviewer>
-        <div className="text-[13px] text-ink">A few that go together — answer the ones you know.</div>
-        <div className="text-[12px] text-warm-500 mt-0.5">{group.label} · together they move the finish up to <span className="font-semibold text-ink tabular-nums">{group.swingDays} days</span></div>
-      </Interviewer>
-      <h2 className="text-[20px] md:text-[23px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-4">
+    <div className="rise-in rounded-[14px] bg-white border border-warm-200 px-6 py-6 md:px-8 md:py-7">
+      <p className="text-[12px] text-warm-600">{group.label} · together they can move the finish up to <span className="font-semibold text-ink tabular-nums">{group.swingDays} days</span></p>
+      <h2 className="text-[20px] leading-[1.25] font-semibold text-ink tracking-[-0.01em] mt-1.5">
         {group.id === 'procurement' ? 'Where does each of these stand?' : group.id === 'permits' ? 'Where is each approval?' : 'Do these apply?'}
       </h2>
       <p className="text-[13px] text-warm-600 mt-1.5">Answer the ones you know. Any you leave are planned with typical lead times and a buffer.</p>
@@ -352,13 +355,13 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
           return (
             <li key={q.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <span className="flex-1 min-w-0 text-[14px] text-ink">{shortName(q)}</span>
-              <div role="radiogroup" aria-label={shortName(q)} className="flex flex-wrap gap-1 rounded-full bg-warm-100 p-1 w-fit">
+              <div role="radiogroup" aria-label={shortName(q)} className="flex flex-wrap gap-0.5 rounded-lg bg-warm-100 p-0.5 w-fit">
                 {opts.map(o => {
                   const on = picked[q.id] === o.value
                   return (
                     <button key={String(o.value)} role="radio" aria-checked={on} disabled={busy || disabled}
                       onClick={() => setPicked(prev => { const n = { ...prev }; if (on) delete n[q.id]; else n[q.id] = o.value; return n })}
-                      className={`pressable rounded-full px-3 py-1 text-[12px] ${on ? 'bg-navy-950 text-white shadow-sm' : 'text-warm-700 hover:text-ink'}`}>{o.label}</button>
+                      className={`pressable rounded-md px-3 py-1 text-[12px] ${on ? 'bg-white text-ink font-semibold shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-700 hover:text-ink'}`}>{o.label}</button>
                   )
                 })}
               </div>
@@ -367,7 +370,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
         })}
       </ul>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-    <button disabled={busy || disabled || !count} onClick={() => save('skip')} className="pressable rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 text-[14px] font-semibold">
+        <button disabled={busy || disabled || !count} onClick={() => save('skip')} className={CONTINUE}>
           {busy ? <Loader2 size={14} className="animate-spin inline mr-1.5" aria-hidden /> : null}Save {count || ''} answer{count === 1 ? '' : 's'}
         </button>
         <button disabled={busy || disabled} onClick={() => save('unknown')} className="text-[13px] text-warm-600 hover:text-ink">{count ? 'Save, and I don’t know the rest' : 'I don’t know any of these yet'}</button>
@@ -382,7 +385,7 @@ function GroupCard({ group, questions, busy, disabled, onSave }: { group: { id: 
 function CompactQuestion({ q, reason, busy, disabled, onAnswer }: { q: Question; reason?: string; busy: boolean; disabled: boolean; onAnswer: SmartInterviewProps['onAnswer'] }) {
   const choices = q.kind === 'boolean' ? [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] : q.kind === 'choice' && (q.options?.length || 0) <= 6 ? q.options!.map(o => ({ value: o.value as unknown, label: SHORT[o.value] || o.label })) : null
   return (
-    <div className="rounded-2xl bg-white border border-warm-200 px-4 py-3.5">
+    <div className="py-3.5">
       <div className="text-[14px] text-ink">{q.prompt}</div>
       {reason && <div className="text-[12px] text-warm-500 mt-0.5">{reason}</div>}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
@@ -416,8 +419,8 @@ function AddNote({ busy, onAddNote }: { busy: boolean; onAddNote: (t: string) =>
       <p className="text-[13px] text-warm-500 mb-2">Owner requirements, site constraints, phasing: anything that affects the schedule. It goes into the Basis of Schedule.</p>
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} aria-label="Information to add"
         placeholder="e.g. The utility will only energize the substation after the owner's commissioning agent signs off"
-        className="w-full rounded-xl border border-warm-300 bg-warm-50 px-3 py-2 text-[14px] text-warm-700 placeholder:text-warm-400" />
-   <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold">Add to brief</button>
+        className="w-full rounded-lg border border-warm-300 bg-white px-3 py-2 text-[14px] text-ink placeholder:text-warm-600" />
+      <button disabled={busy || !note.trim()} onClick={async () => { if (await onAddNote(note)) setNote('') }} className="pressable mt-2 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-9 text-[13px] font-medium disabled:opacity-50">Add to brief</button>
     </Disclosure>
   )
 }

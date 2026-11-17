@@ -71,8 +71,8 @@ export function Hint({ label = 'How this works', children, className = '' }: { l
 
 /** The two pill buttons as class strings, for a button that cannot be the <Button> component (a link, a label). Same size and colours as <Button>. */
 export const buttonClass = {
-  primary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
-  secondary: 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-ink text-[13px] font-medium hover:bg-warm-100 transition-colors',
+  primary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-colors',
+  secondary: 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg border border-warm-300 bg-white text-ink text-[13px] font-medium hover:bg-warm-100 transition-colors',
 }
 
 export function Button({ variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
@@ -82,7 +82,7 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
     danger: 'bg-status-at-risk text-white hover:opacity-90 font-semibold',
     ghost: 'text-accent-600 hover:underline font-medium px-1',
   }[variant]
-  return <button {...props} className={`${variant === 'ghost' ? '' : 'inline-flex items-center justify-center min-h-[36px] px-4 py-1.5 rounded-lg'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
+  return <button {...props} className={`${variant === 'ghost' ? '' : 'inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 rounded-lg'} text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${className}`} />
 }
 
 export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' | 'warning'; children: React.ReactNode }) {

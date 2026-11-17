@@ -5,11 +5,12 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, Lock, Play, Download, Send, ChevronDown, ChevronRight,
+  ArrowLeft, Loader2, Lock, Download, Send, ChevronDown, ChevronRight,
   AlertTriangle, CheckCircle2, Trash2, Link2, X, RefreshCw, Check, Plus, MessageSquareText,
 } from 'lucide-react'
 import { Robot, type RobotMood } from '@/components/Robot'
 import { MoreNumbers, type NumberRow } from '@/components/plan/MoreNumbers'
+import { FinishDistribution } from '@/components/FinishDistribution'
 import { RecoveryPanel } from '@/components/plan/RecoveryPanel'
 import { MoreMenu } from '@/components/MoreMenu'
 import { phaseLabelsFor } from '@/lib/export/wbs'
@@ -286,7 +287,10 @@ export default function PlanPage() {
 
   // One obvious next step; everything else is quieter.
   const canPublish = !!g && can('plan.publish')
-  const primary: 'generate' | 'publish' | 'export' | null = !g ? (can('plan.write') ? 'generate' : null) : canPublish && !plan.scheduleId ? 'publish' : 'export'
+  // Before there is a schedule the one next step is in the interview itself (answer, then build), so this header carries no button.
+  const primary: 'publish' | 'export' | null = !g ? null : canPublish && !plan.scheduleId ? 'publish' : 'export'
+  // Answers given after the schedule was last built: the interview says so and offers the rebuild.
+  const changedSinceBuild = g ? Object.values(plan.answers).filter(a => !!a?.answeredAt && a.answeredAt > g.generatedAt).length : 0
   const headerLoud = !(lateDays > 0 && recoveryCount > 0) && !(tab === 'interview' && !!g)
   const quiet = 'pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-[13px] font-medium text-ink hover:bg-warm-100 disabled:opacity-50'
   const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold disabled:opacity-50'
@@ -307,12 +311,10 @@ export default function PlanPage() {
               { label: busy === 'generate' ? 'Regenerating…' : 'Regenerate from the interview', icon: <RefreshCw size={15} aria-hidden />, onSelect: () => { if (!busy) void generate(false) } },
               { label: 'Discard overrides and rebuild', danger: true, onSelect: () => { if (!busy && confirm('Rebuild from the interview and discard all overrides?')) void generate(true) } },
             ]} />}
-            {primary === 'generate' && <button onClick={() => generate(false)} disabled={!!busy} className={loud}>
-              {busy === 'generate' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Play size={13} aria-hidden />} Generate schedule
-            </button>}
           </div>
         </div>
-        <div data-mood={status.mood} className="mood-tile mt-3 rounded-2xl border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {(g || busy === 'generate') && (
+        <div data-mood={status.mood} className="mood-tile mt-3 rounded-[14px] border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
           <div className="flex-1 min-w-[180px] text-[14px] font-medium text-ink leading-snug py-1">
             {status.onClick
@@ -325,10 +327,11 @@ export default function PlanPage() {
             <MoreNumbers rows={numbers} />
           </div>
         </div>
-        <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/60 p-1 gap-0.5">
+        )}
+        <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-lg bg-warm-100 p-0.5 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`pressable flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_3px_rgba(29,33,37,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
+              className={`pressable flex-shrink-0 px-3.5 py-1.5 rounded-md text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
               {t === 'interview' ? <>Interview{g && !ad.enoughToBuild && ad.remainingThatMatter > 0 ? <span className="ml-1.5 rounded-full bg-warm-200 text-warm-700 px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{ad.remainingThatMatter} open</span> : null}</> : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
@@ -359,8 +362,8 @@ export default function PlanPage() {
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
           <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-ink">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
         )}
-        <DocumentPrefill planId={id} canWrite={can('plan.write')} onSave={saveAnswers} />
-        <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
+        <div className="max-w-[760px] mx-auto"><DocumentPrefill planId={id} canWrite={can('plan.write')} onSave={saveAnswers} /></div>
+        <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} changedSinceBuild={changedSinceBuild} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
           onAnswer={saveAnswer} onAnswerMany={saveAnswers} onSuggest={suggest} onGenerate={() => generate(false)} onAddNote={addNote} />
       </>)}
       {tab === 'schedule' && g && <ScheduleTab plan={plan} textEdit={can('plan.write') ? (<>
@@ -976,7 +979,6 @@ type SraState = 'idle' | 'running' | 'error' | 'locked'
 
 /** The simulation is run by the page for each plan version (see PlanPage); this panel shows it. */
 function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; onRun: () => void }) {
-  const max = r ? Math.max(...r.histogram.map(h => h.count)) : 1
   const pct = (x: number) => `${Math.round(x * 100)}%`
   return (
     <Disclosure title="Schedule risk analysis (Monte Carlo)" meta={r?.required ? `${pct(r.required.probability)} chance of ${fmtDate(r.required.date)}` : r ? `P80 ${fmtDate(r.percentiles.p80)}` : state === 'running' ? 'running…' : state === 'locked' ? 'Pro and Enterprise' : 'not run yet'}>
@@ -1003,15 +1005,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
             ))}
           </dl>
           {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
-          <div>
-            <div className="text-[12px] text-warm-500 mb-1">Finish date distribution ({r.iterations.toLocaleString()} runs)</div>
-            <div className="flex items-end gap-0.5 h-24" role="img" aria-label={`Histogram of simulated finish dates from ${fmtDate(r.histogram[0]?.from)} to ${fmtDate(r.histogram[r.histogram.length - 1]?.to)}; median ${fmtDate(r.percentiles.p50)}.`}>
-              {r.histogram.map((h, i) => (
-                <div key={i} title={`${fmtDate(h.from)}–${fmtDate(h.to)}: ${h.count} runs`} className={`flex-1 rounded-t ${r.required && h.to <= r.required.date ? 'bg-status-on-track/70' : 'bg-accent-500/70'}`} style={{ height: `${Math.max(2, (h.count / max) * 100)}%` }} />
-              ))}
-            </div>
-            <div className="flex justify-between text-[12px] text-warm-500 mt-1"><span>{fmtDate(r.histogram[0]?.from)}</span><span>{fmtDate(r.histogram[r.histogram.length - 1]?.to)}</span></div>
-          </div>
+          <FinishDistribution histogram={r.histogram} iterations={r.iterations} required={r.required?.date} median={r.percentiles.p50} />
           <div>
           {r.sensitivity.length > 0 && (
             <Disclosure title="What drives the risk" meta={`${r.sensitivity.length} activities`}>

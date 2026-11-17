@@ -4,11 +4,12 @@ import { AskTextHost } from '@/components/AskText'
 import { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense, Fragment } from 'react'
 import type { DataLocation } from '@/lib/server/data-location'
 import { FileSourcePicker } from '@/components/FileSourcePicker'
+import { Disclosure } from '@/components/Disclosure'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutGrid, Plus, BarChart3, Upload,
-  LogOut, X, ChevronDown, Lock, UserCog, Building2, KeyRound, MailCheck, PanelLeftClose, PanelLeftOpen, Trash2,
+  LogOut, X, ChevronDown, ChevronRight, Check, Lock, UserCog, Building2, KeyRound, MailCheck, PanelLeftClose, PanelLeftOpen, Trash2,
   MessageSquare,
   FileText,
   Wrench,
@@ -257,6 +258,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [showUpload,       setShowUpload]       = useState(false)
   const [showScheduleList, setShowScheduleList] = useState(false)
+  const [projectFilter,    setProjectFilter]    = useState('')
   const [showSettings,     setShowSettings]     = useState(false)
   const uploadDialog = usePresence(showUpload), listDialog = usePresence(showScheduleList), settingsDialog = usePresence(showSettings)
   const [uploading,        setUploading]        = useState(false)
@@ -462,6 +464,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const openUpload = () => { setUploadSummary(null); setUploadError(''); setShowUpload(true) }
+  const openProjectList = () => { setProjectFilter(''); setShowScheduleList(true) }
   // Sidebar: the five most recent projects (one entry per project name, its latest upload)
   const recent = schedules.filter(s => s.sourceType !== 'generated')
     .filter((s, i, all) => all.findIndex(x => x.name === s.name) === i).slice(0, 5)
@@ -606,7 +609,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <>
                   <Link href="/dashboard" className="flex-shrink-0 hover:text-white">Projects</Link>
                   <span aria-hidden="true">/</span>
-                  <button type="button" data-compact onClick={() => setShowScheduleList(true)} aria-label={`${selectedSchedule.name}: switch project`} className="inline-flex min-w-0 items-center gap-1 font-semibold text-white hover:underline">
+                  <button type="button" data-compact onClick={openProjectList} aria-label={`${selectedSchedule.name}: switch project`} className="inline-flex min-w-0 items-center gap-1 font-semibold text-white hover:underline">
                     <span className="truncate">{selectedSchedule.name}</span><ChevronDown size={13} aria-hidden="true" className="flex-shrink-0" />
                   </button>
                   <span aria-hidden="true">/</span>
@@ -656,7 +659,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             </div>
                           )}
                           <MoreMenu label="More actions for this project" items={[
-                            { label: 'Switch project', onSelect: () => setShowScheduleList(true), icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
+                            { label: 'Switch project', onSelect: openProjectList, icon: <ChevronDown size={15} aria-hidden="true" />, className: 'md:hidden' },
                             { label: 'Ask about this project', onSelect: () => router.push(`/dashboard/ask?schedule=${selectedSchedule.id}`), icon: <MessageSquare size={15} aria-hidden="true" />, className: 'md:hidden' },
                             ...(owns ? [
                               { label: 'Add a schedule update', onSelect: openUpload, icon: <Upload size={15} aria-hidden="true" />, className: 'md:hidden' },
@@ -762,10 +765,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Upload Modal ──────────────────────────────────────── */}
         {uploadDialog.mounted && (
-          <Dialog closing={uploadDialog.closing} labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+          <Dialog closing={uploadDialog.closing} labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
                 <h2 id="upload-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Upload a schedule</h2>
-                <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
 
               {/* Mobile drag handle */}
@@ -806,44 +809,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <FileSourcePicker accept=".xer,.xml,.pdf,.xlsx,.csv" canManage={can('org.manage')}
                     hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
                 </div>
-                <div className="mb-4">
-                  <div id="upload-tag-h" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Tag for firm history <span className="normal-case font-normal tracking-normal">(optional)</span></div>
-                  <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
-                    <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
-                      <option value="">Facility type…</option>
-                      {PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
-                    </select>
-                    <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 uppercase" />
-                    <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700" />
-                  </div>
-                  <p className="text-[12px] text-warm-400 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
-                </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  <label className="block text-[12px] text-warm-600">Whose schedule
-                    <select name="origin" defaultValue="" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
-                      <option value="">Not stated</option>
-                      <option value="own">Our own project</option>
-                      <option value="third_party">Third-party (we review it)</option>
-                    </select>
-                  </label>
-                  <label className="block text-[12px] text-warm-600">Classification
-                    <select name="classification" defaultValue="unclassified" className="mt-1 w-full bg-warm-100 border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
+                <div className="mb-4">
+                  <label className="block text-[12px] font-semibold text-warm-600">Classification
+                    <select name="classification" defaultValue="unclassified" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 font-normal">
                       <option value="unclassified">Unclassified</option>
                       <option value="cui">CUI</option>
                       <option value="classified">Classified</option>
                     </select>
                   </label>
-                  <p className="col-span-2 text-[12px] text-warm-500">Third-party schedules and RunF9 re-imports never calibrate firm history. CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
+                  <p className="text-[12px] text-warm-600 mt-1.5">CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
+                {/* What few uploads need is folded: the tags for firm history, whose schedule it is, and a version label. */}
                 <div className="mb-5">
-                  <label htmlFor="upload-version" className="block text-[12px] font-semibold text-warm-400 mb-1.5">Version label</label>
-                  <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
-                    className="w-full bg-warm-100 border border-warm-300 rounded-md px-3 py-2 text-[13px] text-warm-700" />
+                  <Disclosure title="More options" meta="firm history, version label">
+                    <div className="space-y-4">
+                      <div>
+                        <div id="upload-tag-h" className="block text-[12px] font-semibold text-warm-600 mb-1.5">Tag for firm history</div>
+                        <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
+                          <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
+                            <option value="">Facility type…</option>
+                            {PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
+                          </select>
+                          <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 uppercase placeholder:normal-case" />
+                          <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700" />
+                        </div>
+                        <p className="text-[12px] text-warm-600 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
+                      </div>
+                      <div>
+                        <label className="block text-[12px] font-semibold text-warm-600">Whose schedule
+                          <select name="origin" defaultValue="" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 font-normal">
+                            <option value="">Not stated</option>
+                            <option value="own">Our own project</option>
+                            <option value="third_party">Third-party (we review it)</option>
+                          </select>
+                        </label>
+                        <p className="text-[12px] text-warm-600 mt-1.5">Third-party schedules and RunF9 re-imports never calibrate firm history.</p>
+                      </div>
+                      <div>
+                        <label htmlFor="upload-version" className="block text-[12px] font-semibold text-warm-600 mb-1.5">Version label</label>
+                        <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
+                          className="w-full bg-white border border-warm-300 rounded-lg px-3 py-2 text-[13px] text-warm-700" />
+                      </div>
+                    </div>
+                  </Disclosure>
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="w-full bg-accent-600 text-white py-3 rounded-full text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
-                  {uploading ? 'Parsing schedule…' : 'Upload & Parse'}
+                  className="pressable w-full bg-accent-600 text-white h-10 rounded-lg text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-60">
+                  {uploading ? 'Reading the schedule…' : 'Upload'}
                 </button>
               </form>
               )}
@@ -851,103 +864,110 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* ── Schedule List Modal ───────────────────────────────── */}
+        {/* A plain list: the project you are in carries a tick, and a long list can be narrowed by name. */}
         {listDialog.mounted && (
-          <Dialog closing={listDialog.closing} labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
+          <Dialog closing={listDialog.closing} labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between mb-4">
                 <h2 id="switch-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Switch project</h2>
-                <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
-                <p className="text-center text-warm-400 py-8 text-[14px]">No schedules yet. Upload one to get started.</p>
-              ) : (
-                <div className="space-y-2">
-                  {schedules.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => { setSelectedSchedule(s); setShowScheduleList(false); router.push(`${inProject ? pathname : '/dashboard/project'}?schedule=${s.id}`) }}
-                      className={`w-full text-left p-3.5 rounded-md border transition-colors ${
-                        selectedSchedule?.id === s.id
-                          ? 'border-accent-500 bg-accent-100'
-                          : 'border-warm-200 hover:border-warm-300 bg-warm-100'
-                      }`}
-                    >
-                      <div className="text-[14px] font-semibold text-ink">{s.name}</div>
-                      <div className="text-[12px] text-warm-400 mt-0.5">
-                        {s.version} · {s.activityCount.toLocaleString()} activities · {sourceLabel(s.sourceType)}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+                <p className="py-4 text-[14px] text-warm-600">No schedules yet. Upload one to get started.</p>
+              ) : (() => {
+                const q = projectFilter.trim().toLowerCase()
+                const shown = q ? schedules.filter(s => s.name.toLowerCase().includes(q)) : schedules
+                return (
+                  <>
+                    {schedules.length > 8 && (
+                      <input type="search" value={projectFilter} onChange={e => setProjectFilter(e.target.value)} aria-label="Find a project by name" placeholder="Find a project"
+                        className="mb-3 w-full bg-white border border-warm-300 rounded-lg px-3 h-10 text-[14px] text-ink placeholder:text-warm-600" />
+                    )}
+                    {shown.length === 0 ? <p className="py-4 text-[14px] text-warm-600">No project matches that name.</p> : (
+                      <ul className="divide-y divide-warm-200 border-y border-warm-200">
+                        {shown.map(s => {
+                          const current = selectedSchedule?.id === s.id
+                          return (
+                            <li key={s.id}>
+                              <button type="button" aria-current={current ? 'true' : undefined}
+                                onClick={() => { setSelectedSchedule(s); setShowScheduleList(false); router.push(`${inProject ? pathname : '/dashboard/project'}?schedule=${s.id}`) }}
+                                className="group w-full flex items-center gap-3 py-3 text-left">
+                                <span className="min-w-0 flex-1">
+                                  <span className={`block truncate text-[14px] text-ink group-hover:underline ${current ? 'font-semibold' : 'font-medium'}`}>{s.name}</span>
+                                  <span className="block text-[12px] text-warm-600 mt-0.5">{s.version} · {s.activityCount.toLocaleString()} activities · {sourceLabel(s.sourceType)}</span>
+                                </span>
+                                {current && <Check size={16} aria-hidden="true" className="flex-shrink-0 text-accent-600" />}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </>
+                )
+              })()}
               {can('schedule.write') && (
               <button
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
-                className="w-full mt-4 border border-warm-300 text-ink py-2.5 rounded-full text-[13px] font-medium hover:bg-warm-100 transition-colors"
+                className="pressable w-full mt-4 border border-warm-300 bg-white text-ink h-10 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors"
               >
-                + Upload a new project
+                Upload a new project
               </button>
               )}
           </Dialog>
         )}
 
         {/* ── Settings Modal ────────────────────────────────────── */}
+        {/* Who is signed in, where to go, and how AI is handled: plain lines, not boxes inside a box. */}
         {settingsDialog.mounted && (
-          <Dialog closing={settingsDialog.closing} labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-warm-50 border border-warm-200 rounded-t-xl md:rounded-lg w-full md:max-w-md p-6 shadow-xl">
+          <Dialog closing={settingsDialog.closing} labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between mb-4">
                 <h2 id="account-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Account</h2>
-                <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-400 hover:text-warm-600"><X size={18} /></button>
+                <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
-              <div className="space-y-3">
-                <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[12px] font-semibold text-warm-400 mb-2">Profile</div>
-                  <div className="text-[14px] font-semibold text-ink">{user.name}</div>
-                  <div className="text-[13px] text-warm-500">{user.email}</div>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-[16px] font-semibold text-ink">{user.name}</div>
+                  <div className="text-[13px] text-warm-600 break-all">{user.email}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {user.role && <span className="inline-block text-[12px] font-semibold capitalize text-accent-600 bg-accent-100 px-2 py-0.5 rounded-md">{user.role}</span>}
-                    {org && <span className="inline-block text-[12px] font-medium text-warm-600 bg-warm-200/60 px-2 py-0.5 rounded-md">{org.name}</span>}
+                    {user.role && <span className="inline-block text-[12px] font-semibold capitalize text-accent-700 bg-accent-100 px-2 py-0.5 rounded-md">{user.role}</span>}
+                    {org && <span className="inline-block text-[12px] font-medium text-warm-700 bg-warm-100 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Link href="/dashboard/account" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
-                    <UserCog size={14} aria-hidden="true" /> Account &amp; security
-                  </Link>
-                  <Link href="/dashboard/org" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
-                    <Building2 size={14} aria-hidden="true" /> Organization
-                  </Link>
-                </div>
-                {platformAdmin && (
-                  <Link href="/dashboard/platform" onClick={() => setShowSettings(false)} className="flex items-center justify-center gap-1.5 border border-warm-300 bg-white text-ink py-2.5 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors">
-                    <KeyRound size={14} aria-hidden="true" /> Beta access (platform)
-                  </Link>
-                )}
+                <ul className="divide-y divide-warm-200 border-y border-warm-200">
+                  {([
+                    { href: '/dashboard/account', label: 'Account & security', icon: <UserCog size={16} aria-hidden="true" /> },
+                    { href: '/dashboard/org', label: 'Organization', icon: <Building2 size={16} aria-hidden="true" /> },
+                    ...(platformAdmin ? [{ href: '/dashboard/platform', label: 'Beta access (platform)', icon: <KeyRound size={16} aria-hidden="true" /> }] : []),
+                  ]).map(l => (
+                    <li key={l.href}>
+                      <Link href={l.href} onClick={() => setShowSettings(false)} className="group flex items-center gap-3 py-3 text-[14px] font-medium text-ink">
+                        <span className="flex-shrink-0 text-warm-600">{l.icon}</span>
+                        <span className="flex-1 group-hover:underline">{l.label}</span>
+                        <ChevronRight size={16} aria-hidden="true" className="flex-shrink-0 text-warm-600" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
                 {llm && (
-                  <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                    <div className="text-[12px] font-semibold text-warm-400 mb-2">AI processing</div>
-                    <div className="text-[13px] text-warm-700 font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
-                    <div className="text-[12px] text-warm-500 mt-1">
+                  <div>
+                    <div className="text-[12px] font-semibold text-warm-600">AI processing</div>
+                    <div className="mt-0.5 text-[13px] text-ink font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} aria-hidden="true" />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
+                    <div className="text-[12px] text-warm-600 mt-1">
                       {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
                       {llm.mode === 'local' && `Model ${modelLine(llm)} on ${llm.host}. Nothing leaves your network.`}
                       {llm.mode === 'offline' && (llm.error || 'No model configured. Scheduling, CPM, quality checks and reports run fully offline.')}
                     </div>
                   </div>
                 )}
-                <div className="bg-warm-100 border border-warm-200 rounded-md p-4">
-                  <div className="text-[12px] font-semibold text-warm-400 mb-2">About</div>
-                  <div className="text-[13px] text-warm-600">RunF9 · Version 1.0</div>
-                  <div className="text-[13px] text-warm-400">Built by Hoshmand AI</div>
-                  <div className="flex gap-4 mt-2">
-                    <Link href="/privacy" className="text-[13px] text-accent-600 hover:underline">Privacy</Link>
-                    <Link href="/terms" className="text-[13px] text-accent-600 hover:underline">Terms</Link>
-                  </div>
-                </div>
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-center gap-2 border border-warm-300 text-warm-600 py-2.5 rounded-md text-[13px] font-medium hover:bg-warm-100 transition-colors"
+                  className="pressable w-full flex items-center justify-center gap-2 border border-warm-300 bg-white text-ink h-10 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors"
                 >
-                  <LogOut size={14} /> Sign Out
+                  <LogOut size={14} aria-hidden="true" /> Sign out
                 </button>
+                <p className="text-[12px] text-warm-600">RunF9 · Version 1.0 · Built by Hoshmand AI · <Link href="/privacy" className="text-accent-700 underline underline-offset-2">Privacy</Link> · <Link href="/terms" className="text-accent-700 underline underline-offset-2">Terms</Link></p>
               </div>
           </Dialog>
         )}

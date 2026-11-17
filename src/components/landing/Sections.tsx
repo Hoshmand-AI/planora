@@ -5,7 +5,7 @@
 // docs/marketing/CLAIMS-REGISTER.md. The product pictures are drawn in HTML from sample data and say so.
 
 import { useRef, useState } from 'react'
-import { ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchCheck, KeyRound, Users, ListChecks, Building2, EyeOff, Database, Lock } from 'lucide-react'
+import { ArrowRight, ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchCheck, KeyRound, Users, ListChecks, Building2, EyeOff, Database, Lock } from 'lucide-react'
 import { Reveal } from './motion'
 import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
 
@@ -88,7 +88,7 @@ function LiveBrief() {
       </div>
       <div className="p-5 md:p-8">
         <div className="text-[13.5px] text-warm-600">{b.project} · brief for {b.asOf}</div>
-        <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-warm-600">Are we meeting the deadline?</p>
+        <p className="mt-2 text-[13.5px] font-semibold text-warm-600">Are we meeting the deadline?</p>
         <p className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-status-at-risk leading-tight mt-1">No. {b.headline.daysBehind} days behind.</p>
         <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1.5">{b.headline.text}</p>
 
@@ -104,7 +104,7 @@ function LiveBrief() {
               <ul className="space-y-3">
                 {b.signals.map(g => (
                   <li key={g.quote} className="rounded-xl border border-warm-200 p-4">
-                    <span className={`inline-block text-[12px] font-semibold uppercase tracking-wide rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
+                    <span className={`inline-block text-[12.5px] font-semibold capitalize rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
                     <p className="text-[15.5px] text-ink leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
                     <p className="text-[14px] text-warm-600 mt-1.5">{g.source}{g.activity ? ` · about ${g.activity}` : ''}{g.days ? ` · ${g.days} work days` : ''}</p>
                   </li>
@@ -140,7 +140,7 @@ export function DailyBrief() {
     <section id="today" aria-labelledby="today-h" className="bg-navy-950 scroll-mt-16">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="text-center max-w-[820px] mx-auto">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">The Daily Brief</p>
+          <p className="text-[15px] font-semibold text-accent-400">The Daily Brief</p>
           <h2 id="today-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Every morning, what changed and what to do about it.</h2>
           <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
         </Reveal>
@@ -151,7 +151,7 @@ export function DailyBrief() {
             <p className="text-[14.5px] text-navy-200 mt-4">This is the brief RunF9 computed for its sample data center project on {SAMPLE_BRIEF.asOf}, word for word. No AI model wrote it. Switch the reader to see what each one is told.</p>
           </Reveal>
           <Reveal>
-            <h3 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400">Needs attention today</h3>
+            <h3 className="text-[15px] font-semibold text-accent-400">Needs attention today</h3>
             <ul className="mt-4 space-y-3">
               {SAMPLE_BRIEF.alerts.slice(0, 5).map(a => (
                 <li key={a.text} className="flex gap-3 rounded-xl border border-navy-800 bg-navy-900 p-4">
@@ -180,27 +180,26 @@ export function DailyBrief() {
 
 // ── Check it yourself ────────────────────────────────────────────────────────────────────────────
 
-/** Proof a visitor can check without taking our word for it: a real report, the tests, and who built it. */
+/**
+ * Proof a visitor can check without taking our word for it: a real report, and who built it. One quiet row, not
+ * three boxed cards. How each figure is tested is linked from under the figures just above, so it is not said again here.
+ */
 export function Proof() {
-  const cards: { icon: typeof ScrollText; title: string; text: string; href: string; cta: string }[] = [
-    { icon: ScrollText, title: 'Read a real report', text: 'The Executive Schedule Summary RunF9 wrote for its sample data center, shown exactly as generated, with the file hash and settings it used.', href: '/sample-report', cta: 'Open the sample report' },
-    { icon: SearchCheck, title: 'See where each figure comes from', text: 'Every number on this page is tied to an automated test. We will run those tests in front of your team.', href: '#evidence', cta: 'Where these numbers come from' },
-    { icon: Users, title: 'Built by a scheduler', text: 'RunF9 is built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field. You talk to the person who built it.', href: 'mailto:support@hoshmand.ai', cta: 'Write to the founder' },
+  const items: { title: string; text: string; href: string; cta: string }[] = [
+    { title: 'Read a real report', text: 'The Executive Schedule Summary RunF9 wrote for its sample data center, shown exactly as generated, with the file hash and settings it used.', href: '/sample-report', cta: 'Open the sample report' },
+    { title: 'Built by a scheduler', text: 'RunF9 is built by Hoshmand AI, founded by a construction scheduling consultant with 13 years in the field. You talk to the person who built it.', href: 'mailto:support@hoshmand.ai', cta: 'Write to the founder' },
   ]
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
-      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-20">
-        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-ink text-center">Don’t take our word for it. Check the work.</h2>
-        <ul className="mt-10 grid md:grid-cols-3 gap-5">
-          {cards.map(({ icon: Icon, title, text, href, cta }) => (
-            <li key={title} className="rounded-2xl border border-warm-200 bg-warm-50 p-6 md:p-7 flex flex-col">
-              <span className="w-11 h-11 rounded-xl bg-navy-950 text-white flex items-center justify-center"><Icon size={21} strokeWidth={1.7} aria-hidden /></span>
-              <h3 className="text-[19px] font-semibold text-ink mt-5 tracking-[-0.01em]">{title}</h3>
-              <p className="text-[16px] text-warm-700 leading-relaxed mt-2 flex-1">{text}</p>
-              <a href={href} className="pressable mt-6 inline-flex items-center justify-center self-start rounded-full border border-warm-300 bg-white px-5 py-2.5 text-[15px] font-semibold text-ink hover:border-navy-900">{cta}</a>
-            </li>
-          ))}
-        </ul>
+      <div className="max-w-[1240px] mx-auto px-6 py-14 md:py-16 grid md:grid-cols-3 gap-x-12 gap-y-8">
+        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-ink leading-tight">Don’t take our word for it. Check the work.</h2>
+        {items.map(({ title, text, href, cta }) => (
+          <div key={title} className="border-t border-warm-300 pt-5">
+            <h3 className="text-[18px] font-semibold text-ink tracking-[-0.01em]">{title}</h3>
+            <p className="text-[16px] text-warm-700 leading-relaxed mt-2">{text}</p>
+            <a href={href} className="pressable mt-3 inline-flex items-center gap-1.5 text-[15.5px] font-semibold text-accent-700 underline-offset-4 hover:underline">{cta}<ArrowRight size={16} aria-hidden /></a>
+          </div>
+        ))}
       </div>
     </section>
   )
@@ -209,13 +208,13 @@ export function Proof() {
 // ── Who it is for ────────────────────────────────────────────────────────────────────────────────
 
 const AUDIENCES = [
-  { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Today · What-if', alt: 'What-if results in RunF9: a pending change order, a utility delay and a recovery option, each with the days it moves the finish, beside the work at risk in the next month.',
+  { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Overview · What-if', alt: 'What-if results on the Overview page in RunF9: a pending change order, a utility delay, a delay reported in meeting minutes and the best recovery option, each with the days it moves the finish.',
     points: ['A brief every morning: what drives the finish, what is overdue and what starts today.', 'Each open change is run against the schedule before you price it or send notice.', 'When a date slips, recovery options are re-scheduled on the real network and priced from your labor cost.'] },
-  { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'checks', label: 'RunF9 · Evaluation', alt: 'A failed DCMA check in RunF9: high float, with what it means, why it matters, how to fix it and the activities flagged.',
+  { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'checks', label: 'RunF9 · Health · What to fix', alt: 'A failed DCMA check in RunF9 for the sample data center: negative float, with what it means, why it matters, how to fix it and the activities to look at.',
     points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'All 14 DCMA checks on every submission, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
-  { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Schedule', alt: 'The Schedule page in RunF9: a Gantt chart of the sample data center with the critical path and the data date marked.',
+  { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Gantt chart', alt: 'The Gantt chart in RunF9 for the sample data center: work areas and their activities, with progress, the critical path, the baseline and the data date marked.',
     points: ['Reads and writes P6 and MS Project files, so your client’s tools do not change.', 'Time Impact Analysis with hashed inputs and results: the same inputs reproduce the same answer.', 'Each client’s projects sit in their own workspace, and each client’s files can stay in that client’s cloud.'] },
-  { id: 'federal', tab: 'Federal and defense work', title: 'Built for projects that cannot leave your boundary.', shot: 'earned-value', label: 'RunF9 · Overview · Earned value', alt: 'The Earned value view in RunF9: SPI, CPI, schedule and cost variance, estimate at completion and the cumulative cost curve.',
+  { id: 'federal', tab: 'Federal and defense work', title: 'Built for projects that cannot leave your boundary.', shot: 'earned-value', label: 'RunF9 · Earned value', alt: 'The Earned value page in RunF9: SPI, CPI, schedule and cost variance, estimate at completion and the cumulative cost curve.',
     points: ['Projects marked CUI or classified are never sent to an AI model and have no inbox or mailbox connection.', 'Runs air-gapped on your own servers; every release is checked to send nothing outside your network.', 'Earned value and an IPMDAR schedule export, with a NIST SP 800-171 control mapping for your security review.'] },
 ]
 
@@ -315,7 +314,7 @@ export function Security({ contactHref }: { contactHref: string }) {
     <section id="security" aria-labelledby="security-h" className="bg-navy-950 scroll-mt-16">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="max-w-[720px]">
-          <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-accent-400"><Lock size={15} aria-hidden />Security</p>
+          <p className="flex items-center gap-2 text-[15px] font-semibold text-accent-400"><Lock size={15} aria-hidden />Security</p>
           <h2 id="security-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Security you can check for yourself.</h2>
           <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">Each control below is enforced in code and tested on every change. We will run the tests in front of your security team.</p>
         </Reveal>

@@ -141,7 +141,8 @@ export function ProjectsDashboard() {
   }, [rows, q, filter, sort, pins, col])
 
   // Phones always get cards: a 9-column table can't be read on a narrow screen
-  const view: View = narrow ? 'cards' : viewPref ?? (rows.length > 12 ? 'table' : 'cards')
+  // One project is a card: there is nothing to tabulate, and no switch is offered for it.
+  const view: View = narrow || rows.length < 2 ? 'cards' : viewPref ?? (rows.length > 12 ? 'table' : 'cards')
   const open = (r: PortfolioRow) => {
     if (r.kind === 'schedule') { const s = schedules.find(x => x.id === r.id); if (s) setSelectedSchedule(s) }
     router.push(r.href)
@@ -220,7 +221,7 @@ export function ProjectsDashboard() {
         <div role="group" aria-label="View" className="hidden md:inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
           {([['cards', LayoutGrid, 'Cards'], ['table', Rows3, 'Table']] as const).map(([id, Icon, label]) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} title={label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-ink'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium ${view === id ? 'bg-accent-100 text-accent-700' : 'text-warm-600 hover:text-ink'}`}>
               <Icon size={15} aria-hidden /><span className="hidden sm:inline">{label}</span><span className="sm:hidden sr-only">{label}</span>
             </button>
           ))}
@@ -233,10 +234,16 @@ export function ProjectsDashboard() {
 
       {/* Summary strip: each number is a filter */}
       {/* With a handful of projects the five big counters are mostly zeros, so the filters are a row of chips instead. */}
-      {counts.all < 6 ? (
+      {counts.all < 6 ? (() => {
+        // A filter that would show nothing, or everything, says nothing: it is not offered. With one project there is no row at all.
+        const chips = FILTERS.filter(f => f.id === 'all' || filter === f.id || (counts[f.id] > 0 && counts[f.id] < counts.all))
+        const useful = chips.length > 1
+        if (!useful && rows.length < 2) return null
+        return (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {useful ? (
         <div role="group" aria-label="Filter projects by status" className="flex flex-wrap gap-1.5">
-          {FILTERS.filter(f => f.id === 'all' || counts[f.id] > 0).map(f => {
+          {chips.map(f => {
             const on = filter === f.id
             return (
               <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on && f.id !== 'all' ? 'all' : f.id)}
@@ -246,9 +253,11 @@ export function ProjectsDashboard() {
             )
           })}
         </div>
-        {viewSwitch}
+        ) : <span />}
+        {rows.length >= 2 && viewSwitch}
         </div>
-      ) : (
+        )
+      })() : (
       <div role="group" aria-label="Filter projects by status" title={counts.stale > 0 ? 'A project that needs an update is also counted under its status, so the groups can add up to more than the total.' : undefined} className="grid grid-cols-3 gap-2 md:grid-cols-5 md:gap-2.5">
         {FILTERS.map(f => {
           const on = filter === f.id
@@ -340,31 +349,44 @@ function Monogram({ title }: { title: string }) {
   return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[14px] font-semibold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
 }
 
-/** The open items of every project in one list: what is late, at risk or stale, most serious first, each opening its project. */
+/**
+ * The open items of every project in one list: what is late, at risk or stale. A project is named once, above
+ * its items (it was repeated on every line), the project with the most serious item first. With a single
+ * project its name is on the card just above, so it is not repeated here at all.
+ */
 function OpenItems({ rows, onOpen }: { rows: PortfolioRow[]; onOpen: (r: PortfolioRow) => void }) {
   const [all, setAll] = useState(false)
-  const items = rows.flatMap(r => r.alerts.filter(a => a.severity !== 'info').map(a => ({ r, a })))
-    .sort((x, y) => SEVERITY[x.a.severity] - SEVERITY[y.a.severity])
-  if (!items.length) return null
-  const shown = all ? items : items.slice(0, 6)
+  const groups = rows
+    .map(r => ({ r, items: r.alerts.filter(a => a.severity !== 'info').sort((x, y) => SEVERITY[x.severity] - SEVERITY[y.severity]) }))
+    .filter(g => g.items.length > 0)
+    .sort((x, y) => SEVERITY[x.items[0].severity] - SEVERITY[y.items[0].severity] || y.items.length - x.items.length)
+  const total = groups.reduce((n, g) => n + g.items.length, 0)
+  if (!total) return null
+  // Folded, the list holds six items in all, taken from the top.
+  let room = all ? Number.POSITIVE_INFINITY : 6
+  const shown = groups.map(g => { const items = g.items.slice(0, Math.max(0, room)); room -= items.length; return { r: g.r, items } }).filter(g => g.items.length > 0)
   return (
     <section aria-labelledby="open-items-h" className="rounded-[14px] border border-warm-200 bg-white p-5 md:p-6">
       <div className="flex items-baseline gap-2">
         <h2 id="open-items-h" className="text-[14px] font-semibold text-ink">Open items</h2>
-        <span className="rounded-full border border-warm-300 px-2 text-[12px] font-semibold tabular-nums text-warm-700">{shown.length} of {items.length}</span>
+        <span className="text-[13px] tabular-nums text-warm-600">{total}</span>
       </div>
-      <ul className="mt-2 divide-y divide-warm-200">
-        {shown.map(({ r, a }, i) => (
-          <li key={`${key(r)}-${a.code}-${i}`} className="flex items-start gap-3 py-3">
-            <span className={`mt-0.5 flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-[12px] font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
-            <div className="min-w-0 flex-1">
-              <button type="button" onClick={() => onOpen(r)} className="text-left text-[14px] font-semibold text-accent-700 hover:underline">{r.title}</button>
-              <p className="text-[13px] leading-snug text-warm-700">{fmtDates(a.text)}</p>
-            </div>
-          </li>
+      <div className="mt-2 space-y-4">
+        {shown.map(({ r, items }) => (
+          <div key={key(r)}>
+            {rows.length > 1 && <h3 className="pt-1"><button type="button" onClick={() => onOpen(r)} className="text-left text-[14px] font-semibold text-accent-700 hover:underline">{r.title}</button></h3>}
+            <ul className="divide-y divide-warm-200">
+              {items.map((a, i) => (
+                <li key={`${a.code}-${i}`} className="flex items-start gap-3 py-2.5">
+                  <span className={`mt-px flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-[12px] font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
+                  <p className="min-w-0 flex-1 text-[13px] leading-snug text-warm-700 pt-0.5">{fmtDates(a.text)}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
-      {items.length > 6 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${items.length}`}</button>}
+      </div>
+      {total > 6 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${total}`}</button>}
     </section>
   )
 }
@@ -507,7 +529,7 @@ function DataLocationPicker({ loc }: { loc: DataLocation }) {
   return (
     <div className="mt-2">
       <button type="button" aria-expanded={open} aria-controls={pid} onClick={() => setOpen(o => !o)}
-        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-full border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-ink">
+        className="pressable inline-flex max-w-full items-center gap-1.5 rounded-lg border border-warm-200 bg-white px-3 py-1.5 text-[13px] text-warm-600 hover:border-warm-300 hover:text-ink">
         <Cloud size={14} aria-hidden className="flex-shrink-0" />
         <span className="sr-only">Data storage: </span>
         <span className="truncate font-semibold text-ink">{loc.label}</span>

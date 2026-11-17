@@ -121,7 +121,7 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
             <dl className="mt-6 grid gap-5 md:grid-cols-3">
               {ROW.map(r => (
                 <div key={r.key}>
-                  <dt className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-warm-500"><r.icon size={14} aria-hidden />{r.label}</dt>
+                  <dt className="flex items-center gap-2 text-[13.5px] font-semibold text-warm-600"><r.icon size={14} aria-hidden />{r.label}</dt>
                   <dd className="mt-2 text-[15px] leading-relaxed text-warm-700">{o[r.key]}</dd>
                 </div>
               ))}

@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { Disclosure } from './Disclosure'
+import { FinishDistribution } from './FinishDistribution'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { EditsPanel, RecoveryPanel, RiskInputsPanel, type RiskInputsView } from './UploadedScheduleEdits'
 
@@ -25,6 +26,7 @@ interface Comparison {
 interface SraMilestone { id: string; code: string; name: string; contract: boolean; required: string | null; requiredSource: string | null; deterministic: string; p50: string; p80: string; probability: number | null }
 interface Sra {
   method: string; percentiles: { p10: string; p50: string; p80: string; p90: string }; deterministic: string; required?: { date: string; probability: number }
+  histogram?: { from: string; to: string; count: number }[]; iterations?: number
   contract?: SraMilestone | null; milestones?: SraMilestone[]; warnings?: string[]
   sensitivity: { code: string; name: string; correlation: number; basis: string }[]; assumptions: string[]
   events?: { id: string; name: string; code: string; probability: number; impactDays: number; occurred: number; finishDeltaDays: number }[]
@@ -128,12 +130,12 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
               <a className="underline text-ink" href={`/api/schedules/windows?${new URLSearchParams({ id: scheduleId, ...bq, format: 'xlsx' }).toString()}`}>Windows analysis (Excel)</a></p>
             <ul className="list-disc pl-5 space-y-1">{cmp.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
             {cmp.floatErosion.length > 0 && (
-              <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Largest float erosion (work days)</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Largest float erosion (work days)"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Largest float erosion (work days)</caption>
                 <thead><tr><th className={th}>ID</th><th className={th}>Activity</th><th className={th}>Before</th><th className={th}>After</th><th className={th}>Change</th></tr></thead>
                 <tbody>{cmp.floatErosion.slice(0, 10).map(f => <tr key={f.code}><td className={td}>{f.code}</td><td className={td}>{f.name}</td><td className={td}>{f.before}</td><td className={td}>{f.after}</td><td className={td}>{f.delta}</td></tr>)}</tbody></table></div>
             )}
             {cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).length > 0 && (
-              <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Duration, constraint and calendar changes</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Duration, constraint and calendar changes"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Duration, constraint and calendar changes</caption>
                 <thead><tr><th className={th}>ID</th><th className={th}>Activity</th><th className={th}>Change</th><th className={th}>Before</th><th className={th}>After</th></tr></thead>
                 <tbody>{cmp.changes.filter(c => ['duration', 'constraint', 'calendar'].includes(c.field)).slice(0, 20).map((c, i) => <tr key={i}><td className={td}>{c.code}</td><td className={td}>{c.name}</td><td className={td}>{c.field}</td><td className={td}>{fmtDates(String(c.before ?? '—'))}</td><td className={td}>{fmtDates(String(c.after ?? '—'))}</td></tr>)}</tbody></table></div>
             )}
@@ -167,25 +169,71 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
             {sraErr && <p className="text-status-at-risk">{sraErr}</p>}
           </div>
         ) : (
-          <div className="text-[13px] text-warm-700 space-y-2">
-            <p><span className="font-semibold text-ink">Monte Carlo P50 {fmtDate(sra.percentiles.p50)} · P80 {fmtDate(sra.percentiles.p80)}</span> (deterministic forecast {fmtDate(sra.deterministic)}){sra.required ? `; ${Math.round(sra.required.probability * 100)}% chance of meeting ${fmtDate(sra.required.date)}` : ''}.</p>
-            <p className="text-warm-600">{sra.method}</p>
+          <div className="text-[13px] text-warm-700 space-y-4">
+            {/* The answer first: three figures. How it was simulated, and the scheduler's own inputs, are folded below. */}
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-4">
+              <div>
+                <dt className="text-[12px] text-warm-600">P50 finish</dt>
+                <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.percentiles.p50)}</dd>
+                <dd className="text-[12px] text-warm-600">half of the simulated outcomes finish by then</dd>
+              </div>
+              <div>
+                <dt className="text-[12px] text-warm-600">P80 finish</dt>
+                <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.percentiles.p80)}</dd>
+                <dd className="text-[12px] text-warm-600">a date to commit to with 80% confidence</dd>
+              </div>
+              {sra.required ? (
+                <div>
+                  <dt className="text-[12px] text-warm-600">Chance of meeting {fmtDate(sra.required.date)}</dt>
+                  <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{Math.round(sra.required.probability * 100)}%</dd>
+                  <dd className="text-[12px] text-warm-600">deterministic forecast {fmtDate(sra.deterministic)}</dd>
+                </div>
+              ) : (
+                <div>
+                  <dt className="text-[12px] text-warm-600">Deterministic forecast</dt>
+                  <dd className="mt-0.5 text-[20px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(sra.deterministic)}</dd>
+                  <dd className="text-[12px] text-warm-600">if every activity takes its planned duration</dd>
+                </div>
+              )}
+            </dl>
+            {sra.histogram && sra.histogram.length > 0 && <FinishDistribution histogram={sra.histogram} iterations={sra.iterations} required={sra.required?.date} median={sra.percentiles.p50} />}
             {sra.warnings && sra.warnings.length > 0 && <ul className="list-disc pl-5 border-l-2 border-status-info">{sra.warnings.map((x, i) => <li key={i}>{x}</li>)}</ul>}
-            {sra.contract && <p><span className="font-semibold text-ink">Contract milestone {sra.contract.code} {sra.contract.name}: P50 {fmtDate(sra.contract.p50)} · P80 {fmtDate(sra.contract.p80)}</span>{sra.contract.required && sra.contract.probability != null ? `; ${Math.round(sra.contract.probability * 100)}% chance of meeting ${fmtDate(sra.contract.required)}${sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}` : '; no date to meet'}.</p>}
+            {/* The contract milestone is spelled out only when its dates differ from the project's: the same dates are not said twice. */}
+            {sra.contract && (sra.contract.p50 === sra.percentiles.p50 && sra.contract.p80 === sra.percentiles.p80 && (sra.contract.required ?? null) === (sra.required?.date ?? null)
+              ? <p className="text-warm-600">These are also the dates of the contract milestone {sra.contract.code} {sra.contract.name}{sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}.</p>
+              : <p><span className="font-semibold text-ink">Contract milestone {sra.contract.code} {sra.contract.name}: P50 {fmtDate(sra.contract.p50)} · P80 {fmtDate(sra.contract.p80)}</span>{sra.contract.required && sra.contract.probability != null ? `; ${Math.round(sra.contract.probability * 100)}% chance of meeting ${fmtDate(sra.contract.required)}${sra.contract.requiredSource ? ` (${sra.contract.requiredSource})` : ''}` : '; no date to meet'}.</p>)}
             {sra.milestones && sra.milestones.filter(m => !m.contract).length > 0 && (
-              <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Milestones with a finish constraint</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Milestones with a finish constraint"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Milestones with a finish constraint</caption>
                 <thead><tr><th className={th}>Milestone</th><th className={th}>Date to meet</th><th className={th}>P50</th><th className={th}>P80</th><th className={th}>Chance of meeting</th></tr></thead>
                 <tbody>{sra.milestones.filter(m => !m.contract).map(m => <tr key={m.id}><td className={td}>{m.code} {m.name}</td><td className={td}>{m.required ? fmtDate(m.required) : '—'}</td><td className={td}>{fmtDate(m.p50)}</td><td className={td}>{fmtDate(m.p80)}</td><td className={td}>{m.probability != null ? `${Math.round(m.probability * 100)}%` : '—'}</td></tr>)}</tbody></table></div>
             )}
-            {sra.sensitivity.length > 0 && <p>Biggest drivers: {sra.sensitivity.slice(0, 5).map(s => `${s.code} ${s.name}`).join('; ')}.</p>}
+            {sra.sensitivity.length > 0 && (
+              <div>
+                <p className="text-[12px] font-semibold text-ink mb-1">Biggest drivers of the finish</p>
+                <ol className="list-decimal pl-5 space-y-0.5">{sra.sensitivity.slice(0, 5).map(s => <li key={s.code}><span className="tabular-nums text-warm-600">{s.code}</span> {s.name}</li>)}</ol>
+              </div>
+            )}
             {sra.events && sra.events.length > 0 && (
-              <div className="overflow-x-auto"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Risk events in the simulation</caption>
+              <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Risk events in the simulation"><table className="w-full text-[12px]"><caption className="text-left font-semibold text-ink mb-1">Risk events in the simulation</caption>
                 <thead><tr><th className={th}>Event</th><th className={th}>Activity</th><th className={th}>Probability</th><th className={th}>Impact (wd)</th><th className={th}>Finish when it occurs</th></tr></thead>
                 <tbody>{sra.events.map(e => <tr key={e.id}><td className={td}>{e.name}</td><td className={td}>{e.code}</td><td className={td}>{Math.round(e.probability * 100)}%</td><td className={td}>{e.impactDays}</td><td className={td}>{e.finishDeltaDays > 0 ? `+${e.finishDeltaDays} calendar days` : 'no effect on the finish'}</td></tr>)}</tbody></table></div>
             )}
-            <ul className="list-disc pl-5 text-warm-600 space-y-0.5">{sra.assumptions.slice(0, 4).map((x, i) => <li key={i}>{x}</li>)}</ul>
-            {sra.inputs && <RiskInputsPanel key={sra.inputs.updatedAt ?? 'none'} scheduleId={scheduleId} inputs={sra.inputs} canEdit={canEdit} onSaved={runRisk} />}
             {sraErr && <p role="alert" className="text-status-at-risk">{sraErr} The figures above are from the last run that worked.</p>}
+            <div>
+              <Disclosure title="How this was simulated">
+                <p className="text-warm-700">{sra.method}</p>
+                <ul className="mt-2 list-disc pl-5 text-warm-600 space-y-0.5">{sra.assumptions.slice(0, 4).map((x, i) => <li key={i}>{x}</li>)}</ul>
+              </Disclosure>
+              {sra.inputs && (
+                <Disclosure title="Your ranges and risk events" meta={(() => {
+                  const n = [[sra.inputs.ranges.length, 'range'], [sra.inputs.events.length, 'risk event'], [sra.inputs.commitments?.length ?? 0, 'committed date']] as const
+                  const said = n.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}${c === 1 ? '' : 's'}`)
+                  return said.length ? said.join(' · ') : 'none yet'
+                })()}>
+                  <RiskInputsPanel key={sra.inputs.updatedAt ?? 'none'} scheduleId={scheduleId} inputs={sra.inputs} canEdit={canEdit} onSaved={runRisk} />
+                </Disclosure>
+              )}
+            </div>
           </div>
         )}
       </Disclosure>
@@ -205,22 +253,24 @@ export function ScheduleTools({ scheduleId, progressMode, inHistory, onChanged, 
         <div className="text-[13px] text-warm-700 space-y-3">
           <fieldset>
             <legend className="font-semibold text-ink mb-1">Out-of-sequence progress</legend>
-            <label className="mr-4"><input type="radio" name="pm" checked={progressMode === 'retained'} onChange={() => patch({ progressMode: 'retained' })} /> Retained logic (P6 default)</label>
-            <label><input type="radio" name="pm" checked={progressMode === 'override'} onChange={() => patch({ progressMode: 'override' })} /> Progress override</label>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <label className="inline-flex items-center gap-2 py-1"><input type="radio" name="pm" checked={progressMode === 'retained'} onChange={() => patch({ progressMode: 'retained' })} /> Retained logic (P6 default)</label>
+              <label className="inline-flex items-center gap-2 py-1"><input type="radio" name="pm" checked={progressMode === 'override'} onChange={() => patch({ progressMode: 'override' })} /> Progress override</label>
+            </div>
           </fieldset>
-          <label className="block"><input type="checkbox" checked={inHistory} onChange={e => patch({ inHistory: e.target.checked })} /> Use this schedule&apos;s actuals to calibrate our firm history (only for your own as-built projects)</label>
+          <label className="flex items-start gap-2 py-1"><input type="checkbox" className="mt-0.5 flex-shrink-0" checked={inHistory} onChange={e => patch({ inHistory: e.target.checked })} /> <span>Use this schedule&apos;s actuals to calibrate our firm history (only for your own as-built projects)</span></label>
           {inHistory && (
-            <label className="block ml-5"><input type="checkbox" checked={historyOverride} onChange={e => patch({ inHistory: true, historyOverride: e.target.checked })} /> Include it even if not every activity has an actual finish</label>
+            <label className="flex items-start gap-2 py-1 ml-6"><input type="checkbox" className="mt-0.5 flex-shrink-0" checked={historyOverride} onChange={e => patch({ inHistory: true, historyOverride: e.target.checked })} /> <span>Include it even if not every activity has an actual finish</span></label>
           )}
           <label className="block">Whose schedule{' '}
-            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={origin ?? ''} onChange={e => patch({ origin: e.target.value || null })}>
+            <select className="ml-1 border border-warm-300 rounded-lg px-2 h-9 bg-white" value={origin ?? ''} onChange={e => patch({ origin: e.target.value || null })}>
               <option value="">Not stated</option>
               <option value="own">Our own project</option>
               <option value="third_party">Third-party (we review it)</option>
             </select>
           </label>
           <label className="block">Security classification{' '}
-            <select className="ml-1 border border-warm-300 rounded px-2 py-1 bg-white" value={classification ?? 'unclassified'} onChange={e => {
+            <select className="ml-1 border border-warm-300 rounded-lg px-2 h-9 bg-white" value={classification ?? 'unclassified'} onChange={e => {
               const next = e.target.value
               const was = classification ?? 'unclassified'
               const msg = next === 'unclassified'

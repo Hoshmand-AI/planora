@@ -1,7 +1,7 @@
 'use client'
 
 // "Build. Check. Forecast.": three large tabs, each showing its explanation beside a screenshot of the page
-// that does it, taken from the sample data center project (public/landing).
+// that does it, taken from the built-in sample projects (public/landing; retaken 11/17/2026 after the redesign).
 
 import { useState } from 'react'
 import { Shot } from './Sections'
@@ -9,13 +9,13 @@ import { Shot } from './Sections'
 const PILLARS = [
   { key: 'build', title: 'Build.', lead: 'A baseline from a conversation.', text: 'RunF9 interviews you like a senior scheduler (scope, permits, long-lead equipment, site and calendar) and builds a CPM schedule with a written basis for every duration and link.',
     points: ['Questions are ranked by how far each answer can move your finish date.', 'Or upload a P6, MS Project, Excel or PDF schedule you already have.'],
-    shot: 'interview', label: 'RunF9 · Interview · sample medical office', alt: 'The interview in RunF9 for a sample project: answered questions such as the state, drawing completeness, delivery method, work week and the daily cost of late completion.' },
+    shot: 'interview', label: 'RunF9 · Interview · sample medical office', alt: 'The interview in RunF9 for a sample project: the brief is ready to build, above the answered questions, such as the jurisdiction, the type of project, the state and how complete the drawings are.' },
   { key: 'check', title: 'Check.', lead: 'All 14 DCMA checks, every time.', text: 'Upload a P6 or MS Project file. Each failing check lists the activities involved and a suggested fix, with the published thresholds or your organization’s own.',
     points: ['Critical path and float from forward and backward CPM passes, with calendars, lags and constraints.', 'Checks that need data the file does not have are reported as not applicable, never as passed.'],
-    shot: 'quality', height: 701, label: 'RunF9 · Quality', alt: 'The Quality page in RunF9 for the sample data center: the failing DCMA checks listed first (negative float, missed tasks, CPLI), with the activities behind each one.' },
+    shot: 'quality', height: 1124, label: 'RunF9 · Health', alt: 'The Health page in RunF9 for the sample data center: 10 of 14 DCMA checks pass, and the four that fail are listed first (negative float, missed tasks, CPLI and BEI), each with a link to the activities behind it.' },
   { key: 'forecast', title: 'Forecast.', lead: 'Know the finish before it moves.', text: 'Monte Carlo risk analysis over the full network gives P50 and P80 finish dates. When a date slips, recovery options are re-scheduled and priced from your labor cost.',
     points: ['Every open change and reported delay is run against the real network as a what-if.', 'What-ifs change nothing in the schedule until a person approves an edit.'],
-    shot: 'risk', label: 'RunF9 · Schedule risk analysis', alt: 'Schedule risk analysis in RunF9 for the sample data center: Monte Carlo P50 08/31/2027 and P80 09/10/2027 against a deterministic forecast of 08/17/2027, with the chance of meeting each constrained milestone and the biggest drivers.' },
+    shot: 'risk', label: 'RunF9 · Schedule risk analysis', alt: 'Schedule risk analysis in RunF9 for the sample data center: Monte Carlo P50 and P80 finish dates against a deterministic forecast of 08/17/2027, the spread of the simulated finish dates, the chance of meeting each constrained milestone and the biggest drivers.' },
 ]
 
 export default function Pillars() {

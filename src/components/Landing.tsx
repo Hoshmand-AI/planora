@@ -182,27 +182,6 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
       {/* Who it is for */}
       <Audiences />
 
-      {/* How it works: four steps */}
-      <section id="how-it-works" className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 scroll-mt-12">
-        <Reveal className="text-center max-w-[760px] mx-auto">
-          <h2 className="text-[36px] md:text-[52px] font-bold tracking-[-0.045em] text-ink leading-[1.05]">Four steps to a finish date you can defend.</h2>
-        </Reveal>
-        <ol className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
-          {[
-            { title: 'Start', desc: 'Answer the interview, or upload a P6 (.xer), MS Project (.xml), Excel or PDF schedule.' },
-            { title: 'Calculate', desc: 'The CPM engine computes dates, float and the critical path. This is arithmetic, not AI.' },
-            { title: 'Check', desc: 'DCMA 14-Point checks, date logic and risk analysis, with the reason for every finding.' },
-            { title: 'Deliver', desc: 'Export to P6, MS Project, Excel or PDF, with a Basis of Schedule narrative. Then compare each update and model delays.' },
-          ].map(({ title, desc }, i) => (
-            <Reveal as="li" key={title} delay={i * 80}>
-              <span aria-hidden className="w-10 h-10 rounded-full bg-accent-600 text-white font-semibold text-[16px] flex items-center justify-center">{i + 1}</span>
-              <div className="text-[19px] font-semibold text-ink tracking-[-0.01em] mt-4">{title}</div>
-              <p className="text-[16px] text-warm-700 leading-relaxed mt-1.5">{desc}</p>
-            </Reveal>
-          ))}
-        </ol>
-      </section>
-
       {/* Reports */}
       <section id="reports" className="bg-white border-y border-warm-200 scroll-mt-12">
         <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-center">
@@ -224,7 +203,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               ))}
             </ul>
           </Reveal>
-          <Reveal><Shot name="report" label="RunF9 · Reports · Executive Schedule Summary" alt="An Executive Schedule Summary in RunF9 for the sample data center, with a provenance table: the source file, its SHA-256 hash, the data date and the progress mode." /></Reveal>
+          <Reveal><Shot name="report" label="RunF9 · Reports · Executive Schedule Summary" alt="An Executive Schedule Summary in RunF9 for the sample data center, with a provenance table: the schedule, the source file, its SHA-256 hash and the data date." /></Reveal>
         </div>
       </section>
 
@@ -256,7 +235,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
               <Cta href={p.href} className={`mt-5 mb-7 ${p.featured ? 'pressable inline-flex items-center justify-center rounded-full bg-white text-ink font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors' : 'pressable inline-flex items-center justify-center rounded-full border border-warm-300 text-ink font-semibold px-4 py-3 text-[15px] text-center hover:bg-warm-100 transition-colors'}`}>{p.cta}</Cta>
               <ul className="space-y-3 flex-1">
                 {p.yes.map(f => <li key={f} className={`flex items-start gap-2.5 text-[15.5px] ${p.featured ? 'text-white' : 'text-warm-700'}`}><CheckCircle size={17} className={`${p.featured ? 'text-accent-400' : 'text-accent-600'} flex-shrink-0 mt-0.5`} aria-hidden />{f}</li>)}
-                {p.no.length > 0 && <li className="pt-3 text-[13px] font-semibold uppercase tracking-wider text-warm-600">Not included</li>}
+                {p.no.length > 0 && <li className="pt-3 text-[14px] font-semibold text-warm-600">Not included</li>}
                 {p.no.map(f => <li key={f} className="flex items-start gap-2.5 text-[15.5px] text-warm-600"><X size={17} className="flex-shrink-0 mt-0.5" aria-hidden />{f}</li>)}
               </ul>
             </Reveal>
@@ -288,7 +267,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
           </div>
           <div>
             <div className="text-[13px] font-semibold text-ink mb-3">Product</div>
-            {[['#today', 'Daily Brief'], ['#features', 'Features'], ['#updates', 'Updates & delays'], ['#how-it-works', 'How it works'], ['#reports', 'Reports'], ['#integrations', 'Integrations'], ['#pricing', 'Pricing']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
+            {[['#today', 'Daily Brief'], ['#features', 'Features'], ['#updates', 'Updates & delays'], ['#reports', 'Reports'], ['#integrations', 'Integrations'], ['#pricing', 'Pricing']].map(([href, label]) => <a key={href} href={href} className={footLink}>{label}</a>)}
           </div>
           <div>
             <div className="text-[13px] font-semibold text-ink mb-3">Trust</div>
