@@ -7,7 +7,7 @@ import type { ResourceData } from '@/lib/planning/resource-types'
 import type { ExceptionReport } from './exceptions'
 import { randomUUID as uuid } from 'crypto'
 
-export type ParsedSourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv'
+export type ParsedSourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'word' | 'powerpoint'
 
 export interface ParsedSchedule {
   projectName: string

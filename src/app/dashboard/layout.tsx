@@ -471,7 +471,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Sidebar: the five most recent projects (one entry per project name, its latest upload)
   const recent = schedules.filter(s => s.sourceType !== 'generated')
     .filter((s, i, all) => all.findIndex(x => x.name === s.name) === i).slice(0, 5)
-  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', generated: 'Built in RunF9' } as Record<string, string>)[t] || t
+  const sourceLabel = (t: string) => ({ p6_xer: 'P6', p6_xml: 'P6 XML', ms_xml: 'MS Project', pdf: 'PDF', excel: 'Excel', csv: 'CSV', word: 'Word', powerpoint: 'PowerPoint', generated: 'Built in RunF9' } as Record<string, string>)[t] || t
 
   return (
     <AppContext.Provider value={{ user, schedules, selectedSchedule, setSelectedSchedule, refreshSchedules, metrics, refreshMetrics, metricsError, org, can, openUpload: can('schedule.write') ? openUpload : () => router.push('/dashboard/plan') }}>
@@ -816,8 +816,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               ) : (
               <form onSubmit={handleUpload}>
                 <div className="mb-4">
-                  <FileSourcePicker accept=".xer,.xml,.pdf,.xlsx,.csv" canManage={can('org.manage')}
-                    hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel (.xlsx), CSV, or PDF" />
+                  <FileSourcePicker accept=".xer,.xml,.pmxml,.pdf,.xlsx,.xlsm,.csv,.docx,.pptx" canManage={can('org.manage')}
+                    hint="Primavera P6 (.xer or P6 XML), MS Project (.xml), Excel, CSV, PDF, Word (.docx) or PowerPoint (.pptx)" />
                 </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4">

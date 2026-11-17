@@ -448,5 +448,10 @@ export async function costDataFromFile(fileName: string, content: Buffer): Promi
     })
     return sheetCostData(grids)
   }
+  if (ext === '.docx' || ext === '.pptx') {
+    // The same tables the importer read the schedule from.
+    const { officeTables } = await import('./office-parser')
+    try { return sheetCostData(officeTables(content, ext === '.docx' ? 'docx' : 'pptx')) } catch { return null }
+  }
   return null
 }

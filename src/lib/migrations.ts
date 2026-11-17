@@ -998,6 +998,23 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS plan_y REAL;
     `,
   },
+  {
+    id: 29, name: 'project_schedule_roles',
+    sql: `
+    -- The two uploads a project keeps to compare against: its baseline and its comparison schedule (for
+    -- example last month's update). Kept for the project (its update series inside its workspace), so a new
+    -- upload is measured against the same baseline. Additive: older code ignores the table.
+    CREATE TABLE IF NOT EXISTS project_schedule_roles (
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      baseline_schedule_id TEXT,
+      comparison_schedule_id TEXT,
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (org_id, project_key)
+    );
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

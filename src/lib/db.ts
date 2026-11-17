@@ -279,7 +279,7 @@ export async function updateUser(id: string, updates: Partial<User>): Promise<Us
 
 /* ─── Schedules ─────────────────────────────────────── */
 
-export type SourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'generated'
+export type SourceType = 'p6_xer' | 'p6_xml' | 'ms_xml' | 'pdf' | 'excel' | 'csv' | 'word' | 'powerpoint' | 'generated'
 
 export interface Schedule {
   id: string; userId: string; orgId: string; name: string; version: string
@@ -506,6 +506,9 @@ export async function deleteSchedule(id: string, orgId: string): Promise<boolean
   const res = await query(`DELETE FROM schedules WHERE id=$1 AND org_id=$2${ws.and}`, [id, orgId, ...ws.params])
   if (!(res.rowCount ?? 0)) return false
   await purgeOrphanSiteData(orgId)
+  // A deleted upload is no longer the project's baseline or comparison schedule.
+  await query('UPDATE project_schedule_roles SET baseline_schedule_id=NULL WHERE org_id=$1 AND baseline_schedule_id=$2', [orgId, id])
+  await query('UPDATE project_schedule_roles SET comparison_schedule_id=NULL WHERE org_id=$1 AND comparison_schedule_id=$2', [orgId, id])
   return true
 }
 
@@ -1020,6 +1023,7 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     await q('DELETE FROM site_capture_media WHERE org_id=$1', [orgId])
     await q('DELETE FROM site_captures WHERE org_id=$1', [orgId])
     await q('DELETE FROM site_plans WHERE org_id=$1', [orgId])
+    await q('DELETE FROM project_schedule_roles WHERE org_id=$1', [orgId])
     await q('DELETE FROM brief_subscriptions WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])

@@ -203,12 +203,12 @@ export default function TimelinePage() {
 
       {/* The key sits above the chart, where it is read before the bars, not below a long scroll. */}
       <div className="flex flex-wrap gap-x-5 gap-y-1 -mt-1 mb-3 text-caption text-warm-700">
-        <Legend className="bg-accent-500" label="Planned" />
-        <Legend className="bg-status-at-risk" label="Critical" />
-        {work.some(a => progressOf(a) === 'complete') && <Legend className="bg-status-on-track" label="Complete" />}
+        {/* Three colours, as in Primavera P6: work done, work remaining, the critical path. */}
+        <Legend className="bg-bar-done" label="Completed" />
+        <Legend className="bg-bar-todo" label="Remaining" />
+        <Legend className="bg-bar-critical" label="Critical" />
         {/* The chart-only entries are dropped on a phone, where the schedule is a list. */}
         <span className="hidden md:contents">
-        {work.some(a => progressOf(a) === 'in_progress') && <Legend className="bg-navy-800" label="Progress on open work" />}
         {activities?.some(a => a.baselineStart && a.baselineFinish) && <span className="flex items-center gap-1.5"><span className="w-3 h-[3px] rounded-full bg-warm-400 inline-block" /> Baseline</span>}
         {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
         </span>
@@ -263,9 +263,9 @@ export default function TimelinePage() {
                       </div>
                       <div className="max-md:hidden flex-1 relative h-full pr-4">
                         {g.start && g.finish && span && (
-                          <span className="absolute top-1/2 -translate-y-1/2 h-2.5 rounded-full bg-navy-800/20 overflow-hidden" aria-hidden="true"
+                          <span className="absolute top-1/2 -translate-y-1/2 h-2.5 rounded-full bg-bar-todo/30 overflow-hidden" aria-hidden="true"
                             style={{ left: `${pos(g.start)}%`, width: `${Math.max(0.6, pos(g.finish) - pos(g.start) + (DAY / span.range) * 100)}%` }}>
-                            <span className="block h-full bg-navy-800" style={{ width: `${g.pct}%` }} />
+                            <span className="block h-full bg-bar-done" style={{ width: `${g.pct}%` }} />
                           </span>
                         )}
                       </div>
@@ -301,7 +301,8 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
   const s = startOf(a), f = finishOf(a)
   const prog = progressOf(a)
   const milestone = a.activityType === 'milestone' || a.duration === 0
-  const color = prog === 'complete' ? 'bg-status-on-track' : a.isCritical ? 'bg-status-at-risk' : 'bg-accent-500'
+  // Done is blue whatever it was; what remains is red on the critical path and green off it.
+  const color = prog === 'complete' ? 'bg-bar-done' : a.isCritical ? 'bg-bar-critical' : 'bg-bar-todo'
   const left = s ? pos(s) : 0
   const width = s && f && span ? Math.max(0.5, pos(f) - left + (DAY / span.range) * 100) : 0
   return (
@@ -328,7 +329,7 @@ function ActivityRow({ a, mark, pos, span, active, onSelect }: {
         {s && (milestone
           ? <span className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 ${color}`} style={{ left: `${left}%` }} />
           : <span className={`absolute top-1/2 -translate-y-1/2 h-3 rounded-full overflow-hidden ${color}`} style={{ left: `${left}%`, width: `${width}%` }}>
-              {prog === 'in_progress' && a.percentComplete > 0 && <span className="block h-full bg-navy-800" style={{ width: `${a.percentComplete}%` }} />}
+              {prog === 'in_progress' && a.percentComplete > 0 && <span className="block h-full bg-bar-done" style={{ width: `${a.percentComplete}%` }} />}
             </span>)}
       </div>
     </button>

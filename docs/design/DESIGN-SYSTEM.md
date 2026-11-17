@@ -68,7 +68,7 @@ below in code; never hard-code the hex values.
   - the Projects page keeps “Needs an update”, sort, and the cards/table switch
   - the Schedule keeps its phase grouping and progress bars
   - Quality keeps all 14 check tiles and the decision workflow
-- **Critical-path color.** The package suggests blue for critical bars. The product uses at-risk red with a “Critical” legend label and an “On the critical path” badge, and keeps that so critical and planned work stay distinct.
+- **Schedule bars: three colours.** Every timeline (the Gantt chart, the plan builder, the Overview ribbon, the exports and the public page) uses the `bar` tokens and no others: blue (`bar-done`) for work done, green (`bar-todo`) for work remaining, red (`bar-critical`) for the critical path. This is what a Primavera P6 user expects. A baseline and the data date are lines, not bars. Critical work also carries a “Critical” legend label and an “On the critical path” badge, so colour is never the only signal.
 
 ## Rules for new UI
 - One H1 per page (`page-title`); section H2 (`text-heading`); card H3 (`text-subhead`). Sizes only from the type scale above. Dates through `src/lib/format.ts` (MM/DD/YYYY or the project's DD/MM/YYYY) with `tabular-nums`.

@@ -8,6 +8,8 @@ import { useRef, useState } from 'react'
 import { ArrowRight, ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchCheck, KeyRound, Users, ListChecks, Building2, EyeOff, Database, Lock } from 'lucide-react'
 import { Reveal } from './motion'
 import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
+import { SAMPLE_SCHEDULE } from '@/lib/marketing/sample-schedule'
+import { Logo } from '@/components/Logo'
 
 const H2 = 'text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]'
 const LEAD = 'text-lead text-warm-600 mt-4 leading-snug'
@@ -82,15 +84,24 @@ function LiveBrief() {
   const lines = all ? all.filter(t => t !== b.headline.text) : null
   return (
     <div className="rounded-[18px] md:rounded-[22px] border border-navy-800 bg-white shadow-[0_40px_80px_-40px_rgba(29,33,37,0.6)] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
-        <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
-        <span className="ml-3 text-caption text-navy-200 truncate">RunF9 · Today</span>
+      <div className="flex items-center justify-between gap-4 px-5 md:px-8 h-14 md:h-16 bg-navy-950">
+        <Logo variant="light" size="h-[22px] md:h-[26px]" />
+        <p className="text-fine md:text-small text-navy-200 text-right leading-tight"><span className="font-semibold text-white">Daily Brief</span> <span className="tabular-nums whitespace-nowrap">{b.asOf}</span></p>
       </div>
       <div className="p-5 md:p-8">
-        <div className="text-body text-warm-600">{b.project} · brief for {b.asOf}</div>
-        <p className="mt-2 text-body font-semibold text-warm-600">Are we meeting the deadline?</p>
+        <p className="text-small text-warm-600">{b.project}</p>
+        <p className="mt-3 text-small font-semibold text-warm-600">Are we meeting the deadline?</p>
         <p className="text-h3 font-semibold tracking-[-0.01em] text-status-at-risk leading-tight mt-1">No. {b.headline.daysBehind} days behind.</p>
         <p className="text-small text-warm-700 leading-relaxed mt-1.5">{b.headline.text}</p>
+        {/* The four figures a reader looks for first, value over caption */}
+        <dl className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-warm-200 bg-warm-200">
+          {[[SAMPLE_SCHEDULE.finish, 'Forecast finish'], [SAMPLE_SCHEDULE.required, 'Required'], [`${SAMPLE_SCHEDULE.percentComplete}%`, 'Complete, by duration'], [`${b.alerts.filter(a => a.level === 'act').length} of ${b.alerts.length}`, 'Alerts to act on today']].map(([v, k]) => (
+            <div key={k} className="bg-white px-3.5 py-3 flex flex-col-reverse">
+              <dt className="text-fine text-warm-600 mt-0.5">{k}</dt>
+              <dd className="text-copy font-semibold text-ink tabular-nums">{v}</dd>
+            </div>
+          ))}
+        </dl>
 
         <TabList label="Who the brief is for, and what it read" items={BRIEF_TABS} prefix="brief" panel="brief-panel" tabs={tabs} className="mt-6" />
         <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${id}`} className="mt-5 min-h-[300px]">
@@ -130,7 +141,7 @@ function LiveBrief() {
 
 const BRIEF_POINTS = [
   { icon: ScrollText, title: 'Calculated, not generated', text: 'Computed from the schedule, the project register and your documents. No AI model writes it, so the same inputs always give the same brief.' },
-  { icon: Mail, title: 'Reads your email and meetings', text: 'Emails, minutes and daily reports are read for delays, changes and risks. Each is quoted with its source and the activity it names.' },
+  { icon: Mail, title: 'Reads what your project writes', text: 'Emails, meeting minutes and transcripts, drawings, daily reports and site notes are read for delays, changes and risks. Each is quoted with its source and the activity it names.' },
   { icon: GitPullRequestArrow, title: 'A what-if for every open change', text: 'Risks, issues, PCOs and change orders live in one register. Each open change is run against the schedule for its effect on the finish.' },
   { icon: SearchCheck, title: 'Contract and scope watch', text: 'Notice periods and liquidated damages in your contract are tracked against the dates, and scope no activity covers is listed.' },
 ]
@@ -160,7 +171,6 @@ export function DailyBrief() {
                 </li>
               ))}
             </ul>
-            {SAMPLE_BRIEF.alerts.length > 5 && <p className="text-small text-navy-200 mt-3">And {SAMPLE_BRIEF.alerts.length - 5} more to watch in the product.</p>}
           </Reveal>
         </div>
 
@@ -211,8 +221,8 @@ const AUDIENCES = [
   { id: 'gc', tab: 'General contractors', title: 'Know which open item will cost you days.', shot: 'whatif', label: 'RunF9 · Overview · What-if', alt: 'What-if results on the Overview page in RunF9: a pending change order, a utility delay, a delay reported in meeting minutes and the best recovery option, each with the days it moves the finish.',
     points: ['A brief every morning: what drives the finish, what is overdue and what starts today.', 'Each open change is run against the schedule before you price it or send notice.', 'When a date slips, recovery options are re-scheduled on the real network and priced from your labor cost.'] },
   { id: 'owner', tab: 'Owners and owner’s reps', title: 'Review a contractor’s schedule in minutes.', shot: 'checks', label: 'RunF9 · Health · What to fix', alt: 'A failed DCMA check in RunF9 for the sample data center: negative float, with what it means, why it matters, how to fix it and the activities to look at.',
-    points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'All 14 DCMA checks on every submission, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
-  { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Gantt chart', alt: 'The Gantt chart in RunF9 for the sample data center: work areas and their activities, with progress, the critical path, the baseline and the data date marked.',
+    points: ['Upload each monthly update: logic, duration and calendar edits and rewritten actual dates are listed by activity.', 'All 14 DCMA checks on every submission, GAO checks in the Standards view, with the activities behind each finding.', 'A client version of the brief reports progress and decisions needed in plain language.'] },
+  { id: 'consultant', tab: 'Schedule consultants', title: 'Spend your hours on judgment, not on formatting.', shot: 'schedule', label: 'RunF9 · Gantt chart', alt: 'The Gantt chart in RunF9 for the sample data center: work areas and their activities, with completed work in blue, remaining work in green, the critical path in red, and the baseline and the data date marked.',
     points: ['Reads and writes P6 and MS Project files, so your client’s tools do not change.', 'Time Impact Analysis with hashed inputs and results: the same inputs reproduce the same answer.', 'Each client’s projects sit in their own workspace, and each client’s files can stay in that client’s cloud.'] },
   { id: 'federal', tab: 'Federal and defense work', title: 'Built for projects that cannot leave your boundary.', shot: 'earned-value', label: 'RunF9 · Earned value', alt: 'The Earned value page in RunF9: SPI, CPI, schedule and cost variance, estimate at completion and the cumulative cost curve.',
     points: ['Projects marked CUI or classified are never sent to an AI model and have no inbox or mailbox connection.', 'Runs air-gapped on your own servers; every release is checked to send nothing outside your network.', 'Earned value and an IPMDAR schedule export, with a NIST SP 800-171 control mapping for your security review.'] },
@@ -290,9 +300,9 @@ export function Integrations() {
         ))}
       </ul>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-small text-warm-700">
-        <span className="font-semibold text-ink">Planned, not yet available:</span>
+        <span className="font-semibold text-ink">Coming soon:</span>
         {['Procore', 'Kahua'].map(n => <span key={n} className="rounded-full border border-warm-300 bg-white px-3.5 py-1 font-medium text-ink">{n}</span>)}
-        <span>Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
+        <span>Not available yet. Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
       </div>
     </section>
   )

@@ -157,6 +157,8 @@ export async function exportImportXlsx(s: GeneratedSchedule, projectName: string
 const WBS_FILL = ['FFFFE699', 'FFC6E0B4', 'FFBDD7EE', 'FFF8CBAD']
 const BAR_CRIT = 'FFE0301E'
 const BAR_NONCRIT = 'FF3CB44B'
+// Work already done, as in P6: blue whatever it was before.
+const BAR_DONE = 'FF2B63C1'
 const BAR_WBS = 'FF1F1F1F'
 
 /** Rows x week columns up to which the P6 layout styles every time-scale cell (grid lines, WBS band fill). */
@@ -267,7 +269,7 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
       xr.outlineLevel = row.level - 1
       if (tm?.critical) { ws.getCell(r, 6).font = { color: { argb: BAR_CRIT }, bold: true }; ws.getCell(r, 7).font = { color: { argb: BAR_CRIT } } }
       if (a.placeholder) xr.font = { italic: true, color: { argb: 'FF6B6359' } }
-      paintBar(r, tm?.earlyStart, tm?.earlyFinish, tm?.critical ? BAR_CRIT : BAR_NONCRIT, a.type === 'milestone')
+      paintBar(r, tm?.earlyStart, tm?.earlyFinish, a.actualFinish || a.status === 'complete' ? BAR_DONE : tm?.critical ? BAR_CRIT : BAR_NONCRIT, a.type === 'milestone')
       ws.getCell(r, 2).note = a.rationale.summary.slice(0, 800)
     }
     for (let c = 1; c < styledTo; c++) {
@@ -295,13 +297,13 @@ export async function exportP6LayoutXlsx(s: GeneratedSchedule, projectName: stri
   r += 1
   ws.getCell(r, 2).value = 'Legend'
   ws.getCell(r, 2).font = { bold: true }
-  const legend: [string, string][] = [['Critical activity (total float ≤ 0)', BAR_CRIT], ['Non-critical activity', BAR_NONCRIT], ['WBS summary', BAR_WBS]]
+  const legend: [string, string][] = [['Critical activity (total float ≤ 0)', BAR_CRIT], ['Remaining activity, not critical', BAR_NONCRIT], ['Completed activity', BAR_DONE], ['WBS summary', BAR_WBS]]
   legend.forEach(([label, color], i) => {
     ws.getCell(r + 1 + i, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
     ws.getCell(r + 1 + i, 2).value = label
   })
-  ws.getCell(r + 4, 2).value = 'Durations in work days on each activity\'s calendar. Hover an activity name for why it is scheduled that way.'
-  ws.getCell(r + 4, 2).font = { italic: true, size: 9, color: { argb: 'FF6B6359' } }
+  ws.getCell(r + 5, 2).value = 'Durations in work days on each activity\'s calendar. Hover an activity name for why it is scheduled that way.'
+  ws.getCell(r + 5, 2).font = { italic: true, size: 9, color: { argb: 'FF6B6359' } }
   if (prov) {
     const src = prov.sources[0]
     ws.getCell(off + 3, 1).value = `Source ${src?.fileName ?? '—'} · SHA-256 ${src ? sourceSha(src) : 'not recorded'} · RunF9 ${prov.release} · ${src?.progressMode === 'override' ? 'Progress override' : 'Retained logic'} · Basis: ${src ? sourceBasis(src) : 'as submitted'} — see the Provenance sheet`

@@ -18,7 +18,7 @@ type Loaded = NonNullable<Awaited<ReturnType<typeof loadScheduleData>>>
 
 const CACHE_MAX = 32
 const cache = new Map<string, ResourceData | null>()
-const RESOURCE_SOURCES = new Set(['p6_xer', 'p6_xml', 'ms_xml', 'excel', 'csv'])
+const RESOURCE_SOURCES = new Set(['p6_xer', 'p6_xml', 'ms_xml', 'excel', 'csv', 'word', 'powerpoint'])
 
 /** Resources of an uploaded schedule, read from its stored file and bound to `activities`; null when there are none. */
 export async function loadScheduleResources(schedule: Schedule, orgId: string, activities: Activity[]): Promise<ResourceData | null> {
