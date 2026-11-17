@@ -40,10 +40,12 @@ const SHEET = png(1000, 500, [245, 245, 240])
 const JPEG = Buffer.from('/9j/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAA//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKgHA//Z', 'base64')
 
 // The stand-in aerial picture source runs as its own process and writes what it was asked to a file.
-const TILE_LOG = path.join(os.tmpdir(), `runf9-tiles-${process.pid}.jsonl`)
-fs.writeFileSync(TILE_LOG, '')
+// In a folder of its own that only this user can read (never a guessable name in the shared temp folder).
+const TILE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'runf9-tiles-'))
+const TILE_LOG = path.join(TILE_DIR, 'asked.jsonl')
+fs.writeFileSync(TILE_LOG, '', { mode: 0o600 })
 const tiles = spawn(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), 'mock-tiles.mjs')], { env: { ...process.env, PORT: String(TILE_PORT), LOG: TILE_LOG }, stdio: 'inherit' })
-process.on('exit', () => { tiles.kill(); try { fs.unlinkSync(TILE_LOG) } catch { /* already gone */ } })
+process.on('exit', () => { tiles.kill(); try { fs.rmSync(TILE_DIR, { recursive: true, force: true }) } catch { /* already gone */ } })
 await new Promise(r => setTimeout(r, 600))
 const asked = () => fs.readFileSync(TILE_LOG, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
 
