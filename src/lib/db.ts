@@ -514,11 +514,14 @@ export async function deleteSchedule(id: string, orgId: string): Promise<boolean
  * upload is gone nothing could list or delete them any more, so they go with it: their photos and voice notes too.
  */
 export async function purgeOrphanSiteData(orgId: string): Promise<number> {
-  const res = await query(`DELETE FROM site_captures c WHERE c.org_id=$1 AND NOT EXISTS (
+  const gone = `NOT EXISTS (
     SELECT 1 FROM schedules s WHERE s.org_id=$1 AND c.project_key =
       CASE WHEN s.project_key IS NULL OR s.project_key = '' THEN 'schedule:' || s.id
            WHEN s.workspace_id IS NOT NULL THEN 'ws:' || s.workspace_id || '|' || s.project_key
-           ELSE s.project_key END)`, [orgId])
+           ELSE s.project_key END)`
+  const res = await query(`DELETE FROM site_captures c WHERE c.org_id=$1 AND ${gone}`, [orgId])
+  // The drawings of the project's levels are filed the same way and go the same way.
+  await query(`DELETE FROM site_plans c WHERE c.org_id=$1 AND ${gone}`, [orgId])
   return res.rowCount ?? 0
 }
 
@@ -990,7 +993,9 @@ export async function exportOrganization(orgId: string) {
   // size and SHA-256 (the files themselves are downloaded from the project's Site page, not put inside this JSON).
   const { exportCaptures } = await import('@/lib/server/site-captures')
   const siteCaptures = await exportCaptures(orgId)
-  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, retrievalLog, auditEvents: audit }
+  const { exportPlans } = await import('@/lib/server/site-plans')
+  const sitePlans = await exportPlans(orgId)
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, sitePlans, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -1014,6 +1019,7 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     // Site captures: the photos and voice notes first, then the captures (tombstones included).
     await q('DELETE FROM site_capture_media WHERE org_id=$1', [orgId])
     await q('DELETE FROM site_captures WHERE org_id=$1', [orgId])
+    await q('DELETE FROM site_plans WHERE org_id=$1', [orgId])
     await q('DELETE FROM brief_subscriptions WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
@@ -1061,6 +1067,7 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q("UPDATE project_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q("UPDATE site_captures SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
+    await q("UPDATE site_plans SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q('DELETE FROM brief_subscriptions WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])

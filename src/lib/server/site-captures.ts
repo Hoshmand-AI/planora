@@ -54,6 +54,7 @@ function rowToCapture(r: Record<string, unknown>, media: CaptureMediaInfo[]): Si
     position: r.lat === null || r.lat === undefined || r.lng === null || r.lng === undefined ? null
       : { lat: Number(r.lat), lng: Number(r.lng), accuracyM: numOrNull(r.accuracy_m), altitudeM: numOrNull(r.altitude_m), headingDeg: numOrNull(r.heading_deg) },
     takenAt: iso(r.taken_at), createdAt: iso(r.created_at), createdBy: (r.created_by as string) ?? null, createdByName: (r.created_by_name as string) ?? null,
+    pin: r.plan_id && r.plan_x !== null && r.plan_x !== undefined && r.plan_y !== null && r.plan_y !== undefined ? { planId: String(r.plan_id), x: Number(r.plan_x), y: Number(r.plan_y) } : null,
     media,
   }
 }
@@ -63,7 +64,7 @@ const rowToMedia = (m: Record<string, unknown>): CaptureMediaInfo => ({
 })
 
 // The columns of a capture without anything heavy; media bytes are only ever read one file at a time.
-const CAPTURE_COLS = 'id, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, created_by, created_by_name, created_at'
+const CAPTURE_COLS = 'id, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, created_by, created_by_name, created_at, plan_id, plan_x, plan_y'
 const MEDIA_COLS = 'id, capture_id, kind, content_type, size_bytes, width, height, seconds'
 
 async function withMedia(orgId: string, rows: Record<string, unknown>[]): Promise<SiteCapture[]> {
@@ -128,11 +129,13 @@ export async function createCapture(orgId: string, key: string, scheduleId: stri
     created = await withTransaction(async q => {
       const count = await q('SELECT COUNT(*)::int AS n FROM site_captures WHERE org_id=$1 AND project_key=$2 AND deleted_at IS NULL', [orgId, key])
       if (Number(count.rows[0]?.n) >= MAX_CAPTURES_PER_PROJECT) return false
-      await q(`INSERT INTO site_captures (id, org_id, project_key, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, classification, created_by, created_by_name, client_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+      // A pin counts only on a drawing of this project (one deleted since the capture was made is dropped).
+      const pin = f.pin && (await q('SELECT 1 FROM site_plans WHERE org_id=$1 AND project_key=$2 AND id=$3', [orgId, key, f.pin.planId])).rows.length ? f.pin : null
+      await q(`INSERT INTO site_captures (id, org_id, project_key, schedule_id, status, note, activity_codes, level, room, place_source, lat, lng, accuracy_m, altitude_m, heading_deg, taken_at, classification, created_by, created_by_name, client_id, plan_id, plan_x, plan_y)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
         [id, orgId, key, scheduleId, f.status, f.note, JSON.stringify(f.activityCodes), f.level, f.room, f.placeSource,
           f.position?.lat ?? null, f.position?.lng ?? null, f.position?.accuracyM ?? null, f.position?.altitudeM ?? null, f.position?.headingDeg ?? null,
-          f.takenAt, classification, by.userId, by.name, f.clientId ?? null])
+          f.takenAt, classification, by.userId, by.name, f.clientId ?? null, pin?.planId ?? null, pin?.x ?? null, pin?.y ?? null])
       for (const m of media) {
         await q(`INSERT INTO site_capture_media (id, org_id, capture_id, kind, content_type, size_bytes, sha256, width, height, seconds, content)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
@@ -172,7 +175,7 @@ export async function deleteCapture(orgId: string, key: string, id: string): Pro
   if (!before) return null
   const mediaDeleted = await withTransaction(async q => {
     const del = await q('DELETE FROM site_capture_media WHERE org_id=$1 AND capture_id=$2', [orgId, id])
-    await q(`UPDATE site_captures SET deleted_at=NOW(), note='', activity_codes='[]'::jsonb, level=NULL, room=NULL, place_source='none', lat=NULL, lng=NULL, accuracy_m=NULL, altitude_m=NULL, heading_deg=NULL
+    await q(`UPDATE site_captures SET deleted_at=NOW(), note='', activity_codes='[]'::jsonb, level=NULL, room=NULL, place_source='none', lat=NULL, lng=NULL, accuracy_m=NULL, altitude_m=NULL, heading_deg=NULL, plan_id=NULL, plan_x=NULL, plan_y=NULL
       WHERE org_id=$1 AND project_key=$2 AND id=$3`, [orgId, key, id])
     return del.rowCount ?? 0
   })

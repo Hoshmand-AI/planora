@@ -14,6 +14,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
+import postgres from 'pg'
 import { typeProblems } from './type-audit.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
@@ -23,6 +24,7 @@ if ((await fetch(`${BASE}/api/auth`).then(r => r.json()).catch(() => null))?.sig
   process.exit(1)
 }
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'src', 'lib', 'parsers', '__fixtures__')
+if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
 let passed = 0
 function ok(cond, msg, extra) {
   if (!cond) { console.error(`✗ ${msg}`, extra ?? ''); process.exit(1) }
@@ -30,19 +32,14 @@ function ok(cond, msg, extra) {
   console.log(`✓ ${msg}`)
 }
 
-// Inviting a member needs a confirmed email address: follow the link RunF9 wrote to the test outbox (as in ci.yml).
-const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
-async function confirmEmail(client, address) {
-  if (!OUTBOX) { console.error('✗ Set RUNF9_EMAIL_OUTBOX to the server\'s outbox folder for this suite (see ci.yml).'); process.exit(1) }
-  for (let i = 0; i < 50; i++) {
-    for (const f of fs.readdirSync(OUTBOX).filter(x => x.endsWith('.json')).sort().reverse()) {
-      const m = JSON.parse(fs.readFileSync(path.join(OUTBOX, f), 'utf8'))
-      const hit = m.to === address && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
-      if (hit) { const u = new URL(hit[0]); await client.raw('GET', u.pathname + u.search); return }
-    }
-    await new Promise(r => setTimeout(r, 100))
-  }
-  throw new Error(`no confirmation email to ${address}`)
+// Inviting a member needs a confirmed email address. The confirmation link itself is covered by
+// scripts/e2e-security.mjs; here the address is marked confirmed in the test database directly.
+async function confirmEmail(address) {
+  const db = new postgres.Client({ connectionString: process.env.DATABASE_URL })
+  await db.connect()
+  let updated = 0
+  try { updated = (await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address])).rowCount ?? 0 } finally { await db.end() }
+  if (updated !== 1) { console.error('✗ DATABASE_URL is not the database the server under test uses: the account just created is not in it.'); process.exit(1) }
 }
 
 class Client {
@@ -127,6 +124,8 @@ ok((await a.get(base)).data.captures.filter(c => /answer was lost/.test(c.note))
 ok((await a.del(`${base}/${once.data.capture.id}`)).status === 200 && (await a.post(base, capture({ status: 'progress', note: 'Sent, and the answer was lost on the way.', clientId }))).status === 410, 'sending it again after it was deleted does not bring it back')
 
 // Refusals: each with a message a person can act on.
+const foreign = await a.post(base, capture({ status: 'progress', note: 'Taken by someone else.', authorId: '00000000-0000-4000-8000-000000000000' }))
+ok(foreign.status === 403 && foreign.data.code === 'capture_author', 'a capture taken by another member is not filed under this sign-in', foreign.data)
 const page = await a.post(base, capture({ status: 'progress' }, { photos: [{ bytes: Buffer.from('<!doctype html><html><script>alert(1)</script></html>'), type: 'image/jpeg', name: 'photo.jpg' }] }))
 ok(page.status === 400 && page.data.code === 'unsupported_media', 'a web page sent as a photo is refused, whatever it is called', page.data)
 ok((await a.post(base, capture({ status: 'progress', note: 'ok' }))).data.code === 'empty_capture', 'a capture with nothing in it is refused')
@@ -300,8 +299,9 @@ await sheet.getByRole('textbox', { name: 'Note' }).fill('Kept on the phone for i
 await context.setOffline(true)
 await sheet.getByRole('button', { name: 'Save capture' }).click()
 await pg.getByText(/1 capture is saved on this phone and not sent yet/).waitFor()
-await confirmEmail(a, `site-a-${stamp}@example.com`)
+await confirmEmail(`site-a-${stamp}@example.com`)
 const invite = await a.post('/api/org', { action: 'invite', email: `site-second-${stamp}@example.com`, role: 'scheduler' })
+ok(invite.status === 200 && invite.data.link?.includes('/auth?invite='), 'the owner invites a second member', invite.data)
 const second = new Client()
 ok((await second.post('/api/auth', { action: 'signup', email: `site-second-${stamp}@example.com`, password: 'correct horse battery staple', name: 'Sam Second', invite: new URL(invite.data.link).searchParams.get('invite') })).status === 200, 'a second member joins firm A')
 const cookieName = a.cookie.split('=')[0]

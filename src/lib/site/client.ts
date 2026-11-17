@@ -122,6 +122,8 @@ export async function sendCapture(p: PendingCapture): Promise<SendResult> {
   const fd = new FormData()
   for (const [k, v] of Object.entries(p.fields)) fd.set(k, v)
   fd.set('clientId', p.id)
+  // Who took it: RunF9 refuses it under anyone else's sign-in (a page left open while another member signs in).
+  fd.set('authorId', p.userId)
   p.photos.forEach((b, i) => fd.append('photo', b, `photo-${i + 1}.jpg`))
   if (p.audio) { fd.append('audio', p.audio, 'voice-note'); if (p.audioSeconds) fd.set('audioSeconds', String(Math.round(p.audioSeconds * 10) / 10)) }
   let res: Response
@@ -130,7 +132,8 @@ export async function sendCapture(p: PendingCapture): Promise<SendResult> {
   const data = await res.json().catch(() => null)
   if (res.ok && data?.capture) return { ok: true, capture: data.capture as SiteCapture }
   // A gateway answering for RunF9 while it cannot be reached is the same as no signal.
-  const offline = res.status === 502 || res.status === 503 || res.status === 504
+  // So is a sign-in that is not the author's: the capture waits for its author.
+  const offline = res.status === 502 || res.status === 503 || res.status === 504 || (res.status === 403 && data?.code === 'capture_author')
   return { ok: false, offline, error: data?.error || (res.status === 413 ? 'This capture is too large to send. Remove a photo and try again.' : 'The capture could not be saved. Try again.') }
 }
 
@@ -199,4 +202,85 @@ export function outboxFlush(userId: string, retryRefused = false): Promise<Flush
     return { sent, waiting: left.filter(p => !p.refused).length, refused: left.filter(p => p.refused).map(p => ({ id: p.id, error: p.refused! })) }
   })().finally(() => { flushing = null })
   return flushing
+}
+
+/* ─── Drawings and the live position ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Prepares a picture of a drawing: no larger than `maxSide` on its long side, on white (a transparent sheet
+ * would turn black), as a JPEG good enough to read dimensions and room names.
+ */
+export async function resizePlanImage(file: Blob, maxSide: number): Promise<{ blob: Blob; width: number; height: number }> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  try {
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale)), height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width; canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('This browser cannot prepare the drawing.')
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height)
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    if (!blob) throw new Error('This browser cannot prepare the drawing.')
+    return { blob, width, height }
+  } finally { bitmap.close() }
+}
+
+/**
+ * Follows the phone's position until the returned function is called. `onFix` gets each new fix, or null when
+ * the person says no or the phone cannot tell. The browser shows its own location indicator while this runs.
+ */
+export function watchPosition(onFix: (p: CapturePosition | null, why?: 'denied' | 'unavailable') => void): () => void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) { onFix(null, 'denied'); return () => {} }
+  const id = navigator.geolocation.watchPosition(
+    p => onFix({
+      lat: p.coords.latitude, lng: p.coords.longitude,
+      accuracyM: Number.isFinite(p.coords.accuracy) ? p.coords.accuracy : null,
+      altitudeM: p.coords.altitude ?? null,
+      headingDeg: p.coords.heading != null && Number.isFinite(p.coords.heading) ? p.coords.heading : null,
+    }),
+    // 1 = the person (or the browser's settings) said no; anything else is a fix that did not come in time.
+    e => onFix(null, e.code === 1 ? 'denied' : 'unavailable'),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20_000 },
+  )
+  return () => navigator.geolocation.clearWatch(id)
+}
+
+/**
+ * Looks for a printed code in a photo and gives its text (null when there is none, or it cannot be read).
+ * Done on the phone, from the photo already taken: nothing is sent anywhere. The browser's own reader is used
+ * where it has one (Chrome on Android); otherwise a reader shipped with RunF9 (iPhone, desktop).
+ */
+export async function readCodeInPhoto(photo: Blob): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(photo)
+    try {
+      const Detector = (globalThis as { BarcodeDetector?: new (o: { formats: string[] }) => { detect(i: ImageBitmap): Promise<{ rawValue: string }[]> } }).BarcodeDetector
+      if (Detector) {
+        // The browser's reader looked and found nothing: that is the answer. Only a failure falls through.
+        try { const found = await new Detector({ formats: ['qr_code'] }).detect(bitmap); return found[0]?.rawValue || null } catch { /* the shipped reader below */ }
+      }
+      const { default: jsQR } = await import('jsqr')
+      // A code a few centimetres wide in a photo of a room is small: look at full size first, then smaller.
+      // One canvas, each size once, and the screen gets a turn between passes (a pass can take a moment on a phone).
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return null
+      const long = Math.max(bitmap.width, bitmap.height)
+      const sides = [...new Set([1600, 1000, 600].map(s => Math.min(s, long)))]
+      try {
+        for (const side of sides) {
+          const scale = side / long
+          const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale))
+          canvas.width = w; canvas.height = h
+          ctx.drawImage(bitmap, 0, 0, w, h)
+          const hit = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })
+          if (hit?.data) return hit.data
+          await new Promise(r => setTimeout(r))
+        }
+        return null
+      } finally { canvas.width = 0; canvas.height = 0 }
+    } finally { bitmap.close() }
+  } catch { return null }
 }

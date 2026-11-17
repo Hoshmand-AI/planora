@@ -49,6 +49,8 @@ export interface CaptureFields {
   takenAt: string
   /** The id the phone gave this capture before sending it; sending the same one again is not a second capture */
   clientId?: string | null
+  /** Where the person tapped on a level's drawing, as fractions of its width and height, when they did */
+  pin?: { planId: string; x: number; y: number } | null
 }
 
 export interface CaptureMediaInfo {
@@ -136,6 +138,14 @@ export function parseCaptureFields(b: Record<string, unknown>, now: Date = new D
     }
   }
 
+  // A pin on a drawing: the drawing's id and a point inside it. A malformed one is dropped, never an error
+  // (a capture kept offline must not be refused because a drawing changed meanwhile).
+  let pin: CaptureFields['pin'] = null
+  const px = num(b.planX), py = num(b.planY)
+  if (typeof b.planId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(b.planId) && px !== null && py !== null && px >= 0 && px <= 1 && py >= 0 && py <= 1) {
+    pin = { planId: b.planId, x: Math.round(px * 1e5) / 1e5, y: Math.round(py * 1e5) / 1e5 }
+  }
+
   let takenAt = now.toISOString()
   if (typeof b.takenAt === 'string' && b.takenAt) {
     const t = Date.parse(b.takenAt)
@@ -146,7 +156,7 @@ export function parseCaptureFields(b: Record<string, unknown>, now: Date = new D
     takenAt = new Date(t).toISOString()
   }
   const clientId = typeof b.clientId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(b.clientId) ? b.clientId : null
-  return { fields: { status: b.status as CaptureStatus, note, activityCodes, level, room, placeSource, position, takenAt, clientId } }
+  return { fields: { status: b.status as CaptureStatus, note, activityCodes, level, room, placeSource, position, takenAt, clientId, pin } }
 }
 
 /** A capture has to say something: a photo, a voice note or a few words. */

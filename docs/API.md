@@ -90,9 +90,25 @@ A photo, a voice note and a few words taken on site, filed under the project (th
 | Method | Path | Permission | What it does |
 |---|---|---|---|
 | GET | `/api/schedules/{id}/captures` | read | Captures, newest first (`before`, `limit`); `activities=1` adds the activity pick list |
-| POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note). Send `clientId` (8 to 64 letters, digits or hyphens, made on the device) to make a retry safe: the same `clientId` again returns the stored capture with `alreadySent: true`, or 410 if it was deleted since. 409 `classified_on_commercial_cloud` on a project marked classified |
+| POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note). `authorId` (optional): the member who took it; 403 `capture_author` if that is not the signed-in member. Send `clientId` (8 to 64 letters, digits or hyphens, made on the device) to make a retry safe: the same `clientId` again returns the stored capture with `alreadySent: true`, or 410 if it was deleted since. 409 `classified_on_commercial_cloud` on a project marked classified |
 | GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported; `ETag`, and the browser must ask before reusing its copy) |
 | DELETE | `/api/schedules/{id}/captures/{captureId}` | site.capture; your own capture, or any with scheduler rights | Erases the files and the words; audited as `site.capture_deleted` |
+
+### Site plans (session only)
+
+A drawing of each level, the rooms marked on it, and the points that place it on the ground.
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/schedules/{id}/site-plans` | read | The drawings (never their bytes), `canEdit`, and `imagery` (null when the aerial picture is off or the project is marked CUI or classified) |
+| POST | `/api/schedules/{id}/site-plans` | schedule.write | Multipart: `level`, `image` (one JPEG, PNG or WebP, typed from its bytes). Audited as `site.plan_added` |
+| PATCH | `/api/schedules/{id}/site-plans/{planId}` | schedule.write | `level`, `rooms` (`[{ name, x, y }]`, x and y as fractions of the sheet), `controls` (none, or two or three `{ x, y, lat, lng }`), `sort`. Points that cannot place a drawing are refused. Audited as `site.plan_updated` |
+| DELETE | `/api/schedules/{id}/site-plans/{planId}` | schedule.write | Captures pinned on it keep their level and room. Audited as `site.plan_deleted` |
+| GET | `/api/schedules/{id}/site-plans/{planId}/image` | read | The drawing |
+| GET | `/api/schedules/{id}/site-plans/{planId}/codes` | read | A PDF of room codes to print: each opens a new capture with the level and room filled in. Audited as `site.room_codes_printed` |
+| GET | `/api/site/tiles/{z}/{x}/{y}` | read | One square of the aerial picture, fetched by RunF9's server from the configured source and passed on only if it is a picture |
+
+A capture takes `planId`, `planX`, `planY` (a pin on a drawing of the same project; dropped otherwise).
 
 `POST /api/ask` and `POST /api/reports` accept `useDocuments: true` (and `includeUnreviewed`) and
 return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restricted`, `no_match`),

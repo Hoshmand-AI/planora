@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto'
 
 let lastLocalRun = 0
 
-export interface PurgeSummary { orgId: string; chatMessages: number; plans: number; schedules: number; siteCaptures: number }
+export interface PurgeSummary { orgId: string; chatMessages: number; plans: number; schedules: number; siteCaptures: number; sitePlans: number }
 
 export async function runRetention(): Promise<{ housekeeping: Record<string, number>; orgs: PurgeSummary[] }> {
   await initSchema()
@@ -27,7 +27,7 @@ export async function runRetention(): Promise<{ housekeeping: Record<string, num
   const rows = (await query('SELECT id, settings FROM organizations')).rows
   for (const o of rows) {
     const s = normalizeSettings(o.settings)
-    const sum: PurgeSummary = { orgId: o.id, chatMessages: 0, plans: 0, schedules: 0, siteCaptures: 0 }
+    const sum: PurgeSummary = { orgId: o.id, chatMessages: 0, plans: 0, schedules: 0, siteCaptures: 0, sitePlans: 0 }
     if (s.chatRetentionDays > 0) {
       sum.chatMessages = (await query(`DELETE FROM chat_messages c USING schedules s WHERE c.schedule_id=s.id AND s.org_id=$1 AND c.created_at < NOW() - make_interval(days => $2)`, [o.id, s.chatRetentionDays])).rowCount ?? 0
     }
@@ -41,8 +41,11 @@ export async function runRetention(): Promise<{ housekeeping: Record<string, num
       // gone. Their photos and voice notes go with them.
       sum.siteCaptures = (await query(`DELETE FROM site_captures WHERE org_id=$1 AND created_at < NOW() - make_interval(days => $2)`, [o.id, s.projectRetentionDays])).rowCount ?? 0
       sum.siteCaptures += await purgeOrphanSiteData(o.id)
+      // A level's drawing goes when it has not been touched for that long and the project has no capture left.
+      sum.sitePlans = (await query(`DELETE FROM site_plans p WHERE p.org_id=$1 AND p.updated_at < NOW() - make_interval(days => $2)
+        AND NOT EXISTS (SELECT 1 FROM site_captures c WHERE c.org_id=$1 AND c.project_key=p.project_key AND c.deleted_at IS NULL)`, [o.id, s.projectRetentionDays])).rowCount ?? 0
     }
-    if (sum.chatMessages || sum.plans || sum.schedules || sum.siteCaptures) {
+    if (sum.chatMessages || sum.plans || sum.schedules || sum.siteCaptures || sum.sitePlans) {
       orgs.push(sum)
       await audit({ orgId: o.id, action: 'retention.purge', actor: { id: null, email: 'system' }, detail: { ...sum, chatRetentionDays: s.chatRetentionDays, projectRetentionDays: s.projectRetentionDays } })
     }

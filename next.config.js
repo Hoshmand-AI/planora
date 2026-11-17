@@ -59,6 +59,8 @@ const nextConfig = {
       // A site capture's photo or voice note is a file a member uploaded: it is served with no permissions at all
       // (nothing it could contain may run or load anything), on top of the fixed type and nosniff the route sets.
       { source: '/api/schedules/:id/captures/:captureId/media/:mediaId', headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; sandbox" }] },
+      { source: '/api/schedules/:id/site-plans/:planId/image', headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; sandbox" }] },
+      { source: '/api/site/tiles/:z/:x/:y', headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; sandbox" }] },
     ]
   },
 }
