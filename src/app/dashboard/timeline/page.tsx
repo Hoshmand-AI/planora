@@ -97,8 +97,8 @@ export default function TimelinePage() {
     const ds = work.flatMap(a => [startOf(a), finishOf(a)]).filter((d): d is string => !!d).map(t)
     if (!ds.length) return null
     const lo = Math.min(...ds), hi = Math.max(...ds) + DAY
-    // A little room on the right so the last milestone isn't clipped.
-    return { lo, hi, range: Math.max((hi - lo) * 1.03, DAY) }
+    // Room on the right, so the finish milestone and its month label sit inside the chart and not against its edge.
+    return { lo, hi, range: Math.max((hi - lo) * 1.08, DAY) }
   }, [work])
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map(f => [f.id, work.filter(f.test).length])) as Record<Filter, number>, [work])
