@@ -301,18 +301,19 @@ export function ProjectsDashboard() {
         view === 'table' ? <ProjectTable rows={shown} onOpen={open} pins={pins} onPin={togglePin} col={col} setCol={setCol} /> : null
       ) : grouped ? (
         <div className="space-y-8">
-          {pinned.length > 0 && <Group title="Pinned" rows={pinned} onOpen={open} pins={pins} onPin={togglePin} />}
-          {urgent.length > 0 && <Group title="Act on these first" note={`${urgent.length} ${urgent.length === 1 ? 'project' : 'projects'}, most urgent first`} rows={urgent} onOpen={open} pins={pins} onPin={togglePin} />}
-          {rest.length > 0 && <Group title={urgent.length || pinned.length ? 'Everything else' : 'All projects'} rows={rest} onOpen={open} pins={pins} onPin={togglePin} />}
+          {pinned.length > 0 && <Group title="Pinned" rows={pinned} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
+          {urgent.length > 0 && <Group title="Act on these first" note={`${urgent.length} ${urgent.length === 1 ? 'project' : 'projects'}, most urgent first`} rows={urgent} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
+          {rest.length > 0 && <Group title={urgent.length || pinned.length ? 'Everything else' : 'All projects'} rows={rest} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />}
         </div>
       ) : (
-        <Grid rows={shown} onOpen={open} pins={pins} onPin={togglePin} />
+        <Grid rows={shown} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />
       )}
     </div>
   )
 }
 
-type CardProps = { onOpen: (r: PortfolioRow) => void; pins: string[]; onPin: (r: PortfolioRow) => void }
+/** `wide`: one project per row on a wide screen, used when there are only a few so a lone card does not float in an empty page. */
+type CardProps = { onOpen: (r: PortfolioRow) => void; pins: string[]; onPin: (r: PortfolioRow) => void; wide?: boolean }
 
 function Group({ title, note, rows, ...p }: { title: string; note?: string; rows: PortfolioRow[] } & CardProps) {
   return (
@@ -327,7 +328,7 @@ function Group({ title, note, rows, ...p }: { title: string; note?: string; rows
 }
 
 function Grid({ rows, ...p }: { rows: PortfolioRow[] } & CardProps) {
-  return <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <ProjectCard key={key(r)} r={r} i={i} {...p} />)}</ul>
+  return <ul className={p.wide ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-1' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3'}>{rows.map((r, i) => <ProjectCard key={key(r)} r={r} i={i} {...p} />)}</ul>
 }
 
 function PinButton({ r, pinned, onPin }: { r: PortfolioRow; pinned: boolean; onPin: (r: PortfolioRow) => void }) {
@@ -339,7 +340,7 @@ function PinButton({ r, pinned, onPin }: { r: PortfolioRow; pinned: boolean; onP
   )
 }
 
-function ProjectCard({ r, i, onOpen, pins, onPin }: { r: PortfolioRow; i: number } & CardProps) {
+function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: number } & CardProps) {
   const st = statusOf(r)
   const v = variance(r)
   const draft = r.source === 'built' && r.status === 'not_started'
@@ -347,8 +348,8 @@ function ProjectCard({ r, i, onOpen, pins, onPin }: { r: PortfolioRow; i: number
   const why = needsYou(r) ? reason(r) : null
   return (
     <li className="rise-in" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-      <div className="card-lift group relative h-full rounded-[14px] border border-warm-200 bg-white p-5 flex flex-col hover:border-warm-300">
-        <div className="flex items-start justify-between gap-3">
+      <div className={`card-lift group relative h-full rounded-[14px] border border-warm-200 bg-white p-5 flex flex-col hover:border-warm-300 ${wide ? 'lg:flex-row lg:items-center lg:gap-10 lg:px-7 lg:py-6' : ''}`}>
+        <div className={`flex items-start justify-between gap-3 ${wide ? 'lg:w-[26%] lg:flex-shrink-0' : ''}`}>
           <div className="min-w-0">
             {/* The whole card opens the project; the link's box covers it */}
             <button type="button" onClick={() => onOpen(r)} className="text-left text-[16px] font-semibold tracking-[-0.01em] text-navy-950 leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
@@ -358,15 +359,17 @@ function ProjectCard({ r, i, onOpen, pins, onPin }: { r: PortfolioRow; i: number
           </div>
           <PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} />
         </div>
-        <div className="mt-3"><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
+        <div className={wide ? 'lg:flex-1 lg:min-w-0' : ''}>
+        <div className={`mt-3 ${wide ? 'lg:mt-0' : ''}`}><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden />{st.label}</span></div>
         {why && <p className="mt-2 text-[12.5px] leading-snug text-warm-700 line-clamp-2" title={why}>{why}</p>}
+        </div>
         {draft ? (
-          <div className="mt-4">
+          <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
             <div className="text-[12px] font-medium text-warm-600">Next step</div>
             <div className="text-[15px] font-semibold text-navy-950 mt-0.5">Finish the interview to generate the schedule</div>
           </div>
         ) : (
-          <div className="mt-4">
+          <div className={`mt-4 ${wide ? 'lg:mt-0 lg:w-[200px] lg:flex-shrink-0' : ''}`}>
             <div className="text-[12px] font-medium text-warm-600">Forecast finish</div>
             <div className="flex flex-wrap items-baseline gap-x-2.5 mt-0.5">
               <span className="text-[22px] font-semibold tracking-[-0.02em] text-navy-950 tabular-nums">{fmtDate(r.finish)}</span>
@@ -374,7 +377,7 @@ function ProjectCard({ r, i, onOpen, pins, onPin }: { r: PortfolioRow; i: number
             </div>
           </div>
         )}
-        <div className="mt-auto pt-4">
+        <div className={`mt-auto pt-4 ${wide ? 'lg:mt-0 lg:pt-0 lg:w-[230px] lg:flex-shrink-0' : ''}`}>
           {pct != null && (
             <div className="mb-3">
               <div className="flex justify-between text-[12px] text-warm-600 mb-1"><span>Complete</span><span className="tabular-nums font-medium text-warm-700">{pct}%</span></div>
