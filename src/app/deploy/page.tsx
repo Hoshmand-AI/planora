@@ -15,16 +15,16 @@ export default function DeployPage() {
   return (
     <div className="min-h-screen bg-warm-50">
       <nav className="h-16 flex items-center justify-between px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
-        <Link href="/" aria-label="RunF9 home"><Logo variant="dark" size="text-[20px]" /></Link>
-        <Link href="/#deployment" className="text-[14px] text-accent-600 underline">All the ways to run RunF9</Link>
+        <Link href="/" aria-label="RunF9 home"><Logo variant="dark" size="h-[30px]" /></Link>
+        <Link href="/#deployment" className="text-small text-accent-600 underline">All the ways to run RunF9</Link>
       </nav>
       <main className="max-w-[960px] mx-auto px-6 py-12">
-        <h1 className="text-[34px] md:text-[48px] font-semibold tracking-[-0.02em] text-ink leading-tight">Run RunF9 in your own cloud</h1>
-        <p className="text-[16px] text-warm-700 mt-3 max-w-[720px] leading-relaxed">
+        <h1 className="text-h2 md:text-h1 font-semibold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-tight">Run RunF9 in your own cloud</h1>
+        <p className="text-copy text-warm-700 mt-3 max-w-[720px] leading-relaxed">
           One template installs the whole of RunF9 in your account: the app, its PostgreSQL database, your schedules, analysis, documents and the document-search index.
           Nothing is stored with RunF9, and you choose the AI (your cloud&apos;s own, or none). For a client that requires a different cloud, deploy one copy in each.
         </p>
-        <p className="text-[13px] text-warm-600 mt-3 max-w-[720px]">
+        <p className="text-fine text-warm-600 mt-3 max-w-[720px]">
           Preview: the templates are checked automatically (AWS with cfn-lint, Google with terraform validate) and we do the first install with you. Questions: support@hoshmand.ai.
         </p>
 
@@ -32,24 +32,24 @@ export default function DeployPage() {
           {options.map(o => (
             <section key={o.id} id={o.id} aria-labelledby={`${o.id}-h`} className="rounded-3xl border border-warm-200 bg-white p-6 md:p-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <h2 id={`${o.id}-h`} className="text-[20px] font-semibold tracking-[-0.02em] text-ink">{o.cloud}</h2>
+                <h2 id={`${o.id}-h`} className="text-h3 font-semibold tracking-[-0.02em] text-ink">{o.cloud}</h2>
                 <a href={o.launchUrl ?? o.template} {...(o.launchUrl ? { target: '_blank', rel: 'noopener noreferrer' } : { download: true })}
-                  className="pressable inline-flex items-center rounded-full bg-accent-600 px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-700">{o.launchLabel}</a>
+                  className="pressable inline-flex items-center rounded-full bg-accent-600 px-5 py-2.5 text-small font-semibold text-white hover:bg-accent-700">{o.launchLabel}</a>
               </div>
-              <dl className="mt-4 grid gap-3 md:grid-cols-3 text-[13px]">
+              <dl className="mt-4 grid gap-3 md:grid-cols-3 text-fine">
                 <div><dt className="text-warm-600">App</dt><dd className="mt-0.5 font-medium text-ink">{o.runs}</dd></div>
                 <div><dt className="text-warm-600">Database</dt><dd className="mt-0.5 font-medium text-ink">{o.database}</dd></div>
                 <div><dt className="text-warm-600">AI</dt><dd className="mt-0.5 font-medium text-ink">{o.ai}</dd></div>
               </dl>
-              <ol className="mt-5 list-decimal ml-5 space-y-1.5 text-[14px] text-warm-700">{o.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-              {o.commands && <pre tabIndex={0} aria-label="Commands" className="mt-4 overflow-x-auto rounded-xl bg-navy-950 p-4 text-[13px] text-white"><code>{o.commands}</code></pre>}
-              <p className="mt-4 text-[13px] text-warm-600">Template: <a href={o.template} className="text-accent-600 underline">{o.template.replace(/^https?:\/\//, '')}</a></p>
+              <ol className="mt-5 list-decimal ml-5 space-y-1.5 text-small text-warm-700">{o.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+              {o.commands && <pre tabIndex={0} aria-label="Commands" className="mt-4 overflow-x-auto rounded-xl bg-navy-950 p-4 text-fine text-white"><code>{o.commands}</code></pre>}
+              <p className="mt-4 text-fine text-warm-600">Template: <a href={o.template} className="text-accent-600 underline">{o.template.replace(/^https?:\/\//, '')}</a></p>
             </section>
           ))}
         </div>
 
-        <section aria-labelledby="after-h" className="mt-10 text-[14px] text-warm-700 space-y-2 max-w-[760px]">
-          <h2 id="after-h" className="text-[20px] font-semibold text-ink">After it is running</h2>
+        <section aria-labelledby="after-h" className="mt-10 text-small text-warm-700 space-y-2 max-w-[760px]">
+          <h2 id="after-h" className="text-h3 font-semibold text-ink">After it is running</h2>
           <ul className="list-disc ml-5 space-y-1.5">
             <li>The first person to sign up creates the organization and becomes its owner. Then set sign-up to invite-only (the template&apos;s signup setting) and invite your team, or connect your company sign-in (SSO).</li>
             <li>Organization &gt; Where your data lives shows &quot;Your AWS account&quot; (or Azure, or Google Cloud) and the region.</li>

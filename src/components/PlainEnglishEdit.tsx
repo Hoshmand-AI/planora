@@ -19,7 +19,7 @@ export interface EditPreview {
   note: string | null
 }
 
-const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
+const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-body text-warm-700'
 const primary = buttonClass.primary
 const secondary = buttonClass.secondary
 
@@ -69,7 +69,7 @@ export function PlainEnglishEdit({ id, examples, preview, apply, undo }: {
   return (
     <div className="border border-warm-200 rounded-lg p-3 space-y-2 bg-white">
       <label htmlFor={`pe-${id}`} className="flex items-center gap-2 font-semibold text-ink"><MessageSquareText size={15} aria-hidden className="text-accent-600" />Describe the change</label>
-      <p className="text-[12px] text-warm-600">Write it the way you would say it. RunF9 shows the exact edits and the new finish first; nothing changes until you apply. {examples}</p>
+      <p className="text-caption text-warm-600">Write it the way you would say it. RunF9 shows the exact edits and the new finish first; nothing changes until you apply. {examples}</p>
       <textarea id={`pe-${id}`} value={text} onChange={e => { setText(e.target.value); setP(null) }} rows={2} maxLength={2000} className={`${input} w-full`} placeholder="e.g. extend A1030 by 5 days; start A1070 3 days after A1060 starts" />
       <button type="button" onClick={read} disabled={busy !== '' || text.trim().length < 4} className={secondary}>{busy === 'read' ? 'Reading…' : 'Preview change'}</button>
 
@@ -77,28 +77,28 @@ export function PlainEnglishEdit({ id, examples, preview, apply, undo }: {
         <div className="space-y-2" aria-live="polite">
           <ul className="space-y-1.5">
             {p.clauses.map((c, i) => (
-              <li key={i} className="rounded border border-warm-200 p-2 text-[12px]">
+              <li key={i} className="rounded border border-warm-200 p-2 text-caption">
                 <span className="block text-warm-600">“{c.text}”</span>
                 {c.error ? <span className="block text-status-at-risk">Not applied: {c.error}</span>
-                  : <span className="block text-ink"><strong>{fmtDates(c.what ?? '')}</strong>{c.before != null && <> · {fmtDates(c.before)} → {fmtDates(c.after ?? '')}</>}{c.method === 'model' && <span className="ml-2 text-[12px] text-status-info">read by AI, check it</span>}</span>}
+                  : <span className="block text-ink"><strong>{fmtDates(c.what ?? '')}</strong>{c.before != null && <> · {fmtDates(c.before)} → {fmtDates(c.after ?? '')}</>}{c.method === 'model' && <span className="ml-2 text-caption text-status-info">read by AI, check it</span>}</span>}
               </li>
             ))}
           </ul>
           {p.count > 0 ? (
             <>
-              <p className="text-[13px] text-ink">Finish {fmtDate(p.finishBefore ?? '')} → <strong>{fmtDate(p.finishAfter ?? '')}</strong> ({shift(p.finishDeltaDays)})</p>
-              {p.details.map((d, i) => <p key={i} className="text-[12px] text-warm-600">{fmtDates(d)}</p>)}
-              <label className="block text-[12px] text-warm-600">Reason (required, kept with each edit and in the audit log)
+              <p className="text-body text-ink">Finish {fmtDate(p.finishBefore ?? '')} → <strong>{fmtDate(p.finishAfter ?? '')}</strong> ({shift(p.finishDeltaDays)})</p>
+              {p.details.map((d, i) => <p key={i} className="text-caption text-warm-600">{fmtDates(d)}</p>)}
+              <label className="block text-caption text-warm-600">Reason (required, kept with each edit and in the audit log)
                 <input value={reason} onChange={e => setReason(e.target.value)} className={`${input} block mt-0.5 w-full`} />
               </label>
               <button type="button" onClick={go} disabled={busy !== '' || reason.trim().length < 5} className={primary}>{busy === 'apply' ? 'Applying…' : `Apply ${p.count} edit${p.count === 1 ? '' : 's'}`}</button>
             </>
-          ) : <p className="text-[12px] text-warm-600">Nothing to apply.</p>}
-          {p.note && <p className="text-[12px] text-warm-600">{p.note}</p>}
+          ) : <p className="text-caption text-warm-600">Nothing to apply.</p>}
+          {p.note && <p className="text-caption text-warm-600">{p.note}</p>}
         </div>
       )}
-      {done && <p role="status" className="text-status-on-track text-[13px]">{fmtDates(done)}{canUndo && <> <button type="button" onClick={back} disabled={busy !== ''} className="ml-1 text-accent-600 underline">{busy === 'undo' ? 'Undoing…' : 'Undo this change'}</button></>}</p>}
-      {err && <p role="alert" className="text-status-at-risk text-[13px]">{err}</p>}
+      {done && <p role="status" className="text-status-on-track text-body">{fmtDates(done)}{canUndo && <> <button type="button" onClick={back} disabled={busy !== ''} className="ml-1 text-accent-600 underline">{busy === 'undo' ? 'Undoing…' : 'Undo this change'}</button></>}</p>}
+      {err && <p role="alert" className="text-status-at-risk text-body">{err}</p>}
     </div>
   )
 }

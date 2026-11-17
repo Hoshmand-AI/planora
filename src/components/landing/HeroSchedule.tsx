@@ -70,10 +70,10 @@ export default function HeroSchedule() {
         <figure className="p-5 md:p-8 min-w-0">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 mb-5">
             <div>
-              <div className="text-[13.5px] text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
-              <div className="text-[18px] font-semibold text-ink tracking-[-0.01em]">Schedule calculated by RunF9</div>
+              <div className="text-copy font-semibold text-ink tracking-[-0.01em]">Schedule calculated by RunF9</div>
+              <div className="text-fine text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
             </div>
-            <div className="text-[13px] text-warm-700 flex items-center gap-4" aria-hidden="true">
+            <div className="text-fine text-warm-700 flex items-center gap-4" aria-hidden="true">
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-accent-600 align-middle" /> critical</span>
               <span><span className="inline-block w-0 h-3.5 border-l border-dashed border-navy-700 align-middle" /> data date</span>
               <span><span className="inline-block w-0 h-3.5 border-l-2 border-status-at-risk align-middle" /> required</span>
@@ -90,7 +90,7 @@ export default function HeroSchedule() {
               const lit = phase >= 2 && a.crit
               return (
                 <div key={a.name} className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3">
-                  <div className="text-[13px] md:text-[14px] text-warm-700 truncate">{a.name}</div>
+                  <div className="text-fine text-warm-700 truncate">{a.name}</div>
                   <div className="relative h-[16px] md:h-[18px] rounded-full bg-warm-100">
                     <div
                       className="absolute top-0 h-full rounded-full"
@@ -106,7 +106,7 @@ export default function HeroSchedule() {
               )
             })}
             <div className="grid grid-cols-[124px_1fr] md:grid-cols-[312px_1fr] items-center gap-3 pt-0.5">
-              <div className="text-[13px] md:text-[14px] font-semibold text-ink">Substantial completion</div>
+              <div className="text-fine font-semibold text-ink">Substantial completion</div>
               <div className="relative h-[18px]">
                 <div
                   className="absolute top-1/2 w-3.5 h-3.5 bg-navy-950"
@@ -116,21 +116,21 @@ export default function HeroSchedule() {
             </div>
           </div>
 
-          <figcaption className="mt-5 border-t border-warm-200 pt-4 text-[14px] text-warm-700" aria-live="polite">{STATUS[phase]}</figcaption>
+          <figcaption className="mt-5 border-t border-warm-200 pt-4 text-small text-warm-700" aria-live="polite">{STATUS[phase]}</figcaption>
         </figure>
 
         {/* The answer */}
         <div className="bg-navy-950 text-white p-5 md:p-7 flex flex-col">
-          <p className="text-[13.5px] text-navy-200">Will we finish on time?</p>
-          <p className="text-[38px] md:text-[42px] font-semibold tracking-[-0.03em] leading-none mt-1.5 tabular-nums">{SCH.finish}</p>
-          <p className="mt-3 self-start rounded-full bg-status-at-risk-bg text-status-at-risk text-[14px] font-semibold px-3 py-1">{SCH.daysLate} days after the required {SCH.required}</p>
+          <p className="text-fine text-navy-200">Will we finish on time?</p>
+          <p className="text-h2 font-semibold tracking-[-0.02em] leading-none mt-1.5 tabular-nums">{SCH.finish}</p>
+          <p className="mt-3 self-start rounded-full bg-status-at-risk-bg text-status-at-risk text-fine font-semibold px-3 py-1">{SCH.daysLate} days after the required {SCH.required}</p>
           <dl className="mt-4 grid grid-cols-3 lg:grid-cols-1 gap-2">
             {tiles.map(([value, label]) => (
               <div key={label} className="rounded-xl bg-navy-900 border border-navy-800 px-4 py-2.5">
                 <dt className="sr-only">{label}</dt>
                 <dd className="flex flex-col lg:flex-row lg:items-baseline lg:gap-2.5">
-                  <span className="text-[22px] md:text-[24px] font-semibold tracking-[-0.02em] tabular-nums whitespace-nowrap">{value}</span>
-                  <span className="text-[13.5px] text-navy-200 leading-snug">{label}</span>
+                  <span className="text-h3 font-semibold tracking-[-0.01em] tabular-nums whitespace-nowrap">{value}</span>
+                  <span className="text-fine text-navy-200 leading-snug">{label}</span>
                 </dd>
               </div>
             ))}
@@ -138,10 +138,10 @@ export default function HeroSchedule() {
           <button type="button" onClick={run} className="group mt-5 lg:mt-auto pt-1 flex items-center gap-4 select-none text-left">
             <span
               aria-hidden="true"
-              className="flex-shrink-0 flex items-center justify-center w-[58px] h-[58px] rounded-[15px] bg-navy-900 border-2 border-accent-400 text-white font-bold text-[20px] tracking-tight transition-transform duration-150"
+              className="flex-shrink-0 flex items-center justify-center w-[58px] h-[58px] rounded-[15px] bg-navy-900 border-2 border-accent-400 text-white font-bold text-h3 tracking-tight transition-transform duration-150"
               style={{ transform: pressed ? 'translateY(4px)' : 'none', boxShadow: pressed ? '0 1px 0 #1D2125' : '0 5px 0 #1D2125, 0 18px 30px -10px rgba(59,130,246,0.6)' }}
             >F9</span>
-            <span className="text-[14.5px] text-navy-200 group-hover:text-white transition-colors leading-snug">Press F9 to recalculate.<br />Arithmetic, not AI.</span>
+            <span className="text-small text-navy-200 group-hover:text-white transition-colors leading-snug">Press F9 to recalculate.<br />Arithmetic, not AI.</span>
           </button>
         </div>
       </div>

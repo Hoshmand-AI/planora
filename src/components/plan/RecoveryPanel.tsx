@@ -26,15 +26,15 @@ export function bestOption(options: RecoveryOption[]): RecoveryOption | null {
 function Gain({ o }: { o: RecoveryOption }) {
   if (o.id === 'move_date') return null
   return o.meetsDate
-    ? <span className="rounded-full bg-status-on-track-bg px-2 py-0.5 text-[12px] font-semibold text-status-on-track whitespace-nowrap">Meets the date</span>
-    : <span className="text-[13px] text-warm-700 whitespace-nowrap">Saves {days(o.daysSaved)}</span>
+    ? <span className="rounded-full bg-status-on-track-bg px-2 py-0.5 text-caption font-semibold text-status-on-track whitespace-nowrap">Meets the date</span>
+    : <span className="text-body text-warm-700 whitespace-nowrap">Saves {days(o.daysSaved)}</span>
 }
 
 const costOf = (o: RecoveryOption) => o.impact?.cost ? (o.impact.cost.high === 0 ? '$0 added' : `${usd(o.impact.cost.low)}–${usd(o.impact.cost.high)}`) : undefined
 
 function Details({ o, describe }: { o: RecoveryOption; describe: boolean }) {
   return (
-    <div className="text-[13px] text-warm-700 space-y-1.5">
+    <div className="text-body text-warm-700 space-y-1.5">
       {describe && <p>{o.description}</p>}
       <p><span className="font-medium text-ink">Trade-off: </span>{o.tradeoff}</p>
       {o.impact && (
@@ -54,8 +54,8 @@ function Details({ o, describe }: { o: RecoveryOption; describe: boolean }) {
 
 function Act({ o, primary, busy, onRecover, onInterview }: { o: RecoveryOption; primary: boolean; busy: string | null; onRecover: (id: string) => void; onInterview: () => void }) {
   const look = primary
-    ? 'pressable inline-flex items-center justify-center min-w-[88px] h-9 px-4 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold disabled:opacity-50'
-    : 'pressable inline-flex items-center justify-center min-w-[88px] h-9 px-3.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink text-[13px] font-medium disabled:opacity-50'
+    ? 'pressable inline-flex items-center justify-center min-w-[88px] h-9 px-4 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold disabled:opacity-50'
+    : 'pressable inline-flex items-center justify-center min-w-[88px] h-9 px-3.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink text-body font-medium disabled:opacity-50'
   return o.apply.type === 'navigate'
     ? <button type="button" onClick={onInterview} className={look}>Answer questions</button>
     : <button type="button" disabled={!!busy} aria-label={`Apply: ${o.title}`} onClick={() => { if (confirm(`Apply “${o.title}”? You can override or undo any change afterwards.`)) onRecover(o.id) }} className={look}>{busy === 'recover' ? <Loader2 size={12} className="animate-spin" aria-label="Applying" /> : 'Apply'}</button>
@@ -69,10 +69,10 @@ function OptionRow({ o, busy, onRecover, onInterview }: { o: RecoveryOption; bus
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)} className="group flex-1 min-w-[240px] flex items-start gap-2 text-left">
           <ChevronRight size={15} aria-hidden="true" className={`mt-0.5 flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-90' : ''}`} />
-          <span className="text-[14px] font-medium text-ink group-hover:underline">{o.title}</span>
+          <span className="text-subhead font-medium text-ink group-hover:underline">{o.title}</span>
         </button>
         <Gain o={o} />
-        <span className="text-[13px] text-warm-600 whitespace-nowrap">Finish <span className="font-semibold text-ink tabular-nums">{fmtDate(o.newFinish)}</span></span>
+        <span className="text-body text-warm-600 whitespace-nowrap">Finish <span className="font-semibold text-ink tabular-nums">{fmtDate(o.newFinish)}</span></span>
         <Act o={o} primary={false} busy={busy} onRecover={onRecover} onInterview={onInterview} />
       </div>
       {open && <div className="pl-[23px] pt-2 pb-1 max-w-3xl"><Details o={o} describe /></div>}
@@ -87,19 +87,19 @@ export function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: Recovery
   const noGain = r.options.filter(o => o.id !== 'move_date' && o.daysSaved <= 0)
   return (
     <section id="recovery" aria-labelledby="recovery-title" className="rounded-[14px] border border-warm-200 bg-white p-5 md:p-6 mb-5 scroll-mt-48">
-      <h3 id="recovery-title" className="text-[16px] font-semibold text-ink">Ways to recover the {days(r.gapDays)}</h3>
+      <h3 id="recovery-title" className="text-heading font-semibold text-ink">Ways to recover the {days(r.gapDays)}</h3>
 
       {best ? (
         <div className="mt-3 rounded-xl bg-warm-100 px-4 py-4 md:px-5">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex-1 min-w-[240px]">
-              <p className="text-[12px] font-semibold text-warm-600">Suggested first step</p>
-              <p className="mt-0.5 text-[16px] font-semibold text-ink leading-snug">{best.title}</p>
-              <p className="mt-1 text-[13px] text-warm-700 max-w-2xl">{best.description}</p>
+              <p className="text-subhead font-semibold text-ink leading-snug">{best.title}</p>
+              <p className="text-caption font-semibold text-warm-600">Suggested first step</p>
+              <p className="mt-1 text-body text-warm-700 max-w-2xl">{best.description}</p>
             </div>
             <div>
-              <p className="text-[12px] text-warm-600">New finish</p>
-              <p className="text-[18px] font-semibold text-ink tabular-nums leading-tight">{fmtDate(best.newFinish)}</p>
+              <p className="text-subhead font-semibold text-ink tabular-nums">{fmtDate(best.newFinish)}</p>
+              <p className="text-caption text-warm-600">New finish</p>
               <p className="mt-1"><Gain o={best} /></p>
             </div>
             <Act o={best} primary busy={busy} onRecover={onRecover} onInterview={onInterview} />
@@ -108,7 +108,7 @@ export function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: Recovery
             <Disclosure title="Trade-off and cost" meta={costOf(best)}><Details o={best} describe={false} /></Disclosure>
           </div>
         </div>
-      ) : <p className="mt-2 text-[13px] text-warm-700">None of the modeled levers saves time on its own. See why below, and what you can change.</p>}
+      ) : <p className="mt-2 text-body text-warm-700">None of the modeled levers saves time on its own. See why below, and what you can change.</p>}
 
       {rest.length > 0 && (
         <ul className="mt-3 divide-y divide-warm-200" aria-label={best ? 'Other options, each re-scheduled on the real network' : 'Your options, each re-scheduled on the real network'}>
@@ -118,7 +118,7 @@ export function RecoveryPanel({ r, busy, onRecover, onInterview }: { r: Recovery
 
       <div className="mt-2">
         <Disclosure title="Why is it late?">
-          <div className="space-y-1.5 text-[13px] text-warm-700 max-w-3xl">
+          <div className="space-y-1.5 text-body text-warm-700 max-w-3xl">
             {r.explanation.map((e, i) => <p key={i}>{fmtDates(e)}</p>)}
             {r.combined && <p>Combining the modeled levers would finish <span className="font-semibold text-ink">{fmtDate(r.combined.newFinish)}</span>: {r.combined.meetsDate ? 'enough to meet the date.' : 'still after the required date.'} Apply them one at a time to see each effect.</p>}
             {noGain.length > 0 && <p>Also modeled, with no gain: {noGain.map(o => o.title).join('; ')}.</p>}

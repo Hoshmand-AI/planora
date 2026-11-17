@@ -29,7 +29,7 @@ interface Candidate {
 }
 
 const passages = (n: number) => `${n} passage${n === 1 ? '' : 's'}`
-const badge = 'inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold'
+const badge = 'inline-flex items-center rounded-full px-2 py-0.5 text-caption font-semibold'
 const TrustBadge = ({ trust }: { trust: string }) => trust === 'approved'
   ? <span className={`${badge} bg-status-on-track-bg border-status-on-track/40 text-status-on-track`}>Approved</span>
   : <span className={`${badge} bg-status-attention-bg border-status-attention/40 text-status-attention`}>Unreviewed</span>
@@ -105,12 +105,12 @@ export default function DocumentsPage() {
     <>
       <div className={openDoc ? 'space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-4 lg:items-start' : ''}>
       <Section title="Records in this project" description="New documents start unreviewed. An admin or reviewer approves a document before AI answers rely on it by default.">
-        {!data ? <p className="text-[13px] text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
+        {!data ? <p className="text-body text-warm-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</p>
           : !data.documents.length ? (
             <div className="py-10 text-center">
-              <p className="text-[16px] font-semibold text-ink">No records yet</p>
-              <p className="mt-1 text-[14px] text-warm-600">{can('schedule.write') ? 'Start with the contract or the scheduling specification.' : 'Nothing has been added to this project.'}</p>
-              {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+              <p className="text-subhead font-semibold text-ink">No records yet</p>
+              <p className="mt-1 text-body text-warm-600">{can('schedule.write') ? 'Start with the contract or the scheduling specification.' : 'Nothing has been added to this project.'}</p>
+              {can('schedule.write') && <button type="button" onClick={() => setAdding(true)} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
             </div>
           )
           : (
@@ -119,20 +119,20 @@ export default function DocumentsPage() {
                 <li key={d.id} className={`py-3 flex flex-col md:flex-row md:items-start gap-2 md:gap-4 ${openId === d.id ? '-mx-3 px-3 rounded-lg bg-warm-100' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <button type="button" aria-pressed={openId === d.id} onClick={() => setOpenId(openId === d.id ? null : d.id)} className={`text-left text-[14px] font-semibold break-words hover:underline ${openId === d.id ? 'text-accent-700' : 'text-ink'}`}>{d.title}</button>
+                      <button type="button" aria-pressed={openId === d.id} onClick={() => setOpenId(openId === d.id ? null : d.id)} className={`text-left text-subhead font-semibold break-words hover:underline ${openId === d.id ? 'text-accent-700' : 'text-ink'}`}>{d.title}</button>
                       <TrustBadge trust={d.trust} />
                       {d.scope === 'org' && <span className={`${badge} bg-accent-100 border-accent-500/40 text-warm-700`}>Organization standard</span>}
                       {d.classification && d.classification !== 'unclassified' && <span className={`${badge} bg-status-at-risk-bg border-status-at-risk/40 text-status-at-risk`}>{d.classification.toUpperCase()}</span>}
                     </div>
-                    <div className="text-[12px] text-warm-500 mt-0.5">
+                    <div className="text-caption text-warm-500 mt-0.5">
                       {data.docTypes.find(t => t.id === d.docType)?.label ?? d.docType} · {d.format.toUpperCase()}{d.pageCount ? ` · ${d.pageCount} pages` : ''} · {passages(d.chunkCount)} · added {fmtDay(d.createdAt)}{d.uploadedByName ? ` by ${d.uploadedByName}` : ''}
                       {d.scope === 'project' && d.anchorName && d.scheduleId !== selectedSchedule.id ? ` · attached to ${d.anchorName}${d.anchorVersion ? ` (${d.anchorVersion})` : ''}` : ''}
                     </div>
                     {d.readBy === 'ai_vision' && (
-                      <p className="mt-1 text-[12px] text-status-info">Text read by AI from the page images (scanned pages or drawing sheets): check it against the file before relying on it.</p>
+                      <p className="mt-1 text-caption text-status-info">Text read by AI from the page images (scanned pages or drawing sheets): check it against the file before relying on it.</p>
                     )}
                     {d.flaggedCount > 0 && (
-                      <p className="mt-1 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> {d.flaggedCount} passage{d.flaggedCount === 1 ? '' : 's'} contain{d.flaggedCount === 1 ? 's' : ''} instruction-like text and {d.flaggedCount === 1 ? 'is' : 'are'} never sent to AI.</p>
+                      <p className="mt-1 text-caption text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> {d.flaggedCount} passage{d.flaggedCount === 1 ? '' : 's'} contain{d.flaggedCount === 1 ? 's' : ''} instruction-like text and {d.flaggedCount === 1 ? 'is' : 'are'} never sent to AI.</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -186,11 +186,11 @@ export default function DocumentsPage() {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
         <h2 className="sr-only">Project records</h2>
-        <p className="text-[13px] text-warm-600 max-w-[720px]">
+        <p className="text-body text-warm-600 max-w-[720px]">
           Emails, minutes, daily reports and contract documents, shared with every update of this project. RunF9 keeps the extracted text only, not the original file.
         </p>
         </div>
-        {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
+        {can('schedule.write') && hasDocs && <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold px-4 h-9"><Upload size={14} aria-hidden="true" /> Add a record</button>}
       </div>
 
       {data?.cuiWarning && <Alert tone="info">{data.cuiWarning}</Alert>}
@@ -209,11 +209,11 @@ export default function DocumentsPage() {
           {<button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-ink hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
           {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">
-              <h2 id="add-h" className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Add to this project</h2>
+              <h2 id="add-h" className="text-heading font-semibold text-ink">Add to this project</h2>
               <div role="tablist" aria-labelledby="add-h" className="flex flex-wrap gap-0 border-b border-warm-200">
                 {ADD_WAYS.map(w => (
                   <button key={w.id} role="tab" type="button" aria-selected={addWay === w.id} onClick={() => setAddWay(w.id)}
-                    className={`pressable px-1 pb-2 pt-1 mr-4 text-[13px] font-semibold border-b-2 ${addWay === w.id ? 'border-accent-600 text-ink' : 'border-transparent text-warm-600 hover:text-ink'}`}>{w.label}</button>
+                    className={`pressable px-1 pb-2 pt-1 mr-4 text-body font-semibold border-b-2 ${addWay === w.id ? 'border-accent-600 text-ink' : 'border-transparent text-warm-600 hover:text-ink'}`}>{w.label}</button>
                 ))}
               </div>
             </div>
@@ -255,8 +255,8 @@ function RecordPane({ base, doc, typeLabel, actions, onClose }: { base: string; 
     <section ref={ref} aria-labelledby="record-h" className="rounded-[14px] border border-warm-200 bg-white flex flex-col min-w-0 scroll-mt-20 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)]">
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
         <div className="min-w-0">
-          <h2 id="record-h" className="text-[16px] font-semibold tracking-[-0.01em] text-ink break-words">{doc.title}</h2>
-          <p className="mt-0.5 text-[12px] text-warm-600">{typeLabel} · {doc.format.toUpperCase()}{doc.pageCount ? ` · ${doc.pageCount} pages` : ''} · {passages(doc.chunkCount)}{doc.uploadedByName ? ` · added by ${doc.uploadedByName}` : ''} · {fmtDay(doc.createdAt)}</p>
+          <h2 id="record-h" className="text-heading font-semibold text-ink break-words">{doc.title}</h2>
+          <p className="mt-0.5 text-caption text-warm-600">{typeLabel} · {doc.format.toUpperCase()}{doc.pageCount ? ` · ${doc.pageCount} pages` : ''} · {passages(doc.chunkCount)}{doc.uploadedByName ? ` · added by ${doc.uploadedByName}` : ''} · {fmtDay(doc.createdAt)}</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close this record" className="flex-shrink-0 -mr-1.5 -mt-1.5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink hover:bg-warm-100"><X size={17} aria-hidden="true" /></button>
       </div>
@@ -266,16 +266,16 @@ function RecordPane({ base, doc, typeLabel, actions, onClose }: { base: string; 
         {actions}
       </div>
       <div className="min-h-0 overflow-y-auto px-5 py-4 space-y-4" tabIndex={0} aria-label={`Text of ${doc.title}`}>
-        {state.loading ? <p className="text-[13px] text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Opening…</p>
-          : state.error ? <p role="alert" className="text-[13px] text-status-at-risk">{state.error}</p>
+        {state.loading ? <p className="text-body text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Opening…</p>
+          : state.error ? <p role="alert" className="text-body text-status-at-risk">{state.error}</p>
           : state.passages.map(p => (
             <div key={p.chunkId} className={p.flagged ? 'rounded-lg border border-status-attention/50 bg-status-attention-bg p-3' : ''}>
-              <p className="text-[12px] font-semibold text-warm-600">{[p.section, p.heading].filter(Boolean).join(' · ') || `Passage ${p.ordinal + 1}`}{p.page ? ` · page ${p.page}${p.pageEnd && p.pageEnd !== p.page ? `–${p.pageEnd}` : ''}` : ''}</p>
-              {p.flagged && <p className="mt-0.5 text-[12px] text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> Flagged: {p.flagReasons.join(', ') || 'possible instruction to an AI'}. It is never sent to a model.</p>}
-              <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-warm-700">{p.text}</p>
+              <p className="text-caption font-semibold text-warm-600">{[p.section, p.heading].filter(Boolean).join(' · ') || `Passage ${p.ordinal + 1}`}{p.page ? ` · page ${p.page}${p.pageEnd && p.pageEnd !== p.page ? `–${p.pageEnd}` : ''}` : ''}</p>
+              {p.flagged && <p className="mt-0.5 text-caption text-status-attention flex items-center gap-1"><ShieldAlert size={13} aria-hidden="true" /> Flagged: {p.flagReasons.join(', ') || 'possible instruction to an AI'}. It is never sent to a model.</p>}
+              <p className="mt-1 whitespace-pre-wrap text-body leading-relaxed text-warm-700">{p.text}</p>
             </div>
           ))}
-        {state.truncated && <p className="text-[12px] text-warm-600">Showing the first {state.passages.length} of {doc.chunkCount} passages. Search the records to find text further in.</p>}
+        {state.truncated && <p className="text-caption text-warm-600">Showing the first {state.passages.length} of {doc.chunkCount} passages. Search the records to find text further in.</p>}
       </div>
     </section>
   )
@@ -365,7 +365,7 @@ function UploadForm({ base, data, canOrg, onDone, show = 'both' }: { base: strin
         )}</Field>
         {canOrg && (
           <div className="flex items-end">
-            <label htmlFor={orgId} className="flex items-start gap-2 text-[13px] text-warm-700">
+            <label htmlFor={orgId} className="flex items-start gap-2 text-body text-warm-700">
               <input id={orgId} type="checkbox" checked={orgStandard} onChange={e => setOrgStandard(e.target.checked)} className="mt-0.5" />
               <span>Organization standard (applies to every project of the organization)</span>
             </label>
@@ -408,29 +408,29 @@ function SearchPanel({ base, unreviewed }: { base: string; unreviewed: number })
         <Button type="submit" disabled={busy || !q.trim()}>{busy ? <Loader2 size={13} className="inline animate-spin -mt-0.5" aria-hidden="true" /> : <Search size={13} className="inline -mt-0.5" aria-hidden="true" />} Search</Button>
       </form>
       {unreviewed > 0 && (
-        <label htmlFor={inc} className="mt-2 flex items-center gap-2 text-[13px] text-warm-700">
+        <label htmlFor={inc} className="mt-2 flex items-center gap-2 text-body text-warm-700">
           <input id={inc} type="checkbox" checked={includeUnreviewed} onChange={e => setIncludeUnreviewed(e.target.checked)} />
           Include {unreviewed} unreviewed document{unreviewed === 1 ? '' : 's'} (labelled in the results)
         </label>
       )}
       {error && <div className="mt-3"><Alert tone="error">{error}</Alert></div>}
       <div aria-live="polite" className="mt-3">
-        {hits && !hits.length && <p className="text-[13px] text-warm-500">No passage matched.{unreviewed > 0 && !includeUnreviewed ? ' Unreviewed documents were not searched.' : ''}</p>}
+        {hits && !hits.length && <p className="text-body text-warm-500">No passage matched.{unreviewed > 0 && !includeUnreviewed ? ' Unreviewed documents were not searched.' : ''}</p>}
         {hits && hits.length > 0 && (
           <ol className="space-y-3">
             {hits.map(h => (
               <li key={h.chunkId} className={`border rounded-md p-3 ${h.flagged ? 'border-status-attention bg-status-attention-bg' : 'border-warm-200 bg-warm-100'}`}>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[13px] font-semibold text-ink">{h.citation}</span>
-                  <span className="text-[12px] text-warm-500">{h.tierLabel}</span>
+                  <span className="text-body font-semibold text-ink">{h.citation}</span>
+                  <span className="text-caption text-warm-500">{h.tierLabel}</span>
                   {h.trust !== 'approved' && <TrustBadge trust={h.trust} />}
                 </div>
                 {h.flagged && (
-                  <p className="text-[12px] text-warm-700 mb-1 flex items-start gap-1"><ShieldAlert size={13} className="mt-0.5 shrink-0 text-status-attention" aria-hidden="true" />
+                  <p className="text-caption text-warm-700 mb-1 flex items-start gap-1"><ShieldAlert size={13} className="mt-0.5 shrink-0 text-status-attention" aria-hidden="true" />
                     <span><strong>Caution:</strong> this passage contains text that reads like instructions to an AI ({h.flagReasons.join('; ')}). It is never sent to a model. Check the source document.</span></p>
                 )}
-                {h.heading && !h.text.slice(0, 200).includes(h.heading) && <div className="text-[12px] font-medium text-warm-600">{h.heading}</div>}
-                <p className="text-[13px] text-warm-700 whitespace-pre-wrap break-words">{h.text}</p>
+                {h.heading && !h.text.slice(0, 200).includes(h.heading) && <div className="text-caption font-medium text-warm-600">{h.heading}</div>}
+                <p className="text-body text-warm-700 whitespace-pre-wrap break-words">{h.text}</p>
               </li>
             ))}
           </ol>
@@ -453,13 +453,13 @@ function Requirements({ base, items, canDecide, onChange, onError }: { base: str
           <li key={`${c.documentId}:${c.key}`} className="py-3 first:pt-0 last:pb-0 flex flex-col md:flex-row md:items-start gap-2 md:gap-6">
             <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] font-semibold text-ink">{c.label}: {c.value}</span>
+              <span className="text-body font-semibold text-ink">{c.label}: {c.value}</span>
               {c.review && <span className={`${badge} ${c.review.status === 'confirmed' ? 'bg-status-on-track-bg border-status-on-track/40 text-status-on-track' : 'bg-warm-100 border-warm-300 text-warm-600'}`}>{c.review.status === 'confirmed' ? 'Confirmed' : 'Dismissed'} {fmtDay(c.review.createdAt)}</span>}
               {c.documentTrust !== 'approved' && <TrustBadge trust={c.documentTrust} />}
             </div>
-            <blockquote className="mt-1 border-l-2 border-warm-300 pl-2 text-[13px] text-warm-700">{c.quote}</blockquote>
-            <div className="mt-1 text-[12px] text-warm-600">{c.citation}</div>
-            {c.fromFlaggedPassage && <p className="mt-1 text-[12px] text-status-attention">From a passage flagged for instruction-like text — check the source before confirming.</p>}
+            <blockquote className="mt-1 border-l-2 border-warm-300 pl-2 text-body text-warm-700">{c.quote}</blockquote>
+            <div className="mt-1 text-caption text-warm-600">{c.citation}</div>
+            {c.fromFlaggedPassage && <p className="mt-1 text-caption text-status-attention">From a passage flagged for instruction-like text — check the source before confirming.</p>}
             </div>
             {canDecide && (
               <div className="flex gap-2 flex-shrink-0">
@@ -517,30 +517,30 @@ function ProjectInbox({ base, onReceived }: { base: string; onReceived: () => vo
   --data-binary @message.eml` : ''
   return (
     <Section title="Project inbox" description="Connect the project mailbox and the meeting recorder once. Each email, transcript or daily report they send lands here as a project document, and the Today tab reads it for delays, changes, risks and commitments the same morning.">
-      {!data.available ? <p className="text-[13px] text-warm-700">CUI and classified projects have no inbox. Add their documents by hand.</p> : (
+      {!data.available ? <p className="text-body text-warm-700">CUI and classified projects have no inbox. Add their documents by hand.</p> : (
         <div className="space-y-3">
           {error && <Alert tone="error">{error}</Alert>}
           {fresh && (
             <div className="border border-accent-600/40 bg-white rounded-md p-3 space-y-2" role="status">
-              <p className="text-[13px] font-semibold text-ink">“{fresh.name}” is ready. Copy the token now: it is shown only once.</p>
-              <div className="grid gap-2 text-[12px]">
+              <p className="text-body font-semibold text-ink">“{fresh.name}” is ready. Copy the token now: it is shown only once.</p>
+              <div className="grid gap-2 text-caption">
                 <div><span className="text-warm-700">Send to (POST): </span><code className="font-mono text-ink break-all">{data.address}</code> <button type="button" onClick={() => copy('address', data.address)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'address' ? 'Copied' : 'Copy'}</button></div>
                 <div><span className="text-warm-700">Token (Authorization: Bearer): </span><code className="font-mono text-ink break-all">{fresh.token}</code> <button type="button" onClick={() => copy('token', fresh.token)} className="text-accent-600 font-medium hover:underline ml-1">{copied === 'token' ? 'Copied' : 'Copy'}</button></div>
               </div>
-              <pre className="bg-warm-100 rounded p-2 text-[12px] text-ink overflow-x-auto"><code>{example}</code></pre>
-              <p className="text-[12px] text-warm-700">In Microsoft Power Automate, Zapier or n8n: on a new email in the project mailbox (or a finished meeting transcript), add an HTTP step that posts to the address with this token. Accepted: a raw email (message/rfc822), a transcript (text/vtt), plain text, or JSON with type, title and text.</p>
-              <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-[12px] font-medium text-accent-600 hover:underline">I have copied it</button>
+              <pre className="bg-warm-100 rounded p-2 text-caption text-ink overflow-x-auto"><code>{example}</code></pre>
+              <p className="text-caption text-warm-700">In Microsoft Power Automate, Zapier or n8n: on a new email in the project mailbox (or a finished meeting transcript), add an HTTP step that posts to the address with this token. Accepted: a raw email (message/rfc822), a transcript (text/vtt), plain text, or JSON with type, title and text.</p>
+              <button type="button" onClick={() => { setFresh(null); onReceived() }} className="text-caption font-medium text-accent-600 hover:underline">I have copied it</button>
             </div>
           )}
           {active.length > 0 && (
             <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md bg-white">
               {active.map(i => (
-                <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
+                <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-body">
                   <div>
                     <span className="font-medium text-ink">{i.name}</span>
                     <span className="text-warm-600"> · token {i.prefix}… · {i.received} received{i.lastUsedAt ? `, last ${fmtDay(i.lastUsedAt)}` : ''} · created {fmtDay(i.createdAt)}</span>
                   </div>
-                  <button type="button" onClick={() => turnOff(i)} className="text-[12px] font-medium text-status-at-risk hover:underline">Turn off</button>
+                  <button type="button" onClick={() => turnOff(i)} className="text-caption font-medium text-status-at-risk hover:underline">Turn off</button>
                 </li>
               ))}
             </ul>
@@ -613,15 +613,15 @@ function ProjectMailbox({ base, onReceived }: { base: string; onReceived: () => 
         {active.length > 0 && (
           <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md bg-white">
             {active.map(m => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px]">
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-body">
                 <div className="min-w-0">
                   <span className="font-medium text-ink break-all">{m.address}</span>
                   <span className="text-warm-600"> · folder “{m.folderName}” · {m.received} copied · connected {fmtDay(m.createdAt)}</span>
-                  <div className="text-[12px] text-warm-600">{m.lastSyncAt ? `Last read ${fmtDay(m.lastSyncAt)}: ${m.lastStatus || ''}` : 'Not read yet.'}</div>
+                  <div className="text-caption text-warm-600">{m.lastSyncAt ? `Last read ${fmtDay(m.lastSyncAt)}: ${m.lastStatus || ''}` : 'Not read yet.'}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => sync(m)} disabled={!!busy} className="text-[12px] font-medium text-accent-600 hover:underline disabled:opacity-60">{busy === m.id ? 'Reading…' : 'Sync now'}</button>
-                  {data.canConnect && <button type="button" onClick={() => disconnect(m)} className="text-[12px] font-medium text-status-at-risk hover:underline">Disconnect</button>}
+                  <button type="button" onClick={() => sync(m)} disabled={!!busy} className="text-caption font-medium text-accent-600 hover:underline disabled:opacity-60">{busy === m.id ? 'Reading…' : 'Sync now'}</button>
+                  {data.canConnect && <button type="button" onClick={() => disconnect(m)} className="text-caption font-medium text-status-at-risk hover:underline">Disconnect</button>}
                 </div>
               </li>
             ))}
@@ -632,8 +632,8 @@ function ProjectMailbox({ base, onReceived }: { base: string; onReceived: () => 
             <Field label="Outlook folder to read">{p => <input {...p} required maxLength={80} className={inputClass} value={folder} onChange={e => setFolder(e.target.value)} />}</Field>
             <Button type="submit" disabled={busy === 'connect' || !folder.trim()}>{busy === 'connect' ? 'Opening Microsoft…' : 'Sign in with Microsoft'}</Button>
           </form>
-        ) : <p className="text-[12px] text-warm-600">An organization admin connects or disconnects a mailbox.</p>}
-        {data.canConnect && <p className="text-[12px] text-warm-600">Create the folder in Outlook first and move this project’s emails into it, or add an Outlook rule that does. RunF9 starts with the last {data.firstSyncDays} days of that folder. Attachments are not read. Sign in with a work account.</p>}
+        ) : <p className="text-caption text-warm-600">An organization admin connects or disconnects a mailbox.</p>}
+        {data.canConnect && <p className="text-caption text-warm-600">Create the folder in Outlook first and move this project’s emails into it, or add an Outlook rule that does. RunF9 starts with the last {data.firstSyncDays} days of that folder. Attachments are not read. Sign in with a work account.</p>}
       </div>
     </Section>
   )

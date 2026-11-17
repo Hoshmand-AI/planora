@@ -117,7 +117,7 @@ export default function QualityPage() {
       <div className="max-w-6xl mx-auto px-5 md:px-8 py-8">
         <MoodTile mood={error ? 'worried' : 'working'} className="flex items-center gap-3">
           <Robot mood={error ? 'worried' : 'working'} size={48} />
-          <p role={error ? 'alert' : undefined} className="text-[14px] text-warm-700 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" aria-hidden /> Checking logic, calendars and dates…</>}</p>
+          <p role={error ? 'alert' : undefined} className="text-body text-warm-700 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" aria-hidden /> Checking logic, calendars and dates…</>}</p>
         </MoodTile>
       </div>
     )
@@ -146,7 +146,7 @@ export default function QualityPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
       <div className="pt-4"><QualityTabs tab={tab} onChange={setTab} /></div>
-      {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-body text-status-at-risk">{error}</p>}
 
       <div className="space-y-6 mt-5">
         {/* Three short tabs, not nine stacked sections: the checks, what to fix, then the review and the data questions. */}
@@ -157,47 +157,47 @@ export default function QualityPage() {
             <div className="flex max-sm:flex-col items-center gap-5">
               <ScoreRing passed={data.dcma.passed} applicable={data.dcma.applicable} />
               <div className="min-w-0">
-                <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ink leading-snug">{grade.short}</h2>
+                <h2 className="text-heading font-semibold text-ink leading-snug">{grade.short}</h2>
                 {/* Each outcome counted on its own: a check that could not run is never shown as passed */}
-              <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
+              <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption">
                 {([['pass', 'Pass', 'text-status-on-track'], ['fail', 'Fail', 'text-status-at-risk'], ['warn', 'Warning', 'text-status-attention'], ['n/a', 'Not applicable', 'text-warm-600']] as const)
                   .map(([r, label, cls]) => ({ label, cls, n: data.dcma.checks.filter(c => c.result === r).length }))
                   .filter(x => x.n > 0 || x.label !== 'Warning')
                   .map(x => (
-                    <div key={x.label} className="flex items-baseline gap-1.5">
+                    <div key={x.label} className="flex flex-col">
                       <dt className="text-warm-600">{x.label}</dt>
-                      <dd className={`order-first text-[14px] font-semibold tabular-nums ${x.cls}`}>{x.n}</dd>
+                      <dd className={`order-first text-subhead font-semibold tabular-nums ${x.cls}`}>{x.n}</dd>
                     </div>
                   ))}
               </dl>
               </div>
             </div>
             {/* The two things still waiting on a person, each a way into its view. */}
-            <ul className="mt-5 border-t border-warm-200 divide-y divide-warm-200 text-[13px]">
+            <ul className="mt-5 border-t border-warm-200 divide-y divide-warm-200 text-body">
               <li><button type="button" onClick={() => setTab('review')} className="group w-full flex items-center gap-3 py-2.5 text-left"><span className="flex-1 text-ink group-hover:underline">Questions about the data</span><span className="tabular-nums text-warm-600">{open.length ? `${open.length} open` : 'none open'}</span><ChevronRight size={14} aria-hidden="true" className="text-warm-600" /></button></li>
               {guidance.length > 0 && <li><button type="button" onClick={() => setTab('fix')} className="group w-full flex items-center gap-3 py-2.5 text-left"><span className="flex-1 text-ink group-hover:underline">Findings decided</span><span className="tabular-nums text-warm-600">{guidance.filter(g => g.decision).length} of {guidance.length}</span><ChevronRight size={14} aria-hidden="true" className="text-warm-600" /></button></li>}
             </ul>
           </section>
           <section aria-labelledby="fix-first-h" className="rise-in bg-white border border-warm-200 rounded-[14px] p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="fix-first-h" className="text-[16px] font-semibold text-ink">{flagged.length ? `Checks to fix (${flagged.length})` : 'Checks to fix'}</h2>
-              {guidance.length > 0 && <button type="button" onClick={() => setTab('fix')} className="pressable rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold">See how to fix {guidance.length === 1 ? 'it' : `all ${guidance.length}`}</button>}
+              <h2 id="fix-first-h" className="text-heading font-semibold text-ink">{flagged.length ? `Checks to fix (${flagged.length})` : 'Checks to fix'}</h2>
+              {guidance.length > 0 && <button type="button" onClick={() => setTab('fix')} className="pressable rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-body font-semibold">See how to fix {guidance.length === 1 ? 'it' : `all ${guidance.length}`}</button>}
             </div>
             {flagged.length === 0 ? (
-              <p className="text-[14px] text-warm-600 mt-2"><CheckCircle2 size={15} className="inline mr-1.5 -mt-0.5 text-status-on-track" aria-hidden />Nothing to fix: every applicable check passes.</p>
+              <p className="text-body text-warm-600 mt-2"><CheckCircle2 size={15} className="inline mr-1.5 -mt-0.5 text-status-on-track" aria-hidden />Nothing to fix: every applicable check passes.</p>
             ) : (
               <ol className="mt-2 divide-y divide-warm-200">
                 {flagged.map(c => (
                   <li key={c.id} className="py-3">
                     <div className="flex items-start gap-3">
-                      <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[12px] font-semibold ${c.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{c.result === 'fail' ? 'Fails' : 'Warning'}</span>
-                      <div className="min-w-0 flex-1 text-[14px] font-semibold text-ink">{c.name}: {c.metric} <span className="font-normal text-warm-600">(target {c.threshold})</span></div>
-                      <button type="button" aria-expanded={!allChecks && selected === c.id} onClick={() => { setAllChecks(false); setSelected(selected === c.id && !allChecks ? null : c.id) }} className="flex-shrink-0 text-[13px] font-semibold text-accent-600 hover:underline whitespace-nowrap">{c.offenders.length ? `Show ${c.offenders.length}` : 'Details'}</button>
+                      <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-caption font-semibold ${c.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{c.result === 'fail' ? 'Fails' : 'Warning'}</span>
+                      <div className="min-w-0 flex-1 text-subhead font-semibold text-ink">{c.name}: {c.metric} <span className="text-body font-normal text-warm-600">(target {c.threshold})</span></div>
+                      <button type="button" aria-expanded={!allChecks && selected === c.id} onClick={() => { setAllChecks(false); setSelected(selected === c.id && !allChecks ? null : c.id) }} className="flex-shrink-0 text-body font-semibold text-accent-600 hover:underline whitespace-nowrap">{c.offenders.length ? `Show ${c.offenders.length}` : 'Details'}</button>
                     </div>
                     {!allChecks && selected === c.id && (
-                      <div className="mt-2 pl-[58px] text-[13px] text-warm-700">
+                      <div className="mt-2 pl-[58px] text-body text-warm-700">
                         <p>{c.explanation}</p>
-                        {c.offenders.length > 0 && <p className="text-[12px] text-warm-600 mt-2">Activities ({c.offenders.length}): <span className="font-mono">{c.offenders.slice(0, 40).join(', ')}{c.offenders.length > 40 ? ' …' : ''}</span></p>}
+                        {c.offenders.length > 0 && <p className="text-caption text-warm-600 mt-2">Activities ({c.offenders.length}): <span className="font-mono">{c.offenders.slice(0, 40).join(', ')}{c.offenders.length > 40 ? ' …' : ''}</span></p>}
                       </div>
                     )}
                   </li>
@@ -209,11 +209,11 @@ export default function QualityPage() {
 
         {/* Everything else about the score is folded: all the checks, and what the number is and is not. */}
         <section aria-labelledby="dcma-h" className="rounded-[14px] border border-warm-200 bg-white">
-          <h2 id="dcma-h">
+          <h2 id="dcma-h" className="text-subhead">
             <button type="button" aria-expanded={allChecks} aria-controls="dcma-all" onClick={() => { setAllChecks(v => !v); setSelected(null) }} className="w-full flex items-center gap-2.5 px-5 py-4 text-left">
               <ChevronRight size={15} aria-hidden="true" className={`flex-shrink-0 text-warm-600 transition-transform ${allChecks ? 'rotate-90' : ''}`} />
-              <span className="flex-1 text-[14px] font-medium text-ink">All {data.dcma.checks.length} DCMA checks</span>
-              <span className="text-[12px] text-warm-600 tabular-nums">{data.dcma.passed} of {data.dcma.applicable} applicable checks pass</span>
+              <span className="flex-1 font-medium text-ink">All {data.dcma.checks.length} DCMA checks</span>
+              <span className="text-caption text-warm-600 tabular-nums">{data.dcma.passed} of {data.dcma.applicable} applicable checks pass</span>
             </button>
           </h2>
           {allChecks && (
@@ -222,32 +222,35 @@ export default function QualityPage() {
                 {data.dcma.checks.map((c, i) => (
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
-                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}border border-warm-200`}>
-                <span className="text-[12px] font-semibold text-warm-500 tabular-nums">{c.id}</span>
-                <span className="text-[13px] font-semibold text-ink leading-tight min-h-[2.4em]">{c.name}</span>
-                <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[18px] tracking-[-0.02em]'} font-semibold tabular-nums inline-flex items-center gap-2 ${c.result === 'n/a' ? 'text-warm-400' : 'text-ink'}`}>{c.result !== 'n/a' && <span aria-hidden="true" className={`h-2 w-2 flex-shrink-0 rounded-full ${c.result === 'pass' ? 'bg-status-on-track' : c.result === 'fail' ? 'bg-status-at-risk' : 'bg-status-attention'}`} />}{c.result === 'n/a' ? 'n/a' : c.metric}</span>
-                <span className="text-[12px] text-warm-600">{c.basis && c.result !== 'n/a' ? <>{c.basis} · </> : null}target {c.threshold}</span>
+                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 border ${selected === c.id ? 'border-accent-600 shadow-[inset_0_0_0_1px_#2B63C1]' : 'border-warm-200'}`}>
+                <span className="flex items-baseline gap-1.5 text-caption font-semibold leading-tight">
+                  {c.result !== 'n/a' && <span aria-hidden="true" className={`h-2 w-2 flex-shrink-0 rounded-full ${c.result === 'pass' ? 'bg-status-on-track' : c.result === 'fail' ? 'bg-status-at-risk' : 'bg-status-attention'}`} />}
+                  <span className="text-warm-500 tabular-nums">{c.id}</span>
+                  <span className="text-ink">{c.name}</span>
+                </span>
+                <span className={`order-first text-subhead leading-snug font-semibold tabular-nums ${c.result === 'n/a' ? 'text-warm-400' : 'text-ink'}`}>{c.result === 'n/a' ? 'n/a' : c.metric}</span>
+                <span className="text-caption text-warm-600">{c.basis && c.result !== 'n/a' ? <>{c.basis} · </> : null}target {c.threshold}</span>
               </button>
                 ))}
               </div>
               {selectedCheck && (
                 <div id="dcma-detail" role="region" aria-label={`Check ${selectedCheck.id}: ${selectedCheck.name}`} className="rise-in border-t border-warm-200 pt-4">
-                  <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
+                  <div className="flex flex-wrap items-baseline gap-x-2 text-body">
                     <span className="text-ink font-semibold">#{selectedCheck.id} {selectedCheck.name}</span>
                     <span className="text-warm-600 tabular-nums">{selectedCheck.result === 'n/a' ? 'not applicable' : selectedCheck.result} · {selectedCheck.metric} (target {selectedCheck.threshold})</span>
                   </div>
-                  <p className="text-[13px] text-warm-700 mt-1.5">{selectedCheck.explanation}</p>
+                  <p className="text-body text-warm-700 mt-1.5">{selectedCheck.explanation}</p>
                   {selectedCheck.offenders.length > 0 && (
-                    <p className="text-[12px] text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
+                    <p className="text-caption text-warm-600 mt-2">Activities ({selectedCheck.offenders.length}): <span className="font-mono">{selectedCheck.offenders.slice(0, 40).join(', ')}{selectedCheck.offenders.length > 40 ? ' …' : ''}</span></p>
                   )}
-                  {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" onClick={() => setTab('fix')} className="inline-block mt-2 text-[13px] font-semibold text-accent-600 hover:underline">How to fix it</a>}
+                  {guidance.some(g => g.id === selectedCheck.id) && <a href="#what-to-fix-h" onClick={() => setTab('fix')} className="inline-block mt-2 text-body font-semibold text-accent-600 hover:underline">How to fix it</a>}
                 </div>
               )}
             </div>
           )}
         </section>
         <Disclosure tone="card" title="What this score means">
-          <ul className="space-y-1.5 text-[13px] text-warm-700 list-disc pl-5">
+          <ul className="space-y-1.5 text-body text-warm-700 list-disc pl-5">
             <li>It counts the DCMA 14-Point checks that <strong>apply</strong> to this schedule and pass. Checks marked “Not applicable” are left out of the count, never counted as passes; a check that needs data the file doesn&apos;t have says so instead of passing.</li>
             <li>Thresholds are the DCMA defaults, as adjusted by an admin under Organization → “Quality check thresholds (DCMA 14-point)”.</li>
             <li>A high score is not an approval. Each finding still needs a decision (accept with a reason, or mark to fix), and the submission review records the reviewer&apos;s verdict.</li>
@@ -259,10 +262,10 @@ export default function QualityPage() {
 
 
         <div role="tabpanel" id="quality-panel-fix" aria-labelledby="quality-tab-fix" hidden={tab !== 'fix'} className="space-y-6">
-        {guidance.length === 0 && <p className="text-[14px] text-warm-700">Nothing to fix: every applicable check passes.</p>}
+        {guidance.length === 0 && <p className="text-body text-warm-700">Nothing to fix: every applicable check passes.</p>}
         {guidance.length > 0 && (
           <section aria-labelledby="what-to-fix-h">
-            <h2 id="what-to-fix-h" className="text-[16px] font-semibold text-ink mb-3">What to fix <span className="ml-1 text-[13px] font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
+            <h2 id="what-to-fix-h" className="text-heading font-semibold text-ink mb-3">What to fix <span className="ml-1 text-body font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h2>
             <div className="space-y-3">
               {guidance.map((g, i) => <QualityGuide key={g.id} startOpen={i === guidance.findIndex(x => !x.decision)} g={g} check={data.dcma.checks.find(c => c.id === g.id)!} onDecide={decide} canDecide={can('schedule.write')} disposition={dispositionOf(`dcma:${g.id}`)} reviewer={reviewer} onDispose={dispose} />)}
             </div>
@@ -277,10 +280,10 @@ export default function QualityPage() {
 
         <section aria-labelledby="data-questions-h" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="data-questions-h" className="text-[16px] font-semibold text-ink">Questions about this file <span className="ml-1 text-[13px] font-normal text-warm-600">{open.length} open</span></h2>
-            <label className="text-[12px] text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
+            <h2 id="data-questions-h" className="text-heading font-semibold text-ink">Questions about this file <span className="ml-1 text-body font-normal text-warm-600">{open.length} open</span></h2>
+            <label className="text-body text-warm-600 flex items-center gap-1.5"><input type="checkbox" checked={hideAnswered} onChange={e => setHideAnswered(e.target.checked)} /> Hide answered</label>
           </div>
-          {shown.length === 0 && <div className="bg-white border border-warm-200 rounded-[14px] p-5 text-[13px] text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
+          {shown.length === 0 && <div className="bg-white border border-warm-200 rounded-[14px] p-5 text-body text-warm-600"><CheckCircle2 size={15} className="inline mr-1.5 text-status-on-track" />No open questions about the data.</div>}
           {shown.map(q => {
             const Icon = SEV_ICON[q.severity]
             return (
@@ -288,15 +291,15 @@ export default function QualityPage() {
                 <div className="flex gap-2">
                   <Icon size={15} aria-hidden="true" className={`flex-shrink-0 mt-0.5 ${q.severity === 'error' ? 'text-status-at-risk' : 'text-warm-600'}`} />
                   <div className="flex-1">
-                    <div className="text-[13px] text-ink">{fmtDates(q.question)}</div>
-                    <div className="text-[12px] text-warm-600 mt-1">{fmtDates(q.detail)}</div>
+                    <div className="text-body text-ink">{fmtDates(q.question)}</div>
+                    <div className="text-caption text-warm-600 mt-1">{fmtDates(q.detail)}</div>
                     {q.response ? (
-                      <div className="text-[12px] text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
+                      <div className="text-caption text-status-on-track mt-2 font-medium">Answered: {q.response.response.replace(/_/g, ' ')}{q.response.note ? ` — ${q.response.note}` : ''}</div>
                     ) : !can('schedule.write') ? null : (
                       <div className="flex flex-wrap gap-2 mt-2.5">
-                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">Yes, intentional</button>
-                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">No — will fix in source</button>
-                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink transition-colors">Not an issue</button>
+                        <button onClick={() => respond(q, 'intentional')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body text-ink transition-colors">Yes, intentional</button>
+                        <button onClick={() => respond(q, 'will_fix')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body text-ink transition-colors">No — will fix in source</button>
+                        <button onClick={() => respond(q, 'not_an_issue')} className="px-2.5 py-1 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body text-ink transition-colors">Not an issue</button>
                       </div>
                     )}
                     <ReviewControl itemId={q.id} label={q.question} disposition={dispositionOf(q.id)} reviewer={reviewer} onDispose={dispose} />
@@ -308,10 +311,10 @@ export default function QualityPage() {
         </section>
 
         <Disclosure tone="card" title="Calendars — as labeled vs. as understood" meta={`${data.schedule.calendars.length} calendar${data.schedule.calendars.length === 1 ? '' : 's'}${importNotes ? ` · ${importNotes} import note${importNotes === 1 ? '' : 's'}` : ''}`}>
-          {data.schedule.calendars.length === 0 && <p className="text-[12px] text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
+          {data.schedule.calendars.length === 0 && <p className="text-caption text-warm-500">This file has no calendar data{data.schedule.sourceType === 'pdf' ? ' (PDF)' : ''}.</p>}
           <ul className="space-y-2">
             {data.schedule.calendars.map(c => (
-              <li key={c.id} className="text-[12px]">
+              <li key={c.id} className="text-caption">
                 <div className="text-ink font-medium">“{c.sourceName || c.name}”</div>
                 <div className="text-warm-500">{c.canonical || `${c.workDays.map(d => DAYS[d]).join(', ')} × ${c.hoursPerDay}h`} · {c.holidays.length} holidays</div>
               </li>
@@ -319,7 +322,7 @@ export default function QualityPage() {
           </ul>
           {data.schedule.warnings.length > 0 && (
             <div className="mt-3 pt-3 border-t border-warm-200 space-y-1">
-              {data.schedule.warnings.slice(0, 8).map((w, i) => <p key={i} className="text-[12px] text-warm-500">· {w}</p>)}
+              {data.schedule.warnings.slice(0, 8).map((w, i) => <p key={i} className="text-caption text-warm-500">· {w}</p>)}
             </div>
           )}
           {data.schedule.importExceptions && (
@@ -354,16 +357,16 @@ function EmptyState<S extends { id: string; name: string }>({ schedules, onPick,
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-12 flex justify-center">
       <MoodTile mood="idle" as="section" className="max-w-md w-full text-center px-6 py-8">
         <Robot mood="idle" size={80} className="mx-auto" />
-        <h2 className="tab-title mt-3">Schedule quality</h2>
-        <p className="text-[14px] text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
-        <p className="text-[12px] text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
+        <h2 className="text-heading font-semibold text-ink mt-3">Schedule quality</h2>
+        <p className="text-body text-warm-600 mt-1"><ShieldCheck size={15} className="inline mr-1 -mt-0.5 text-warm-500" aria-hidden />Upload or select a schedule to run quality checks.</p>
+        <p className="text-caption text-warm-600 mt-1">RunF9 checks the logic, calendars and dates, and points out the few things worth fixing first.</p>
         <div className="mt-5">
           {latest ? (
-            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
+            <button type="button" onClick={() => onPick(latest)} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">Check {latest.name.length > 40 ? `${latest.name.slice(0, 40)}…` : latest.name}</button>
           ) : canUpload ? (
-            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">Upload a schedule</button>
+            <button type="button" onClick={onUpload} className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">Upload a schedule</button>
           ) : (
-            <p className="text-[12px] text-warm-600">Ask a scheduler on your team to upload one.</p>
+            <p className="text-caption text-warm-600">Ask a scheduler on your team to upload one.</p>
           )}
         </div>
       </MoodTile>
@@ -377,34 +380,34 @@ function QualityGuide({ g, check, onDecide, canDecide, disposition, reviewer, on
   const [note, setNote] = useState('')
   // The justification field opens when someone chooses to accept the finding, not before.
   const [accepting, setAccepting] = useState(false)
-  const quiet = 'pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink disabled:opacity-50'
+  const quiet = 'pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body text-ink disabled:opacity-50'
   return (
     <div className={`border border-warm-200 rounded-[14px] ${g.decision ? 'bg-warm-50' : 'bg-white'}`}>
       <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[12px] font-semibold ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{check.result === 'fail' ? 'Fails' : 'Warning'}</span>
-        <span className="text-[14px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-600">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[12px] text-warm-600">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
-        {disposition && <span className="text-[12px] text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition].toLowerCase()}</span>}
+        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-caption font-semibold ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{check.result === 'fail' ? 'Fails' : 'Warning'}</span>
+        <span className="text-subhead font-semibold text-ink flex-1">{check.name} <span className="text-body font-normal text-warm-600">— {check.metric} (target {check.threshold})</span></span>
+        {g.decision && <span className="text-caption text-warm-600">{g.decision.response === 'intentional' ? 'Accepted' : 'To fix'}</span>}
+        {disposition && <span className="text-caption text-warm-600">Reviewer: {FINDING_LABELS[disposition.disposition].toLowerCase()}</span>}
         <ChevronRight size={15} aria-hidden="true" className={`flex-shrink-0 text-warm-600 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="px-5 pb-4 space-y-2.5">
-          <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
-          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
-          {g.steps.length > 0 && <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
-          {check.offenders.length > 0 && <p className="text-[12px] text-warm-600">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
-          {g.decision && <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>}
+          <p className="text-body text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
+          {g.whyItMatters && <p className="text-body text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
+          {g.steps.length > 0 && <ol className="list-decimal ml-5 text-body text-warm-700 space-y-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>}
+          {check.offenders.length > 0 && <p className="text-caption text-warm-600">Activities to look at: <span className="font-mono">{check.offenders.slice(0, 20).join(', ')}</span>{check.offenders.length > 20 ? ` and ${check.offenders.length - 20} more` : ''}</p>}
+          {g.decision && <p className="text-caption text-warm-600 border-l-2 border-status-on-track pl-2">{g.decision.response === 'intentional' ? 'Accepted' : 'Will fix in the source schedule'}{g.decision.note ? ` — “${g.decision.note}”` : ''}</p>}
           {/* One filled button, the way to the fix; the two decisions sit beside it, outlined. */}
           {(g.actions.some(a => a.kind === 'link') || (!g.decision && canDecide)) && (
             <div className="flex flex-wrap gap-2 items-center pt-1">
-              {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</Link> : null)}
+              {g.actions.map((a, i) => a.kind === 'link' ? <Link key={i} href={a.href} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">{a.label}</Link> : null)}
               {!g.decision && canDecide && <button type="button" onClick={() => onDecide(g.id, 'will_fix', note)} className={quiet}>I&apos;ll fix it in P6 / MSP</button>}
               {!g.decision && canDecide && <button type="button" aria-expanded={accepting} onClick={() => setAccepting(v => !v)} className={quiet}>Accept with justification…</button>}
             </div>
           )}
           {accepting && !g.decision && canDecide && (
             <div className="flex flex-wrap gap-2 items-center">
-              <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Why this is acceptable as it is (at least 10 characters)" className="flex-1 min-w-[220px] bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
+              <input value={note} onChange={e => setNote(e.target.value)} aria-label={`Justification for accepting check ${g.id} as it is`} placeholder="Why this is acceptable as it is (at least 10 characters)" className="flex-1 min-w-[220px] bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />
               <button type="button" disabled={note.trim().length < 10} onClick={() => onDecide(g.id, 'intentional', note)} className={quiet}>Record acceptance</button>
             </div>
           )}
@@ -424,7 +427,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
   const [busy, setBusy] = useState(false)
   if (!reviewer && !disposition) return null
   // Nothing recorded yet: one quiet link, so a list of findings is not a list of open forms.
-  if (!disposition && !editing) return <button type="button" onClick={() => setEditing(true)} className="mt-1 text-[12px] font-semibold text-accent-600 hover:underline">Add a reviewer disposition</button>
+  if (!disposition && !editing) return <button type="button" onClick={() => setEditing(true)} className="mt-1 text-body font-semibold text-accent-600 hover:underline">Add a reviewer disposition</button>
   const save = async () => {
     if (!choice) return
     setBusy(true); setErr('')
@@ -435,7 +438,7 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
   return (
     <div className="mt-2.5 pt-2.5 border-t border-warm-200">
       {disposition && !editing ? (
-        <p className="text-[12px] text-warm-700">
+        <p className="text-caption text-warm-700">
           <span className="font-semibold text-ink">Reviewer disposition: {FINDING_LABELS[disposition.disposition]}</span>
           {disposition.justification ? ` — “${disposition.justification}”` : ''}
           <span className="text-warm-600"> · {disposition.reviewer ?? 'reviewer'}, {fmtDay(disposition.createdAt)}</span>
@@ -443,15 +446,15 @@ function ReviewControl({ itemId, label, disposition, reviewer, onDispose }: { it
         </p>
       ) : (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-[12px] font-medium text-ink">Reviewer</span>
-          <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-lg px-2 py-1 text-[12px] text-ink">
+          <span className="text-body font-medium text-ink">Reviewer</span>
+          <select aria-label={`Disposition for ${label}`} value={choice} onChange={e => setChoice(e.target.value as FindingDisposition)} className="bg-warm-50 border border-warm-300 rounded-lg px-2 py-1 text-body text-ink">
             <option value="" disabled>Choose…</option>
             {FINDING_DISPOSITIONS.map(d => <option key={d} value={d}>{FINDING_LABELS[d]}</option>)}
           </select>
-          <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1 text-[12px]" />
-          <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] text-ink disabled:opacity-50">Save</button>
-          {!disposition && <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-warm-600 hover:underline">Cancel</button>}
-          {err && <span role="alert" className="text-[12px] text-status-at-risk w-full">{err}</span>}
+          <input aria-label={`Justification for ${label}`} value={text} onChange={e => setText(e.target.value)} placeholder={choice === 'exception' ? 'Justification (required)' : 'Comment (optional)'} className="flex-1 min-w-[200px] bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1 text-body" />
+          <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body text-ink disabled:opacity-50">Save</button>
+          {!disposition && <button type="button" onClick={() => setEditing(false)} className="text-body text-warm-600 hover:underline">Cancel</button>}
+          {err && <span role="alert" className="text-body text-status-at-risk w-full">{err}</span>}
         </div>
       )}
     </div>
@@ -477,29 +480,29 @@ function SubmissionPanel({ review, reviewer, onSave }: { review: ReviewState; re
   }
   return (
     <section aria-labelledby="submission-h" className="bg-white border border-warm-200 rounded-[14px] p-5">
-      <h2 id="submission-h" className="text-[16px] font-semibold text-ink mb-2">Submission review</h2>
+      <h2 id="submission-h" className="text-heading font-semibold text-ink mb-2">Submission review</h2>
       {s && !editing ? (
-        <div className="text-[13px] text-warm-700 space-y-1">
+        <div className="text-body text-warm-700 space-y-1">
           <p><span className="font-semibold text-ink">{SUBMISSION_LABELS[s.disposition]}</span> <span className="text-warm-600">· {s.reviewer ?? 'reviewer'}, {fmtDay(s.createdAt)}</span>
-            {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink text-[12px]">Change</button>}</p>
+            {reviewer && <button type="button" onClick={() => setEditing(true)} className="ml-2 underline text-ink">Change</button>}</p>
           {s.comments && <p className="whitespace-pre-wrap">{s.comments}</p>}
-          <p className="text-[12px] text-warm-600">Findings and questions dispositioned: {counts}</p>
+          <p className="text-caption text-warm-600">Findings and questions dispositioned: {counts}</p>
         </div>
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
-            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-[13px] text-ink">
+            <select aria-label="Submission disposition" value={choice} onChange={e => setChoice(e.target.value as SubmissionDisposition)} className="bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-body text-ink">
               {/* No decision is pre-selected: a reviewer picks one, so a default never reads as a recorded approval. */}
               <option value="" disabled>Choose a disposition…</option>
               {SUBMISSION_DISPOSITIONS.map(d => <option key={d} value={d}>{SUBMISSION_LABELS[d]}</option>)}
             </select>
-            <span className="text-[12px] text-warm-600">{counts}</span>
+            <span className="text-caption text-warm-600">{counts}</span>
           </div>
-          {choice && <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />}
+          {choice && <textarea aria-label="Review comments" value={comments} onChange={e => setComments(e.target.value)} rows={3} placeholder={choice === 'approved' ? 'Comments (optional)' : 'Comments (required): what to note or revise'} className="w-full bg-white border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />}
           <div className={`items-center gap-2 ${choice || editing ? 'flex' : 'hidden'}`}>
-            <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold disabled:opacity-50">Record disposition</button>
-            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-ink">Cancel</button>}
-            {err && <span role="alert" className="text-[12px] text-status-at-risk">{err}</span>}
+            <button type="button" disabled={busy || !choice} onClick={save} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold disabled:opacity-50">Record disposition</button>
+            {editing && <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-body text-ink">Cancel</button>}
+            {err && <span role="alert" className="text-body text-status-at-risk">{err}</span>}
           </div>
         </div>
       )}
@@ -525,7 +528,7 @@ function QualityTabs({ tab, onChange }: { tab: QualityTab; onChange: (t: Quality
       {QUALITY_TABS.map(t => (
         <button key={t.id} id={`quality-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={tab === t.id ? `quality-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
-          className={`pressable rounded-lg px-3 min-h-[32px] text-[13px] font-semibold border ${tab === t.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-warm-300 bg-white text-warm-700 hover:text-ink'}`}>
+          className={`pressable rounded-lg px-3 min-h-[32px] text-body font-semibold border ${tab === t.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-warm-300 bg-white text-warm-700 hover:text-ink'}`}>
           {t.label}
         </button>
       ))}
@@ -543,7 +546,7 @@ function ScoreRing({ passed, applicable }: { passed: number; applicable: number 
       <circle cx="56" cy="56" r={r} fill="none" stroke={applicable && passed < applicable ? '#A64848' : '#E8EAEC'} strokeWidth="10" />
       <circle cx="56" cy="56" r={r} fill="none" stroke="#2F7358" strokeWidth="10" strokeLinecap="round" transform="rotate(-90 56 56)"
         strokeDasharray={c} strokeDashoffset={c * (1 - share)} className="ring-draw" style={{ ['--ring-c' as string]: c }} />
-      <text x="56" y="62" textAnchor="middle" fontSize="24" fontWeight="700" fill="#1D2125">{passed}/{applicable}</text>
+      <text x="56" y="62" textAnchor="middle" fontSize="16" fontWeight="600" fill="#1D2125">{passed}/{applicable}</text>
     </svg>
   )
 }

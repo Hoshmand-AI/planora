@@ -68,7 +68,7 @@ export function BetaAdmin() {
       {note('top')}
       <div>
         <h1 className="page-title">Beta access</h1>
-        <p className="text-[13px] text-warm-600">
+        <p className="text-body text-warm-600">
           {data.signup.mode === 'invite_only'
             ? 'RunF9 is in private beta: sign-up needs an invitation, and signing in needs beta access.'
             : 'Self sign-up is open (RUNF9_SIGNUP=open), so the beta gate is off. Invitations still work.'}
@@ -90,21 +90,21 @@ export function BetaAdmin() {
         {link && (
           <div className="mt-3">
             <div className="flex gap-2 items-center bg-warm-100 border border-warm-200 rounded-md p-2.5">
-              <code className="flex-1 text-[12px] break-all text-ink" aria-label="Invitation link">{link.url}</code>
+              <code className="flex-1 text-caption break-all text-ink" aria-label="Invitation link">{link.url}</code>
               <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(link.url)}><Copy size={13} className="inline mr-1" aria-hidden="true" />Copy</Button>
             </div>
-            <p className="text-[12px] text-warm-600 mt-1.5">{link.emailed ? 'Also emailed to the invitee.' : 'Not emailed: send this link yourself.'} It is shown only once.</p>
+            <p className="text-caption text-warm-600 mt-1.5">{link.emailed ? 'Also emailed to the invitee.' : 'Not emailed: send this link yourself.'} It is shown only once.</p>
           </div>
         )}
       </Section>
 
       <Section title={`Invitations (${data.invites.length})`}>
         {note('invites')}
-        {data.invites.length === 0 ? <p className="text-[13px] text-warm-600">No beta invitations yet.</p> : (
+        {data.invites.length === 0 ? <p className="text-body text-warm-600">No beta invitations yet.</p> : (
           <div tabIndex={0} role="region" aria-label="Beta invitations" className="relative overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-body">
               <caption className="sr-only">Beta invitations</caption>
-              <thead><tr className="text-left text-[12px] text-warm-500 border-b border-warm-200">
+              <thead><tr className="text-left text-caption text-warm-500 border-b border-warm-200">
                 <th scope="col" className="py-2 pr-3 font-semibold">Invitee</th><th scope="col" className="py-2 pr-3 font-semibold">Status</th>
                 <th scope="col" className="py-2 pr-3 font-semibold">Sent</th><th scope="col" className="py-2 pr-3 font-semibold">Expires / accepted</th>
                 <th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>
@@ -112,9 +112,9 @@ export function BetaAdmin() {
               <tbody>
                 {data.invites.map(i => (
                   <tr key={i.id} className="border-b border-warm-200 last:border-0 align-top">
-                    <td className="py-2 pr-3"><div className="text-ink font-medium">{i.email}</div><div className="text-warm-600 text-[12px]">{i.acceptedOrgName || i.company || '—'}</div></td>
-                    <td className="py-2 pr-3"><span className={`inline-block text-[12px] font-semibold px-2 py-0.5 rounded-md ${STATUS[i.status].cls}`}>{STATUS[i.status].label}</span></td>
-                    <td className="py-2 pr-3 text-warm-700">{fmtDay(i.createdAt)}<div className="text-warm-600 text-[12px]">{i.createdByEmail}</div></td>
+                    <td className="py-2 pr-3"><div className="text-ink font-medium">{i.email}</div><div className="text-warm-600 text-caption">{i.acceptedOrgName || i.company || '—'}</div></td>
+                    <td className="py-2 pr-3"><span className={`inline-block text-caption font-semibold px-2 py-0.5 rounded-md ${STATUS[i.status].cls}`}>{STATUS[i.status].label}</span></td>
+                    <td className="py-2 pr-3 text-warm-700">{fmtDay(i.createdAt)}<div className="text-warm-600 text-caption">{i.createdByEmail}</div></td>
                     <td className="py-2 pr-3 text-warm-700">{i.acceptedAt ? `Accepted ${fmtDay(i.acceptedAt)}` : i.revokedAt ? `Revoked ${fmtDay(i.revokedAt)}` : fmtDay(i.expiresAt)}</td>
                     <td className="py-2 text-right">
                       {i.status === 'pending' && (
@@ -136,18 +136,18 @@ export function BetaAdmin() {
           <Field label="Filter">{p => <input {...p} type="search" className={inputClass} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Email, name or organization" />}</Field>
         </div>
         <div tabIndex={0} role="region" aria-label="Accounts and their beta access" className="relative overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-body">
             <caption className="sr-only">Accounts and their beta access</caption>
-            <thead><tr className="text-left text-[12px] text-warm-500 border-b border-warm-200">
+            <thead><tr className="text-left text-caption text-warm-500 border-b border-warm-200">
               <th scope="col" className="py-2 pr-3 font-semibold">Person</th><th scope="col" className="py-2 pr-3 font-semibold">Organization</th>
               <th scope="col" className="py-2 pr-3 font-semibold">Beta access</th><th scope="col" className="py-2 font-semibold"><span className="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id} className="border-b border-warm-200 last:border-0 align-top">
-                  <td className="py-2 pr-3"><div className="text-ink font-medium">{u.name}</div><div className="text-warm-600 text-[12px]">{u.email}{u.disabled ? ' · removed from organization' : ''}</div></td>
-                  <td className="py-2 pr-3 text-warm-700">{u.orgName}<div className="text-warm-600 text-[12px] capitalize">{u.role}</div>
-                    <label className="mt-1 flex items-center gap-1.5 text-[12px] text-warm-600">Plan
+                  <td className="py-2 pr-3"><div className="text-ink font-medium">{u.name}</div><div className="text-warm-600 text-caption">{u.email}{u.disabled ? ' · removed from organization' : ''}</div></td>
+                  <td className="py-2 pr-3 text-warm-700">{u.orgName}<div className="text-warm-600 text-caption capitalize">{u.role}</div>
+                    <label className="mt-1 flex items-center gap-1.5 text-caption text-warm-600">Plan
                       <select className="border border-warm-300 rounded px-1.5 py-0.5 bg-white text-ink" value={u.orgPlan} disabled={busy === 'users'} aria-label={`Plan for ${u.orgName}`}
                         onChange={async e => {
                           const plan = e.target.value
@@ -160,7 +160,7 @@ export function BetaAdmin() {
                   </td>
                   <td className="py-2 pr-3 text-warm-700">
                     {u.platformAdmin ? 'Operator (always)' : u.hasAccess ? `Yes · ${VIA[u.betaAccessVia || ''] || 'Granted'}` : u.betaRevokedAt ? `Revoked ${fmtDay(u.betaRevokedAt)}` : 'No'}
-                    {u.betaAccessAt && !u.platformAdmin && u.hasAccess && <div className="text-warm-600 text-[12px]">since {fmtDay(u.betaAccessAt)}</div>}
+                    {u.betaAccessAt && !u.platformAdmin && u.hasAccess && <div className="text-warm-600 text-caption">since {fmtDay(u.betaAccessAt)}</div>}
                   </td>
                   <td className="py-2 text-right whitespace-nowrap">
                     {!u.platformAdmin && (u.hasAccess ? (

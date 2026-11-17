@@ -49,12 +49,12 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
   const current = resources.find(r => r.id === selected) ?? resources.find(r => r.overAllocatedDays > 0) ?? resources[0] ?? null
 
   const retry = <Button variant="secondary" onClick={() => setRefresh(x => x + 1)}>Try again</Button>
-  if (!data) return error ? <div className="space-y-2"><Alert tone="error">{error}</Alert>{retry}</div> : <p className="text-[13px] text-warm-600" role="status">{loading ? 'Loading resources…' : ''}</p>
+  if (!data) return error ? <div className="space-y-2"><Alert tone="error">{error}</Alert>{retry}</div> : <p className="text-body text-warm-600" role="status">{loading ? 'Loading resources…' : ''}</p>
 
   return (
     <div className="space-y-6">
       {error && <div className="space-y-2"><Alert tone="error">{error} The figures below are the last ones that loaded.</Alert>{retry}</div>}
-      <div className="flex flex-wrap items-center gap-4 text-[13px] text-warm-700">
+      <div className="flex flex-wrap items-center gap-4 text-body text-warm-700">
         <label className="flex items-center gap-2">Period
           <select value={bucket} onChange={e => setBucket(e.target.value as HistogramBucket)} className="bg-white border border-warm-300 rounded-lg px-2 py-1">
             <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
@@ -69,7 +69,7 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
         )}
         {loading && <span role="status" className="text-warm-600">Updating…</span>}
       </div>
-      {data.basisNote && <p className="text-[12px] text-warm-600">{data.basisNote}</p>}
+      {data.basisNote && <p className="text-caption text-warm-600">{data.basisNote}</p>}
 
       {data.state === 'no_resource_data' ? (
         <Alert tone="info">{data.message}</Alert>
@@ -86,8 +86,8 @@ export function ResourcesPanel({ kind, id, canEdit }: { kind: 'schedule' | 'plan
               selected={current?.id ?? null} bucket={bucket} levelingEdits={data.levelingEdits ?? 0} onSaved={() => { setBasis('scenario'); setRefresh(x => x + 1) }} />
             {(data.assumptions.length > 0 || data.notes.length > 0) && (
               <Disclosure tone="card" title="Assumptions and notes" meta={data.assumptions.length + data.notes.length}>
-                <ul className="list-disc pl-5 space-y-0.5 text-[12px] text-warm-700">{[...data.assumptions, ...data.notes].map((t, i) => <li key={i}>{t}</li>)}</ul>
-                {data.unscheduled.length > 0 && <p className="mt-1 text-[12px] text-warm-600">Not loaded (no scheduled dates): {data.unscheduled.slice(0, 20).join(', ')}{data.unscheduled.length > 20 ? ', …' : ''}</p>}
+                <ul className="list-disc pl-5 space-y-0.5 text-caption text-warm-700">{[...data.assumptions, ...data.notes].map((t, i) => <li key={i}>{t}</li>)}</ul>
+                {data.unscheduled.length > 0 && <p className="mt-1 text-caption text-warm-600">Not loaded (no scheduled dates): {data.unscheduled.slice(0, 20).join(', ')}{data.unscheduled.length > 20 ? ', …' : ''}</p>}
               </Disclosure>
             )}
           </div>
@@ -102,10 +102,10 @@ function Summary({ data }: { data: Analysis }) {
   const over = t.overAllocatedResources
   return (
     <div>
-      <p className="text-[16px] font-semibold text-ink">{over
+      <p className="text-heading font-semibold text-ink">{over
         ? `${n(over)} of ${n(t.resources)} resource${t.resources === 1 ? '' : 's'} ${over === 1 ? 'is' : 'are'} over ${over === 1 ? 'its' : 'their'} limit, on ${n(t.overAllocatedDays)} day${t.overAllocatedDays === 1 ? '' : 's'} ahead`
         : 'No resource is over its limit from the data date on'}</p>
-      <p className="text-[12px] text-warm-600 mt-0.5">{n(t.resources)} resource{t.resources === 1 ? '' : 's'} · {n(t.assignments)} assignment{t.assignments === 1 ? '' : 's'} · {n(t.units)} units</p>
+      <p className="text-caption text-warm-600 mt-0.5">{n(t.resources)} resource{t.resources === 1 ? '' : 's'} · {n(t.assignments)} assignment{t.assignments === 1 ? '' : 's'} · {n(t.units)} units</p>
     </div>
   )
 }
@@ -116,8 +116,8 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
       <h3 id="res-list" className="sr-only">Resources: peak demand vs available</h3>
       <Hint label="How days are counted" className="mb-2">Over-allocated days are counted from the data date on. A peak above the limit that has already passed is shown, not counted.</Hint>
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] text-warm-700">
-          <thead><tr className="text-left text-[12px] font-medium text-warm-600 border-b border-warm-200">
+        <table className="w-full text-body text-warm-700">
+          <thead><tr className="text-left text-caption font-medium text-warm-600 border-b border-warm-200">
             <th scope="col" className="py-1.5 pr-3 font-medium">Resource</th><th scope="col" className="pr-3 font-medium">Type</th>
             <th scope="col" className="pr-3 text-right font-medium">Available / day</th><th scope="col" className="pr-3 text-right font-medium">Peak / day</th>
             <th scope="col" className="pr-3 font-medium">Peak on</th><th scope="col" className="pr-3 text-right font-medium">Total units</th><th scope="col" className="pr-3 text-right font-medium">Days over, ahead</th><th scope="col"><span className="sr-only">Chart</span></th>
@@ -125,14 +125,14 @@ function ResourceTable({ resources, current, onSelect }: { resources: ResourceSu
           <tbody>
             {resources.map(r => (
               <tr key={r.id} className={`border-b border-warm-200 ${r.id === current ? 'bg-warm-100' : ''}`}>
-                <th scope="row" className="py-1.5 pr-3 text-left font-medium text-ink">{r.code}<span className="block text-[12px] font-normal text-warm-600">{r.name}</span></th>
+                <th scope="row" className="py-1.5 pr-3 text-left font-medium text-ink">{r.code}<span className="block text-caption font-normal text-warm-600">{r.name}</span></th>
                 <td className="pr-3 capitalize">{r.kind}</td>
-                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}{/* "from the file" is the normal case and is not repeated on every row; anything else is said. */}{r.availabilitySource !== 'file' && <span className="block text-[12px] text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span>}</td>
+                <td className="pr-3 text-right tabular-nums">{n(r.availablePerDay)} {r.unit}{/* "from the file" is the normal case and is not repeated on every row; anything else is said. */}{r.availabilitySource !== 'file' && <span className="block text-caption text-warm-600">{SOURCE_LABEL[r.availabilitySource]}</span>}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.peakPerDay)} {r.unit}</td>
                 <td className="pr-3 tabular-nums">{fmtDate(r.peakDate)}</td>
                 <td className="pr-3 text-right tabular-nums">{n(r.totalUnits)}</td>
-                <td className="pr-3 text-right tabular-nums">{r.overAllocatedDays ? <span className="rounded-full bg-status-at-risk-bg px-2 py-0.5 text-[12px] font-semibold text-status-at-risk">{r.overAllocatedDays}<span className="sr-only"> over-allocated</span></span> : <span className="text-warm-600">0</span>}{r.availablePerDay !== null && r.peakPerDay > r.availablePerDay && !r.overAllocatedDays && <span className="block text-[12px] font-normal text-warm-600">the peak has passed</span>}</td>
-                <td className="text-right"><button type="button" aria-pressed={r.id === current} onClick={() => onSelect(r.id)} className={`px-1 text-[13px] hover:underline ${r.id === current ? 'font-semibold text-ink' : 'text-warm-700'}`}><span className="sr-only">Show the </span>{r.id === current ? 'Shown below' : 'Histogram'}<span className="sr-only"> for {r.code}</span></button></td>
+                <td className="pr-3 text-right tabular-nums">{r.overAllocatedDays ? <span className="rounded-full bg-status-at-risk-bg px-2 py-0.5 text-caption font-semibold text-status-at-risk">{r.overAllocatedDays}<span className="sr-only"> over-allocated</span></span> : <span className="text-warm-600">0</span>}{r.availablePerDay !== null && r.peakPerDay > r.availablePerDay && !r.overAllocatedDays && <span className="block text-caption font-normal text-warm-600">the peak has passed</span>}</td>
+                <td className="text-right"><button type="button" aria-pressed={r.id === current} onClick={() => onSelect(r.id)} className={`px-1 text-body hover:underline ${r.id === current ? 'font-semibold text-ink' : 'text-warm-700'}`}><span className="sr-only">Show the </span>{r.id === current ? 'Shown below' : 'Histogram'}<span className="sr-only"> for {r.code}</span></button></td>
               </tr>
             ))}
           </tbody>
@@ -152,10 +152,10 @@ function HistogramSection({ r, bucket }: { r: ResourceSummary; bucket: Histogram
   return (
     <section aria-labelledby="res-hist">
       <div className="flex items-start justify-between gap-3 mb-2">
-        <h3 id="res-hist" className="text-[16px] font-semibold text-ink">{r.code} — {r.name} <span className="text-[13px] font-normal text-warm-600">{r.unit} per {BUCKET_WORD[bucket]}</span></h3>
-        <button type="button" aria-pressed={asTable} onClick={() => setAsTable(v => !v)} className="flex-shrink-0 whitespace-nowrap text-[13px] font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
+        <h3 id="res-hist" className="text-subhead font-semibold text-ink">{r.code} — {r.name} <span className="text-body font-normal text-warm-600">{r.unit} per {BUCKET_WORD[bucket]}</span></h3>
+        <button type="button" aria-pressed={asTable} onClick={() => setAsTable(v => !v)} className="flex-shrink-0 whitespace-nowrap text-body font-medium text-accent-600 hover:underline">{asTable ? 'Show chart' : 'Show as table'}</button>
       </div>
-      {!bars.length ? <p className="text-[13px] text-warm-600">No load in this view. Pick the resource in the table above to load its histogram.</p>
+      {!bars.length ? <p className="text-body text-warm-600">No load in this view. Pick the resource in the table above to load its histogram.</p>
         : asTable ? <HistogramTable bars={bars} unit={r.unit} /> : <HistogramChart bars={bars} unit={r.unit} summary={summary} bucket={bucket} />}
       {/* The chart's description in words is its accessible name; it is not printed again under the picture. */}
       {asTable && <p className="sr-only">{summary}</p>}
@@ -216,14 +216,14 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
         {line && <path d={line} fill="none" stroke="#1D2125" strokeWidth="2" strokeDasharray="5 3" />}
       </svg>
       {h && (
-        <div className="absolute top-1 right-1 bg-white border border-warm-300 rounded-md px-2 py-1 text-[12px] text-warm-700 shadow-sm pointer-events-none">
+        <div className="absolute top-1 right-1 bg-white border border-warm-300 rounded-md px-2 py-1 text-caption text-warm-700 shadow-sm pointer-events-none">
           <div className="font-semibold text-ink">{BUCKET_WORD[bucket]} of {fmtDate(h.start)}</div>
           <div>Demand {n(h.demand)} {unit} (peak day {n(h.peakDaily)})</div>
           <div>Available {n(h.available)} {unit}</div>
           {h.overAllocatedDays > 0 && <div className="text-status-at-risk font-semibold">Over-allocated on {h.overAllocatedDays} day{h.overAllocatedDays === 1 ? '' : 's'}</div>}
         </div>
       )}
-      <figcaption className="flex flex-wrap gap-4 text-[12px] text-warm-700 mt-1">
+      <figcaption className="flex flex-wrap gap-4 text-caption text-warm-700 mt-1">
         {anyAhead && <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#4A82D6" /></svg>Demand ahead</span>}
         {anyWorked && <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill="#A2A7AC" /></svg>Already worked</span>}
         {anyOver && <span className="flex items-center gap-1.5"><svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" fill={`url(#${pid}-hatch)`} /></svg>Over the daily limit (hatched)</span>}
@@ -236,9 +236,9 @@ function HistogramChart({ bars, unit, summary, bucket }: { bars: HistogramBar[];
 function HistogramTable({ bars, unit }: { bars: HistogramBar[]; unit: string }) {
   return (
     <div tabIndex={0} role="region" aria-label={`Demand and availability by period, in ${unit} (scrolls)`} className="overflow-x-auto max-h-[360px] overflow-y-auto">
-      <table className="w-full text-[12px] text-warm-700">
+      <table className="w-full text-body [&_th]:text-caption text-warm-700">
         <caption className="sr-only">Demand and availability by period ({unit})</caption>
-        <thead><tr className="text-left text-[12px] font-medium text-warm-600 border-b border-warm-200">
+        <thead><tr className="text-left text-caption font-medium text-warm-600 border-b border-warm-200">
           <th scope="col" className="py-1 pr-3">From</th><th scope="col" className="pr-3">To</th><th scope="col" className="pr-3 text-right">Demand</th>
           <th scope="col" className="pr-3 text-right">Actual</th><th scope="col" className="pr-3 text-right">Remaining</th><th scope="col" className="pr-3 text-right">Available</th><th scope="col" className="pr-3 text-right">Peak day</th><th scope="col">Over-allocated days</th>
         </tr></thead>
@@ -260,9 +260,9 @@ function OverAllocations({ periods, title = 'Over-allocations' }: { periods: Ove
   if (!periods.length && title === 'Over-allocations') return null
   return (
     <section aria-label={title}>
-      <h3 className="text-[16px] font-semibold text-ink mb-1">{title} <span className="ml-1 text-[13px] font-normal text-warm-600">{periods.length}</span></h3>
-      {!periods.length ? <p className="text-[13px] text-warm-600">No resource is over-allocated from the data date on.</p> : (
-        <ul className="divide-y divide-warm-200 text-[13px] text-warm-700">
+      <h3 className="text-subhead font-semibold text-ink mb-1">{title} <span className="ml-1 text-body font-normal text-warm-600">{periods.length}</span></h3>
+      {!periods.length ? <p className="text-body text-warm-600">No resource is over-allocated from the data date on.</p> : (
+        <ul className="divide-y divide-warm-200 text-body text-warm-700">
           {periods.slice(0, 50).map(p => (
             <li key={`${p.resourceId}-${p.from}`} className="py-2">
               <details className="group">
@@ -270,9 +270,9 @@ function OverAllocations({ periods, title = 'Over-allocations' }: { periods: Ove
                   <span className="font-semibold text-ink">{p.resourceCode}</span>
                   <span className="tabular-nums">{fmtDate(p.from)}{p.to !== p.from ? ` – ${fmtDate(p.to)}` : ''}</span>
                   <span className="flex-1 min-w-[200px]">{p.days} day{p.days === 1 ? '' : 's'} over, peak {n(p.peakDemand)} vs {n(p.available)} available</span>
-                  <span className="text-[12px] font-semibold text-accent-600 group-open:hidden">{p.activities.length} contributing</span>
+                  <span className="text-caption font-semibold text-accent-600 group-open:hidden">{p.activities.length} contributing</span>
                 </summary>
-                <p className="mt-1 text-[12px] text-warm-600">Up to {n(p.maxExcess)} over. Contributing: {p.activities.slice(0, 8).map(a => `${a.code} ${a.name} (${n(a.unitsPerDay)}/day)`).join('; ')}{p.activities.length > 8 ? `; and ${p.activities.length - 8} more` : ''}</p>
+                <p className="mt-1 text-caption text-warm-600">Up to {n(p.maxExcess)} over. Contributing: {p.activities.slice(0, 8).map(a => `${a.code} ${a.name} (${n(a.unitsPerDay)}/day)`).join('; ')}{p.activities.length > 8 ? `; and ${p.activities.length - 8} more` : ''}</p>
               </details>
             </li>
           ))}
@@ -293,14 +293,14 @@ function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSum
   const set = (v: number) => setStaffing({ ...staffing, [rid]: Math.max(0, Math.round(v * 100) / 100) })
   return (
     <Disclosure tone="card" title="Staffing what-if" meta={Object.keys(staffing).length ? 'in effect' : 'nothing is saved'}>
-      <p className="text-[12px] text-warm-600 mb-2 max-w-[80ch]">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact.</p>
+      <p className="text-caption text-warm-600 mb-2 max-w-[80ch]">Change how many units a resource can supply per day (for example, add a crew), then look at the histogram or run leveling to see the date impact.</p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="text-[12px] text-warm-700">Resource
-          <select value={rid} onChange={e => setRid(e.target.value)} className="block bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-[13px]">
+        <label className="text-caption text-warm-700">Resource
+          <select value={rid} onChange={e => setRid(e.target.value)} className="block bg-white border border-warm-300 rounded-lg px-2 py-1.5 text-body">
             {limited.map(x => <option key={x.id} value={x.id}>{x.code} — {x.name}</option>)}
           </select>
         </label>
-        <label className="text-[12px] text-warm-700">Available per day ({r?.unit})
+        <label className="text-caption text-warm-700">Available per day ({r?.unit})
           <input type="number" min={0} step="any" value={val} placeholder={String(r?.availablePerDay ?? '')} onChange={e => setVal(e.target.value)} className={`${inputClass} w-32`} />
         </label>
         <Button variant="secondary" disabled={val === '' || !Number.isFinite(Number(val))} onClick={() => { set(Number(val)); setVal('') }}>Apply</Button>
@@ -308,7 +308,7 @@ function Staffing({ resources, staffing, setStaffing }: { resources: ResourceSum
         {Object.keys(staffing).length > 0 && <Button variant="ghost" onClick={() => setStaffing({})}>Reset to the file</Button>}
       </div>
       {Object.keys(staffing).length > 0 && (
-        <p className="text-[12px] text-warm-700 mt-2">What-if: {Object.entries(staffing).map(([k, v]) => `${resources.find(x => x.id === k)?.code ?? k} ${n(v)}/day`).join('; ')}</p>
+        <p className="text-caption text-warm-700 mt-2">What-if: {Object.entries(staffing).map(([k, v]) => `${resources.find(x => x.id === k)?.code ?? k} ${n(v)}/day`).join('; ')}</p>
       )}
     </Disclosure>
   )
@@ -356,10 +356,10 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
   const res = preview?.result
   return (
     <Disclosure tone="card" title="Resource leveling" meta={levelingEdits > 0 ? `leveled scenario saved (${levelingEdits} edits)` : undefined}>
-      {!hasLogic ? <p className="text-[13px] text-warm-600">This schedule has no activity relationships, so it cannot be recalculated to level resources.</p> : (
+      {!hasLogic ? <p className="text-body text-warm-600">This schedule has no activity relationships, so it cannot be recalculated to level resources.</p> : (
         <>
           <Hint label="How leveling works" className="mb-2">Delays not-started work so no resource is over its limit. Priority: least total float keeps the resource, then the earliest late start, then the activity ID. Work in progress, actuals, the data date and constraints are never moved. Delays become Start On or After dates in a scenario labelled “Leveled scenario”; the schedule as submitted is unchanged.</Hint>
-          <fieldset className="flex flex-wrap items-center gap-4 text-[13px] text-warm-700">
+          <fieldset className="flex flex-wrap items-center gap-4 text-body text-warm-700">
             <legend className="sr-only">Leveling mode</legend>
             <label><input type="radio" name="lv-mode" checked={mode === 'level'} onChange={() => setMode('level')} /> Level (within float first)</label>
             <label><input type="radio" name="lv-mode" checked={mode === 'smooth'} onChange={() => setMode('smooth')} /> Smooth (within float only)</label>
@@ -372,13 +372,13 @@ function Leveling({ base, kind, canEdit, hasLogic, staffing, selected, bucket, l
           {res && <LevelingResults p={preview!} />}
           {res && kind === 'schedule' && (canEdit ? (
             <div className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="text-[12px] text-warm-700 flex-1 min-w-[240px]">Reason (kept with each edit and in the audit log)
+              <label className="text-caption text-warm-700 flex-1 min-w-[240px]">Reason (kept with each edit and in the audit log)
                 <input value={reason} onChange={e => setReason(e.target.value)} className={inputClass} placeholder="e.g. Level carpenters to one crew per the superintendent" />
               </label>
               <Button onClick={save} disabled={busy || reason.trim().length < 5 || !res.changes.length}>Save as Leveled scenario</Button>
             </div>
-          ) : <p className="text-[12px] text-warm-600 mt-2">Saving the leveled scenario needs the scheduler role.</p>)}
-          {res && kind === 'plan' && <p className="text-[12px] text-warm-600 mt-2">Plans change through plan edits: apply these Start On or After dates as constraint edits on the plan to keep them.</p>}
+          ) : <p className="text-caption text-warm-600 mt-2">Saving the leveled scenario needs the scheduler role.</p>)}
+          {res && kind === 'plan' && <p className="text-caption text-warm-600 mt-2">Plans change through plan edits: apply these Start On or After dates as constraint edits on the plan to keep them.</p>}
         </>
       )}
     </Disclosure>
@@ -389,10 +389,10 @@ function LevelingResults({ p }: { p: Preview }) {
   const r = p.result
   const fin = (d: number) => (d === 0 ? 'no change' : `${d > 0 ? '+' : ''}${d} calendar day${Math.abs(d) === 1 ? '' : 's'}`)
   return (
-    <div className="mt-3 space-y-3 text-[13px] text-warm-700">
+    <div className="mt-3 space-y-3 text-body text-warm-700">
       <h4 className="font-semibold text-ink">{r.label} — {r.mode === 'smooth' ? 'smoothing (within float)' : r.allowFinishExtension ? 'leveling, finish may extend' : 'leveling within float'}</h4>
-      <table className="text-[13px]">
-        <thead><tr className="text-left text-[12px] font-medium text-warm-600"><th scope="col" className="pr-4">Measure</th><th scope="col" className="pr-4">Before</th><th scope="col">After</th></tr></thead>
+      <table className="text-body">
+        <thead><tr className="text-left text-caption font-medium text-warm-600"><th scope="col" className="pr-4">Measure</th><th scope="col" className="pr-4">Before</th><th scope="col">After</th></tr></thead>
         <tbody>
           <tr><th scope="row" className="text-left pr-4 font-medium">Finish</th><td className="pr-4 tabular-nums">{fmtDate(r.before.finish)}</td><td className="tabular-nums">{fmtDate(r.after.finish)} ({fin(r.finishChangeDays)})</td></tr>
           {r.before.milestones.map((m, i) => (
@@ -404,8 +404,8 @@ function LevelingResults({ p }: { p: Preview }) {
       <div>
         <h5 className="font-semibold text-ink mb-1">Delays introduced ({r.delays.length})</h5>
         {!r.delays.length ? <p className="text-warm-600">No activity needs to wait.</p> : (
-          <div tabIndex={0} role="region" aria-label="Activities moved by leveling (scrolls sideways on small screens)" className="overflow-x-auto"><table className="w-full text-[12px]">
-            <thead><tr className="text-left text-[12px] font-medium text-warm-600 border-b border-warm-200">
+          <div tabIndex={0} role="region" aria-label="Activities moved by leveling (scrolls sideways on small screens)" className="overflow-x-auto"><table className="w-full text-body [&_th]:text-caption">
+            <thead><tr className="text-left text-caption font-medium text-warm-600 border-b border-warm-200">
               <th scope="col" className="py-1 pr-3">Activity</th><th scope="col" className="pr-3">Start before</th><th scope="col" className="pr-3">Start after</th><th scope="col" className="pr-3 text-right">Delay (work days)</th><th scope="col" className="pr-3">Within float</th><th scope="col">Resources</th>
             </tr></thead>
             <tbody>{r.delays.map(d => (
@@ -417,14 +417,14 @@ function LevelingResults({ p }: { p: Preview }) {
             ))}</tbody>
           </table></div>
         )}
-        {r.knockOn.length > 0 && <p className="text-[12px] text-warm-600 mt-1">Moved by logic as a result: {r.knockOn.slice(0, 15).map(k => `${k.code} (+${k.calendarDays}d)`).join(', ')}{r.knockOn.length > 15 ? ', …' : ''}</p>}
+        {r.knockOn.length > 0 && <p className="text-caption text-warm-600 mt-1">Moved by logic as a result: {r.knockOn.slice(0, 15).map(k => `${k.code} (+${k.calendarDays}d)`).join(', ')}{r.knockOn.length > 15 ? ', …' : ''}</p>}
       </div>
       {r.unresolved.length > 0 && (
         <div><h5 className="font-semibold text-ink mb-1">Not resolved</h5>
-          <ul className="list-disc pl-5 text-[12px]">{r.unresolved.slice(0, 15).map((u, i) => <li key={i}>{u.resourceCode} from {fmtDate(u.date)}: {u.reason}</li>)}</ul></div>
+          <ul className="list-disc pl-5 text-caption">{r.unresolved.slice(0, 15).map((u, i) => <li key={i}>{u.resourceCode} from {fmtDate(u.date)}: {u.reason}</li>)}</ul></div>
       )}
       <OverAllocations periods={r.remaining} title="Remaining over-allocations after leveling" />
-      {r.assumptions.length > 0 && <ul className="list-disc pl-5 text-[12px] text-warm-600">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>}
+      {r.assumptions.length > 0 && <ul className="list-disc pl-5 text-caption text-warm-600">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>}
     </div>
   )
 }

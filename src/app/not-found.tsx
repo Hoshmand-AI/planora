@@ -6,12 +6,12 @@ export default function NotFound() {
   return (
     <main className="min-h-screen bg-warm-50 flex items-center justify-center px-6">
       <div className="max-w-md text-center">
-        <p className="text-[13px] font-semiboldst text-accent-600 mb-3">404</p>
-        <h1 className="font-display text-[28px] text-ink mb-3">This page could not be found.</h1>
-        <p className="text-[14px] text-warm-600 mb-8">The link may be out of date, or the page may have moved.</p>
+        <p className="text-fine font-semiboldst text-accent-600 mb-3">404</p>
+        <h1 className="font-display text-h2 text-ink mb-3">This page could not be found.</h1>
+        <p className="text-small text-warm-600 mb-8">The link may be out of date, or the page may have moved.</p>
         <div className="flex gap-3 justify-center flex-wrap">
-          <Link href="/" className="bg-accent-600 text-white px-6 py-2.5 rounded-full text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Go to the home page</Link>
-          <Link href="/dashboard" className="border border-warm-300 text-ink px-6 py-2.5 rounded-full text-[14px] font-medium hover:bg-warm-100 transition-colors">Open RunF9</Link>
+          <Link href="/" className="bg-accent-600 text-white px-6 py-2.5 rounded-full text-small font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Go to the home page</Link>
+          <Link href="/dashboard" className="border border-warm-300 text-ink px-6 py-2.5 rounded-full text-small font-medium hover:bg-warm-100 transition-colors">Open RunF9</Link>
         </div>
       </div>
     </main>

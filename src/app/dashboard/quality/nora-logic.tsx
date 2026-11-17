@@ -76,7 +76,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     return (
       <MoodTile mood="worried" as="section" className="flex items-center gap-3">
         <Robot mood="worried" size={48} />
-        <p role="alert" className="text-[13px] text-warm-700">{error}</p>
+        <p role="alert" className="text-body text-warm-700">{error}</p>
       </MoodTile>
     )
   }
@@ -84,7 +84,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
     return (
       <MoodTile mood="working" as="section" className="flex items-center gap-3">
         <Robot mood="working" size={48} />
-        <p className="text-[13px] text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Reading the activity names and tracing the logic…</p>
+        <p className="text-body text-warm-700 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Reading the activity names and tracing the logic…</p>
       </MoodTile>
     )
   }
@@ -102,9 +102,9 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
   return (
     <section aria-labelledby="nora-logic-h" id="nora-logic" className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id="nora-logic-h" className="text-[16px] font-semibold text-ink">Logic suggestions</h2>
-        <p className="flex-1 min-w-[200px] text-[13px] text-warm-600">{h.title}</p>
-        {data.suggestions.length > 0 && <button type="button" onClick={download} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-600 hover:underline"><Download size={13} aria-hidden /> Download as CSV</button>}
+        <h2 id="nora-logic-h" className="text-heading font-semibold text-ink">Logic suggestions</h2>
+        <p className="flex-1 min-w-[200px] text-body text-warm-600">{h.title}</p>
+        {data.suggestions.length > 0 && <button type="button" onClick={download} className="inline-flex items-center gap-1.5 text-body font-semibold text-accent-600 hover:underline"><Download size={13} aria-hidden /> Download as CSV</button>}
       </div>
 
       {top.length > 0 && (
@@ -114,7 +114,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
           </ol>
         </div>
       )}
-      <div aria-live="polite">{status && <p role="status" className="text-[12px] text-status-on-track">{status}</p>}</div>
+      <div aria-live="polite">{status && <p role="status" className="text-body text-status-on-track">{status}</p>}</div>
 
       {(data.suggestions.length > top.length || data.unresolved.length > 0) && (
         <Disclosure tone="card" title={`Show all suggestions`} meta={`${data.suggestions.length} suggestion${data.suggestions.length === 1 ? '' : 's'}${data.unresolved.length ? ` · ${data.unresolved.length} without one` : ''}`}>
@@ -126,11 +126,11 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
             )}
             {data.suggestions.some(s => s.action !== 'add_link') && (
               <div>
-                <h3 className="text-[12px] font-semibold text-ink mb-1">Links to look over (optional)</h3>
-                <ul className="divide-y divide-warm-200 text-[12px]">
+                <h3 className="text-body font-semibold text-ink mb-1">Links to look over (optional)</h3>
+                <ul className="divide-y divide-warm-200 text-caption">
                   {data.suggestions.filter(s => s.action !== 'add_link').map(s => (
                     <li key={s.id} className="py-2">
-                      <span className="text-[12px] font-semibold text-warm-600">{SUGGESTION_KIND_LABEL[s.kind]}</span>
+                      <span className="text-caption font-semibold text-warm-600">{SUGGESTION_KIND_LABEL[s.kind]}</span>
                       <p className="text-ink"><LinkText s={s} /></p>
                       <p className="text-warm-600">{s.reason}</p>
                     </li>
@@ -140,9 +140,9 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
             )}
             {data.unresolved.length > 0 && (
               <div>
-                <h3 className="text-[12px] font-semibold text-ink mb-1">Loose ends without a suggestion</h3>
-                <p className="text-[12px] text-warm-600 mb-1">RunF9 could not tell what kind of work these are, or every likely link would have created a loop. Link them in your scheduling tool or in RunF9&apos;s edits.</p>
-                <ul className="text-[12px] text-warm-700 space-y-0.5">
+                <h3 className="text-body font-semibold text-ink mb-1">Loose ends without a suggestion</h3>
+                <p className="text-caption text-warm-600 mb-1">RunF9 could not tell what kind of work these are, or every likely link would have created a loop. Link them in your scheduling tool or in RunF9&apos;s edits.</p>
+                <ul className="text-caption text-warm-700 space-y-0.5">
                   {data.unresolved.map(u => <li key={`${u.id}-${u.missing}`}><span className="font-mono text-warm-600">{u.code}</span> {u.name} <span className="text-warm-600">· no {u.missing}</span></li>)}
                 </ul>
               </div>
@@ -152,7 +152,7 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
       )}
 
       {data.suggestions.length > 0 && (
-        <p className="text-[12px] text-warm-600">{h.sub} Each is checked so it creates no logic loop and repeats no existing path.{data.editsApplied > 0 ? ` Includes the ${plural(data.editsApplied, 'edit')} made in RunF9.` : ''}</p>
+        <p className="text-caption text-warm-600">{h.sub} Each is checked so it creates no logic loop and repeats no existing path.{data.editsApplied > 0 ? ` Includes the ${plural(data.editsApplied, 'edit')} made in RunF9.` : ''}</p>
       )}
     </section>
   )
@@ -161,11 +161,11 @@ export function NoraLogicPanel({ scheduleId, canEdit }: { scheduleId: string; ca
 function LinkText({ s }: { s: LogicSuggestion }) {
   return (
     <>
-      <span className="font-mono text-[12px] text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
+      <span className="font-mono text-caption text-warm-600">{s.predecessor.code}</span> {s.predecessor.name}
       <ArrowRight size={12} className="inline mx-1 -mt-0.5 text-warm-500" aria-label="then" />
-      <span className="font-mono text-[12px] text-warm-600">{s.successor.code}</span> {s.successor.name}
-      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-[12px] text-ink">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
-      {s.firm && <span className="ml-1.5 text-[12px] text-warm-600">· your firm&apos;s pattern</span>}
+      <span className="font-mono text-caption text-warm-600">{s.successor.code}</span> {s.successor.name}
+      {(s.type !== 'FS' || s.lag !== 0) && <span className="ml-1.5 font-mono text-caption text-ink">({s.type}{s.lag ? ` ${s.lag > 0 ? '+' : '−'}${Math.abs(s.lag)}d` : ''})</span>}
+      {s.firm && <span className="ml-1.5 text-caption text-warm-600">· your firm&apos;s pattern</span>}
     </>
   )
 }
@@ -192,25 +192,25 @@ function SuggestionCard({ s, scheduleId, canApply, onApplied, compact = false }:
     <li className={`bg-white border border-warm-200 rounded-[14px] ${compact ? 'px-3.5 py-2.5' : 'px-4 py-3'}`}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-warm-600">{s.problem}</p>
-          <p className="text-[13px] text-ink mt-0.5"><span className="font-semibold">Link </span><LinkText s={s} /></p>
-          <p className="text-[12px] text-warm-700 mt-0.5">{s.reason} <span className="text-warm-600">· {level(s.confidence)} ({Math.round(s.confidence * 100)}%)</span></p>
+          <p className="text-body text-warm-600">{s.problem}</p>
+          <p className="text-body text-ink mt-0.5"><span className="font-semibold">Link </span><LinkText s={s} /></p>
+          <p className="text-caption text-warm-700 mt-0.5">{s.reason} <span className="text-warm-600">· {level(s.confidence)} ({Math.round(s.confidence * 100)}%)</span></p>
         </div>
         {canApply && !confirming && (
-          <button type="button" onClick={() => setConfirming(true)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-[13px] font-medium text-ink flex-shrink-0">Add this link</button>
+          <button type="button" onClick={() => setConfirming(true)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-body font-medium text-ink flex-shrink-0">Add this link</button>
         )}
       </div>
       {confirming && (
         <div className="mt-2.5 pt-2.5 border-t border-warm-200 space-y-2">
-          <label className="block text-[12px] text-warm-600">Reason (kept with the edit and in the audit log)
-            <input value={reason} onChange={e => setReason(e.target.value)} className="block mt-0.5 w-full border border-warm-300 rounded-lg px-2.5 py-1.5 bg-white text-[13px] text-warm-700" />
+          <label className="block text-caption text-warm-600">Reason (kept with the edit and in the audit log)
+            <input value={reason} onChange={e => setReason(e.target.value)} className="block mt-0.5 w-full border border-warm-300 rounded-lg px-2.5 py-1.5 bg-white text-body text-warm-700" />
           </label>
-          <p className="text-[12px] text-warm-600">Adds a {LINK_TYPE_NAME[s.type] ?? s.type} link{s.lag ? ` with a ${Math.abs(s.lag)}-day ${s.lag > 0 ? 'lag' : 'lead'}` : ''} to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
+          <p className="text-caption text-warm-600">Adds a {LINK_TYPE_NAME[s.type] ?? s.type} link{s.lag ? ` with a ${Math.abs(s.lag)}-day ${s.lag > 0 ? 'lag' : 'lead'}` : ''} to RunF9&apos;s “With RunF9 edits” scenario and recalculates it. Your uploaded file is not changed.</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
-            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-[13px] text-ink">Cancel</button>
+            <button type="button" disabled={busy || reason.trim().length < 5} onClick={apply} className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">{busy ? 'Adding…' : 'Add link and recalculate'}</button>
+            <button type="button" disabled={busy} onClick={() => { setConfirming(false); setErr('') }} className="px-3.5 py-1.5 rounded-lg border border-warm-300 text-body text-ink">Cancel</button>
           </div>
-          {err && <p role="alert" className="text-[12px] text-status-at-risk">{err}</p>}
+          {err && <p role="alert" className="text-body text-status-at-risk">{err}</p>}
         </div>
       )}
     </li>

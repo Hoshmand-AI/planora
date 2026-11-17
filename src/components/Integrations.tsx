@@ -55,9 +55,9 @@ export function Integrations() {
       {!data.available && <div className="mb-3"><Alert tone="info">API keys and webhooks are included in the Pro and Enterprise plans.</Alert></div>}
       {secret && (
         <div className="mb-4 border border-status-attention bg-status-attention-bg rounded-md p-3">
-          <p className="text-[13px] text-warm-700 font-medium">{secret.label} Copy it now: it won&apos;t be shown again.</p>
+          <p className="text-body text-warm-700 font-medium">{secret.label} Copy it now: it won&apos;t be shown again.</p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 break-all text-[12px] bg-warm-50 border border-warm-200 rounded px-2 py-1.5 text-ink">{secret.value}</code>
+            <code className="flex-1 break-all text-caption bg-warm-50 border border-warm-200 rounded px-2 py-1.5 text-ink">{secret.value}</code>
             <Button variant="secondary" aria-label="Copy" onClick={() => navigator.clipboard?.writeText(secret.value)}><Copy size={13} /></Button>
           </div>
           <Button variant="ghost" className="mt-2" onClick={() => setSecret(null)}>I&apos;ve stored it safely</Button>
@@ -65,12 +65,12 @@ export function Integrations() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <h3 className="text-[13px] font-semibold text-ink">API keys</h3>
+        <h3 className="text-subhead font-semibold text-ink">API keys</h3>
         {adding !== 'key' && <Button variant="secondary" disabled={!data.available} onClick={() => setAdding('key')}>New API key</Button>}
       </div>
       {data.keys.length > 0 ? (
         <div tabIndex={0} role="region" aria-label="API keys" className="relative overflow-x-auto mb-3">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body [&_th]:text-caption">
             <caption className="sr-only">API keys</caption>
             <thead><tr className="text-left text-warm-500"><th scope="col" className="py-1.5 pr-3 font-medium">Name</th><th scope="col" className="pr-3 font-medium">Key</th><th scope="col" className="pr-3 font-medium">Role</th><th scope="col" className="pr-3 font-medium">Last used</th><th scope="col" className="pr-3 font-medium">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
@@ -87,7 +87,7 @@ export function Integrations() {
             </tbody>
           </table>
         </div>
-      ) : adding !== 'key' && <p className="text-[13px] text-warm-600 mb-3">No API keys yet.</p>}
+      ) : adding !== 'key' && <p className="text-body text-warm-600 mb-3">No API keys yet.</p>}
       {adding === 'key' && (
       <form className="grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-end mb-3" onSubmit={async e => {
         e.preventDefault()
@@ -103,13 +103,13 @@ export function Integrations() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2 mt-6 pt-5 border-t border-warm-200">
-        <h3 className="text-[13px] font-semibold text-ink">Webhooks</h3>
+        <h3 className="text-subhead font-semibold text-ink">Webhooks</h3>
         {adding !== 'hook' && <Button variant="secondary" disabled={!data.available} onClick={() => setAdding('hook')}>New webhook</Button>}
       </div>
       {data.webhooks.length > 0 ? (
         <ul className="mb-3 divide-y divide-warm-200 border-y border-warm-200">
           {data.webhooks.map(h => (
-            <li key={h.id} className="py-3 text-[12px] text-warm-700">
+            <li key={h.id} className="py-3 text-caption text-warm-700">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-mono break-all text-ink">{h.url}</div>
@@ -128,7 +128,7 @@ export function Integrations() {
             </li>
           ))}
         </ul>
-      ) : adding !== 'hook' && <p className="text-[13px] text-warm-600">No webhooks yet.</p>}
+      ) : adding !== 'hook' && <p className="text-body text-warm-600">No webhooks yet.</p>}
       {adding === 'hook' && (
       <form className="space-y-3" onSubmit={async e => {
         e.preventDefault()
@@ -137,10 +137,10 @@ export function Integrations() {
       }}>
         <Field label="Endpoint URL (HTTPS)">{p => <input {...p} required type="url" className={inputClass} placeholder="https://hooks.example.com/runf9" value={hook.url} onChange={e => setHook({ ...hook, url: e.target.value })} />}</Field>
         <fieldset>
-          <legend className="block text-[12px] font-semibold text-warm-600 mb-1.5">Events</legend>
+          <legend className="block text-caption font-semibold text-warm-600 mb-1.5">Events</legend>
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
             {data.events.map(ev => (
-              <label key={ev.id} className="flex items-start gap-2 py-1 text-[12px] text-warm-700">
+              <label key={ev.id} className="flex items-start gap-2 py-1 text-caption text-warm-700">
                 <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-500" checked={hook.events.includes(ev.id)} onChange={e => setHook({ ...hook, events: e.target.checked ? [...hook.events, ev.id] : hook.events.filter(x => x !== ev.id) })} />
                 <span><span className="font-mono text-ink">{ev.id}</span> · {ev.label}</span>
               </label>

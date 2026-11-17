@@ -40,17 +40,17 @@ function ResetForm() {
     <div className="min-h-screen bg-warm-50 flex flex-col">
       <nav className="h-16 flex items-center px-6 border-b border-warm-200 bg-white/80 backdrop-blur-xl">
         <Link href="/" aria-label="RunF9 home">
-          <Logo variant="dark" size="text-[20px]" />
+          <Logo variant="dark" size="h-[30px]" />
         </Link>
       </nav>
 
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[400px]">
-          <Link href="/auth" className="inline-flex items-center gap-1.5 text-warm-400 text-[13px] font-medium hover:text-warm-700 transition-colors mb-8">
+          <Link href="/auth" className="inline-flex items-center gap-1.5 text-warm-400 text-fine font-medium hover:text-warm-700 transition-colors mb-8">
             <ArrowLeft size={14} /> Back to sign in
           </Link>
-          <h1 className="font-display text-[28px] text-ink mb-2">{done ? 'Password reset' : linkDead ? 'This link can’t be used' : 'Choose a new password'}</h1>
-          <p className="text-warm-500 text-[14px] mb-8">
+          <h1 className="font-display text-h2 text-ink mb-2">{done ? 'Password reset' : linkDead ? 'This link can’t be used' : 'Choose a new password'}</h1>
+          <p className="text-warm-500 text-small mb-8">
             {done
               ? 'You’ve been signed out on every device. Sign in with your new password.'
               : linkDead
@@ -60,42 +60,42 @@ function ResetForm() {
 
           <div role="status" aria-live="polite">
             {done && (
-              <div className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-[13px] px-4 py-3 rounded-md mb-5">
+              <div className="bg-status-on-track-bg border-l-2 border-status-on-track text-warm-700 text-fine px-4 py-3 rounded-md mb-5">
                 Your password has been reset.
               </div>
             )}
           </div>
 
           {error && (
-            <div role="alert" className="bg-status-at-risk-bg border border-status-at-risk/20 text-status-at-risk text-[13px] px-4 py-3 rounded-md mb-5 border-l-2 border-l-status-at-risk">
+            <div role="alert" className="bg-status-at-risk-bg border border-status-at-risk/20 text-status-at-risk text-fine px-4 py-3 rounded-md mb-5 border-l-2 border-l-status-at-risk">
               {error}
               {linkDead && <> <Link href="/auth?forgot=1" className="font-semibold underline">Request a new link</Link></>}
             </div>
           )}
 
           {done ? (
-            <Link href="/auth" className="block w-full text-center bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
+            <Link href="/auth" className="block w-full text-center bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">
               Sign in
             </Link>
           ) : token && !linkDead ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="new-password" className="block text-[12px] font-semibold text-warm-400 mb-1.5">New password</label>
+                <label htmlFor="new-password" className="block text-caption font-semibold text-warm-400 mb-1.5">New password</label>
                 <div className="relative">
                   <input
                     id="new-password" autoComplete="new-password" aria-describedby="password-hint" autoFocus
                     type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={12} maxLength={128}
                     placeholder="At least 12 characters"
-                    className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400 pr-10"
+                    className="w-full bg-warm-100 border border-warm-300 rounded-md px-4 py-2.5 text-small text-warm-700 placeholder:text-warm-400 pr-10"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-warm-400 hover:text-warm-600">
                     {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                   </button>
                 </div>
-                <p id="password-hint" className="text-[12px] text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>
+                <p id="password-hint" className="text-caption text-warm-400 mt-1.5">At least 12 characters. A short phrase of a few unrelated words is strong and easy to remember.</p>
               </div>
               <button type="submit" disabled={loading}
-                className="w-full bg-accent-600 text-white py-3 rounded-md text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
+                className="w-full bg-accent-600 text-white py-3 rounded-md text-small font-semibold hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed pressable shadow-sm">
                 {loading ? 'Please wait…' : 'Reset password'}
               </button>
             </form>

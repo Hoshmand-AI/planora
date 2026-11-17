@@ -3,13 +3,15 @@
 // signed in as a real user with a generated plan. Also checks that every page can be operated
 // from the keyboard to the main actions (focus is visible and lands on interactive elements).
 //   BASE_URL=http://localhost:3200 node scripts/a11y-check.mjs
-// Fails on any "serious" or "critical" violation. SCREENSHOTS=dir also saves a screenshot per page.
+// Fails on any "serious" or "critical" violation, and on any text off the type scale (scripts/type-audit.mjs).
+// SCREENSHOTS=dir also saves a screenshot per page.
 // With BETA_BASE_URL (a server in the default invite-only mode) and BETA_ADMIN_EMAIL (one of its
 // RUNF9_PLATFORM_ADMINS), also checks the private-beta landing and sign-in pages and the Beta access page.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
+import { typeProblems } from './type-audit.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
 // This suite creates its own organizations, so the server must allow self sign-up (RUNF9_SIGNUP=open,
@@ -66,7 +68,7 @@ const PAGES = [
   ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
   ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
   ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]:visible'); await page.waitForSelector('text=What is driving the project') }],
-  ['Old Today link (lands on Overview)', '/dashboard/today', async () => { await page.getByText('Will we finish on time?').waitFor() }],
+  ['Old Today link (lands on Overview)', '/dashboard/today', async () => { await page.locator('#finish-h').waitFor() }],
   ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
   ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /All \d+ DCMA checks/ }).click(); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
 ]
@@ -90,6 +92,9 @@ for (const [name, url, prepare] of pages) {
     return r.violations.map(v => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.slice(0, 3).map(n => n.target.join(' ')) , count: v.nodes.length }))
   })
   const blocking = result.filter(v => v.impact === 'serious' || v.impact === 'critical')
+  // The type scale: every text on one of its sizes, the page title the largest, nothing larger than its section's heading.
+  const type = await typeProblems(page)
+  if (type.length) { console.log(`✗ ${name}: text sizes off the type scale`); for (const t of type) console.log(`    ${t}`); failed++ }
   // Keyboard: Tab must move focus to a visible, interactive element.
   await page.keyboard.press('Tab')
   const focus = await page.evaluate(() => {
@@ -147,5 +152,5 @@ if (process.env.BETA_BASE_URL) {
 }
 
 await browser.close()
-if (failed) { console.error(`\nAccessibility check failed on ${failed} page(s).`); process.exit(1) }
-console.log('\nNo serious or critical WCAG 2.2 AA violations; keyboard focus reachable on every page.')
+if (failed) { console.error(`\nAccessibility and type-scale check: ${failed} failure(s).`); process.exit(1) }
+console.log('\nNo serious or critical WCAG 2.2 AA violations; keyboard focus reachable on every page; every text on the type scale.')

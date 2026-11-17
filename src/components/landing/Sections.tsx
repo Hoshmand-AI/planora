@@ -9,8 +9,8 @@ import { ArrowRight, ChevronDown, Mail, GitPullRequestArrow, ScrollText, SearchC
 import { Reveal } from './motion'
 import { SAMPLE_BRIEF } from '@/lib/marketing/sample-brief'
 
-const H2 = 'text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-ink leading-[1.05]'
-const LEAD = 'text-[17px] md:text-[19px] text-warm-600 mt-4 leading-snug'
+const H2 = 'text-h2 md:text-h1 font-bold tracking-[-0.03em] text-ink leading-[1.1]'
+const LEAD = 'text-lead text-warm-600 mt-4 leading-snug'
 
 /** Accessible tabs: arrow keys, Home and End move between them (WAI-ARIA tabs pattern). */
 function useTabs(count: number) {
@@ -34,7 +34,7 @@ function TabList({ label, items, prefix, panel, tabs, className = '' }: { label:
           key={x.id} ref={el => { tabs.refs.current[i] = el }} type="button" role="tab" id={`${prefix}-tab-${x.id}`}
           aria-selected={i === tabs.active} aria-controls={panel} tabIndex={i === tabs.active ? 0 : -1}
           onClick={() => tabs.setActive(i)}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-medium transition-colors ${i === tabs.active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-small font-medium transition-colors ${i === tabs.active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
         >{x.tab}</button>
       ))}
     </div>
@@ -49,7 +49,7 @@ export function Shot({ name, alt, label, eager = false, height = 1200, className
     <figure className={`rounded-[18px] md:rounded-[22px] border border-warm-200 bg-white shadow-[0_40px_80px_-40px_rgba(29,33,37,0.45)] overflow-hidden ${className}`}>
       <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
         <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
-        <span className="ml-3 text-[12.5px] text-navy-200 truncate">{label}</span>
+        <span className="ml-3 text-caption text-navy-200 truncate">{label}</span>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {/* On a phone the picture is shown larger and cropped to its top-left, so its text stays readable */}
@@ -84,29 +84,29 @@ function LiveBrief() {
     <div className="rounded-[18px] md:rounded-[22px] border border-navy-800 bg-white shadow-[0_40px_80px_-40px_rgba(29,33,37,0.6)] overflow-hidden">
       <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
         <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
-        <span className="ml-3 text-[12.5px] text-navy-200 truncate">RunF9 · Today</span>
+        <span className="ml-3 text-caption text-navy-200 truncate">RunF9 · Today</span>
       </div>
       <div className="p-5 md:p-8">
-        <div className="text-[13.5px] text-warm-600">{b.project} · brief for {b.asOf}</div>
-        <p className="mt-2 text-[13.5px] font-semibold text-warm-600">Are we meeting the deadline?</p>
-        <p className="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-status-at-risk leading-tight mt-1">No. {b.headline.daysBehind} days behind.</p>
-        <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1.5">{b.headline.text}</p>
+        <div className="text-body text-warm-600">{b.project} · brief for {b.asOf}</div>
+        <p className="mt-2 text-body font-semibold text-warm-600">Are we meeting the deadline?</p>
+        <p className="text-h3 font-semibold tracking-[-0.01em] text-status-at-risk leading-tight mt-1">No. {b.headline.daysBehind} days behind.</p>
+        <p className="text-small text-warm-700 leading-relaxed mt-1.5">{b.headline.text}</p>
 
         <TabList label="Who the brief is for, and what it read" items={BRIEF_TABS} prefix="brief" panel="brief-panel" tabs={tabs} className="mt-6" />
         <div id="brief-panel" role="tabpanel" aria-labelledby={`brief-tab-${id}`} className="mt-5 min-h-[300px]">
           <div key={id} className="rise-in">
             {lines && (
               <ul className="divide-y divide-warm-200 border-y border-warm-200">
-                {lines.map(t => <li key={t} className="py-3.5 text-[15.5px] text-warm-700 leading-relaxed">{t}</li>)}
+                {lines.map(t => <li key={t} className="py-3 text-small text-warm-700 leading-relaxed">{t}</li>)}
               </ul>
             )}
             {id === 'signals' && (
               <ul className="space-y-3">
                 {b.signals.map(g => (
                   <li key={g.quote} className="rounded-xl border border-warm-200 p-4">
-                    <span className={`inline-block text-[12.5px] font-semibold capitalize rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
-                    <p className="text-[15.5px] text-ink leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
-                    <p className="text-[14px] text-warm-600 mt-1.5">{g.source}{g.activity ? ` · about ${g.activity}` : ''}{g.days ? ` · ${g.days} work days` : ''}</p>
+                    <span className={`inline-block text-caption font-semibold capitalize rounded-full px-2.5 py-0.5 ${SIGNAL_TONE[g.kind] || SIGNAL_TONE.risk}`}>{g.kind}</span>
+                    <p className="text-small text-ink leading-relaxed mt-2">&ldquo;{g.quote}&rdquo;</p>
+                    <p className="text-fine text-warm-600 mt-1.5">{g.source}{g.activity ? ` · about ${g.activity}` : ''}{g.days ? ` · ${g.days} work days` : ''}</p>
                   </li>
                 ))}
               </ul>
@@ -115,8 +115,8 @@ function LiveBrief() {
               <ul className="divide-y divide-warm-200 border-y border-warm-200">
                 {b.whatIfs.map(w => (
                   <li key={w.title} className="py-3.5">
-                    <p className="text-[15px] font-semibold text-ink leading-snug">{w.title}</p>
-                    <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1">{w.text}</p>
+                    <p className="text-small font-semibold text-ink leading-snug">{w.title}</p>
+                    <p className="text-small text-warm-700 leading-relaxed mt-1">{w.text}</p>
                   </li>
                 ))}
               </ul>
@@ -140,27 +140,27 @@ export function DailyBrief() {
     <section id="today" aria-labelledby="today-h" className="bg-navy-950 scroll-mt-16">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="text-center max-w-[820px] mx-auto">
-          <p className="text-[15px] font-semibold text-accent-400">The Daily Brief</p>
-          <h2 id="today-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Every morning, what changed and what to do about it.</h2>
-          <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
+          <p className="text-small font-semibold text-accent-400">The Daily Brief</p>
+          <h2 id="today-h" className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-white leading-[1.1] mt-3">Every morning, what changed and what to do about it.</h2>
+          <p className="text-lead text-navy-200 mt-4 leading-snug">RunF9 recalculates the schedule, reads what came in overnight and writes one brief for the project manager, one for the field and one for the client.</p>
         </Reveal>
 
         <div className="mt-12 md:mt-16 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-8 lg:gap-10 items-start">
           <Reveal>
             <LiveBrief />
-            <p className="text-[14.5px] text-navy-200 mt-4">This is the brief RunF9 computed for its sample data center project on {SAMPLE_BRIEF.asOf}, word for word. No AI model wrote it. Switch the reader to see what each one is told.</p>
+            <p className="text-small text-navy-200 mt-4">This is the brief RunF9 computed for its sample data center project on {SAMPLE_BRIEF.asOf}, word for word. No AI model wrote it. Switch the reader to see what each one is told.</p>
           </Reveal>
           <Reveal>
-            <h3 className="text-[15px] font-semibold text-accent-400">Needs attention today</h3>
+            <h3 className="text-small font-semibold text-accent-400">Needs attention today</h3>
             <ul className="mt-4 space-y-3">
               {SAMPLE_BRIEF.alerts.slice(0, 5).map(a => (
                 <li key={a.text} className="flex gap-3 rounded-xl border border-navy-800 bg-navy-900 p-4">
-                  <span className={`self-start flex-shrink-0 text-[12px] font-semibold rounded-full px-2.5 py-0.5 ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-accent-100 text-accent-700'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
-                  <span className="text-[15px] text-navy-200 leading-relaxed">{a.text}</span>
+                  <span className={`self-start flex-shrink-0 text-caption font-semibold rounded-full px-2.5 py-0.5 ${a.level === 'act' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-accent-100 text-accent-700'}`}>{a.level === 'act' ? 'Act' : 'Watch'}</span>
+                  <span className="text-small text-navy-200 leading-relaxed">{a.text}</span>
                 </li>
               ))}
             </ul>
-            {SAMPLE_BRIEF.alerts.length > 5 && <p className="text-[14.5px] text-navy-200 mt-3">And {SAMPLE_BRIEF.alerts.length - 5} more to watch in the product.</p>}
+            {SAMPLE_BRIEF.alerts.length > 5 && <p className="text-small text-navy-200 mt-3">And {SAMPLE_BRIEF.alerts.length - 5} more to watch in the product.</p>}
           </Reveal>
         </div>
 
@@ -168,8 +168,8 @@ export function DailyBrief() {
           {BRIEF_POINTS.map(({ icon: Icon, title, text }, i) => (
             <Reveal as="li" key={title} delay={i * 80}>
               <Icon size={24} strokeWidth={1.6} className="text-accent-400" aria-hidden />
-              <h3 className="text-[18px] font-semibold text-white mt-4 tracking-[-0.01em]">{title}</h3>
-              <p className="text-[16px] text-navy-200 leading-relaxed mt-2">{text}</p>
+              <h3 className="text-h3 font-semibold text-white mt-4 tracking-[-0.01em]">{title}</h3>
+              <p className="text-copy text-navy-200 leading-relaxed mt-2">{text}</p>
             </Reveal>
           ))}
         </ul>
@@ -192,12 +192,12 @@ export function Proof() {
   return (
     <section aria-labelledby="proof-h" className="bg-white border-b border-warm-200">
       <div className="max-w-[1240px] mx-auto px-6 py-14 md:py-16 grid md:grid-cols-3 gap-x-12 gap-y-8">
-        <h2 id="proof-h" className="text-[26px] md:text-[32px] font-semibold tracking-[-0.03em] text-ink leading-tight">Don’t take our word for it. Check the work.</h2>
+        <h2 id="proof-h" className="text-h3 md:text-h2 font-semibold tracking-[-0.02em] text-ink leading-tight">Don’t take our word for it. Check the work.</h2>
         {items.map(({ title, text, href, cta }) => (
           <div key={title} className="border-t border-warm-300 pt-5">
-            <h3 className="text-[18px] font-semibold text-ink tracking-[-0.01em]">{title}</h3>
-            <p className="text-[16px] text-warm-700 leading-relaxed mt-2">{text}</p>
-            <a href={href} className="pressable mt-3 inline-flex items-center gap-1.5 text-[15.5px] font-semibold text-accent-700 underline-offset-4 hover:underline">{cta}<ArrowRight size={16} aria-hidden /></a>
+            <h3 className="text-lead font-semibold text-ink tracking-[-0.01em]">{title}</h3>
+            <p className="text-copy text-warm-700 leading-relaxed mt-2">{text}</p>
+            <a href={href} className="pressable mt-3 inline-flex items-center gap-1.5 text-small font-semibold text-accent-700 underline-offset-4 hover:underline">{cta}<ArrowRight size={16} aria-hidden /></a>
           </div>
         ))}
       </div>
@@ -232,10 +232,10 @@ export function Audiences() {
           <div id="who-panel" role="tabpanel" aria-labelledby={`who-tab-${a.id}`} className="mt-10">
             <div key={a.id} className="rise-in grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 lg:gap-14 items-center">
               <div>
-                <h3 className="text-[26px] md:text-[34px] font-semibold tracking-[-0.03em] text-ink leading-tight">{a.title}</h3>
+                <h3 className="text-h3 md:text-h2 font-semibold tracking-[-0.02em] text-ink leading-tight">{a.title}</h3>
                 <ul className="mt-6 space-y-4">
                   {a.points.map(p => (
-                    <li key={p} className="flex items-start gap-3 text-[16px] text-warm-700 leading-relaxed">
+                    <li key={p} className="flex items-start gap-3 text-copy text-warm-700 leading-relaxed">
                       <ListChecks size={20} className="text-accent-600 flex-shrink-0 mt-1" aria-hidden />{p}
                     </li>
                   ))}
@@ -275,21 +275,21 @@ export function Integrations() {
       <ul className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {FILES.map(([ext, name, text], i) => (
           <Reveal as="li" key={name} delay={i * 70} className="rounded-2xl bg-white border border-warm-200 p-6">
-            <span aria-hidden className="inline-flex items-center justify-center h-12 min-w-[64px] px-3 rounded-xl bg-navy-950 text-white font-mono text-[15px] font-semibold">{ext}</span>
-            <h3 className="text-[19px] font-semibold text-ink tracking-[-0.01em] mt-5">{name}</h3>
-            <p className="text-[16px] text-warm-700 leading-relaxed mt-2">{text}</p>
+            <span aria-hidden className="inline-flex items-center justify-center h-12 min-w-[64px] px-3 rounded-xl bg-navy-950 text-white font-mono text-small font-semibold">{ext}</span>
+            <h3 className="text-h3 font-semibold text-ink tracking-[-0.01em] mt-5">{name}</h3>
+            <p className="text-copy text-warm-700 leading-relaxed mt-2">{text}</p>
           </Reveal>
         ))}
       </ul>
       <ul className="mt-4 grid sm:grid-cols-2 gap-x-10 gap-y-6 rounded-2xl bg-warm-100 border border-warm-200 p-6 md:p-8">
         {ALSO.map(([name, text]) => (
           <li key={name}>
-            <h3 className="text-[16.5px] font-semibold text-ink">{name}</h3>
-            <p className="text-[15.5px] text-warm-700 leading-relaxed mt-1">{text}</p>
+            <h3 className="text-copy font-semibold text-ink">{name}</h3>
+            <p className="text-small text-warm-700 leading-relaxed mt-1">{text}</p>
           </li>
         ))}
       </ul>
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[15px] text-warm-700">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-small text-warm-700">
         <span className="font-semibold text-ink">Planned, not yet available:</span>
         {['Procore', 'Kahua'].map(n => <span key={n} className="rounded-full border border-warm-300 bg-white px-3.5 py-1 font-medium text-ink">{n}</span>)}
         <span>Until then, their notifications reach RunF9 through the project inbox or a mail folder.</span>
@@ -314,27 +314,27 @@ export function Security({ contactHref }: { contactHref: string }) {
     <section id="security" aria-labelledby="security-h" className="bg-navy-950 scroll-mt-16">
       <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
         <Reveal className="max-w-[720px]">
-          <p className="flex items-center gap-2 text-[15px] font-semibold text-accent-400"><Lock size={15} aria-hidden />Security</p>
-          <h2 id="security-h" className="text-[36px] md:text-[56px] font-bold tracking-[-0.045em] text-white leading-[1.05] mt-3">Security you can check for yourself.</h2>
-          <p className="text-[17px] md:text-[19px] text-navy-200 mt-4 leading-snug">Each control below is enforced in code and tested on every change. We will run the tests in front of your security team.</p>
+          <p className="flex items-center gap-2 text-small font-semibold text-accent-400"><Lock size={15} aria-hidden />Security</p>
+          <h2 id="security-h" className="text-h2 md:text-h1 font-bold tracking-[-0.03em] text-white leading-[1.1] mt-3">Security you can check for yourself.</h2>
+          <p className="text-lead text-navy-200 mt-4 leading-snug">Each control below is enforced in code and tested on every change. We will run the tests in front of your security team.</p>
         </Reveal>
         <ul className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
           {SECURITY.map(({ icon: Icon, title, text }, i) => (
             <Reveal as="li" key={title} delay={(i % 3) * 80}>
               <Icon size={24} strokeWidth={1.6} className="text-accent-400" aria-hidden />
-              <h3 className="text-[18px] font-semibold text-white mt-4 tracking-[-0.01em]">{title}</h3>
-              <p className="text-[16px] text-navy-200 leading-relaxed mt-2">{text}</p>
+              <h3 className="text-h3 font-semibold text-white mt-4 tracking-[-0.01em]">{title}</h3>
+              <p className="text-copy text-navy-200 leading-relaxed mt-2">{text}</p>
             </Reveal>
           ))}
         </ul>
         <div className="mt-14 grid md:grid-cols-2 gap-5">
           <div className="rounded-2xl border border-navy-800 bg-navy-900 p-6 md:p-7">
-            <h3 className="text-[17px] font-semibold text-white">What we do not have yet</h3>
-            <p className="text-[16px] text-navy-200 leading-relaxed mt-2">RunF9 has not completed a SOC 2 audit and is not FedRAMP authorized. For work that needs either, run RunF9 inside your own boundary.</p>
+            <h3 className="text-lead font-semibold text-white">What we do not have yet</h3>
+            <p className="text-copy text-navy-200 leading-relaxed mt-2">RunF9 has not completed a SOC 2 audit and is not FedRAMP authorized. For work that needs either, run RunF9 inside your own boundary.</p>
           </div>
           <div className="rounded-2xl border border-navy-800 bg-navy-900 p-6 md:p-7">
-            <h3 className="text-[17px] font-semibold text-white">Documents for your review</h3>
-            <p className="text-[16px] text-navy-200 leading-relaxed mt-2">Our security overview, control matrix and NIST SP 800-171 mapping are available: <a href={contactHref} className="text-white underline">ask us for them</a>.</p>
+            <h3 className="text-lead font-semibold text-white">Documents for your review</h3>
+            <p className="text-copy text-navy-200 leading-relaxed mt-2">Our security overview, control matrix and NIST SP 800-171 mapping are available: <a href={contactHref} className="text-white underline">ask us for them</a>.</p>
           </div>
         </div>
       </div>
@@ -364,11 +364,11 @@ export function Faq() {
       <div className="border-t border-warm-200 mt-10">
         {FAQ.map(([q, a]) => (
           <details key={q} className="group border-b border-warm-200">
-            <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none text-[17px] font-semibold text-ink">
+            <summary className="flex items-center justify-between gap-4 py-4 cursor-pointer list-none text-copy font-semibold text-ink">
               {q}
               <ChevronDown size={20} className="text-warm-600 transition-transform duration-300 group-open:rotate-180 flex-shrink-0" aria-hidden />
             </summary>
-            <p className="text-[16px] text-warm-700 leading-relaxed pb-6 -mt-1 max-w-[720px]">{a}</p>
+            <p className="text-copy text-warm-700 leading-relaxed pb-5 -mt-1 max-w-[720px]">{a}</p>
           </details>
         ))}
       </div>

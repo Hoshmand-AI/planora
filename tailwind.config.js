@@ -2,6 +2,26 @@
 module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
+    // One type scale (docs/design/DESIGN-SYSTEM.md, "Type"). Sizes only: weight and color are set where the text is.
+    // This replaces Tailwind's default scale, so `text-sm` or `text-xl` do not exist, and src/lib/type-scale.test.ts
+    // fails the build if a size is written any other way (`text-[17px]`, an inline font-size off the scale).
+    fontSize: {
+      // The app: five sizes, one per level of a page. A level down the page, or into a card, is one step smaller.
+      title: '20px',   // the page title: once, top-left; nothing on the page is larger
+      heading: '16px', // a section's heading, a dialog's title, the figure that answers the page
+      subhead: '14px', // the title of an item inside a section: a card, a row, a folded row, a navigation item
+      body: '13px',    // everything you read or operate: text, buttons, fields, table cells
+      caption: '12px', // notes: captions, hints, column headers, badges, chart text
+      // Public pages only (landing, sign-in, legal): headlines above the app's five, and a larger reading size.
+      display: '64px', // the landing headline on a desktop
+      h1: '40px',      // a section's headline on a desktop; the landing headline on a phone
+      h2: '28px',      // a sub-headline on a desktop; a section's headline on a phone; a figure
+      h3: '20px',      // a card's title
+      lead: '18px',    // the paragraph under a headline
+      copy: '16px',    // reading text
+      small: '14px',   // secondary text, links, buttons
+      fine: '13px',    // fine print
+    },
     extend: {
       colors: {
         // Text. A neutral near-black: titles and figures. Body and secondary text step down through warm-700 … warm-400.

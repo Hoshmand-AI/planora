@@ -50,15 +50,15 @@ export default function HistoryPage() {
     setSaving(null)
   }
 
-  if (!data) return <div className="px-6 py-10 text-[14px] text-warm-600 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Loading firm data…</>}</div>
+  if (!data) return <div className="px-6 py-10 text-body text-warm-600 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Loading firm data…</>}</div>
   const bt = data.backtest
 
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 md:py-8 space-y-5">
-      {error ? <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-[13px] text-status-at-risk">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-md border border-status-at-risk bg-status-at-risk-bg px-3 py-2 text-body text-status-at-risk">{error}</p> : null}
       <div>
         <h1 className="page-title">Firm insights</h1>
-        <p className="text-[13px] text-warm-600 mt-1 max-w-3xl" title={data.privacy}><Lock size={13} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Learned only from {data.organization?.name}&apos;s own schedules. Nothing is shared with other firms.</p>
+        <p className="text-body text-warm-600 mt-1 max-w-3xl" title={data.privacy}><Lock size={13} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Learned only from {data.organization?.name}&apos;s own schedules. Nothing is shared with other firms.</p>
       </div>
 
       {data.schedules.length === 0 ? (
@@ -66,31 +66,53 @@ export default function HistoryPage() {
           Upload finished P6, MS Project or Excel schedules with actual dates. RunF9 learns your firm&apos;s real durations and sequencing from them and uses them on new projects.
         </EmptyState>
       ) : (<>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card label="Schedules" value={String(data.schedules.length)} sub="uploaded by your firm" />
-        <Card label="Work categories learned" value={String(data.categories.length)} sub="with actual durations" />
-        <Card label="Typical overrun" value={data.overallOverrunMedian ? `×${data.overallOverrunMedian.toFixed(2)}` : '—'} sub={data.overallOverrunP80 ? `P80 ×${data.overallOverrunP80.toFixed(2)} (actual ÷ planned)` : 'needs baselines + actuals'} />
-        <Card label="Backtest error" value={bt.mape !== null ? `${bt.mape}%` : '—'} sub={bt.biasPct !== null ? `bias ${bt.biasPct > 0 ? '+' : ''}${bt.biasPct}% · ${bt.projects.length} projects` : 'needs tagged, completed projects'} />
-      </div>
+      {/* A figure is shown once there is one: a tile holding a dash or a zero says nothing, so what is still missing is one sentence. */}
+      {(() => {
+        const n = data.schedules.length
+        const cards = [
+          { label: 'Schedules', value: String(n), sub: 'uploaded by your firm', has: true, need: '' },
+          { label: 'Work categories learned', value: String(data.categories.length), sub: 'with actual durations', has: data.categories.length > 0, need: 'durations by kind of work (from schedules with actual dates)' },
+          { label: 'Typical overrun', value: data.overallOverrunMedian ? `×${data.overallOverrunMedian.toFixed(2)}` : '—', sub: data.overallOverrunP80 ? `P80 ×${data.overallOverrunP80.toFixed(2)} (actual ÷ planned)` : '', has: !!data.overallOverrunMedian, need: 'typical overrun (from schedules with a baseline and actual dates)' },
+          { label: 'Backtest error', value: bt.mape !== null ? `${bt.mape}%` : '—', sub: bt.biasPct !== null ? `bias ${bt.biasPct > 0 ? '+' : ''}${bt.biasPct}% · ${bt.projects.length} projects` : '', has: bt.mape !== null, need: 'backtest error (from tagged, completed projects)' },
+        ]
+        const missing = cards.filter(c => !c.has).map(c => c.need)
+        const learned = cards.slice(1).some(c => c.has)
+        return (
+          <>
+            {learned && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {cards.filter(c => c.has).map(c => <Card key={c.label} label={c.label} value={c.value} sub={c.sub} />)}
+              </div>
+            )}
+            {missing.length > 0 && (
+              <p className="text-body text-warm-700 max-w-3xl">
+                {learned
+                  ? <>Not learned yet: {missing.join('; ')}.</>
+                  : <>{n} schedule{n === 1 ? '' : 's'} uploaded, and nothing learned from {n === 1 ? 'it' : 'them'} yet. Each section below says what it needs.</>}
+              </p>
+            )}
+          </>
+        )
+      })()}
 
       <section aria-labelledby="past-h" className="bg-white border border-warm-200 rounded-[14px] p-5">
-        <h2 id="past-h" className="text-[16px] font-semibold text-ink">Your schedules</h2>
-        <p className="text-[13px] text-warm-600 mt-0.5 mb-3">Tag each with its facility type, state and area, so like is compared with like.</p>
+        <h2 id="past-h" className="text-heading font-semibold text-ink">Your schedules</h2>
+        <p className="text-body text-warm-600 mt-0.5 mb-3">Tag each with its facility type, state and area, so like is compared with like.</p>
           <div tabIndex={0} role="region" aria-label="Past schedules" className="overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[640px]">
-              <thead><tr className="text-left text-[12px] font-medium text-warm-600"><th className="py-1.5">Schedule</th><th className="py-1.5">Facility type</th><th className="py-1.5">State</th><th className="py-1.5">Gross sf</th><th className="py-1.5 text-right">Activities</th></tr></thead>
+            <table className="w-full text-body [&_th]:text-caption min-w-[640px]">
+              <thead><tr className="text-left text-caption font-medium text-warm-600"><th className="py-1.5">Schedule</th><th className="py-1.5">Facility type</th><th className="py-1.5">State</th><th className="py-1.5">Gross sf</th><th className="py-1.5 text-right">Activities</th></tr></thead>
               <tbody>
                 {data.schedules.map(s => (
                   <tr key={s.id} className="border-t border-warm-200">
                     <td className="py-2 pr-2 text-ink">{s.name} <span className="text-warm-600">{s.version}</span>{saving === s.id && <Loader2 size={11} className="inline ml-1 animate-spin" />}
-                      <span className="block text-[12px] text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
+                      <span className="block text-caption text-warm-600">{s.usedInHistory ? 'Used in firm history' : s.historyNote ?? 'Not used in firm history'}</span></td>
                     <td className="py-2 pr-2">
-                      <select disabled={!canTag} aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-[12px]">
+                      <select disabled={!canTag} aria-label={`Facility type for ${s.name}`} value={s.projectType || ''} onChange={e => tag(s.id, { projectType: e.target.value || null })} className="bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-caption">
                         <option value="">—</option>{PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                       </select>
                     </td>
-                    <td className="py-2 pr-2"><input disabled={!canTag} aria-label={`State for ${s.name}`} defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-[12px] uppercase" /></td>
-                    <td className="py-2 pr-2"><input type="number" disabled={!canTag} aria-label={`Gross square feet for ${s.name}`} defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-[12px]" /></td>
+                    <td className="py-2 pr-2"><input disabled={!canTag} aria-label={`State for ${s.name}`} defaultValue={s.region || ''} maxLength={2} onBlur={e => e.target.value !== (s.region || '') && tag(s.id, { region: e.target.value })} className="w-12 bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-caption uppercase" /></td>
+                    <td className="py-2 pr-2"><input type="number" disabled={!canTag} aria-label={`Gross square feet for ${s.name}`} defaultValue={s.grossSqft ?? ''} onBlur={e => Number(e.target.value) !== (s.grossSqft ?? 0) && tag(s.id, { grossSqft: Number(e.target.value) || null })} className="w-28 bg-warm-50 border border-warm-300 rounded-lg px-1.5 py-1 text-caption" /></td>
                     <td className="py-2 text-right tabular-nums text-warm-600">{s.activityCount.toLocaleString()}</td>
                   </tr>
                 ))}
@@ -104,9 +126,9 @@ export default function HistoryPage() {
       {data.sequencing && <SequencingCard seq={data.sequencing} />}
 
         <Disclosure tone="card" title="What your projects actually took" meta={data.categories.length ? `${data.categories.length} kinds of work` : 'no actual dates yet'}>
-          {data.categories.length === 0 ? <p className="text-[13px] text-warm-600">No activities with actual start and finish dates yet.</p> : (
-            <table className="w-full text-[12px]">
-              <thead><tr className="text-left text-[12px] font-medium text-warm-600"><th className="py-1">Work</th><th className="py-1 text-right">Projects</th><th className="py-1 text-right">P20 / median / P80 days</th><th className="py-1 text-right">Overrun</th></tr></thead>
+          {data.categories.length === 0 ? <p className="text-body text-warm-600">No activities with actual start and finish dates yet.</p> : (
+            <table className="w-full text-body [&_th]:text-caption">
+              <thead><tr className="text-left text-caption font-medium text-warm-600"><th className="py-1">Work</th><th className="py-1 text-right">Projects</th><th className="py-1 text-right">P20 / median / P80 days</th><th className="py-1 text-right">Overrun</th></tr></thead>
               <tbody>
                 {data.categories.map(c => (
                   <tr key={c.category} className="border-t border-warm-200">
@@ -119,14 +141,14 @@ export default function HistoryPage() {
               </tbody>
             </table>
           )}
-          <p className="text-[12px] text-warm-600 mt-2">Durations normalized to 100,000 sf where area is tagged. Overrun = actual ÷ planned (baseline).</p>
+          <p className="text-caption text-warm-600 mt-2">Durations normalized to 100,000 sf where area is tagged. Overrun = actual ÷ planned (baseline).</p>
         </Disclosure>
 
         <Disclosure tone="card" title="Backtest: would RunF9 have predicted your real projects?" meta={bt.mape !== null ? `${bt.mape}% error` : 'needs completed projects'}>
-          <p className="text-[12px] text-warm-600 mb-2">For each completed project, RunF9 rebuilds the construction schedule from its facility type and size using only your <em>other</em> projects (leave-one-out), then compares to what actually happened.</p>
-          {bt.projects.length === 0 ? <p className="text-[13px] text-warm-600">Not enough tagged, completed projects yet.</p> : (
-            <table className="w-full text-[12px]">
-              <thead><tr className="text-left text-[12px] font-medium text-warm-600"><th className="py-1">Project</th><th className="py-1 text-right">Actual</th><th className="py-1 text-right">Predicted</th><th className="py-1 text-right">Error</th></tr></thead>
+          <p className="text-caption text-warm-600 mb-2">For each completed project, RunF9 rebuilds the construction schedule from its facility type and size using only your <em>other</em> projects (leave-one-out), then compares to what actually happened.</p>
+          {bt.projects.length === 0 ? <p className="text-body text-warm-600">Not enough tagged, completed projects yet.</p> : (
+            <table className="w-full text-body [&_th]:text-caption">
+              <thead><tr className="text-left text-caption font-medium text-warm-600"><th className="py-1">Project</th><th className="py-1 text-right">Actual</th><th className="py-1 text-right">Predicted</th><th className="py-1 text-right">Error</th></tr></thead>
               <tbody>
                 {bt.projects.map(p => (
                   <tr key={p.scheduleId} className="border-t border-warm-200">
@@ -139,7 +161,7 @@ export default function HistoryPage() {
               </tbody>
             </table>
           )}
-          {bt.skipped.length > 0 && <div className="mt-2 space-y-0.5">{bt.skipped.slice(0, 6).map((s, i) => <p key={i} className="text-[12px] text-warm-600">Skipped {s.name}: {s.reason}</p>)}</div>}
+          {bt.skipped.length > 0 && <div className="mt-2 space-y-0.5">{bt.skipped.slice(0, 6).map((s, i) => <p key={i} className="text-caption text-warm-600">Skipped {s.name}: {s.reason}</p>)}</div>}
         </Disclosure>
       </div>
       </>)}
@@ -150,9 +172,9 @@ export default function HistoryPage() {
 function Card({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-white border border-warm-200 rounded-[14px] p-4">
-      <div className="text-[12px] text-warm-600">{label}</div>
-      <div className="text-[20px] font-semibold text-ink tabular-nums mt-1">{value}</div>
-      <div className="text-[12px] text-warm-600 mt-0.5">{sub}</div>
+      <div className="text-heading font-semibold text-ink tabular-nums">{value}</div>
+      <div className="text-caption text-warm-700">{label}</div>
+      <div className="text-caption text-warm-600">{sub}</div>
     </div>
   )
 }
@@ -162,19 +184,19 @@ function SequencingCard({ seq }: { seq: FirmSequencing }) {
   const own = seq.patterns.filter(p => !p.usual || p.type !== 'FS' || p.lag)
   return (
     <Disclosure tone="card" title="How your firm sequences work" meta={seq.patterns.length ? `${seq.patterns.length} ties` : seq.projectCount < 2 ? 'needs two past projects' : 'no repeated ties yet'}>
-      <p className="text-[12px] text-warm-600 mb-3 max-w-3xl">Learned from the logic of {seq.projectCount} past project{seq.projectCount === 1 ? '' : 's'}: which kinds of work your schedules tie together, and how. Logic suggestions on new schedules favour these ties and use your link type and lag.{seq.overlapShare != null ? ` ${Math.round(seq.overlapShare * 100)}% of your ties between trades overlap the work (start-to-start or finish-to-finish).` : ''}</p>
-      {seq.patterns.length === 0 ? <p className="text-[13px] text-warm-600">{seq.projectCount < 2 ? 'Needs at least two past projects with logic to learn from.' : 'No tie appears in at least two of your projects yet.'}</p> : (
+      <p className="text-caption text-warm-600 mb-3 max-w-3xl">Learned from the logic of {seq.projectCount} past project{seq.projectCount === 1 ? '' : 's'}: which kinds of work your schedules tie together, and how. Logic suggestions on new schedules favour these ties and use your link type and lag.{seq.overlapShare != null ? ` ${Math.round(seq.overlapShare * 100)}% of your ties between trades overlap the work (start-to-start or finish-to-finish).` : ''}</p>
+      {seq.patterns.length === 0 ? <p className="text-body text-warm-600">{seq.projectCount < 2 ? 'Needs at least two past projects with logic to learn from.' : 'No tie appears in at least two of your projects yet.'}</p> : (
         <>
-          {own.length > 0 && <p className="text-[12px] text-ink mb-2"><span className="font-semibold">Your own habits</span> (differ from the general trade order): {own.slice(0, 4).map(p => `${p.fromLabel} → ${p.toLabel} ${linkText(p.type, p.lag)}`).join('; ')}.</p>}
+          {own.length > 0 && <p className="text-caption text-ink mb-2"><span className="font-semibold">Your own habits</span> (differ from the general trade order): {own.slice(0, 4).map(p => `${p.fromLabel} → ${p.toLabel} ${linkText(p.type, p.lag)}`).join('; ')}.</p>}
           <div tabIndex={0} role="region" aria-label="Sequencing patterns" className="overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[520px]">
-              <thead><tr className="text-left text-[12px] font-medium text-warm-600"><th className="py-1">From</th><th className="py-1">To</th><th className="py-1">Usually</th><th className="py-1 text-right">Projects</th></tr></thead>
+            <table className="w-full text-body [&_th]:text-caption min-w-[520px]">
+              <thead><tr className="text-left text-caption font-medium text-warm-600"><th className="py-1">From</th><th className="py-1">To</th><th className="py-1">Usually</th><th className="py-1 text-right">Projects</th></tr></thead>
               <tbody>
                 {seq.patterns.slice(0, 25).map(p => (
                   <tr key={`${p.from}>${p.to}`} className="border-t border-warm-200">
                     <td className="py-1.5 text-ink">{cap(p.fromLabel)}</td>
                     <td className="py-1.5 text-ink">{cap(p.toLabel)}</td>
-                    <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-[12px] text-warm-600">· your habit</span>}</td>
+                    <td className="py-1.5 tabular-nums">{linkText(p.type, p.lag)}{p.typeProjects < p.projects && <span className="text-warm-600"> ({p.typeProjects} of {p.projects})</span>}{!p.usual && <span className="ml-1.5 text-caption text-warm-600">· your habit</span>}</td>
                     <td className="py-1.5 text-right tabular-nums">{p.projects} of {p.of}</td>
                   </tr>
                 ))}

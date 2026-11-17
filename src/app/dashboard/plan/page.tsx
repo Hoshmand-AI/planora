@@ -53,63 +53,63 @@ export default function PlansPage() {
     <div className="px-4 md:px-6 py-6 md:py-10">
       <div className="mb-6">
         <h1 className="page-title">New project</h1>
-        <p className="text-[14px] text-warm-600 mt-2 max-w-2xl leading-relaxed">Build a schedule with a guided interview, or bring one you already have.</p>
+        <p className="text-body text-warm-600 mt-2 max-w-2xl leading-relaxed">Build a schedule with a guided interview, or bring one you already have.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4 mb-8">
         <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-16px_rgba(29,33,37,0.18)]">
-          <h2 id="build-h" className="text-[16px] font-semibold text-ink flex items-center gap-2"><Sparkles size={16} aria-hidden className="text-accent-600" /> Build with an interview</h2>
-          <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">
+          <h2 id="build-h" className="text-heading font-semibold text-ink flex items-center gap-2"><Sparkles size={16} aria-hidden className="text-accent-600" /> Build with an interview</h2>
+          <p className="text-body text-warm-600 mt-1.5 leading-relaxed">
             Answer questions about drawings, permits, long-lead equipment and the site. RunF9 builds the schedule and shows the reason for every duration and link.
           </p>
-          {!canBuild ? <p className="mt-4 text-[13px] text-warm-600">Your role can&apos;t build schedules. Ask an admin for access.</p> : (
+          {!canBuild ? <p className="mt-4 text-body text-warm-600">Your role can&apos;t build schedules. Ask an admin for access.</p> : (
           <form onSubmit={create} className="mt-4 flex flex-col sm:flex-row gap-2">
             <input
               value={name} onChange={e => setName(e.target.value)} required maxLength={120} aria-label="Project name"
               placeholder="Project name, e.g. Riverside Medical Office Building"
-              className="flex-1 min-w-0 bg-warm-50 border border-warm-200 rounded-xl px-3.5 py-2.5 text-[14px] text-warm-700 placeholder:text-warm-400"
+              className="flex-1 min-w-0 bg-warm-50 border border-warm-200 rounded-xl px-3.5 py-2.5 text-body text-warm-700 placeholder:text-warm-400"
             />
-            <WorkspaceSelect labelClassName="sr-only" className="bg-warm-50 border border-warm-200 rounded-xl px-2 py-2.5 text-[14px] text-warm-700" />
-            <button disabled={creating} className="pressable flex items-center justify-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-lg text-[14px] font-semibold transition-colors">
+            <WorkspaceSelect labelClassName="sr-only" className="bg-warm-50 border border-warm-200 rounded-xl px-2 py-2.5 text-body text-warm-700" />
+            <button disabled={creating} className="pressable flex items-center justify-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white px-5 py-2.5 rounded-lg text-body font-semibold transition-colors">
               {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Plus size={14} aria-hidden />} Start interview
             </button>
           </form>
           )}
         </section>
         <section aria-labelledby="upload-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 flex flex-col">
-          <h2 id="upload-h" className="text-[16px] font-semibold text-ink flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
-          <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF.</p>
+          <h2 id="upload-h" className="text-heading font-semibold text-ink flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
+          <p className="text-body text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF.</p>
           {can('schedule.write') ? (
-            <button type="button" onClick={openUpload} className="pressable mt-4 lg:mt-auto self-start inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 px-4 py-2 text-[13px] font-semibold">
+            <button type="button" onClick={openUpload} className="pressable mt-4 lg:mt-auto self-start inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 px-4 py-2 text-body font-semibold">
               <Upload size={14} aria-hidden /> Choose a file
             </button>
           ) : (
-            <p className="mt-4 text-[13px] text-warm-500">Your role can&apos;t upload schedules. Ask an admin for access.</p>
+            <p className="mt-4 text-body text-warm-500">Your role can&apos;t upload schedules. Ask an admin for access.</p>
           )}
         </section>
       </div>
-      {error && <div role="alert" className="border-l-2 border-status-at-risk bg-status-at-risk-bg text-status-at-risk text-[13px] px-3 py-2 rounded-md mb-4">{error}</div>}
+      {error && <div role="alert" className="border-l-2 border-status-at-risk bg-status-at-risk-bg text-status-at-risk text-body px-3 py-2 rounded-md mb-4">{error}</div>}
 
       {plans === null ? listFailed ? null : (
-        <div className="text-warm-500 text-[14px] flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</div>
+        <div className="text-warm-500 text-body flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden /> Loading…</div>
       ) : plans.length === 0 ? (
         <div className="mood-tile rounded-[14px] border px-6 py-10 text-center" data-mood="idle">
           <Robot mood="idle" size={80} className="mx-auto mb-3" />
-          <p className="text-[16px] font-semibold text-ink">No plans yet</p>
+          <p className="text-subhead font-semibold text-ink">No plans yet</p>
           {canBuild ? <>
-          <p className="text-[14px] text-warm-600 mt-1">Name your project above to start the interview, or upload a schedule.</p>
-          <p className="text-[14px] text-warm-600 mt-4 max-w-md mx-auto">New to RunF9? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
-          <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 px-4 py-2 text-[13px] font-medium">
+          <p className="text-body text-warm-600 mt-1">Name your project above to start the interview, or upload a schedule.</p>
+          <p className="text-body text-warm-600 mt-4 max-w-md mx-auto">New to RunF9? Open a finished sample project to see the interview, quality checks, risk analysis and recovery options first.</p>
+          <button onClick={trySample} disabled={creating} className="pressable mt-4 inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 px-4 py-2 text-body font-medium">
             {creating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />} Open a sample project
           </button>
-          </> : <p className="text-[14px] text-warm-600 mt-1">Plans built by your team will show here.</p>}
+          </> : <p className="text-body text-warm-600 mt-1">Plans built by your team will show here.</p>}
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-[13px] font-medium text-warm-500">Your plans</h2>
+            <h2 className="text-heading font-semibold text-ink">Your plans</h2>
             {canBuild && (
-            <button onClick={trySample} disabled={creating} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-600 hover:underline disabled:opacity-50">
+            <button onClick={trySample} disabled={creating} className="inline-flex items-center gap-1.5 text-body font-medium text-accent-600 hover:underline disabled:opacity-50">
               <Sparkles size={13} aria-hidden /> Open a sample project
             </button>
             )}
@@ -119,18 +119,18 @@ export default function PlansPage() {
               <Link key={p.id} href={`/dashboard/plan/${p.id}`} className="group card-lift block bg-white/70 border border-warm-200 rounded-2xl p-5 hover:bg-white hover:border-warm-300">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[16px] font-semibold text-ink truncate">{p.name}</div>
-                    <div className="text-[12px] text-warm-500 mt-0.5">Updated {fmtDay(p.updatedAt)}</div>
+                    <div className="text-subhead font-semibold text-ink truncate">{p.name}</div>
+                    <div className="text-caption text-warm-500 mt-0.5">Updated {fmtDay(p.updatedAt)}</div>
                   </div>
                   <ArrowRight size={15} aria-hidden className="text-warm-400 flex-shrink-0 mt-1 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </div>
                 <div className="mt-4">
-                  <div className="flex justify-between text-[12px] text-warm-500 mb-1.5">
+                  <div className="flex justify-between text-caption text-warm-500 mb-1.5">
                     <span>Interview questions answered</span><span className="tabular-nums font-medium text-ink">{p.readiness}%</span>
                   </div>
                   <div className="h-1.5 bg-warm-200 rounded-full overflow-hidden"><div className="h-full rounded-full bg-accent-500" style={{ width: `${p.readiness}%` }} /></div>
                 </div>
-                <div className="mt-3 text-[13px] text-warm-600">
+                <div className="mt-3 text-body text-warm-600">
                   {p.generated ? <>{p.activityCount} activities · finish <span className="font-medium text-ink tabular-nums">{fmtDate(p.finish)}</span>{p.scheduleId ? ' · published' : ''}</> : 'Not generated yet'}
                 </div>
               </Link>

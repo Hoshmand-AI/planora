@@ -100,7 +100,7 @@ const TAB_ICON: Record<string, typeof LayoutGrid> = {
 }
 /** One row of the sidebar: an icon and a name; the current one is tinted with a bar on its left edge. */
 const sideItem = (active: boolean, open: boolean) =>
-  `relative flex items-center gap-3 py-2 rounded-lg text-[14px] transition-colors ${open ? 'px-3' : 'justify-center px-0'} ${active ? "bg-accent-100 text-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent-600 before:content-['']" : 'text-warm-700 font-medium hover:bg-warm-100 hover:text-ink'}`
+  `relative flex items-center gap-3 py-2 rounded-lg text-subhead transition-colors ${open ? 'px-3' : 'justify-center px-0'} ${active ? "bg-accent-100 text-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent-600 before:content-['']" : 'text-warm-700 font-medium hover:bg-warm-100 hover:text-ink'}`
 /** The name of the page a path shows, for the top bar. */
 const pageLabel = (pathname: string) => {
   for (const t of PROJECT_TABS) {
@@ -452,12 +452,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-warm-50 flex items-center justify-center px-6">
         {authError ? (
           <div role="alert" className="max-w-sm text-center">
-            <p className="text-[14px] text-ink font-semibold">RunF9 could not load.</p>
-            <p className="text-[14px] text-warm-600 mt-1">Check your connection and try again.</p>
-            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-lg text-[13px] font-semibold hover:bg-accent-700">Try again</button>
+            <p className="text-heading text-ink font-semibold">RunF9 could not load.</p>
+            <p className="text-body text-warm-600 mt-1">Check your connection and try again.</p>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 bg-accent-600 text-white px-5 py-2 rounded-lg text-body font-semibold hover:bg-accent-700">Try again</button>
           </div>
         ) : (
-          <div className="text-warm-600 text-[14px]">Loading…</div>
+          <div className="text-warm-600 text-body">Loading…</div>
         )}
       </div>
     )
@@ -494,7 +494,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-white text-ink border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
           <div className={`flex items-center pb-6 flex-shrink-0 ${sidebarOpen ? 'justify-between pl-2.5' : 'flex-col gap-3'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects">
-              <Logo variant="dark" size="text-[20px]" mark={!sidebarOpen} />
+              <Logo variant="dark" size="h-[30px]" mark={!sidebarOpen} />
             </Link>
             <button type="button" onClick={toggleSidebar} aria-expanded={sidebarOpen} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
               className="grid place-items-center w-9 h-9 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-ink transition-colors">
@@ -518,7 +518,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         return (
                           <li key={s.id}>
                             <Link href={`/dashboard/project?schedule=${s.id}`} onClick={() => setSelectedSchedule(s)} aria-current={here ? 'page' : undefined}
-                              className={`block truncate py-1.5 text-[13px] transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 hover:text-ink'}`}>{s.name}</Link>
+                              className={`block truncate py-1.5 text-body transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 hover:text-ink'}`}>{s.name}</Link>
                           </li>
                         )
                       })}
@@ -531,7 +531,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* The open project's pages are a list in the sidebar, like the rest of the app's destinations (they were tabs across the top). */}
           {inProject && selectedSchedule && (
             <div className="mt-3 pt-3 border-t border-warm-200 min-h-0 overflow-y-auto">
-              {sidebarOpen && <p className="px-3 pb-1.5 text-[12px] font-semibold text-warm-600 truncate" title={selectedSchedule.name}>{selectedSchedule.name}</p>}
+              {sidebarOpen && <p className="px-3 pb-1.5 text-caption font-semibold text-warm-600 truncate" title={selectedSchedule.name}>{selectedSchedule.name}</p>}
               <nav aria-label="Project" className="flex flex-col gap-0.5">
                 {PROJECT_TABS.map(t => {
                   const here = tabPaths(t).some(h => pathname.startsWith(h))
@@ -543,14 +543,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <Icon size={sidebarOpen ? 17 : 19} aria-hidden="true" className="flex-shrink-0" /><span className={sidebarOpen ? undefined : 'sr-only'}>{t.label}</span>
                         </Link>
                         {/* How many things need action today: beside the link, not inside it, so it is still named "Overview". */}
-                        {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className={`pointer-events-none absolute min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-semibold leading-[18px] text-white ${sidebarOpen ? 'right-2.5 top-1/2 -translate-y-1/2' : 'right-1 top-0.5'}`}>{todayCount}</span>}
+                        {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className={`pointer-events-none absolute min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-caption font-semibold leading-[18px] text-white ${sidebarOpen ? 'right-2.5 top-1/2 -translate-y-1/2' : 'right-1 top-0.5'}`}>{todayCount}</span>}
                       </div>
                       {here && t.views && sidebarOpen && (
                         <nav aria-label={`${t.label} views`} className="ml-[38px] mb-1 flex flex-col border-l border-warm-200">
                           {t.views.map(v => {
                             const on = pathname.startsWith(v.href)
                             return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'true' : undefined}
-                              className={`-ml-px border-l-2 pl-3 py-1.5 text-[13px] transition-colors ${on ? 'border-accent-600 text-ink font-semibold' : 'border-transparent text-warm-600 hover:text-ink'}`}>{v.label}</Link>
+                              className={`-ml-px border-l-2 pl-3 py-1.5 text-body transition-colors ${on ? 'border-accent-600 text-ink font-semibold' : 'border-transparent text-warm-600 hover:text-ink'}`}>{v.label}</Link>
                           })}
                         </nav>
                       )}
@@ -573,7 +573,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="mt-auto pt-4 border-t border-warm-200 flex flex-col gap-2">
             {llm && (
               <span title={llm.error || (llm.model ? `${modelLine(llm)} @ ${llm.host}` : 'Deterministic analysis only: scheduling, CPM, quality checks and reports still work')}
-                className={`flex items-center gap-2 text-[12px] font-medium text-warm-600 ${sidebarOpen ? 'px-3' : 'justify-center [&>span:last-child]:sr-only'}`}>
+                className={`flex items-center gap-2 text-caption font-medium text-warm-600 ${sidebarOpen ? 'px-3' : 'justify-center [&>span:last-child]:sr-only'}`}>
                 {llm.airgapped ? <Lock size={11} aria-hidden="true" /> : <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${llm.mode === 'offline' ? 'bg-warm-300' : 'bg-accent-400'}`} />}
                 <span>{aiLabel(llm)}{llm.airgapped ? ' · air-gapped' : ''}</span>
               </span>
@@ -582,10 +582,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button type="button" onClick={() => setShowSettings(true)}
               className={`flex items-center gap-3 py-2 rounded-lg text-left hover:bg-warm-100 transition-colors ${sidebarOpen ? 'px-2.5' : 'justify-center px-0'}`}>
               <span className="sr-only">Account menu: </span>
-              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-950 text-white flex items-center justify-center text-[13px] font-semibold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span aria-hidden="true" className="w-8 h-8 rounded-full bg-navy-950 text-white flex items-center justify-center text-body font-semibold flex-shrink-0">{user.name?.[0]?.toUpperCase() || 'U'}</span>
               <span className={sidebarOpen ? 'min-w-0' : 'sr-only'}>
-                <span className="block text-[13px] font-semibold truncate">{user.name}</span>
-                {org && <span className="block text-[12px] text-warm-600 truncate">{org.name}</span>}
+                <span className="block text-body font-semibold truncate">{user.name}</span>
+                {org && <span className="block text-caption text-warm-600 truncate">{org.name}</span>}
               </span>
             </button>
           </div>
@@ -595,13 +595,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ── Top bar (phones) ─────────────────────────────── */}
           {/* Inside a project the project's own header is the app bar, so the page starts one bar higher: the name is the headline and the account is in its menu. */}
           <header className={`md:hidden glass-bar sticky top-0 z-40 h-14 items-center justify-between px-4 border-b border-white/5 ${inProject && selectedSchedule ? 'hidden' : 'flex'}`}>
-            <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="text-[20px]" /></Link>
+            <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="h-[30px]" /></Link>
             <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
-              className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-[12px] font-semibold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
+              className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-caption font-semibold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
           </header>
 
           {/* ── Top bar (desktop): a thin navy bar that says where you are ── */}
-          <div className="hidden md:flex sticky top-0 z-30 h-12 flex-shrink-0 items-center gap-4 bg-navy-950 px-5 lg:px-8 text-[13px] text-navy-200">
+          <div className="hidden md:flex sticky top-0 z-30 h-12 flex-shrink-0 items-center gap-4 bg-navy-950 px-5 lg:px-8 text-body text-navy-200">
             <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2">
               <Link href="/dashboard" aria-label="All projects" className="flex-shrink-0 rounded p-1 hover:text-white"><Home size={15} aria-hidden="true" /></Link>
               <span aria-hidden="true">/</span>
@@ -632,16 +632,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {selectedSchedule ? (
                   <div className="flex items-center md:items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-warm-600 max-md:hidden">{selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}</p>
-                      {/* On a phone the name keeps to one line, so the page under it starts sooner. */}
-                      <div className="flex items-center gap-x-3 gap-y-1.5 md:mt-1 md:flex-wrap">
+                      {/* The name is the page's title: the first and largest text. What the upload is sits under it, as a note. */}
+                      <div className="flex items-center gap-x-3 gap-y-1.5 md:flex-wrap">
                         <Link href="/dashboard" aria-label="All projects" className="md:hidden flex-shrink-0 -ml-2 inline-flex items-center justify-center w-9 h-11 text-ink"><ChevronDown size={20} className="rotate-90" aria-hidden="true" /></Link>
-                        <h1 className="page-title min-w-0 max-md:text-[16px] max-md:leading-[1.2] max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
+                        <h1 className="page-title min-w-0 max-md:line-clamp-2" title={selectedSchedule.name}>{selectedSchedule.name}</h1>
                         {(() => {
                           const st = STATUS_PILL[selectedSchedule.analysis?.status ?? '']
-                          return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
+                          return st ? <span className={`flex-shrink-0 inline-flex items-center gap-1.5 text-caption font-semibold px-2.5 py-1 rounded-full ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} aria-hidden="true" />{st.label}</span> : null
                         })()}
                       </div>
+                      <p className="mt-1 text-body text-warm-600 max-md:hidden">{selectedSchedule.version} · {sourceLabel(selectedSchedule.sourceType)} · {selectedSchedule.activityCount.toLocaleString()} activities{selectedSchedule.dataDate ? <> · data date <span className="tabular-nums">{fmtDate(selectedSchedule.dataDate)}</span></> : null}</p>
                     </div>
                     {/* On a phone the breadcrumb is dropped to save height: switching project, uploading and deleting are in this menu. */}
                     {(() => {
@@ -674,7 +674,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     })()}
                   </div>
                 ) : (
-                  <p role={linkMissing ? 'alert' : undefined} className="text-[14px] text-warm-600 pb-2">{linkMissing && <span className="text-ink font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
+                  <p role={linkMissing ? 'alert' : undefined} className="text-body text-warm-600 pb-2">{linkMissing && <span className="text-ink font-medium">This project was not found. It may have been deleted, or you may not have access to it. </span>}<Link href="/dashboard" className="text-accent-600 font-medium hover:underline">Choose a project</Link> to see this page.</p>
                 )}
                 {/* Tabs scroll sideways on narrow screens: the right edge fades to show there are more, and the current tab is scrolled into view */}
                 {/* A chevron at the right edge on narrow screens says the strip scrolls; a fade alone was too faint to read as "more". */}
@@ -686,12 +686,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     return (
                       <Fragment key={t.href}>
                       <Link href={selectedSchedule ? `${t.href}?schedule=${selectedSchedule.id}` : t.href} aria-current={here ? 'page' : undefined}
-                        className={`relative whitespace-nowrap px-3 py-3 text-[14px] transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 font-medium hover:text-ink'}`}>
+                        className={`relative whitespace-nowrap px-3 py-3 text-subhead transition-colors ${here ? 'text-ink font-semibold' : 'text-warm-600 font-medium hover:text-ink'}`}>
                         {t.label}
                         <span aria-hidden="true" className={`absolute left-3 right-3 -bottom-px h-[2px] rounded-full bg-accent-600 origin-left transition-transform duration-300 ${here ? 'scale-x-100' : 'scale-x-0'}`} />
                       </Link>
                       {/* How many things need action today: beside the tab, not inside it, so the tab is still named "Overview". */}
-                      {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-[12px] font-semibold leading-[18px] text-white">{todayCount}</span>}
+                      {t.href === '/dashboard/project' && todayCount > 0 && <span aria-hidden="true" className="self-center -ml-2 mr-1 inline-block min-w-[18px] rounded-full bg-status-at-risk px-1 text-center text-caption font-semibold leading-[18px] text-white">{todayCount}</span>}
                       </Fragment>
                     )
                   })}
@@ -708,7 +708,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {t.views.map(v => {
                           const on = pathname.startsWith(v.href)
                           return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
-                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-ink shadow-[0_1px_2px_rgb(29_33_37/0.12)]' : 'text-warm-700 hover:text-ink'}`}>{v.label}</Link>
+                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-body font-semibold ${on ? 'bg-white text-ink shadow-[0_1px_2px_rgb(29_33_37/0.12)]' : 'text-warm-700 hover:text-ink'}`}>{v.label}</Link>
                         })}
                       </nav>
                     </div>
@@ -722,7 +722,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* pb-20 on phones = space for the bottom bar */}
           <main id="main" tabIndex={-1} className={`app-canvas flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none ${fillScreen ? 'flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
             {emailUnconfirmed && pathname !== '/dashboard/account' && (
-              <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-[13px] text-warm-700">
+              <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-body text-warm-700">
                 <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
                   <MailCheck size={14} aria-hidden="true" className="text-accent-600 flex-shrink-0" />
                   <span>Please confirm your email. We sent you a link.</span>
@@ -731,12 +731,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </button>
                   <button type="button" aria-expanded={emailWhy} aria-controls="email-why" onClick={() => setEmailWhy(w => !w)} className="text-warm-600 underline decoration-warm-300 underline-offset-2 hover:text-ink">Why?</button>
                   <span role="status" aria-live="polite" className={resend.ok ? 'text-warm-700' : 'text-status-at-risk'}>{resend.note}</span>
-                  <span id="email-why" hidden={!emailWhy} className="basis-full text-[12px] text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
+                  <span id="email-why" hidden={!emailWhy} className="basis-full text-caption text-warm-600">Until then, inviting people, API keys and data export are paused.</span>
                 </div>
               </div>
             )}
             {schedulesError && (
-              <p role="alert" className="bg-status-at-risk-bg border-b border-status-at-risk px-4 md:px-8 py-2 text-[13px] text-status-at-risk">
+              <p role="alert" className="bg-status-at-risk-bg border-b border-status-at-risk px-4 md:px-8 py-2 text-body text-status-at-risk">
                 Your projects could not be loaded. <button type="button" onClick={() => { refreshSchedules() }} className="underline font-medium">Try again</button>
               </p>
             )}
@@ -756,7 +756,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
                   className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 transition-colors ${active ? 'text-white' : 'text-warm-200'}`}>
                   <n.icon size={19} strokeWidth={active ? 2.2 : 1.7} aria-hidden="true" />
-                  <span className={`text-[12px] ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
+                  <span className={`text-caption ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
                 </Link>
               )
             })}
@@ -767,7 +767,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {uploadDialog.mounted && (
           <Dialog closing={uploadDialog.closing} labelledBy="upload-dialog-h" onClose={() => setShowUpload(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <h2 id="upload-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Upload a schedule</h2>
+                <h2 id="upload-dialog-h" className="text-heading font-semibold text-ink">Upload a schedule</h2>
                 <button onClick={() => setShowUpload(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
 
@@ -775,13 +775,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5 -mt-1" />
 
               {uploadError && (
-                <div className="bg-status-at-risk-bg border-l-2 border-status-at-risk text-status-at-risk text-[13px] px-3 py-2 rounded-md mb-4">
+                <div className="bg-status-at-risk-bg border-l-2 border-status-at-risk text-status-at-risk text-body px-3 py-2 rounded-md mb-4">
                   {uploadError}
                 </div>
               )}
               {uploadSummary ? (
                 <div className="space-y-3">
-                  <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 text-[13px] text-warm-600 space-y-1">
+                  <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 text-body text-warm-600 space-y-1">
                     <div><span className="font-semibold text-ink">{uploadSummary.activitiesImported.toLocaleString()}</span> activities, <span className="font-semibold text-ink">{uploadSummary.relationshipsImported.toLocaleString()}</span> relationships, {uploadSummary.calendarsImported} calendars imported.</div>
                     <div>{uploadSummary.classifiedPct}% of activities mapped to standard work categories.</div>
                     {uploadSummary.warnings.slice(0, 4).map((w, i) => <div key={i} className="text-warm-500">· {w}</div>)}
@@ -792,15 +792,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   )}
                   {uploadSummary.dataQuestions > 0 && (
-                    <div className="border-l-2 border-status-attention bg-status-attention-bg text-[13px] text-warm-700 px-3 py-2 rounded-md">
+                    <div className="border-l-2 border-status-attention bg-status-attention-bg text-body text-warm-700 px-3 py-2 rounded-md">
                       RunF9 has {uploadSummary.dataQuestions} question{uploadSummary.dataQuestions > 1 ? 's' : ''} about this file&apos;s data (calendars, dates, progress).
                     </div>
                   )}
                   <div className="flex gap-2">
                     {uploadSummary.dataQuestions > 0 && (
-                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-lg text-[13px] font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
+                      <Link href={selectedSchedule ? `/dashboard/quality?schedule=${selectedSchedule.id}` : '/dashboard/quality'} onClick={() => setShowUpload(false)} className="flex-1 text-center bg-accent-600 text-white py-2.5 rounded-lg text-body font-semibold hover:bg-accent-700 transition-colors pressable shadow-sm">Review data questions</Link>
                     )}
-                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-lg text-[13px] transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-ink font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
+                    <button onClick={() => setShowUpload(false)} className={`flex-1 py-2.5 rounded-lg text-body transition-colors ${uploadSummary.dataQuestions > 0 ? 'border border-warm-300 text-ink font-semibold hover:bg-warm-100' : 'bg-accent-600 text-white font-semibold hover:bg-accent-700 pressable shadow-sm'}`}>Done</button>
                   </div>
                 </div>
               ) : (
@@ -811,51 +811,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="mb-4 empty:hidden"><WorkspaceSelect /></div>
                 <div className="mb-4">
-                  <label className="block text-[12px] font-semibold text-warm-600">Classification
-                    <select name="classification" defaultValue="unclassified" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 font-normal">
+                  <label className="block text-caption font-semibold text-warm-600">Classification
+                    <select name="classification" defaultValue="unclassified" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700 font-normal">
                       <option value="unclassified">Unclassified</option>
                       <option value="cui">CUI</option>
                       <option value="classified">Classified</option>
                     </select>
                   </label>
-                  <p className="text-[12px] text-warm-600 mt-1.5">CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
+                  <p className="text-caption text-warm-600 mt-1.5">CUI schedules are never sent to a cloud AI model and their exports carry CUI markings.</p>
                 </div>
                 {/* What few uploads need is folded: the tags for firm history, whose schedule it is, and a version label. */}
                 <div className="mb-5">
                   <Disclosure title="More options" meta="firm history, version label">
                     <div className="space-y-4">
                       <div>
-                        <div id="upload-tag-h" className="block text-[12px] font-semibold text-warm-600 mb-1.5">Tag for firm history</div>
+                        <div id="upload-tag-h" className="block text-caption font-semibold text-warm-600 mb-1.5">Tag for firm history</div>
                         <div role="group" aria-labelledby="upload-tag-h" className="grid grid-cols-3 gap-2">
-                          <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700">
+                          <select name="projectType" aria-label="Facility type" defaultValue="" className="col-span-3 bg-white border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700">
                             <option value="">Facility type…</option>
                             {PROJECT_TYPES.map(t => <option key={t} value={t}>{PROJECT_TYPE_LABELS[t]}</option>)}
                           </select>
-                          <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 uppercase placeholder:normal-case" />
-                          <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700" />
+                          <input name="region" aria-label="State" placeholder="State (e.g. CA)" maxLength={2} className="bg-white border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700 uppercase placeholder:normal-case" />
+                          <input name="grossSqft" type="number" min={0} aria-label="Gross square feet" placeholder="Gross sf" className="col-span-2 bg-white border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700" />
                         </div>
-                        <p className="text-[12px] text-warm-600 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
+                        <p className="text-caption text-warm-600 mt-1.5">Tagged schedules with actual dates teach RunF9 how your projects really perform. Used only for your firm.</p>
                       </div>
                       <div>
-                        <label className="block text-[12px] font-semibold text-warm-600">Whose schedule
-                          <select name="origin" defaultValue="" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-[13px] text-warm-700 font-normal">
+                        <label className="block text-caption font-semibold text-warm-600">Whose schedule
+                          <select name="origin" defaultValue="" className="mt-1.5 w-full bg-white border border-warm-300 rounded-lg px-2 py-2 text-body text-warm-700 font-normal">
                             <option value="">Not stated</option>
                             <option value="own">Our own project</option>
                             <option value="third_party">Third-party (we review it)</option>
                           </select>
                         </label>
-                        <p className="text-[12px] text-warm-600 mt-1.5">Third-party schedules and RunF9 re-imports never calibrate firm history.</p>
+                        <p className="text-caption text-warm-600 mt-1.5">Third-party schedules and RunF9 re-imports never calibrate firm history.</p>
                       </div>
                       <div>
-                        <label htmlFor="upload-version" className="block text-[12px] font-semibold text-warm-600 mb-1.5">Version label</label>
+                        <label htmlFor="upload-version" className="block text-caption font-semibold text-warm-600 mb-1.5">Version label</label>
                         <input id="upload-version" type="text" name="version" defaultValue="" maxLength={40} placeholder="Automatic: Baseline, then Update 1, 2…"
-                          className="w-full bg-white border border-warm-300 rounded-lg px-3 py-2 text-[13px] text-warm-700" />
+                          className="w-full bg-white border border-warm-300 rounded-lg px-3 py-2 text-body text-warm-700" />
                       </div>
                     </div>
                   </Disclosure>
                 </div>
                 <button type="submit" disabled={uploading}
-                  className="pressable w-full bg-accent-600 text-white h-10 rounded-lg text-[14px] font-semibold hover:bg-accent-700 transition-colors disabled:opacity-60">
+                  className="pressable w-full bg-accent-600 text-white h-10 rounded-lg text-body font-semibold hover:bg-accent-700 transition-colors disabled:opacity-60">
                   {uploading ? 'Reading the schedule…' : 'Upload'}
                 </button>
               </form>
@@ -869,11 +869,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Dialog closing={listDialog.closing} labelledBy="switch-dialog-h" onClose={() => setShowScheduleList(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl max-h-[80vh] overflow-auto">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-4">
-                <h2 id="switch-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Switch project</h2>
+                <h2 id="switch-dialog-h" className="text-heading font-semibold text-ink">Switch project</h2>
                 <button onClick={() => setShowScheduleList(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
               {schedules.length === 0 ? (
-                <p className="py-4 text-[14px] text-warm-600">No schedules yet. Upload one to get started.</p>
+                <p className="py-4 text-body text-warm-600">No schedules yet. Upload one to get started.</p>
               ) : (() => {
                 const q = projectFilter.trim().toLowerCase()
                 const shown = q ? schedules.filter(s => s.name.toLowerCase().includes(q)) : schedules
@@ -881,9 +881,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <>
                     {schedules.length > 8 && (
                       <input type="search" value={projectFilter} onChange={e => setProjectFilter(e.target.value)} aria-label="Find a project by name" placeholder="Find a project"
-                        className="mb-3 w-full bg-white border border-warm-300 rounded-lg px-3 h-10 text-[14px] text-ink placeholder:text-warm-600" />
+                        className="mb-3 w-full bg-white border border-warm-300 rounded-lg px-3 h-10 text-body text-ink placeholder:text-warm-600" />
                     )}
-                    {shown.length === 0 ? <p className="py-4 text-[14px] text-warm-600">No project matches that name.</p> : (
+                    {shown.length === 0 ? <p className="py-4 text-body text-warm-600">No project matches that name.</p> : (
                       <ul className="divide-y divide-warm-200 border-y border-warm-200">
                         {shown.map(s => {
                           const current = selectedSchedule?.id === s.id
@@ -893,8 +893,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 onClick={() => { setSelectedSchedule(s); setShowScheduleList(false); router.push(`${inProject ? pathname : '/dashboard/project'}?schedule=${s.id}`) }}
                                 className="group w-full flex items-center gap-3 py-3 text-left">
                                 <span className="min-w-0 flex-1">
-                                  <span className={`block truncate text-[14px] text-ink group-hover:underline ${current ? 'font-semibold' : 'font-medium'}`}>{s.name}</span>
-                                  <span className="block text-[12px] text-warm-600 mt-0.5">{s.version} · {s.activityCount.toLocaleString()} activities · {sourceLabel(s.sourceType)}</span>
+                                  <span className={`block truncate text-subhead text-ink group-hover:underline ${current ? 'font-semibold' : 'font-medium'}`}>{s.name}</span>
+                                  <span className="block text-caption text-warm-600 mt-0.5">{s.version} · {s.activityCount.toLocaleString()} activities · {sourceLabel(s.sourceType)}</span>
                                 </span>
                                 {current && <Check size={16} aria-hidden="true" className="flex-shrink-0 text-accent-600" />}
                               </button>
@@ -909,7 +909,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {can('schedule.write') && (
               <button
                 onClick={() => { setShowScheduleList(false); setShowUpload(true) }}
-                className="pressable w-full mt-4 border border-warm-300 bg-white text-ink h-10 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors"
+                className="pressable w-full mt-4 border border-warm-300 bg-white text-ink h-10 rounded-lg text-body font-medium hover:bg-warm-100 transition-colors"
               >
                 Upload a new project
               </button>
@@ -923,16 +923,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Dialog closing={settingsDialog.closing} labelledBy="account-dialog-h" onClose={() => setShowSettings(false)} className="bg-white border border-warm-200 rounded-t-xl md:rounded-[14px] w-full md:max-w-md p-6 shadow-xl">
               <div className="md:hidden w-10 h-1 bg-warm-300 rounded-full mx-auto mb-5" />
               <div className="flex items-center justify-between mb-4">
-                <h2 id="account-dialog-h" className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Account</h2>
+                <h2 id="account-dialog-h" className="text-heading font-semibold text-ink">Account</h2>
                 <button onClick={() => setShowSettings(false)} aria-label="Close" className="text-warm-600 hover:text-ink"><X size={18} /></button>
               </div>
               <div className="space-y-4">
                 <div>
-                  <div className="text-[16px] font-semibold text-ink">{user.name}</div>
-                  <div className="text-[13px] text-warm-600 break-all">{user.email}</div>
+                  <div className="text-subhead font-semibold text-ink">{user.name}</div>
+                  <div className="text-body text-warm-600 break-all">{user.email}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {user.role && <span className="inline-block text-[12px] font-semibold capitalize text-accent-700 bg-accent-100 px-2 py-0.5 rounded-md">{user.role}</span>}
-                    {org && <span className="inline-block text-[12px] font-medium text-warm-700 bg-warm-100 px-2 py-0.5 rounded-md">{org.name}</span>}
+                    {user.role && <span className="inline-block text-caption font-semibold capitalize text-accent-700 bg-accent-100 px-2 py-0.5 rounded-md">{user.role}</span>}
+                    {org && <span className="inline-block text-caption font-medium text-warm-700 bg-warm-100 px-2 py-0.5 rounded-md">{org.name}</span>}
                   </div>
                 </div>
                 <ul className="divide-y divide-warm-200 border-y border-warm-200">
@@ -942,7 +942,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     ...(platformAdmin ? [{ href: '/dashboard/platform', label: 'Beta access (platform)', icon: <KeyRound size={16} aria-hidden="true" /> }] : []),
                   ]).map(l => (
                     <li key={l.href}>
-                      <Link href={l.href} onClick={() => setShowSettings(false)} className="group flex items-center gap-3 py-3 text-[14px] font-medium text-ink">
+                      <Link href={l.href} onClick={() => setShowSettings(false)} className="group flex items-center gap-3 py-3 text-subhead font-medium text-ink">
                         <span className="flex-shrink-0 text-warm-600">{l.icon}</span>
                         <span className="flex-1 group-hover:underline">{l.label}</span>
                         <ChevronRight size={16} aria-hidden="true" className="flex-shrink-0 text-warm-600" />
@@ -952,9 +952,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </ul>
                 {llm && (
                   <div>
-                    <div className="text-[12px] font-semibold text-warm-600">AI processing</div>
-                    <div className="mt-0.5 text-[13px] text-ink font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} aria-hidden="true" />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
-                    <div className="text-[12px] text-warm-600 mt-1">
+                    <div className="text-caption font-semibold text-warm-600">AI processing</div>
+                    <div className="mt-0.5 text-body text-ink font-medium flex items-center gap-1.5">{llm.airgapped && <Lock size={12} aria-hidden="true" />}{aiLabel(llm)}{llm.airgapped ? ' — air-gapped deployment' : ''}</div>
+                    <div className="text-caption text-warm-600 mt-1">
                       {llm.mode === 'cloud' && `Model ${modelLine(llm)} via ${llm.host}. Request content for AI features is sent to ${llm.provider ? PROVIDER_LABEL[llm.provider] : 'the cloud AI provider'}; withheld answers and CUI / classified projects are never sent.`}
                       {llm.mode === 'local' && `Model ${modelLine(llm)} on ${llm.host}. Nothing leaves your network.`}
                       {llm.mode === 'offline' && (llm.error || 'No model configured. Scheduling, CPM, quality checks and reports run fully offline.')}
@@ -963,11 +963,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 <button
                   onClick={handleSignOut}
-                  className="pressable w-full flex items-center justify-center gap-2 border border-warm-300 bg-white text-ink h-10 rounded-lg text-[13px] font-medium hover:bg-warm-100 transition-colors"
+                  className="pressable w-full flex items-center justify-center gap-2 border border-warm-300 bg-white text-ink h-10 rounded-lg text-body font-medium hover:bg-warm-100 transition-colors"
                 >
                   <LogOut size={14} aria-hidden="true" /> Sign out
                 </button>
-                <p className="text-[12px] text-warm-600">RunF9 · Version 1.0 · Built by Hoshmand AI · <Link href="/privacy" className="text-accent-700 underline underline-offset-2">Privacy</Link> · <Link href="/terms" className="text-accent-700 underline underline-offset-2">Terms</Link></p>
+                <p className="text-caption text-warm-600">RunF9 · Version 1.0 · Built by Hoshmand AI · <Link href="/privacy" className="text-accent-700 underline underline-offset-2">Privacy</Link> · <Link href="/terms" className="text-accent-700 underline underline-offset-2">Terms</Link></p>
               </div>
           </Dialog>
         )}

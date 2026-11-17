@@ -17,7 +17,7 @@ function inline(text: string, keyBase: string): ReactNode[] {
     if (m.index > last) out.push(text.slice(last, m.index))
     const k = `${keyBase}-${i++}`
     if (m[1] !== undefined) out.push(<strong key={k} className="font-semibold text-ink">{inline(m[1], k)}</strong>)
-    else if (m[2] !== undefined) out.push(<code key={k} className="font-mono text-[0.92em] bg-warm-200/60 rounded px-1">{m[2]}</code>)
+    else if (m[2] !== undefined) out.push(<code key={k} className="font-mono bg-warm-200/60 rounded px-1">{m[2]}</code>)
     else out.push(<em key={k}>{inline(m[3] ?? m[4], k)}</em>)
     last = m.index + m[0].length
   }
@@ -47,7 +47,7 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       i++
       while (i < lines.length && !/^\s*```/.test(lines[i])) { body.push(lines[i]); i++ }
       i++
-      blocks.push(<pre key={`c${blocks.length}`} className="whitespace-pre-wrap font-mono text-[12px] bg-warm-200/50 rounded-md p-3">{body.join('\n')}</pre>)
+      blocks.push(<pre key={`c${blocks.length}`} className="whitespace-pre-wrap font-mono text-caption bg-warm-200/50 rounded-md p-3">{body.join('\n')}</pre>)
       continue
     }
     // A line of only dashes, asterisks or underscores is a divider, not text.
@@ -56,7 +56,7 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       flush()
       const k = `h${blocks.length}`
       const level = h[1].length
-      const cls = level === 1 ? 'font-display text-[20px] text-ink leading-snug' : level === 2 ? 'text-[16px] font-semibold text-ink pt-2' : 'text-[14px] font-semibold text-ink'
+      const cls = level === 1 ? 'text-heading font-semibold text-ink leading-snug' : level === 2 ? 'text-subhead font-semibold text-ink pt-2' : 'text-body font-semibold text-ink'
       blocks.push(level === 1 ? <h3 key={k} className={cls}>{inline(h[2], k)}</h3> : level === 2 ? <h4 key={k} className={cls}>{inline(h[2], k)}</h4> : <h5 key={k} className={cls}>{inline(h[2], k)}</h5>)
       i++; continue
     }
@@ -69,8 +69,8 @@ export function Markdown({ text, className = '' }: { text: string; className?: s
       const k = `t${blocks.length}`
       blocks.push(
         <div key={k} className="overflow-x-auto -mx-1 px-1" tabIndex={0} role="region" aria-label="Table (scrolls sideways)">
-          <p className="sm:hidden text-[12px] text-warm-600 mb-1">Swipe sideways to see every column.</p>
-          <table className="min-w-full text-[12px] border-collapse">
+          <p className="sm:hidden text-caption text-warm-600 mb-1">Swipe sideways to see every column.</p>
+          <table className="min-w-full text-body [&_th]:text-caption border-collapse">
             <thead><tr>{head.map((c, j) => <th key={j} scope="col" className="text-left font-semibold text-ink border-b border-warm-300 px-2 py-1.5 align-bottom">{inline(c, `${k}-h${j}`)}</th>)}</tr></thead>
             <tbody>{rows.map((r, ri) => <tr key={ri} className="border-b border-warm-200">{r.map((c, j) => <td key={j} className="px-2 py-1.5 align-top">{inline(c, `${k}-${ri}-${j}`)}</td>)}</tr>)}</tbody>
           </table>

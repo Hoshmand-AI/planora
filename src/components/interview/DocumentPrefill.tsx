@@ -59,15 +59,15 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
   return (
     <div className="mb-4">
       <Disclosure tone="card" title={<span className="inline-flex items-center gap-2"><FileSearch size={15} aria-hidden className="flex-shrink-0 text-warm-600" />Fill answers from a document</span>} meta="RFP, scope, contract, specs or drawings">
-        <div className="space-y-3 text-[13px] text-warm-700">
+        <div className="space-y-3 text-body text-warm-700">
           <p>RunF9 reads the document and proposes answers, each with the sentence and page it came from. The file is not stored. You choose which answers to use.</p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="inline-flex items-center gap-2">
               <span className="sr-only">Document</span>
-              <input key={inputKey} type="file" accept=".pdf,.docx,.txt,.md" onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(null); setErr('') }} className="text-[13px]" />
+              <input key={inputKey} type="file" accept=".pdf,.docx,.txt,.md" onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(null); setErr('') }} className="text-body" />
             </label>
             <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={drawing} onChange={e => setDrawing(e.target.checked)} /> It is a drawing set</label>
-            <button type="button" onClick={read} disabled={!file || busy} className="pressable rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-9 text-[13px] font-medium disabled:opacity-50">
+            <button type="button" onClick={read} disabled={!file || busy} className="pressable rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-4 h-9 text-body font-medium disabled:opacity-50">
               {busy && !result ? <><Loader2 size={13} className="inline animate-spin mr-1" aria-hidden />Reading…</> : 'Read document'}
             </button>
           </div>
@@ -75,7 +75,7 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
           {saved && <p role="status" className="text-status-on-track">{saved}</p>}
           {result && (
             <div className="space-y-2">
-              {result.note && <p className="text-[12px] text-warm-600">{result.note}</p>}
+              {result.note && <p className="text-caption text-warm-600">{result.note}</p>}
               {result.proposals.length === 0 ? <p>No interview answers were found in this document.</p> : (
                 <fieldset>
                   <legend className="font-semibold text-ink mb-2">Proposed answers ({result.proposals.length})</legend>
@@ -85,14 +85,14 @@ export function DocumentPrefill({ planId, canWrite, onSave }: {
                       <input type="checkbox" className="mt-1" checked={!!pick[p.questionId]} onChange={e => setPick(s => ({ ...s, [p.questionId]: e.target.checked }))} />
                       <span className="min-w-0">
                         <span className="block"><span className="text-warm-600">{PREFILL_QUESTIONS[p.questionId]}: </span><strong className="text-ink">{p.display}</strong>
-                          {result.alreadyAnswered.includes(p.questionId) && <span className="ml-2 text-[12px] text-warm-600">(replaces your current answer)</span>}
-                          {p.method === 'model' && <span className="ml-2 text-[12px] text-status-info">AI suggestion</span>}</span>
-                        <span className="block text-[12px] text-warm-600 mt-0.5"><q>{p.quote}</q>{p.page != null ? ` p.${p.page}` : ''}</span>
+                          {result.alreadyAnswered.includes(p.questionId) && <span className="ml-2 text-caption text-warm-600">(replaces your current answer)</span>}
+                          {p.method === 'model' && <span className="ml-2 text-caption text-status-info">AI suggestion</span>}</span>
+                        <span className="block text-caption text-warm-600 mt-0.5"><q>{p.quote}</q>{p.page != null ? ` p.${p.page}` : ''}</span>
                       </span>
                     </label>
                   ))}
                   </div>
-                  <button type="button" onClick={use} disabled={busy || !Object.values(pick).some(Boolean)} className="pressable mt-3 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold disabled:bg-warm-200 disabled:text-warm-600">
+                  <button type="button" onClick={use} disabled={busy || !Object.values(pick).some(Boolean)} className="pressable mt-3 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-body font-semibold disabled:bg-warm-200 disabled:text-warm-600">
                     Use selected answers
                   </button>
                 </fieldset>

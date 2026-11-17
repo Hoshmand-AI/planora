@@ -226,7 +226,7 @@ export default function PlanPage() {
   }
 
   if (!view) {
-    return <div className="px-6 py-10 text-warm-400 text-[14px] flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Loading plan…</>}</div>
+    return <div className="px-6 py-10 text-warm-400 text-body flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" /> Loading plan…</>}</div>
   }
   const { plan, elicitation: el, evaluation: ev, llm } = view
   const g = plan.generated
@@ -292,14 +292,14 @@ export default function PlanPage() {
   // Answers given after the schedule was last built: the interview says so and offers the rebuild.
   const changedSinceBuild = g ? Object.values(plan.answers).filter(a => !!a?.answeredAt && a.answeredAt > g.generatedAt).length : 0
   const headerLoud = !(lateDays > 0 && recoveryCount > 0) && !(tab === 'interview' && !!g)
-  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-[13px] font-medium text-ink hover:bg-warm-100 disabled:opacity-50'
-  const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold disabled:opacity-50'
+  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-body font-medium text-ink hover:bg-warm-100 disabled:opacity-50'
+  const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-body font-semibold disabled:opacity-50'
 
   return (
     <div className="px-4 md:px-6 pb-8">
       {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
       <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-white/95 backdrop-blur border-b border-warm-200 mb-5">
-        <Link href="/dashboard" className="md:hidden inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-ink"><ArrowLeft size={12} aria-hidden /> Projects</Link>
+        <Link href="/dashboard" className="md:hidden inline-flex items-center gap-1 text-body text-warm-500 hover:text-ink"><ArrowLeft size={12} aria-hidden /> Projects</Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
           <h1 className="page-title min-w-0 md:truncate">{plan.name}</h1>
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
@@ -316,14 +316,14 @@ export default function PlanPage() {
         {(g || busy === 'generate') && (
         <div data-mood={status.mood} className="mood-tile mt-3 rounded-[14px] border px-2 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
-          <div className="flex-1 min-w-[180px] text-[14px] font-medium text-ink leading-snug py-1">
+          <div className="flex-1 min-w-[180px] text-heading font-medium text-ink leading-snug py-1">
             {status.onClick
               ? <button onClick={status.onClick} className="group text-left">{status.text}{' '}<span className="whitespace-nowrap font-semibold text-accent-600 group-hover:underline">{status.action ? <>· {status.action} </> : null}<span aria-hidden>→</span></span></button>
               : <span role="status">{status.text}</span>}
           </div>
           <div className="flex items-center gap-2 ml-auto">
             {/* The finish date is said once: here only when the sentence beside it does not already carry it. */}
-            {g?.cpm && !status.hasFinish && <div className="text-[12px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
+            {g?.cpm && !status.hasFinish && <div className="whitespace-nowrap"><div className="text-subhead font-semibold text-ink tabular-nums">{fmtDate(g.cpm.projectFinish)}</div><div className="text-caption text-warm-600">Forecast finish</div></div>}
             <MoreNumbers rows={numbers} />
           </div>
         </div>
@@ -331,8 +331,8 @@ export default function PlanPage() {
         <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-lg bg-warm-100 p-0.5 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`pressable flex-shrink-0 px-3.5 py-1.5 rounded-md text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
-              {t === 'interview' ? <>Interview{g && !ad.enoughToBuild && ad.remainingThatMatter > 0 ? <span className="ml-1.5 rounded-full bg-warm-200 text-warm-700 px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{ad.remainingThatMatter} open</span> : null}</> : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
+              className={`pressable flex-shrink-0 px-3.5 py-1.5 rounded-md text-body font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_2px_rgba(29,33,37,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
+              {t === 'interview' ? <>Interview{g && !ad.enoughToBuild && ad.remainingThatMatter > 0 ? <span className="ml-1.5 rounded-full bg-warm-200 text-warm-700 px-1.5 py-px text-caption font-semibold"><span className="sr-only">, </span>{ad.remainingThatMatter} open</span> : null}</> : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-caption font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
         </div>
@@ -360,7 +360,7 @@ export default function PlanPage() {
 
       {tab === 'interview' && (<>
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
-          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-ink">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
+          <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-body text-warm-700"><strong className="font-semibold text-ink">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
         )}
         <div className="max-w-[760px] mx-auto"><DocumentPrefill planId={id} canWrite={can('plan.write')} onSave={saveAnswers} /></div>
         <SmartInterview el={el} adaptive={view.adaptive} answered={view.answered} hasSchedule={!!g} changedSinceBuild={changedSinceBuild} canWrite={can('plan.write')} busy={busy} llm={llm} history={view.history}
@@ -369,7 +369,7 @@ export default function PlanPage() {
       {tab === 'schedule' && g && <ScheduleTab plan={plan} textEdit={can('plan.write') ? (<>
         <PlainEnglishEdit id={id} examples="For example: “extend Spread Footings by 5 days”, “start A1070 3 days after A1060 starts”, “add &quot;Owner move-in&quot; (10 days) after A1300”, “rename A1050 to &quot;Roof membrane&quot;”."
           preview={previewText} apply={applyText} undo={undoLast} />
-        {view.undo && <p className="text-[12px] text-warm-600 mt-2">Last change: {view.undo.summary} ({view.undo.by}, {fmtDateTime(view.undo.at)}). <button type="button" disabled={!!busy} onClick={() => { void undoLast().then(r => { if ('done' in r && r.done) setNotice(r.done) }) }} className="text-accent-600 underline">Undo it</button></p>}
+        {view.undo && <p className="text-caption text-warm-600 mt-2">Last change: {view.undo.summary} ({view.undo.by}, {fmtDateTime(view.undo.at)}). <button type="button" disabled={!!busy} onClick={() => { void undoLast().then(r => { if ('done' in r && r.done) setNotice(r.done) }) }} className="text-accent-600 underline">Undo it</button></p>}
       </>) : null} onEdit={async (edit) => {
         const data = await call('edit', `/api/plans/${id}/edit`, { method: 'POST', body: JSON.stringify({ edit }) })
         if (data?.impact) {
@@ -406,7 +406,7 @@ function headline(ev: Evaluation | null, sra: Sra | null) {
 function Banner({ kind, children, onClose }: { kind: 'ok' | 'error' | 'warn'; children: React.ReactNode; onClose?: () => void }) {
   const style = kind === 'ok' ? 'border-status-on-track bg-status-on-track-bg' : kind === 'error' ? 'border-status-at-risk bg-status-at-risk-bg' : 'border-status-attention bg-status-attention-bg'
   return (
-    <div role={kind === 'error' ? 'alert' : 'status'} className={`border-l-2 ${style} text-[13px] text-warm-700 px-3 py-2 rounded-md mb-4 flex items-start gap-2`}>
+    <div role={kind === 'error' ? 'alert' : 'status'} className={`border-l-2 ${style} text-body text-warm-700 px-3 py-2 rounded-md mb-4 flex items-start gap-2`}>
       <div className="flex-1">{children}</div>
       {onClose && <button onClick={onClose} aria-label="Dismiss" className="text-warm-400 hover:text-warm-600"><X size={14} aria-hidden="true" /></button>}
     </div>
@@ -417,7 +417,7 @@ function Sources({ sources }: { sources: SourceRef[] }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       {sources.map((s, i) => (
-        <span key={i} title={s.detail} className="text-[12px] text-warm-600 bg-warm-50 border border-warm-200 rounded-md px-1.5 py-0.5">
+        <span key={i} title={s.detail} className="text-caption text-warm-600 bg-warm-50 border border-warm-200 rounded-md px-1.5 py-0.5">
           <span className="font-semibold">{SOURCE_LABEL[s.kind]}:</span> {s.label}
         </span>
       ))}
@@ -429,20 +429,20 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
   const [open, setOpen] = useState(false)
   const item = (format: string, label: string, sub: string) => (
     <a key={format} href={`/api/plans/${id}/export?format=${format}`} onClick={() => setOpen(false)} className="block px-3 py-2 hover:bg-warm-100">
-      <div className="text-ink">{label}</div><div className="text-[12px] text-warm-400">{sub}</div>
+      <div className="text-ink">{label}</div><div className="text-caption text-warm-400">{sub}</div>
     </a>
   )
-  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-[12px] font-semibold text-warm-400">{title}</div>
+  const group = (title: string) => <div className="px-3 pt-2 pb-1 text-caption font-semibold text-warm-400">{title}</div>
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
-        ? 'pressable flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold'
-        : 'pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-[13px] font-medium text-ink hover:bg-warm-100'}>
+        ? 'pressable flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-body font-semibold'
+        : 'pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-body font-medium text-ink hover:bg-warm-100'}>
         <Download size={13} aria-hidden /> Export <ChevronDown size={12} aria-hidden />
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
       {open && (
-        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(29,33,37,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
+        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(29,33,37,0.25)] z-20 py-1.5 text-body overflow-hidden">
           {group('Scheduling software')}
           {item('xer', 'Primavera P6 (.xer)', 'Native P6 file: WBS, calendars, logic, constraints')}
           {item('xml', 'MS Project (.xml)', 'Opens in MS Project; P6 can import it too')}
@@ -499,16 +499,16 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
   const togglePhase = (ph: string) => setOpenPhases(prev => { const n = new Set(prev); if (n.has(ph)) n.delete(ph); else n.add(ph); return n })
   const pos = (from?: string, to?: string) => from && to
     ? { left: `${((Date.parse(from) - start) / span) * 100}%`, width: `${Math.max(0.6, ((Date.parse(to) - Date.parse(from) + 86_400_000) / span) * 100)}%` } : { left: '0%', width: '0%' }
-  const chip = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`
-  const toolButton = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium ${on ? 'border-accent-500 bg-accent-100 text-accent-700' : 'border-warm-300 bg-white text-ink hover:bg-warm-100'}`
+  const chip = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-body font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`
+  const toolButton = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-body font-medium ${on ? 'border-accent-500 bg-accent-100 text-accent-700' : 'border-warm-300 bg-white text-ink hover:bg-warm-100'}`
 
   return (
     <div>
       {recovery && <RecoveryPanel r={recovery} busy={canWrite ? busy : 'read-only'} onRecover={onRecover} onInterview={onInterview} />}
       {focusCodes && (
-        <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
+        <div className="border-l-2 border-accent-500 bg-accent-100 text-body text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
           <span className="flex-1">Showing the {focusCodes.length} activities flagged by the quality check.</span>
-          <button onClick={onClearFocus} className="text-[12px] font-medium text-ink underline">Show all</button>
+          <button onClick={onClearFocus} className="text-body font-medium text-ink underline">Show all</button>
         </div>
       )}
       {(g.cpm?.warnings?.length ?? 0) > 0 && <Banner kind="warn">{g.cpm!.warnings.slice(0, 3).join(' · ')}</Banner>}
@@ -526,7 +526,7 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
           })}
         </div>
         <span className="flex-1" />
-        {!narrowed && <button type="button" onClick={() => setOpenPhases(allOpen ? new Set() : new Set(groups.map(x => x.ph)))} className="text-[13px] font-medium text-accent-600 hover:underline px-1">{allOpen ? 'Collapse all' : 'Expand all'}</button>}
+        {!narrowed && <button type="button" onClick={() => setOpenPhases(allOpen ? new Set() : new Set(groups.map(x => x.ph)))} className="text-body font-medium text-accent-600 hover:underline px-1">{allOpen ? 'Collapse all' : 'Expand all'}</button>}
         {canWrite && textEdit && <button type="button" aria-expanded={tool === 'text'} onClick={() => setTool(v => v === 'text' ? null : 'text')} className={toolButton(tool === 'text')}><MessageSquareText size={14} aria-hidden="true" /> Describe a change</button>}
         {canWrite && <button type="button" aria-expanded={tool === 'add'} onClick={() => setTool(v => v === 'add' ? null : 'add')} className={toolButton(tool === 'add')}><Plus size={14} aria-hidden="true" /> Add activity</button>}
       </div>
@@ -534,10 +534,10 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
       {tool === 'add' && canWrite && <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} onClose={() => setTool(null)} />}
 
       <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white border border-warm-200 rounded-[14px] overflow-x-auto">
-        <table className="w-full text-[13px] min-w-[760px]">
+        <table className="w-full text-body min-w-[760px]">
           <caption className="sr-only">Activities by phase. Open a phase to list its activities; open an activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</caption>
           <thead>
-            <tr className="text-left text-[12px] font-medium text-warm-500 border-b border-warm-200">
+            <tr className="text-left text-caption font-medium text-warm-500 border-b border-warm-200">
               <th className="px-3 py-2.5 w-6"><span className="sr-only">Open</span></th><th className="px-2 py-2.5 font-medium">ID</th><th className="px-2 py-2.5 font-medium">Activity</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Duration in work days (cd = calendar days)" className="no-underline">Days</abbr></th>
               <th className="px-2 py-2.5 font-medium">Start</th><th className="px-2 py-2.5 font-medium">Finish</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Total float: work days this activity can slip before it delays the finish" className="no-underline">Float</abbr></th><th className="px-2 py-2.5 font-medium">Confidence</th><th className="px-3 py-2.5 font-medium w-[22%]">Timeline</th>
             </tr>
@@ -557,7 +557,7 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
                         : <button type="button" aria-expanded={shown} onClick={e => { e.stopPropagation(); togglePhase(ph) }} className="inline-flex items-center gap-2 font-semibold text-ink">
                             <ChevronRight size={14} aria-hidden="true" className={`text-warm-600 transition-transform ${shown ? 'rotate-90' : ''}`} />{labels[ph] || ph}
                           </button>}
-                      <span className="ml-2 text-[12px] text-warm-600">{list.length} {list.length === 1 ? 'activity' : 'activities'}{critical && !allCritical ? ` · ${critical === list.length ? 'all' : critical} critical` : ''}</span>
+                      <span className="ml-2 text-caption text-warm-600">{list.length} {list.length === 1 ? 'activity' : 'activities'}{critical && !allCritical ? ` · ${critical === list.length ? 'all' : critical} critical` : ''}</span>
                     </th>
                     <td className="px-2 py-2.5 tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(from)}</td>
                     <td className="px-2 py-2.5 tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(to)}</td>
@@ -584,12 +584,12 @@ function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInte
       {(g.notes?.length ?? 0) > 0 && (
         <div className="mt-4">
           <Disclosure title="Notes about how this schedule was built" meta={g.notes!.length}>
-            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12px] text-warm-600">{fmtDates(n)}</li>)}</ul>
+            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-body text-warm-600">{fmtDates(n)}</li>)}</ul>
           </Disclosure>
         </div>
       )}
       {(g.removed?.length ?? 0) > 0 && (
-        <div className="mt-4 text-[12px] text-warm-500">
+        <div className="mt-4 text-body text-warm-500">
           <div className="font-semibold text-warm-600 mb-1">Removed by scheduler</div>
           {g.removed!.map(r => <div key={r.id}>· {r.name} — {r.override.reason} ({r.override.by})</div>)}
         </div>
@@ -607,25 +607,25 @@ function AddActivity({ activities, onEdit, busy, onClose }: { activities: PlanAc
   const opt = (a: PlanActivity) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>
   return (
     <div className="border border-warm-200 rounded-lg p-4 mb-4 bg-white">
-      <div className="text-[14px] font-semibold text-ink mb-2">Add an activity the tool doesn&apos;t know about</div>
+      <div className="text-subhead font-semibold text-ink mb-2">Add an activity the tool doesn&apos;t know about</div>
       <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-        <input value={name} onChange={e => setName(e.target.value)} aria-label="Activity name" placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
+        <input value={name} onChange={e => setName(e.target.value)} aria-label="Activity name" placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />
         <div className="md:col-span-2 flex items-center gap-2">
-          <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label="Duration in work days (0 for a milestone)" className="w-20 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-          <span className="text-[12px] text-warm-500">work days (0 = milestone)</span>
+          <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label="Duration in work days (0 for a milestone)" className="w-20 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />
+          <span className="text-caption text-warm-500">work days (0 = milestone)</span>
         </div>
-        <select value={after} onChange={e => setAfter(e.target.value)} aria-label="Starts after" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
+        <select value={after} onChange={e => setAfter(e.target.value)} aria-label="Starts after" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-body">
           <option value="">Starts after…</option>{activities.map(opt)}
         </select>
-        <select value={before} onChange={e => setBefore(e.target.value)} aria-label="Must finish before" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
+        <select value={before} onChange={e => setBefore(e.target.value)} aria-label="Must finish before" className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2 py-1.5 text-body">
           <option value="">Must finish before… (default: substantial completion)</option>{activities.map(opt)}
         </select>
-        <input value={reason} onChange={e => setReason(e.target.value)} aria-label="Reason for adding this activity" placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
+        <input value={reason} onChange={e => setReason(e.target.value)} aria-label="Reason for adding this activity" placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />
         <div className="md:col-span-2 flex gap-2">
           <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
             if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); onClose() }
-     }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-[13px] font-semibold py-1.5 disabled:opacity-50">Add</button>
-          <button onClick={onClose} className="px-3 border border-warm-300 rounded-lg text-[13px] text-warm-700">Cancel</button>
+     }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-body font-semibold py-1.5 disabled:opacity-50">Add</button>
+          <button onClick={onClose} className="px-3 border border-warm-300 rounded-lg text-body text-warm-700">Cancel</button>
         </div>
       </div>
     </div>
@@ -654,12 +654,12 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
             {open ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
           </button>
         </td>
-        <td className="px-2 py-2 font-mono text-[12px] text-warm-500">{a.code}</td>
+        <td className="px-2 py-2 font-mono text-body text-warm-500">{a.code}</td>
         <td className="px-2 py-2 text-ink">
           <div className="flex items-center gap-1.5">
             {a.placeholder && <Lock size={11} className="text-warm-500 flex-shrink-0" />}
             <span className={tm?.critical ? 'font-semibold' : ''}>{a.name}</span>
-            {a.overrides?.length ? <span className="text-[12px] text-warm-600">· edited</span> : null}
+            {a.overrides?.length ? <span className="text-caption text-warm-600">· edited</span> : null}
           </div>
         </td>
         <td className="px-2 py-2 text-right tabular-nums">{a.type === 'milestone' ? '◆' : a.duration}{a.calendarId === 'cal-7d' && a.type !== 'milestone' ? <span className="text-warm-400">cd</span> : ''}</td>
@@ -681,51 +681,51 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           <td colSpan={8} className="px-2 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <div className="text-[12px] font-semibold text-warm-400 mb-1">Why this duration</div>
-                <p className="text-[13px] text-warm-700">{fmtDates(a.rationale.summary)}</p>
+                <div className="text-body font-semibold text-warm-400 mb-1">Why this duration</div>
+                <p className="text-body text-warm-700">{fmtDates(a.rationale.summary)}</p>
                 <Sources sources={a.rationale.sources} />
-                {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-[12px] text-warm-500 mt-1.5">Assumes: {fmtDates(x)}</p>)}
-                {tm && <p className="text-[12px] text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
+                {a.rationale.assumptions?.map((x, i) => <p key={i} className="text-caption text-warm-500 mt-1.5">Assumes: {fmtDates(x)}</p>)}
+                {tm && <p className="text-caption text-warm-500 mt-2 tabular-nums">Late start {fmtDate(tm.lateStart)} · late finish {fmtDate(tm.lateFinish)} · free float {tm.freeFloat}d</p>}
 
-                <div className="text-[12px] font-semibold text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
-                {preds.length === 0 && <p className="text-[12px] text-warm-500">No predecessors (project start).</p>}
+                <div className="text-body font-semibold text-warm-400 mt-4 mb-1">Why it is sequenced here</div>
+                {preds.length === 0 && <p className="text-body text-warm-500">No predecessors (project start).</p>}
                 {preds.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.from)} dir="after" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
                 {succs.map(l => <LinkRow key={l.id} l={l} other={byId.get(l.to)} dir="before" onEdit={onEdit} busy={busy} canWrite={canWrite} />)}
               </div>
 
               <div className="space-y-3">
                 {canWrite && <>
-                <div className="text-[12px] font-semibold text-warm-400">Override (your call wins)</div>
+                <div className="text-body font-semibold text-warm-400">Override (your call wins)</div>
                 <input value={reason} onChange={e => setReason(e.target.value)} aria-label={`Reason for changing ${a.code}`} placeholder="Reason (required, kept in the audit trail)"
-                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-[13px] text-warm-700" />
+                  className="w-full bg-warm-100 border border-warm-300 rounded-md px-2.5 py-1.5 text-body text-warm-700" />
                 {a.type !== 'milestone' && (
                   <div className="flex gap-2 items-center">
-                    <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label={`Duration of ${a.code} in work days`} className="w-24 bg-warm-100 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-                    <span className="text-[12px] text-warm-500">work days</span>
+                    <input type="number" min={0} value={dur} onChange={e => setDur(e.target.value)} aria-label={`Duration of ${a.code} in work days`} className="w-24 bg-warm-100 border border-warm-300 rounded-lg px-2.5 py-1.5 text-body" />
+                    <span className="text-caption text-warm-500">work days</span>
                     <button disabled={!!busy || !reason.trim() || Number(dur) === a.duration} onClick={async () => { if (await onEdit({ kind: 'duration', activityId: a.id, value: Number(dur), reason })) setReason('') }}
-           className="bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold">Set duration</button>
+           className="bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-body font-semibold">Set duration</button>
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 items-center">
                   <Link2 size={13} className="text-warm-400" />
-                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} aria-label={`Successor to add after ${a.code}`} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
+                  <select value={linkTarget} onChange={e => setLinkTarget(e.target.value)} aria-label={`Successor to add after ${a.code}`} className="flex-1 min-w-[160px] bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-body">
                     <option value="">Add successor…</option>
                     {[...byId.values()].filter(x => x.id !== a.id).map(x => <option key={x.id} value={x.id}>{x.code} {x.name}</option>)}
                   </select>
-                  <select value={linkType} onChange={e => setLinkType(e.target.value)} aria-label="Link type" className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]">
+                  <select value={linkType} onChange={e => setLinkType(e.target.value)} aria-label="Link type" className="bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-body">
                     {['FS', 'SS', 'FF', 'SF'].map(x => <option key={x}>{x}</option>)}
                   </select>
-                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-[12px]" />
+                  <input type="number" value={linkLag} onChange={e => setLinkLag(e.target.value)} title="Lag (work days)" aria-label="Lag in work days" className="w-16 bg-warm-100 border border-warm-300 rounded-lg px-2 py-1.5 text-body" />
                   <button disabled={!!busy || !reason.trim() || !linkTarget} onClick={async () => { if (await onEdit({ kind: 'add_link', from: a.id, to: linkTarget, type: linkType, lag: Number(linkLag) || 0, reason })) { setReason(''); setLinkTarget('') } }}
-          className="bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold">Link</button>
+          className="bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-body font-semibold">Link</button>
                 </div>
                 {!['ntp', 'substantial_completion', 'final_completion'].includes(a.category) && (
                   <button disabled={!!busy || !reason.trim()} onClick={async () => { if (confirm(`Remove ${a.code}? Its predecessors will be linked to its successors.`)) await onEdit({ kind: 'remove_activity', activityId: a.id, reason }) }}
-                    className="flex items-center gap-1 text-[12px] text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
+                    className="flex items-center gap-1 text-body text-status-at-risk disabled:opacity-40"><Trash2 size={12} /> Remove activity</button>
                 )}
                 </>}
                 {a.overrides?.map((o, i) => (
-                  <p key={i} className="text-[12px] text-warm-500">{fmtDateTime(o.at)} — {o.by}: {o.field} {o.from !== undefined ? `${String(o.from)} → ` : ''}{String(o.to ?? '')} · “{o.reason}”</p>
+                  <p key={i} className="text-caption text-warm-500">{fmtDateTime(o.at)} — {o.by}: {o.field} {o.from !== undefined ? `${String(o.from)} → ` : ''}{String(o.to ?? '')} · “{o.reason}”</p>
                 ))}
               </div>
             </div>
@@ -742,8 +742,8 @@ function LinkRow({ l, other, dir, onEdit, busy, canWrite }: { l: PlanLink; other
     if (reason && reason.trim()) await onEdit({ kind: 'remove_link', linkId: l.id, reason })
   }
   return (
-    <div className="text-[12px] text-warm-600 py-1 flex gap-2 items-start">
-      <span className="font-mono text-[12px] text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
+    <div className="text-body text-warm-600 py-1 flex gap-2 items-start">
+      <span className="font-mono text-body text-warm-500 flex-shrink-0 mt-0.5">{dir === 'after' ? '←' : '→'} {l.type}{l.lag ? `${l.lag > 0 ? '+' : ''}${l.lag}` : ''}</span>
       <span className="flex-1"><span className="font-medium text-ink">{other?.code} {other?.name}</span> — {fmtDates(l.rationale.summary)}</span>
       {canWrite && <button disabled={!!busy} onClick={remove} title="Remove relationship" aria-label={`Remove the relationship with ${other?.code ?? 'this activity'}`} className="text-warm-600 hover:text-status-at-risk flex-shrink-0"><X size={12} aria-hidden="true" /></button>}
     </div>
@@ -781,7 +781,7 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
 
       {guidance.length > 0 && (
         <section aria-labelledby="decisions-title">
-          <h3 id="decisions-title" className="text-[16px] font-semibold text-ink mb-3">What needs your decision <span className="ml-1 text-[13px] font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h3>
+          <h3 id="decisions-title" className="text-heading font-semibold text-ink mb-3">What needs your decision <span className="ml-1 text-body font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h3>
           <div className="space-y-2.5">
             {guidance.map((g, i) => <GuideCard key={g.id} g={g} startOpen={!g.decision && guidance.findIndex(x => !x.decision) === i} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} onRecovery={onRecovery} />)}
           </div>
@@ -789,13 +789,13 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
       )}
 
       <div>
-        <h3 className="text-[16px] font-semibold text-ink mb-2">Details</h3>
+        <h3 className="text-heading font-semibold text-ink mb-2">Details</h3>
         <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
         {ev.dateChecks.length > 0 && (
           <Disclosure title="Your dates vs. what the logic can achieve" meta={ev.dateChecks.filter(c => c.severity !== 'info').length ? `${ev.dateChecks.filter(c => c.severity !== 'info').length} to check` : 'all fit'}>
           <ul className="space-y-1.5">
             {ev.dateChecks.map((c, i) => (
-              <li key={i} className="text-[13px] text-warm-700 flex gap-2">
+              <li key={i} className="text-body text-warm-700 flex gap-2">
                 {c.severity === 'info' ? <CheckCircle2 size={13} className="text-status-on-track flex-shrink-0 mt-0.5" /> : <AlertTriangle size={13} className={`${c.severity === 'error' ? 'text-status-at-risk' : 'text-status-attention'} flex-shrink-0 mt-0.5`} />}
                 <span>{fmtDates(c.text)}</span>
               </li>
@@ -805,11 +805,11 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         )}
         {ev.findings.length > 0 && (
           <Disclosure title="Findings" meta={ev.findings.length}>
-            <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
+            <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-body text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
           </Disclosure>
         )}
         <Disclosure title="DCMA 14-point assessment" meta={`${ev.dcma.passed}/${ev.dcma.applicable} passing`}>
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body">
             <caption className="sr-only">DCMA 14-point checks with metric, threshold and result</caption>
             <tbody>
               {ev.dcma.checks.map(c => (
@@ -818,24 +818,24 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
                   <td className="py-1.5 pr-2 text-ink">{c.name}</td>
                   <td className="py-1.5 pr-2 text-warm-600 tabular-nums">{c.metric}</td>
                   <td className="py-1.5 pr-2 text-warm-500">{c.threshold}</td>
-                  <td className={`py-1.5 text-[12px] ${c.result === 'fail' ? 'font-semibold text-status-at-risk' : c.result === 'warn' ? 'font-semibold text-status-attention' : 'text-warm-600'}`}>{c.result === 'pass' ? 'Pass' : c.result === 'fail' ? 'Fail' : c.result === 'warn' ? 'Warning' : 'Not applicable'}</td>
+                  <td className={`py-1.5 text-body ${c.result === 'fail' ? 'font-semibold text-status-at-risk' : c.result === 'warn' ? 'font-semibold text-status-attention' : 'text-warm-600'}`}>{c.result === 'pass' ? 'Pass' : c.result === 'fail' ? 'Fail' : c.result === 'warn' ? 'Warning' : 'Not applicable'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </Disclosure>
         <Disclosure title="Against how your projects actually went" meta={ev.benchmark.rows.length ? `${ev.benchmark.rows.length} activities${ev.benchmark.rows.some(r => r.verdict === 'optimistic') ? ` · ${ev.benchmark.rows.filter(r => r.verdict === 'optimistic').length} optimistic` : ''}` : 'no comparables yet'}>
-          <p className="text-[12px] text-warm-500 mb-2">{ev.benchmark.basis}</p>
-          {ev.benchmark.rows.length === 0 ? <p className="text-[13px] text-warm-500">No comparable activities yet.</p> : (
-            <table className="w-full text-[12px]">
-              <thead><tr className="text-left text-[12px] text-warm-500"><th className="py-1 font-medium">Activity</th><th className="py-1 font-medium text-right">Plan</th><th className="py-1 font-medium text-right">Firm P20–P80</th><th className="py-1 pl-2 font-medium">Verdict</th></tr></thead>
+          <p className="text-caption text-warm-500 mb-2">{ev.benchmark.basis}</p>
+          {ev.benchmark.rows.length === 0 ? <p className="text-body text-warm-500">No comparable activities yet.</p> : (
+            <table className="w-full text-body">
+              <thead><tr className="text-left text-caption text-warm-500"><th className="py-1 font-medium">Activity</th><th className="py-1 font-medium text-right">Plan</th><th className="py-1 font-medium text-right">Firm P20–P80</th><th className="py-1 pl-2 font-medium">Verdict</th></tr></thead>
               <tbody>
                 {ev.benchmark.rows.map(r => (
                   <tr key={r.activityId} className="border-t border-warm-200">
                     <td className="py-1.5 text-ink">{r.code} {r.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{r.planned}</td>
                     <td className="py-1.5 text-right tabular-nums text-warm-600">{r.firmP20}–{r.firmP80}</td>
-                    <td className={`py-1.5 pl-2 text-[12px] ${r.verdict === 'optimistic' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(r.verdict.replace('_', ' '))}</td>
+                    <td className={`py-1.5 pl-2 text-body ${r.verdict === 'optimistic' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(r.verdict.replace('_', ' '))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -843,11 +843,11 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           )}
         </Disclosure>
         <Disclosure title="Coverage of grounded requirements" meta={ev.coverage.length ? `${ev.coverage.length} items${ev.coverage.some(c => c.status === 'missing') ? ` · ${ev.coverage.filter(c => c.status === 'missing').length} missing` : ''}` : 'none yet'}>
-          {ev.coverage.length === 0 && <p className="text-[13px] text-warm-500">No permits or long-lead items apply yet — answer facility type and state.</p>}
+          {ev.coverage.length === 0 && <p className="text-body text-warm-500">No permits or long-lead items apply yet — answer facility type and state.</p>}
           <ul className="space-y-1">
             {ev.coverage.map((c, i) => (
-              <li key={i} className="text-[12px] flex gap-2">
-                <span className={`text-[12px] w-20 flex-shrink-0 ${c.status === 'missing' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(c.status)}</span>
+              <li key={i} className="text-body flex gap-2">
+                <span className={`text-body w-20 flex-shrink-0 ${c.status === 'missing' ? 'font-semibold text-status-at-risk' : 'text-warm-600'}`}>{cap(c.status)}</span>
                 <span><span className="text-ink">{c.item}</span><span className="text-warm-500"> — {c.detail}</span></span>
               </li>
             ))}
@@ -857,26 +857,26 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
         </Disclosure>
         <Disclosure title="Expert review" meta={ev.review.status !== 'none' ? ev.review.status.replace('_', ' ') : 'none recorded'}>
-          <p className="text-[12px] text-warm-600 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
+          <p className="text-caption text-warm-600 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
-          <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
-            <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="text-[12px] font-semibold">{cap(r.verdict.replace(/_/g, ' '))}</span>
+          <div key={r.id} className="text-body text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
+            <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="text-caption font-semibold">{cap(r.verdict.replace(/_/g, ' '))}</span>
             {r.comment && <div className="text-warm-600 mt-0.5">{r.comment}</div>}
           </div>
         ))}
-        {!canReview ? <p className="text-[12px] text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
+        {!canReview ? <p className="text-caption text-warm-600 mt-3">Reviews are recorded by a reviewer, an admin or the owner of your organization.</p> : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-          <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]">
+          <select value={verdict} onChange={e => setVerdict(e.target.value)} aria-label="Review verdict" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-body">
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
           </select>
-          <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
-          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable border border-warm-300 bg-white hover:bg-warm-100 text-ink rounded-lg text-[13px] font-semibold py-2">Record review</button>
-          <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
+          <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-body" />
+          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable border border-warm-300 bg-white hover:bg-warm-100 text-ink rounded-lg text-body font-semibold py-2">Record review</button>
+          <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-body" />
         </div>
         )}
         </Disclosure>
         <Disclosure title="What these numbers mean">
-            <ul className="text-[13px] text-warm-600 space-y-1.5">
+            <ul className="text-body text-warm-600 space-y-1.5">
               <li><span className="font-medium text-ink">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
               <li><span className="font-medium text-ink">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
               <li><span className="font-medium text-ink">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-ink">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-ink">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
@@ -906,45 +906,45 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, onRecov
   return (
     <div className={`border border-warm-200 rounded-[14px] ${g.decision ? 'bg-warm-50' : 'bg-white'}`}>
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
-        <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
-        <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
-        {g.decision && <span className="text-[12px] text-warm-600">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
+        <span className={`rounded-full px-2 py-0.5 text-caption font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
+        <span className="text-subhead font-semibold text-ink flex-1">{check.name} <span className="text-body font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
+        {g.decision && <span className="text-caption text-warm-600">{g.decision.decision === 'accept' ? 'Accepted' : 'To fix'}</span>}
         {open ? <ChevronDown size={14} className="text-warm-400" /> : <ChevronRight size={14} className="text-warm-400" />}
       </button>
       {open && (
         <div className="px-4 md:px-5 pb-4 space-y-2.5">
-          <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
-          {g.whyItMatters && <p className="text-[13px] text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
+          <p className="text-body text-warm-700"><span className="font-semibold text-ink">What it means: </span>{g.meaning}</p>
+          {g.whyItMatters && <p className="text-body text-warm-700"><span className="font-semibold text-ink">Why it matters: </span>{g.whyItMatters}</p>}
           {g.steps.length > 0 && (
             <div>
-              <div className="text-[12px] font-semibold text-ink">How to fix it</div>
-              <ol className="list-decimal ml-5 text-[13px] text-warm-700 space-y-0.5 mt-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+              <div className="text-body font-semibold text-ink">How to fix it</div>
+              <ol className="list-decimal ml-5 text-body text-warm-700 space-y-0.5 mt-0.5">{g.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
             </div>
           )}
-          {check.offenders.length > 0 && <p className="text-[12px] text-warm-500">Flagged: {check.offenders.slice(0, 12).join(', ')}{check.offenders.length > 12 ? ` and ${check.offenders.length - 12} more` : ''}</p>}
+          {check.offenders.length > 0 && <p className="text-caption text-warm-500">Flagged: {check.offenders.slice(0, 12).join(', ')}{check.offenders.length > 12 ? ` and ${check.offenders.length - 12} more` : ''}</p>}
           {g.decision && (
-            <p className="text-[12px] text-warm-600 border-l-2 border-status-on-track pl-2">
+            <p className="text-caption text-warm-600 border-l-2 border-status-on-track pl-2">
               {g.decision.decision === 'accept' ? 'Accepted' : 'Marked to fix'} by {g.decision.by} on {fmtDateTime(g.decision.at)}{g.decision.note ? ` — “${g.decision.note}”` : ''}
               {canWrite && <button onClick={() => onDecide(key, null, '')} className="ml-2 underline text-warm-600">Undo</button>}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             {g.actions.map((a, i) => a.kind === 'filter'
-              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
+              ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-body text-ink hover:bg-warm-100">{a.label}</button>
               : a.kind === 'recovery'
-        ? <button key={i} onClick={onRecovery} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</button>
+        ? <button key={i} onClick={onRecovery} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold">{a.label}</button>
                 : a.kind === 'interview'
-                  ? <button key={i} onClick={onInterview} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
-                  : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}…</button>)}
+                  ? <button key={i} onClick={onInterview} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-body text-ink hover:bg-warm-100">{a.label}</button>
+                  : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-body text-ink hover:bg-warm-100">{a.label}…</button>)}
             {!g.decision && !accept && canWrite && (
-              <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-lg border border-dashed border-warm-400 text-[12px] text-warm-600 hover:border-navy-900">Accept with justification…</button>
+              <button onClick={() => setAccepting(x => !x)} className="pressable px-3 py-1.5 rounded-lg border border-dashed border-warm-400 text-body text-warm-600 hover:border-navy-900">Accept with justification…</button>
             )}
-            {!g.decision && canWrite && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">I&apos;ll fix it</button>}
+            {!g.decision && canWrite && <button disabled={!!busy} onClick={() => onDecide(key, 'fix', '')} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-body text-ink hover:bg-warm-100">I&apos;ll fix it</button>}
           </div>
           {accepting && !g.decision && canWrite && (
             <div className="flex flex-col gap-2">
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} aria-label={`Why check ${g.id} is acceptable for this project`} placeholder="Why this is acceptable for this project (goes into the Basis of Schedule)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
-              <button disabled={!!busy || note.trim().length < 10} onClick={async () => { if (await onDecide(key, 'accept', note)) setAccepting(false) }} className="self-start bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold">Record decision</button>
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} aria-label={`Why check ${g.id} is acceptable for this project`} placeholder="Why this is acceptable for this project (goes into the Basis of Schedule)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-body" />
+              <button disabled={!!busy || note.trim().length < 10} onClick={async () => { if (await onDecide(key, 'accept', note)) setAccepting(false) }} className="self-start bg-accent-600 hover:bg-accent-700 text-white px-3.5 py-1.5 rounded-lg text-body font-semibold">Record decision</button>
             </div>
           )}
         </div>
@@ -955,10 +955,10 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, onRecov
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div>
-      <dt className="text-[12px] text-warm-500">{label}</dt>
-      <dd className="text-[18px] font-semibold text-ink tabular-nums mt-0.5">{value}</dd>
-      {sub && <dd className="text-[12px] text-warm-500 mt-0.5">{sub}</dd>}
+    <div className="flex flex-col">
+      <dt className="text-caption text-warm-500">{label}</dt>
+      <dd className="order-first text-heading font-semibold text-ink tabular-nums">{value}</dd>
+      {sub && <dd className="text-caption text-warm-500">{sub}</dd>}
     </div>
   )
 }
@@ -982,36 +982,36 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
   const pct = (x: number) => `${Math.round(x * 100)}%`
   return (
     <Disclosure title="Schedule risk analysis (Monte Carlo)" meta={r?.required ? `${pct(r.required.probability)} chance of ${fmtDate(r.required.date)}` : r ? `P80 ${fmtDate(r.percentiles.p80)}` : state === 'running' ? 'running…' : state === 'locked' ? 'Pro and Enterprise' : 'not run yet'}>
-      {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable mb-3 flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-3.5 py-1.5 text-[13px] font-medium">
+      {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable mb-3 flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-3.5 py-1.5 text-body font-medium">
         {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
       </button>}
-      {!r && state !== 'running' && <p className="text-[12px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
-      {state === 'locked' && <p role="status" className="text-[12px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
-      {state === 'error' && <p role="alert" className="text-[12px] text-status-at-risk">The simulation could not run. Try again.</p>}
+      {!r && state !== 'running' && <p className="text-caption text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
+      {state === 'locked' && <p role="status" className="text-body text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
+      {state === 'error' && <p role="alert" className="text-body text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">
           {r.required && (
-            <p className="text-[13px] text-warm-700">
+            <p className="text-body text-warm-700">
               Chance of finishing by the required {fmtDate(r.required.date)}: <span className="font-semibold text-ink">{pct(r.required.probability)}</span>
               {r.required.probability < 0.8 && ' (the usual target is 80%).'}
             </p>
           )}
           <dl className="grid grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-3">
             {([['P10', r.percentiles.p10], ['P50', r.percentiles.p50], ['P80', r.percentiles.p80], ['P90', r.percentiles.p90], ['Deterministic', r.deterministic]] as const).map(([l, d]) => (
-              <div key={l}>
-                <dt className="text-[12px] text-warm-500">{l}</dt>
-                <dd className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(d)}</dd>
+              <div key={l} className="flex flex-col">
+                <dt className="text-caption text-warm-500">{l}</dt>
+                <dd className="order-first text-subhead font-semibold text-ink tabular-nums">{fmtDate(d)}</dd>
               </div>
             ))}
           </dl>
-          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-[12px] text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
+          {r.warnings?.map((w, i) => <p key={i} role="note" className="text-caption text-status-attention border-l-2 border-status-attention pl-2">{w}</p>)}
           <FinishDistribution histogram={r.histogram} iterations={r.iterations} required={r.required?.date} median={r.percentiles.p50} />
           <div>
           {r.sensitivity.length > 0 && (
             <Disclosure title="What drives the risk" meta={`${r.sensitivity.length} activities`}>
-              <table className="w-full text-[12px]">
+              <table className="w-full text-body">
                 <caption className="sr-only">Activities whose uncertainty moves the finish date most</caption>
-                <thead><tr className="text-left text-[12px] text-warm-500"><th scope="col" className="py-1 font-medium">Activity</th><th scope="col" className="py-1 font-medium text-right">Sensitivity</th><th scope="col" className="py-1 font-medium text-right">Critical in</th><th scope="col" className="py-1 pl-3 font-medium hidden md:table-cell">Range used</th></tr></thead>
+                <thead><tr className="text-left text-caption text-warm-500"><th scope="col" className="py-1 font-medium">Activity</th><th scope="col" className="py-1 font-medium text-right">Sensitivity</th><th scope="col" className="py-1 font-medium text-right">Critical in</th><th scope="col" className="py-1 pl-3 font-medium hidden md:table-cell">Range used</th></tr></thead>
                 <tbody>
                   {r.sensitivity.map(s => (
                     <tr key={s.id} className="border-t border-warm-200">
@@ -1023,11 +1023,11 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
                   ))}
                 </tbody>
               </table>
-              <p className="text-[12px] text-warm-500 mt-1">Sensitivity is the rank correlation between the activity&apos;s duration and the finish date across runs (1.00 = moves the finish one-for-one). &quot;Critical in&quot; is the share of runs in which the activity was on the critical path.</p>
+              <p className="text-caption text-warm-500 mt-1">Sensitivity is the rank correlation between the activity&apos;s duration and the finish date across runs (1.00 = moves the finish one-for-one). &quot;Critical in&quot; is the share of runs in which the activity was on the critical path.</p>
             </Disclosure>
           )}
           <Disclosure title="Method and assumptions">
-            <div className="text-[12px] text-warm-600">
+            <div className="text-body text-warm-600">
               <p>{r.method}</p>
               <ul className="list-disc ml-5 mt-1 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
             </div>
@@ -1055,32 +1055,32 @@ function AuditTab({ plan, onDelete, fullLog }: { plan: Plan; onDelete?: () => vo
     <div>
       {records ? (
         <>
-          <p className="text-[12px] text-warm-500 mb-2">Complete record from the organization audit log ({records.length} entries). Each entry is hash-chained; verify integrity or download the full log under Organization.</p>
+          <p className="text-caption text-warm-500 mb-2">Complete record from the organization audit log ({records.length} entries). Each entry is hash-chained; verify integrity or download the full log under Organization.</p>
           <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
-            {records.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
+            {records.length === 0 && <p className="p-5 text-body text-warm-500">Nothing recorded yet.</p>}
             {records.map(e => (
-              <div key={e.seq} className="px-4 py-2.5 text-[12px] flex flex-col sm:flex-row gap-1 sm:gap-3">
+              <div key={e.seq} className="px-4 py-2.5 text-body flex flex-col sm:flex-row gap-1 sm:gap-3">
                 <span className="text-warm-500 tabular-nums sm:w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
                 <span className="text-ink sm:w-44 flex-shrink-0 truncate" title={e.ip ? `from ${e.ip}` : undefined}>{e.actorEmail || 'system'}</span>
                 <span className="text-warm-600 min-w-0"><span className="font-medium">{e.action.replace(/^plan\./, '')}</span>{e.detail?.detail ? ` — ${fmtDates(String(e.detail.detail))}` : e.detail?.format ? ` — ${String(e.detail.format)}` : ''}</span>
-                <span className="sm:ml-auto font-mono text-[12px] text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
+                <span className="sm:ml-auto font-mono text-caption text-warm-400 flex-shrink-0" title={`hash ${e.hash}`}>#{e.seq} · {e.hash.slice(0, 8)}</span>
               </div>
             ))}
           </div>
         </>
       ) : (
         <div className="bg-warm-100 border border-warm-200 rounded-lg divide-y divide-warm-200">
-          {plan.audit.length === 0 && <p className="p-5 text-[13px] text-warm-500">Nothing recorded yet.</p>}
+          {plan.audit.length === 0 && <p className="p-5 text-body text-warm-500">Nothing recorded yet.</p>}
           {[...plan.audit].reverse().map((e, i) => (
-            <div key={i} className="px-4 py-2.5 text-[12px] flex gap-3">
+            <div key={i} className="px-4 py-2.5 text-body flex flex-wrap gap-x-3 gap-y-0.5">
               <span className="text-warm-500 tabular-nums w-36 flex-shrink-0">{fmtDateTime(e.at)}</span>
               <span className="text-ink w-28 flex-shrink-0 truncate">{e.by}</span>
-              <span className="text-warm-600"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
+              <span className="text-warm-600 min-w-[200px] flex-1"><span className="font-medium">{e.action}</span>{e.detail ? ` — ${fmtDates(e.detail)}` : ''}</span>
             </div>
           ))}
         </div>
       )}
-      {onDelete && <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-[12px] text-status-at-risk"><Trash2 size={12} aria-hidden="true" /> Delete plan</button>}
+      {onDelete && <button onClick={onDelete} className="mt-4 flex items-center gap-1 text-body text-status-at-risk"><Trash2 size={12} aria-hidden="true" /> Delete plan</button>}
     </div>
   )
 }

@@ -30,7 +30,7 @@ const RESP: [Responsibility, string][] = [['unassigned', 'Unassigned'], ['owner'
 const STATUS: Record<string, string> = { draft: 'Draft', analyzed: 'Analysed', accepted: 'Accepted', rejected: 'Rejected' }
 const td = 'px-2 py-1.5 border-b border-warm-200 align-top'
 const th = 'px-2 py-1.5 border-b border-warm-300 text-left font-semibold text-warm-600'
-const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-[13px] text-warm-700'
+const input = 'border border-warm-300 rounded px-2 py-1 bg-white text-body text-warm-700'
 const primary = buttonClass.primary
 const secondary = buttonClass.secondary
 const signed = (n: number | null | undefined) => (n == null ? '—' : n > 0 ? `+${n}` : String(n))
@@ -118,33 +118,33 @@ export default function TimeImpactPage() {
       Upload or select a schedule update to run a time impact analysis.
     </EmptyState>
   )
-  if (!data) return <div className="px-6 py-10 text-[14px] text-warm-600 flex items-center gap-2" role="status">{err || <><Loader2 size={14} className="animate-spin" aria-hidden /> Loading delay events…</>}</div>
+  if (!data) return <div className="px-6 py-10 text-body text-warm-600 flex items-center gap-2" role="status">{err || <><Loader2 size={14} className="animate-spin" aria-hidden /> Loading delay events…</>}</div>
   const event = data.events.find(e => e.id === selected) ?? null
 
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
       <header>
         <h2 className="sr-only">Delays</h2>
-        <p className="text-[13px] text-warm-700">Delays measured as of data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
+        <p className="text-body text-warm-700">Delays measured as of data date {fmtDate(data.schedule.dataDate)}{data.contractMilestone ? ` · contract milestone ${data.contractMilestone.code} ${data.contractMilestone.name}` : ''}{data.previous ? ` · previous update ${data.previous.label}` : ''}</p>
       </header>
       {/* One notice, not two stacked banners. */}
       {/* One line, with the full notice a click away: the page used to open on a five-line paragraph. */}
       <Disclosure tone="card" title="Calculation, not conclusion" meta="what this analysis is and is not">
-        <p className="text-[13px] text-warm-700">{data.disclaimer}{data.acceptanceNote ? <> {data.acceptanceNote}</> : null}</p>
+        <p className="text-body text-warm-700">{data.disclaimer}{data.acceptanceNote ? <> {data.acceptanceNote}</> : null}</p>
       </Disclosure>
       {err && <Alert tone="error">{err}</Alert>}
 
       <div className="grid md:grid-cols-[260px_1fr] gap-5 items-start">
         <section aria-labelledby="events-h" className="bg-white border border-warm-200 rounded-[14px] p-4 space-y-3">
-          <h2 id="events-h" className="text-[14px] font-semibold text-ink">Delay events</h2>
-          {data.events.length === 0 ? <p className="text-[13px] text-warm-600">None yet.</p> : (
+          <h2 id="events-h" className="text-heading font-semibold text-ink">Delay events</h2>
+          {data.events.length === 0 ? <p className="text-body text-warm-600">None yet.</p> : (
             <ul className="space-y-1">
               {data.events.map(e => (
                 <li key={e.id}>
                   <button type="button" onClick={() => setSelected(e.id)} aria-current={e.id === selected ? 'true' : undefined}
-                    className={`w-full text-left px-2.5 py-2 rounded-md text-[13px] ${e.id === selected ? 'bg-accent-100 text-ink' : 'hover:bg-warm-100 text-warm-700'}`}>
+                    className={`w-full text-left px-2.5 py-2 rounded-md text-body ${e.id === selected ? 'bg-accent-100 text-ink' : 'hover:bg-warm-100 text-warm-700'}`}>
                     <span className="block font-medium text-ink">{e.title}</span>
-                    <span className="block text-[12px] text-warm-600">{STATUS[e.status]} · {e.runs} run{e.runs === 1 ? '' : 's'}{e.eventStart ? ` · from ${fmtDate(e.eventStart)}` : ''}</span>
+                    <span className="block text-caption text-warm-600">{STATUS[e.status]} · {e.runs} run{e.runs === 1 ? '' : 's'}{e.eventStart ? ` · from ${fmtDate(e.eventStart)}` : ''}</span>
                   </button>
                 </li>
               ))}
@@ -152,14 +152,14 @@ export default function TimeImpactPage() {
           )}
           {canWrite && (
             <form onSubmit={create} className={`space-y-2 ${data.events.length ? 'pt-2 border-t border-warm-200' : ''}`}>
-              <label htmlFor="new-ev" className="block text-[12px] font-semibold text-warm-700">New delay event</label>
+              <label htmlFor="new-ev" className="block text-caption font-semibold text-warm-700">New delay event</label>
               <input id="new-ev" className={`${input} w-full`} value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Differing site condition" maxLength={200} />
               <button type="submit" className={primary} disabled={busy || newTitle.trim().length < 3}>Add event</button>
             </form>
           )}
           {canWrite && docs !== null && docs.length > 0 && (
             <div className="space-y-2 pt-3 border-t border-warm-200">
-              <label htmlFor="draft-doc" className="block text-[12px] font-semibold text-warm-700">Draft from a change document</label>
+              <label htmlFor="draft-doc" className="block text-caption font-semibold text-warm-700">Draft from a change document</label>
               {(
                 <>
                   <select id="draft-doc" className={`${input} w-full`} value={docId} onChange={e => setDocId(e.target.value)}>
@@ -169,7 +169,7 @@ export default function TimeImpactPage() {
                   <button type="button" className={secondary} disabled={!docId || drafting} onClick={runDraft}>
                     {drafting ? <><Loader2 size={13} className="inline animate-spin mr-1" aria-hidden />Reading…</> : 'Draft fragnet'}
                   </button>
-                  <p className="text-[12px] text-warm-600">RunF9 proposes the new activities and ties, each with the sentence it relies on. Nothing is saved until you create the event.</p>
+                  <p className="text-caption text-warm-600">RunF9 proposes the new activities and ties, each with the sentence it relies on. Nothing is saved until you create the event.</p>
                 </>
               )}
             </div>
@@ -181,13 +181,13 @@ export default function TimeImpactPage() {
           : (
             /* The empty pane says what happens here, in three short steps. */
             <div className="rounded-[14px] border border-warm-200 bg-white p-5">
-              <h3 className="text-[16px] font-semibold text-ink">Measure what a delay does to the finish</h3>
-              <ol className="mt-3 space-y-2 text-[13px] text-warm-700 max-w-2xl">
+              <h3 className="text-subhead font-semibold text-ink">Measure what a delay does to the finish</h3>
+              <ol className="mt-3 space-y-2 text-body text-warm-700 max-w-2xl">
                 {[['Name the event', 'a late delivery, a change order, a stop-work.'],
                   ['Describe the added work', <>the few activities and links it adds (a fragnet). With a change order under <Link href="/dashboard/documents" className="font-medium text-accent-600 hover:underline">Project records</Link>, RunF9 drafts it.</>],
                   ['Run the analysis', 'each milestone is shown before and after.']].map(([t, d], n) => (
                   <li key={n} className="flex gap-3">
-                    <span aria-hidden="true" className="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full border border-warm-300 text-[12px] font-semibold text-ink">{n + 1}</span>
+                    <span aria-hidden="true" className="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full border border-warm-300 text-caption font-semibold text-ink">{n + 1}</span>
                     <span><span className="font-semibold text-ink">{t}: </span>{d}</span>
                   </li>
                 ))}
@@ -274,17 +274,17 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
 
       <section aria-labelledby="ev-h" className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-3">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="ev-h" className="text-[14px] font-semibold text-ink">Delay event</h2>
-          <span className="text-[12px] text-warm-700">{STATUS[event.status]}{event.statusNote ? ` — ${event.statusNote}` : ''}</span>
+          <h2 id="ev-h" className="text-heading font-semibold text-ink">Delay event</h2>
+          <span className="text-caption text-warm-700">{STATUS[event.status]}{event.statusNote ? ` — ${event.statusNote}` : ''}</span>
         </div>
-        <fieldset disabled={ro} className="grid sm:grid-cols-2 gap-3 text-[12px] text-warm-700">
+        <fieldset disabled={ro} className="grid sm:grid-cols-2 gap-3 text-caption text-warm-700">
           <label className="sm:col-span-2">Title<input className={`${input} w-full mt-0.5`} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} maxLength={200} /></label>
           <label className="sm:col-span-2">Description<textarea className={`${input} w-full mt-0.5`} rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} maxLength={5000} /></label>
           <label>Responsibility (label only)
             <select className={`${input} w-full mt-0.5`} value={form.responsibility} onChange={e => setForm({ ...form, responsibility: e.target.value as Responsibility })}>
               {RESP.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <span className="block text-[12px] text-warm-600 mt-0.5">A label you enter. RunF9 does not assess responsibility.</span>
+            <span className="block text-caption text-warm-600 mt-0.5">A label you enter. RunF9 does not assess responsibility.</span>
           </label>
           <label>Notice date<input type="date" className={`${input} w-full mt-0.5`} value={form.notifiedOn} onChange={e => setForm({ ...form, notifiedOn: e.target.value })} /></label>
           <label>Event start<input type="date" className={`${input} w-full mt-0.5`} value={form.eventStart} onChange={e => setForm({ ...form, eventStart: e.target.value })} /></label>
@@ -292,12 +292,12 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
         </fieldset>
 
         <fieldset disabled={ro} className="space-y-2">
-          <legend className="text-[13px] font-semibold text-ink">Evidence</legend>
-          {evidence.length === 0 && <p className="text-[12px] text-warm-600">No references yet (letters, RFIs, daily reports, photos…).</p>}
+          <legend className="text-body font-semibold text-ink">Evidence</legend>
+          {evidence.length === 0 && <p className="text-caption text-warm-600">No references yet (letters, RFIs, daily reports, photos…).</p>}
           {evidence.map((ev, i) => (
             <div key={i} className="flex flex-wrap gap-2 items-end">
-              <label className="text-[12px] text-warm-700 flex-1 min-w-[180px]">Reference<input className={`${input} w-full mt-0.5`} value={ev.label} onChange={e => setEvidence(evidence.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="e.g. RFI 042, owner letter 03/02/2026" /></label>
-              <label className="text-[12px] text-warm-700 flex-1 min-w-[180px]">Link (optional)<input type="url" className={`${input} w-full mt-0.5`} value={ev.url} onChange={e => setEvidence(evidence.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))} placeholder="https://…" /></label>
+              <label className="text-caption text-warm-700 flex-1 min-w-[180px]">Reference<input className={`${input} w-full mt-0.5`} value={ev.label} onChange={e => setEvidence(evidence.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="e.g. RFI 042, owner letter 03/02/2026" /></label>
+              <label className="text-caption text-warm-700 flex-1 min-w-[180px]">Link (optional)<input type="url" className={`${input} w-full mt-0.5`} value={ev.url} onChange={e => setEvidence(evidence.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))} placeholder="https://…" /></label>
               <button type="button" className={secondary} onClick={() => setEvidence(evidence.filter((_, j) => j !== i))} aria-label={`Remove evidence ${i + 1}`}>Remove</button>
             </div>
           ))}
@@ -306,12 +306,12 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
       </section>
 
       <section aria-labelledby="frag-h" className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-3">
-        <h2 id="frag-h" className="text-[14px] font-semibold text-ink">Fragnet</h2>
-        <p className="text-[12px] text-warm-700">New activities that model the delay, tied to existing activity codes. Fragnet work cannot start before the data date ({fmtDate(overview.schedule.dataDate)}); completed activities are not moved. Durations and lags are work days.</p>
+        <h2 id="frag-h" className="text-heading font-semibold text-ink">Fragnet</h2>
+        <p className="text-caption text-warm-700">New activities that model the delay, tied to existing activity codes. Fragnet work cannot start before the data date ({fmtDate(overview.schedule.dataDate)}); completed activities are not moved. Durations and lags are work days.</p>
         <fieldset disabled={ro} className="space-y-2">
-          <legend className="text-[13px] font-semibold text-ink">Activities</legend>
+          <legend className="text-body font-semibold text-ink">Activities</legend>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-body [&_th]:text-caption">
               <thead><tr><th className={th}>ID</th><th className={th}>Name</th><th className={th}>Duration (wd)</th><th className={th}>Calendar</th><th className={th}>Earliest start</th><th className={th}><span className="sr-only">Remove</span></th></tr></thead>
               <tbody>
                 {acts.map((a, i) => {
@@ -328,7 +328,7 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
                         </select>
                       </td>
                       <td className={td}><input aria-label={`Fragnet activity ${i + 1} earliest start`} type="date" className={input} value={a.startNoEarlierThan ?? ''} onChange={e => upd({ startNoEarlierThan: e.target.value || null })} /></td>
-                      <td className={td}><button type="button" className="text-[12px] underline text-ink" onClick={() => setActs(acts.filter((_, j) => j !== i))}>Remove</button></td>
+                      <td className={td}><button type="button" className="text-caption underline text-ink" onClick={() => setActs(acts.filter((_, j) => j !== i))}>Remove</button></td>
                     </tr>
                   )
                 })}
@@ -339,10 +339,10 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
         </fieldset>
 
         <fieldset disabled={ro} className="space-y-2">
-          <legend className="text-[13px] font-semibold text-ink">Relationships</legend>
-          <p className="text-[12px] text-warm-600">Type an activity ID or pick from the list (fragnet and existing activities).</p>
+          <legend className="text-body font-semibold text-ink">Relationships</legend>
+          <p className="text-caption text-warm-600">Type an activity ID or pick from the list (fragnet and existing activities).</p>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-body [&_th]:text-caption">
               <thead><tr><th className={th}>Predecessor</th><th className={th}>Successor</th><th className={th}>Type</th><th className={th}>Lag (wd)</th><th className={th}><span className="sr-only">Remove</span></th></tr></thead>
               <tbody>
                 {rels.map((l, i) => {
@@ -357,7 +357,7 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
                         </select>
                       </td>
                       <td className={td}><input aria-label={`Relationship ${i + 1} lag in work days`} type="number" className={`${input} w-20`} value={String(l.lag)} onChange={e => upd({ lag: e.target.value === '' ? 0 : Number(e.target.value) })} /></td>
-                      <td className={td}><button type="button" className="text-[12px] underline text-ink" onClick={() => setRels(rels.filter((_, j) => j !== i))}>Remove</button></td>
+                      <td className={td}><button type="button" className="text-caption underline text-ink" onClick={() => setRels(rels.filter((_, j) => j !== i))}>Remove</button></td>
                     </tr>
                   )
                 })}
@@ -365,14 +365,14 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
             </table>
           </div>
           {canWrite && <button type="button" className={secondary} onClick={() => setRels([...rels, { from: '', to: '', type: 'FS', lag: 0 }])}>Add relationship</button>}
-          <label className="block text-[12px] text-warm-700"><input type="checkbox" checked={openEnds} onChange={e => setOpenEnds(e.target.checked)} /> Open ends are intentional (report them as warnings, not errors)</label>
+          <label className="block text-caption text-warm-700"><input type="checkbox" checked={openEnds} onChange={e => setOpenEnds(e.target.checked)} /> Open ends are intentional (report them as warnings, not errors)</label>
         </fieldset>
 
         {msg && <Alert tone={msg.tone}>{msg.text}{msg.list && <ul className="list-disc pl-5 mt-1">{msg.list.map((x, i) => <li key={i}>{x}</li>)}</ul>}</Alert>}
         <div className="flex flex-wrap items-center gap-2">
           {canWrite && <button type="button" className={secondary} onClick={() => { save().then(ok => ok && setMsg({ tone: 'success', text: 'Saved.' })) }} disabled={busy}>Save</button>}
           {canWrite && overview.schedule.editsApplied > 0 && (
-            <label className="text-[12px] text-warm-700">Network{' '}
+            <label className="text-caption text-warm-700">Network{' '}
               <select className={input} value={basis} onChange={e => setBasis(e.target.value as 'submitted' | 'scenario')}>
                 <option value="submitted">As submitted</option>
                 <option value="scenario">With RunF9 edits ({overview.schedule.editsApplied})</option>
@@ -380,15 +380,15 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
             </label>
           )}
           {canWrite && <button type="button" className={primary} onClick={run} disabled={busy || !acts.length}>{busy ? 'Working…' : 'Save and run analysis'}</button>}
-          {canWrite && event.status === 'draft' && <button type="button" className="text-[12px] underline text-status-at-risk ml-auto" onClick={remove}>Delete draft</button>}
+          {canWrite && event.status === 'draft' && <button type="button" className="text-caption underline text-status-at-risk ml-auto" onClick={remove}>Delete draft</button>}
         </div>
       </section>
 
       {runs.length > 0 && (
         <section aria-labelledby="runs-h" className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 id="runs-h" className="font-display text-[18px] text-ink">Results</h2>
-            <label className="text-[12px] text-warm-700">Run{' '}
+            <h2 id="runs-h" className="text-heading font-semibold text-ink">Results</h2>
+            <label className="text-caption text-warm-700">Run{' '}
               <select className={input} value={runId ?? ''} onChange={e => setRunId(e.target.value)}>
                 {runs.map(r => <option key={r.id} value={r.id}>{fmtDateTime(r.createdAt)}{r.createdByName ? ` · ${r.createdByName}` : ''} · {r.inputsHash.slice(0, 8)}</option>)}
               </select>
@@ -397,8 +397,8 @@ function EventPanel({ scheduleId, event, overview, canWrite, canAi, onChanged }:
           {current && <RunResult base={`${base}/runs/${current.id}`} run={current} canAi={canAi} />}
           {canWrite && current && (
             <div className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-2">
-              <label htmlFor="st-note" className="block text-[13px] font-semibold text-ink">Record the analysis decision</label>
-              <p className="text-[12px] text-warm-600">Accepting records that this analysis was accepted. It is not a determination of entitlement.</p>
+              <label htmlFor="st-note" className="block text-body font-semibold text-ink">Record the analysis decision</label>
+              <p className="text-caption text-warm-600">Accepting records that this analysis was accepted. It is not a determination of entitlement.</p>
               <input id="st-note" className={`${input} w-full`} value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional), e.g. accepted at the 05/04/2026 progress meeting" maxLength={2000} />
               <div className="flex gap-2">
                 <button type="button" className={primary} disabled={busy} onClick={() => setStatus('accepted')}>Accept analysis</button>
@@ -435,7 +435,7 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
   }
 
   return (
-    <div className="space-y-4 text-[13px] text-warm-700">
+    <div className="space-y-4 text-body text-warm-700">
       {cm && (
         <div className="grid sm:grid-cols-3 gap-3">
           <Stat label={`${cm.code} (logic-driven)`} value={signed(cm.impactCd.logic) + ' cd'} sub={`${fmtDate(cm.before.logic)} → ${fmtDate(cm.after.logic)} · ${signed(cm.impactWd.logic)} wd`} />
@@ -453,8 +453,8 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
       </div>
       {ai && (
         <div className="bg-warm-50 border border-warm-200 rounded-lg p-4 space-y-2" role="status">
-          <p className="text-[12px] text-warm-700 font-semibold">{ai.source === 'ai' ? 'AI-written explanation of the computed results (the tables govern)' : ai.source === 'template' ? 'Template narrative (no AI model)' : 'Narrative'}</p>
-          {ai.note && <p className="text-[12px] text-warm-700">{ai.note}</p>}
+          <p className="text-caption text-warm-700 font-semibold">{ai.source === 'ai' ? 'AI-written explanation of the computed results (the tables govern)' : ai.source === 'template' ? 'Template narrative (no AI model)' : 'Narrative'}</p>
+          {ai.note && <p className="text-caption text-warm-700">{ai.note}</p>}
           {ai.text.split('\n\n').map((p, i) => <p key={i}>{p}</p>)}
           {ai.content && <button type="button" className={secondary} onClick={downloadMd}>Download report with this narrative (Markdown)</button>}
         </div>
@@ -473,18 +473,18 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
         rows={r.fragnet.map(f => [f.code, f.name, f.duration, f.calendar, fmtDate(f.start), fmtDate(f.finish), f.totalFloat ?? '—', f.onDrivingPath ? 'Yes' : 'No'])} />
 
       <div>
-        <h3 className="text-[13px] font-semibold text-ink mb-1">Concurrency indicators</h3>
-        <p className="text-[12px] text-warm-700 mb-1">{r.concurrency.basis === 'previous_update' ? `Compared with ${r.concurrency.comparedWith}.` : r.concurrency.basis === 'baseline' ? 'No previous update: compared with baseline dates.' : 'No previous update or baseline to compare with.'} Each flag is a potential concurrent delay and requires analyst judgment.</p>
-        {r.concurrency.flags.length === 0 ? <p className="text-[12px] text-warm-600">None flagged.</p> : (
+        <h3 className="text-subhead font-semibold text-ink mb-1">Concurrency indicators</h3>
+        <p className="text-caption text-warm-700 mb-1">{r.concurrency.basis === 'previous_update' ? `Compared with ${r.concurrency.comparedWith}.` : r.concurrency.basis === 'baseline' ? 'No previous update: compared with baseline dates.' : 'No previous update or baseline to compare with.'} Each flag is a potential concurrent delay and requires analyst judgment.</p>
+        {r.concurrency.flags.length === 0 ? <p className="text-caption text-warm-600">None flagged.</p> : (
           <ul className="space-y-1">{r.concurrency.flags.map(f => <li key={f.code} className="border-l-2 border-status-attention pl-2"><span className="font-semibold text-ink">{f.code} {f.name}</span> — {f.detail}{f.overlapsEvent ? ' Overlaps the event period.' : ''} <span className="text-warm-700">({f.label})</span></li>)}</ul>
         )}
       </div>
 
       {(r.validation.warnings.length > 0 || r.warnings.length > 0) && (
-        <div><h3 className="text-[13px] font-semibold text-ink mb-1">Warnings</h3><ul className="list-disc pl-5">{[...r.validation.warnings, ...r.warnings].map((w, i) => <li key={i}>{w}</li>)}</ul></div>
+        <div><h3 className="text-subhead font-semibold text-ink mb-1">Warnings</h3><ul className="list-disc pl-5">{[...r.validation.warnings, ...r.warnings].map((w, i) => <li key={i}>{w}</li>)}</ul></div>
       )}
-      <div><h3 className="text-[13px] font-semibold text-ink mb-1">Assumptions</h3><ul className="list-disc pl-5 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul></div>
-      <p className="text-[12px] text-warm-600 break-all">Engine {run.engine} · inputs {run.inputsHash} · result {run.resultHash}</p>
+      <div><h3 className="text-subhead font-semibold text-ink mb-1">Assumptions</h3><ul className="list-disc pl-5 space-y-0.5">{r.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul></div>
+      <p className="text-caption text-warm-600 break-all">Engine {run.engine} · inputs {run.inputsHash} · result {run.resultHash}</p>
     </div>
   )
 }
@@ -492,9 +492,9 @@ function RunResult({ base, run, canAi }: { base: string; run: TiaRun; canAi: boo
 function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-warm-50 border border-warm-200 rounded-lg p-3">
-      <div className="text-[12px] font-semibold text-warm-600">{label}</div>
-      <div className="text-[20px] font-semibold text-ink tabular-nums">{value}</div>
-      <div className="text-[12px] text-warm-700">{sub}</div>
+      <div className="text-heading font-semibold text-ink tabular-nums">{value}</div>
+      <div className="text-caption font-semibold text-warm-700">{label}</div>
+      <div className="text-caption text-warm-600">{sub}</div>
     </div>
   )
 }
@@ -504,13 +504,13 @@ function Table({ caption, head, rows }: { caption: string; head: string[]; rows:
     <div>
       {/* Phones: one card per row (design system v2: tables become cards below 768px) */}
       <div className="md:hidden">
-        <h3 className="text-[12px] font-semibold text-ink mb-1">{caption}</h3>
-        {rows.length === 0 ? <p className="text-[12px] text-warm-600">None.</p> : (
+        <h3 className="text-subhead font-semibold text-ink mb-1">{caption}</h3>
+        {rows.length === 0 ? <p className="text-caption text-warm-600">None.</p> : (
           <ul className="space-y-2">
             {rows.map((r, i) => (
               <li key={i} className="rounded-[14px] border border-warm-200 bg-white p-3">
-                <div className="text-[13px] font-semibold text-ink">{r[0]} {r[1]}</div>
-                <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12px]">
+                <div className="text-body font-semibold text-ink">{r[0]} {r[1]}</div>
+                <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-caption">
                   {r.slice(2).map((c, j) => <div key={j} className="contents"><dt className="text-warm-600">{head[j + 2]}</dt><dd className="text-warm-700 tabular-nums">{c}</dd></div>)}
                 </dl>
               </li>
@@ -519,8 +519,8 @@ function Table({ caption, head, rows }: { caption: string; head: string[]; rows:
         )}
       </div>
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <caption className="text-left font-semibold text-ink mb-1">{caption}</caption>
+        <table className="w-full text-body [&_th]:text-caption">
+          <caption className="text-left text-subhead font-semibold text-ink mb-1">{caption}</caption>
           <thead><tr>{head.map(h => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
           <tbody>{rows.length ? rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={td}>{c}</td>)}</tr>) : <tr><td className={td} colSpan={head.length}>None.</td></tr>}</tbody>
         </table>
@@ -532,9 +532,9 @@ function Table({ caption, head, rows }: { caption: string; head: string[]; rows:
 function PathList({ title, steps }: { title: string; steps: TiaResult['drivingPath']['before'] }) {
   return (
     <div>
-      <h3 className="text-[13px] font-semibold text-ink mb-1">{title}</h3>
-      {steps.length === 0 ? <p className="text-[12px] text-warm-600">No open driving path.</p> : (
-        <ol className="list-decimal pl-5 space-y-0.5 text-[12px]">
+      <h3 className="text-subhead font-semibold text-ink mb-1">{title}</h3>
+      {steps.length === 0 ? <p className="text-caption text-warm-600">No open driving path.</p> : (
+        <ol className="list-decimal pl-5 space-y-0.5 text-caption">
           {steps.map(s => <li key={s.id} className={s.fragnet ? 'font-semibold text-ink' : ''}>{s.code} {s.name} · {fmtDate(s.finish)} · float {s.totalFloat ?? '—'}{s.fragnet ? ' (fragnet)' : ''}</li>)}
         </ol>
       )}
@@ -550,21 +550,21 @@ function DraftReview({ draft, busy, onCreate, onDiscard }: { draft: FragnetDraft
   return (
     <section aria-labelledby="draft-h" className="space-y-4 min-w-0">
       <div>
-        <h2 id="draft-h" className="text-[16px] font-semibold text-ink">Drafted fragnet: review before saving</h2>
-        <p className="text-[13px] text-warm-700 mt-1">
+        <h2 id="draft-h" className="text-heading font-semibold text-ink">Drafted fragnet: review before saving</h2>
+        <p className="text-body text-warm-700 mt-1">
           {draft.method === 'model'
             ? 'Proposed by the AI model from the document. Each activity below quotes the sentence it relies on; anything it could not back with a quote was left out.'
             : `A rules-based starting point (no AI): ${draft.reason ?? ''}`}
         </p>
       </div>
-      <label className="block text-[13px] text-warm-700">Event title
+      <label className="block text-body text-warm-700">Event title
         <input className={`${input} w-full mt-1`} value={title} onChange={e => setTitle(e.target.value)} maxLength={200} />
       </label>
-      {draft.description && <p className="text-[13px] text-warm-700">{draft.description}</p>}
-      {draft.eventStart && <p className="text-[13px] text-warm-700">Event start stated in the document: <strong className="text-ink">{fmtDate(draft.eventStart)}</strong></p>}
+      {draft.description && <p className="text-body text-warm-700">{draft.description}</p>}
+      {draft.eventStart && <p className="text-body text-warm-700">Event start stated in the document: <strong className="text-ink">{fmtDate(draft.eventStart)}</strong></p>}
 
       <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Proposed fragnet activities">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-body [&_th]:text-caption">
           <caption className="text-left font-semibold text-ink mb-1">New activities ({draft.fragnet.activities.length})</caption>
           <thead><tr><th className={th}>Code</th><th className={th}>Activity</th><th className={th}>Duration</th><th className={th}>Source</th></tr></thead>
           <tbody>
@@ -583,7 +583,7 @@ function DraftReview({ draft, busy, onCreate, onDiscard }: { draft: FragnetDraft
 
       {draft.ties.length > 0 && (
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Proposed ties">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body [&_th]:text-caption">
             <caption className="text-left font-semibold text-ink mb-1">Ties ({draft.ties.length})</caption>
             <thead><tr><th className={th}>From</th><th className={th}>To</th><th className={th}>Type</th><th className={th}>Lag</th><th className={th}>Why</th></tr></thead>
             <tbody>{draft.ties.map(t => (
@@ -593,7 +593,7 @@ function DraftReview({ draft, busy, onCreate, onDiscard }: { draft: FragnetDraft
         </div>
       )}
 
-      {draft.related.length > 0 && <p className="text-[12px] text-warm-700"><span className="font-semibold text-ink">Activities the document mentions: </span>{draft.related.map(r => `${r.code} ${r.name}`).join(' · ')}</p>}
+      {draft.related.length > 0 && <p className="text-caption text-warm-700"><span className="font-semibold text-ink">Activities the document mentions: </span>{draft.related.map(r => `${r.code} ${r.name}`).join(' · ')}</p>}
       {errors.length > 0 && <Alert tone="warning"><strong>Fix in the fragnet editor before running the analysis:</strong> {errors.join(' ')}</Alert>}
       {draft.validation.warnings.length > 0 && <Alert tone="info">{draft.validation.warnings.join(' ')}</Alert>}
       {draft.warnings.length > 0 && <Alert tone="info">{draft.warnings.join(' ')}</Alert>}
@@ -601,7 +601,7 @@ function DraftReview({ draft, busy, onCreate, onDiscard }: { draft: FragnetDraft
         <button type="button" className={primary} disabled={busy || title.trim().length < 3} onClick={() => onCreate(draft, title.trim())}>Create delay event</button>
         <button type="button" className={secondary} onClick={onDiscard}>Discard</button>
       </div>
-      <p className="text-[12px] text-warm-600">The event is created as a draft with this fragnet and the document as evidence. Edit the fragnet, then run the analysis as usual. Responsibility starts as Unassigned.</p>
+      <p className="text-caption text-warm-600">The event is created as a draft with this fragnet and the document as evidence. Edit the fragnet, then run the analysis as usual. Responsibility starts as Unassigned.</p>
     </section>
   )
 }
