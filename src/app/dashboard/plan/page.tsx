@@ -57,11 +57,10 @@ export default function PlansPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4 mb-8">
-        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 shadow-[0_1px_2px_rgba(6,20,27,0.04),0_8px_24px_-16px_rgba(6,20,27,0.18)]">
+        <section aria-labelledby="build-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 shadow-[0_1px_2px_rgba(29,33,37,0.04),0_8px_24px_-16px_rgba(29,33,37,0.18)]">
           <h2 id="build-h" className="text-[16px] font-semibold text-ink flex items-center gap-2"><Sparkles size={16} aria-hidden className="text-accent-600" /> Build with an interview</h2>
           <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">
-            RunF9 interviews you like a senior scheduler: drawings, permits for your jurisdiction, long-lead equipment and site constraints.
-            It asks about what it doesn&apos;t know instead of guessing, and shows the reason for every duration and link.
+            Answer questions about drawings, permits, long-lead equipment and the site. RunF9 builds the schedule and shows the reason for every duration and link.
           </p>
           {!canBuild ? <p className="mt-4 text-[13px] text-warm-600">Your role can&apos;t build schedules. Ask an admin for access.</p> : (
           <form onSubmit={create} className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -79,7 +78,7 @@ export default function PlansPage() {
         </section>
         <section aria-labelledby="upload-h" className="bg-white border border-warm-200 rounded-[14px] p-5 md:p-6 flex flex-col">
           <h2 id="upload-h" className="text-[16px] font-semibold text-ink flex items-center gap-2"><Upload size={16} aria-hidden className="text-accent-600" /> Upload a schedule</h2>
-          <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF. RunF9 checks it and opens it as a project.</p>
+          <p className="text-[14px] text-warm-600 mt-1.5 leading-relaxed">Primavera P6 (XER or XML), Microsoft Project XML, Excel, CSV or PDF.</p>
           {can('schedule.write') ? (
             <button type="button" onClick={openUpload} className="pressable mt-4 lg:mt-auto self-start inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white text-ink hover:bg-warm-100 px-4 py-2 text-[13px] font-semibold">
               <Upload size={14} aria-hidden /> Choose a file

@@ -205,7 +205,7 @@ export default function DocumentsPage() {
       {can('schedule.write') && data && adding && createPortal(
         <div className={`${digitsFont.variable} font-sans fixed inset-0 z-50 overflow-y-auto bg-navy-950/45 p-3 md:p-8 flex justify-center items-start`} onMouseDown={e => { if (e.target === e.currentTarget) setAdding(false) }}>
         <div id="upload-documents" role="dialog" aria-modal="true" aria-labelledby="add-h"
-          className={'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(6_20_27/0.45)]'}>
+          className={'relative w-full max-w-3xl rounded-2xl bg-warm-50 border border-warm-200 p-5 md:p-6 space-y-5 shadow-[0_24px_60px_-20px_rgb(29_33_37/0.45)]'}>
           {<button ref={addClose} type="button" onClick={() => setAdding(false)} aria-label="Close" className="absolute right-3 top-3 inline-flex items-center justify-center w-10 h-10 rounded-lg text-ink hover:bg-warm-200"><X size={18} aria-hidden="true" /></button>}
           {/* With documents already here, the three ways to add more are tabs, so the page does not end in four stacked forms. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-10">

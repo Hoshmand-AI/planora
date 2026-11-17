@@ -116,12 +116,12 @@ export default function ProjectPage() {
           note={undatedNote} />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Until the numbers arrive the tiles show a dash, never a made-up 0 */}
-          {m ? <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="Progress (by duration)" />
-            : <CounterTile mood="idle" value="—" label="complete" sub="Progress (by duration)" />}
+          {m ? <RingTile mood={percentComplete >= 100 ? 'done' : 'working'} percent={percentComplete} label="complete" sub="by duration" />
+            : <CounterTile mood="idle" value="—" label="complete" sub="by duration" />}
           <CounterTile mood={varianceTone}
             value={!m ? '—' : varianceDays == null ? <span className="text-[16px] font-semibold text-warm-600">{isBaselineUpload ? 'This is the baseline' : 'No baseline'}</span> : varianceDays !== 0 ? `${varianceDays > 0 ? '+' : ''}${varianceDays}d` : '0d'}
             label="Variance vs baseline"
-            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? (isBaselineUpload ? 'measured from the next update' : 'mark an upload as Baseline to measure it') : baselineHeader ? `calendar days · baseline: ${baselineHeader.replace(/^Baseline:\s*/, '').replace(/\s+(uploaded|\().*$/, '')}` : 'calendar days'} />
+            sub={!m ? (metricsError ? 'not available' : 'loading…') : varianceDays == null ? (isBaselineUpload ? 'measured from the next update' : 'mark an upload as Baseline to measure it') : 'calendar days'} />
           <CounterTile mood={criticalPath && !criticalPath.determined ? 'waiting' : 'idle'}
             value={!m || (criticalPath && !criticalPath.determined) ? '—' : String(criticalCount)} label="Critical activities"
             sub={!m ? (metricsError ? 'not available' : 'loading…') : criticalPath && (!criticalPath.determined || criticalCount === 0) ? criticalPath.label : totalActivities > 0 ? `of ${totalActivities} total` : 'total activities'} />
@@ -157,31 +157,23 @@ export default function ProjectPage() {
       {/* What needs attention, then the detail behind it in folded cards (one page, where Today and Overview used to be two). */}
       <ProjectBrief onHeadline={setHeadline} />
 
-      {/* About this project — what, where, when, what must be achieved */}
-      {brief && (
-        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          {/* Facts, not a paragraph: the sentence that used to sit here restated the tiles above. */}
-          {/* Only what the hero and the tiles above do not already say: the project type, its length, and the next milestones. */}
-          <h2 className="sr-only">Next milestones</h2>
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {brief.facts.filter(f => /^(type|duration)$/i.test(f.label)).map(f => (
-              <div key={f.label} className="text-[12px]"><span className="text-warm-600">{f.label}:</span> <span className="text-ink font-medium">{f.value}</span></div>
-            ))}
-          </div>
+      {/* Only what the forecast and the tiles above do not already say: the next milestones, with the project type and length. Folded. */}
+      {brief && (brief.nextMilestones.length > 0 || warnings.length > 0) && (
+        <Disclosure tone="card" title="Next milestones" meta={brief.nextMilestones[0] ? `${brief.nextMilestones[0].name} ${brief.nextMilestones[0].date}` : undefined}>
           {brief.nextMilestones.length > 0 && (
-            <div className="mt-2 text-[12px] text-warm-600">
-              <span className="font-semibold text-ink">Next milestones: </span>
-              {brief.nextMilestones.map((ms, i) => <span key={i}>{i ? ' · ' : ''}{ms.name} <span className="tabular-nums">{ms.date}</span>{ms.basis === 'logic' ? <span className="text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}> (logic-driven; {ms.scheduled} as scheduled)</span> : null}{ms.critical ? <span className="text-status-attention"> (critical)</span> : null}</span>)}
-            </div>
+            <ul className="divide-y divide-warm-200 text-[13px]">
+              {brief.nextMilestones.map((ms, i) => (
+                <li key={i} className="flex flex-wrap items-baseline gap-x-3 py-1.5">
+                  <span className="flex-1 min-w-[180px] text-ink">{ms.name}{ms.critical ? <span className="text-warm-600"> · critical</span> : null}</span>
+                  {ms.basis === 'logic' && <span className="text-[12px] text-warm-600" title={`Logic-driven date; ${ms.scheduled ?? ''} as scheduled, held by a mandatory constraint`}>logic-driven; {ms.scheduled} as scheduled</span>}
+                  <span className="tabular-nums font-medium text-ink">{ms.date}</span>
+                </li>
+              ))}
+            </ul>
           )}
-          {warnings.length > 0 && (
-            <div className="mt-3">
-              <Disclosure title="Calculation notes" meta={String(Math.min(warnings.length, 2))}>
-                {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-1.5 first:mt-0 text-[12px] text-warm-600 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
-              </Disclosure>
-            </div>
-          )}
-        </div>
+          <p className="mt-3 text-[12px] text-warm-600">{brief.facts.filter(f => /^(type|duration)$/i.test(f.label)).map(f => `${f.label}: ${f.value}`).join(' · ')}</p>
+          {warnings.slice(0, 2).map((w, i) => <p key={i} className="mt-1.5 text-[12px] text-warm-600 border-l-2 border-status-info pl-2">{fmtDates(w)}</p>)}
+        </Disclosure>
       )}
 
       </div>

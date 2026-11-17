@@ -110,6 +110,7 @@ const pageLabel = (pathname: string) => {
   if (pathname.startsWith('/dashboard/ask')) return 'Ask'
   if (pathname.startsWith('/dashboard/tools')) return 'Analysis tools'
   if (pathname.startsWith('/dashboard/account')) return 'Account and security'
+  if (/^\/dashboard\/plan\/[^/]+/.test(pathname)) return 'Plan'
   if (pathname.startsWith('/dashboard/plan')) return 'New project'
   if (pathname.startsWith('/dashboard/history')) return 'Firm insights'
   if (pathname.startsWith('/dashboard/org')) return 'Organization'
@@ -611,6 +612,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span aria-hidden="true">/</span>
                   <span className="flex-shrink-0 text-white">{pageLabel(pathname)}</span>
                 </>
+              ) : /^\/dashboard\/plan\/[^/]+/.test(pathname) ? (
+                <>
+                  <Link href="/dashboard" className="flex-shrink-0 hover:text-white">Projects</Link>
+                  <span aria-hidden="true">/</span>
+                  <span className="font-semibold text-white">{pageLabel(pathname)}</span>
+                </>
               ) : <span className="font-semibold text-white">{pageLabel(pathname)}</span>}
             </nav>
           </div>
@@ -698,7 +705,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {t.views.map(v => {
                           const on = pathname.startsWith(v.href)
                           return <Link key={v.href} href={`${v.href}?schedule=${selectedSchedule.id}`} aria-current={on ? 'page' : undefined}
-                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-ink shadow-[0_1px_2px_rgb(6_20_27/0.12)]' : 'text-warm-700 hover:text-ink'}`}>{v.label}</Link>
+                            className={`pressable rounded-lg px-3 min-h-[32px] inline-flex items-center text-[13px] font-semibold ${on ? 'bg-white text-ink shadow-[0_1px_2px_rgb(29_33_37/0.12)]' : 'text-warm-700 hover:text-ink'}`}>{v.label}</Link>
                         })}
                       </nav>
                     </div>

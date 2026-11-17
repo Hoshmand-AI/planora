@@ -6,6 +6,7 @@ import { useApp } from '../layout'
 import { EmptyState } from '@/components/EmptyState'
 import { fmtDate, fmtDates } from '@/lib/format'
 import { axisTicks } from '@/lib/timeline-axis'
+import { PHASE_LABELS } from '@/lib/export/wbs'
 
 interface Impact { windowDays: number; changed: { id: string; code: string; name: string; what: string; before: string; after: string }[]; moved: { id: string; finishDays: number; startDays: number }[]; movedCount: number; finishMovedDays: number | null }
 
@@ -111,7 +112,8 @@ export default function TimelinePage() {
       if (!test(a)) continue
       if (onlyChanged && !marks.has(a.id)) continue
       if (q && !a.name.toLowerCase().includes(q) && !a.activityId.toLowerCase().includes(q)) continue
-      const k = a.wbs?.trim() || 'General activities'
+      const raw = a.wbs?.trim() || 'General activities'
+      const k = PHASE_LABELS[raw] ?? raw
       if (!byWbs.has(k)) byWbs.set(k, [])
       byWbs.get(k)!.push(a)
     }
@@ -169,7 +171,7 @@ export default function TimelinePage() {
       )}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div role="group" aria-label="Show" className="flex gap-1.5 max-md:w-full max-md:overflow-x-auto max-md:whitespace-nowrap [&>button]:flex-shrink-0 md:flex-wrap max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]">
-          {FILTERS.map(f => (
+          {FILTERS.filter(f => f.id === 'all' || f.id === filter || (counts[f.id] ?? 0) > 0).map(f => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
               className={`pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${filter === f.id ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`}>
               {/* A filter chip, not a tab: the one that is on carries a check. */}
@@ -201,10 +203,10 @@ export default function TimelinePage() {
       <div className="flex flex-wrap gap-x-5 gap-y-1 -mt-1 mb-3 text-[12px] text-warm-700">
         <Legend className="bg-accent-500" label="Planned" />
         <Legend className="bg-status-at-risk" label="Critical" />
-        <Legend className="bg-status-on-track" label="Complete" />
+        {work.some(a => progressOf(a) === 'complete') && <Legend className="bg-status-on-track" label="Complete" />}
         {/* The chart-only entries are dropped on a phone, where the schedule is a list. */}
         <span className="hidden md:contents">
-        <Legend className="bg-navy-800" label="Progress on open work" />
+        {work.some(a => progressOf(a) === 'in_progress') && <Legend className="bg-navy-800" label="Progress on open work" />}
         {activities?.some(a => a.baselineStart && a.baselineFinish) && <span className="flex items-center gap-1.5"><span className="w-3 h-[3px] rounded-full bg-warm-400 inline-block" /> Baseline</span>}
         {dataDate && <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-accent-600 inline-block" /> Data date</span>}
         </span>
@@ -251,7 +253,7 @@ export default function TimelinePage() {
                         <ChevronRight size={15} aria-hidden className={`disclosure-chevron flex-shrink-0 text-warm-500 ${expanded ? 'rotate-90' : ''}`} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-semibold text-ink">{g.name}</span>
-                          <span className="block truncate text-[12px] text-warm-600">{g.acts.length} · {g.pct}% done{g.critical ? <span className="text-status-at-risk"> · {g.critical} critical</span> : null}</span>
+                          <span className="block truncate text-[12px] text-warm-600">{g.acts.length} · {g.pct}% done{g.critical ? ` · ${g.critical} critical` : ''}</span>
                         </span>
                         <span className="hidden cols:block flex-shrink-0 tabular-nums text-[12px] w-[84px] font-semibold text-ink">{g.start ? fmtDate(g.start) : ''}</span>
                         <span className="hidden cols:block flex-shrink-0 tabular-nums text-[12px] w-[84px] font-semibold text-ink">{g.finish ? fmtDate(g.finish) : ''}</span>
@@ -353,7 +355,7 @@ function Detail({ a, onClose }: { a: ActivityData; onClose: () => void }) {
   if (a.constraintType) rows.push(['Constraint', `${a.constraintType}${a.constraintDate ? ` ${fmtDate(a.constraintDate)}` : ''}`])
   return (
     <aside aria-label={`Activity ${a.activityId}`}
-      className="rise-in fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto rounded-t-3xl border-t border-warm-200 bg-white p-5 shadow-[0_-16px_40px_-20px_rgba(6,20,27,0.35)] lg:static lg:z-auto lg:max-h-none lg:w-[320px] lg:flex-shrink-0 lg:rounded-2xl lg:border lg:shadow-none lg:sticky lg:top-4 mb-16 md:mb-0">
+      className="rise-in fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto rounded-t-3xl border-t border-warm-200 bg-white p-5 shadow-[0_-16px_40px_-20px_rgba(29,33,37,0.35)] lg:static lg:z-auto lg:max-h-none lg:w-[320px] lg:flex-shrink-0 lg:rounded-2xl lg:border lg:shadow-none lg:sticky lg:top-4 mb-16 md:mb-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[12px] font-semibold text-warm-600 tabular-nums">{a.activityId}{a.wbs ? ` · ${a.wbs}` : ''}</div>

@@ -1,16 +1,19 @@
 'use client'
 
 import { askText } from '@/components/AskText'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Lock, Play, Download, Send, ChevronDown, ChevronRight,
-  AlertTriangle, CheckCircle2, Trash2, Link2, X, RefreshCw,
+  AlertTriangle, CheckCircle2, Trash2, Link2, X, RefreshCw, Check, Plus, MessageSquareText,
 } from 'lucide-react'
 import { Robot, type RobotMood } from '@/components/Robot'
 import { MoreNumbers, type NumberRow } from '@/components/plan/MoreNumbers'
 import { RecoveryPanel } from '@/components/plan/RecoveryPanel'
+import { MoreMenu } from '@/components/MoreMenu'
+import { phaseLabelsFor } from '@/lib/export/wbs'
+import { PHASES } from '@/lib/planning/types'
 import type {
   Answer, ElicitationResult, GeneratedSchedule, PlanActivity, PlanLink, SourceRef,
 } from '@/lib/planning/types'
@@ -51,10 +54,6 @@ const SOURCE_LABEL: Record<SourceRef['kind'], string> = {
   user: 'Your answer', file: 'Uploaded file', catalog: 'Regional catalog', firm_history: 'Firm history', template: 'Template',
   model: 'AI suggestion', override: 'Override', assumption: 'Assumption',
 }
-const CONF_STYLE: Record<string, string> = {
-  high: 'border-status-on-track text-status-on-track', medium: 'border-status-info text-status-info', low: 'border-status-attention text-status-attention',
-}
-
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -251,15 +250,15 @@ export default function PlanPage() {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
   // One mood and one plain sentence for where this plan stands; the most urgent thing wins.
-  const status: { mood: RobotMood; text: React.ReactNode; onClick?: () => void } =
+  const status: { mood: RobotMood; text: React.ReactNode; onClick?: () => void; action?: string; hasFinish?: boolean } =
     busy === 'generate' ? { mood: 'working', text: 'Building your schedule…' }
     : !g ? (ad.enoughToBuild
       ? { mood: 'waiting', text: 'Ready to build: nothing left would move your finish much', onClick: () => goTab('interview') }
       : { mood: 'waiting', text: `${plural(ad.remainingThatMatter, 'question')} could still move your finish — answer what you can, then build`, onClick: () => goTab('interview') })
-    : lateDays > 0 ? { mood: 'worried', text: <>Finishing {lateDays} days late{g.mustFinishBy ? <>, after the required {fmtDate(g.mustFinishBy)}</> : null}{recoveryCount ? ` — ${plural(recoveryCount, 'way')} to recover` : ' — see your options'}</>, onClick: goRecovery }
+    : lateDays > 0 ? { mood: 'worried', text: <>{lateDays} days late{g.mustFinishBy ? <>: forecast {fmtDate(g.cpm?.projectFinish)}, required {fmtDate(g.mustFinishBy)}</> : null}</>, action: recoveryCount ? `${plural(recoveryCount, 'way')} to recover` : 'See your options', onClick: goRecovery, hasFinish: !!g.mustFinishBy }
     : !ad.enoughToBuild && ad.remainingThatMatter > 0 ? { mood: 'waiting', text: `${plural(ad.remainingThatMatter, 'question')} could still move your finish`, onClick: () => goTab('interview') }
     : openDecisions > 0 ? { mood: 'waiting', text: `On track — ${plural(openDecisions, 'quality check')} could use your decision`, onClick: goEvaluation }
-    : { mood: 'done', text: g.mustFinishBy ? <>On track for {fmtDate(g.cpm?.projectFinish)}, before the required {fmtDate(g.mustFinishBy)}</> : <>Schedule built — forecast finish {fmtDate(g.cpm?.projectFinish)}</> }
+    : { mood: 'done', text: g.mustFinishBy ? <>On track for {fmtDate(g.cpm?.projectFinish)}, before the required {fmtDate(g.mustFinishBy)}</> : <>Schedule built — forecast finish {fmtDate(g.cpm?.projectFinish)}</>, hasFinish: true }
 
   const aiLabel = llm.mode === 'cloud' ? 'Cloud AI' : llm.mode === 'local' ? 'On-prem AI' : 'Rules only'
   const numbers: NumberRow[] = [
@@ -267,6 +266,11 @@ export default function PlanPage() {
       explain: `Open interview questions whose answer could still move the finish by ${ad.thresholdDays} days or more. Answer them, then rebuild; your overrides are kept.`, go: { label: 'Interview', onClick: () => goTab('interview') } },
     ...(g?.cpm ? [{ key: 'finish', label: 'Finish', value: fmtDate(g.cpm.projectFinish),
       explain: 'The critical-path finish if every activity takes its planned duration.', go: { label: 'Schedule', onClick: () => goTab('schedule') } }] : []),
+    ...(g ? [{ key: 'start', label: 'Start', value: fmtDate(g.projectStart), explain: 'The first day of the plan, from your interview answers.' }] : []),
+    ...(g ? [{ key: 'activities', label: 'Activities', value: `${g.activities.length} · ${g.activities.filter(a => g.cpm?.times?.[a.id]?.critical).length} critical`,
+      explain: 'Everything in the schedule, and how many of them are on the critical path (no float).', go: { label: 'Schedule', onClick: () => goTab('schedule') } }] : []),
+    ...(g ? [{ key: 'overrides', label: 'Your overrides', value: String(g.activities.filter(a => a.overrides?.length).length + g.links.filter(l => l.overrides?.length).length + (g.removed?.length || 0)),
+      explain: 'Activities and links you changed by hand. They are kept when the schedule is regenerated.' }] : []),
     ...(g?.mustFinishBy ? [{ key: 'required', label: 'Required finish', value: fmtDate(g.mustFinishBy), explain: 'The date the project must be complete by, from your interview answers.' }] : []),
     ...(lateDays > 0 ? [{ key: 'late', label: 'Behind the required date', value: `${lateDays} days`, tone: 'bad' as const,
       explain: 'Calendar days between the forecast finish and the required date.', go: { label: 'Ways to recover', onClick: goRecovery } }] : []),
@@ -283,24 +287,26 @@ export default function PlanPage() {
   // One obvious next step; everything else is quieter.
   const canPublish = !!g && can('plan.publish')
   const primary: 'generate' | 'publish' | 'export' | null = !g ? (can('plan.write') ? 'generate' : null) : canPublish && !plan.scheduleId ? 'publish' : 'export'
-  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-warm-200/70 disabled:opacity-50'
- const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold'
+  const headerLoud = !(lateDays > 0 && recoveryCount > 0) && !(tab === 'interview' && !!g)
+  const quiet = 'pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-[13px] font-medium text-ink hover:bg-warm-100 disabled:opacity-50'
+  const loud = 'pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold disabled:opacity-50'
 
   return (
     <div className="px-4 md:px-6 pb-8">
       {/* Frozen summary: what this plan is, where it stands, and the tabs — stays visible while scrolling (on wider screens) */}
-      <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-warm-50/95 backdrop-blur border-b border-warm-200 mb-5">
-        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-ink"><ArrowLeft size={12} aria-hidden /> Projects</Link>
+      <div ref={stickyRef} style={{ ["--sticky-top" as string]: `${stickyTop}px` }} className="relative md:sticky md:top-[var(--sticky-top)] z-30 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 pb-3 bg-white/95 backdrop-blur border-b border-warm-200 mb-5">
+        <Link href="/dashboard" className="md:hidden inline-flex items-center gap-1 text-[12px] text-warm-500 hover:text-ink"><ArrowLeft size={12} aria-hidden /> Projects</Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-x-4 gap-y-2 mt-0.5">
           <h1 className="page-title min-w-0 md:truncate">{plan.name}</h1>
-          <div className="flex flex-wrap items-center gap-1 flex-shrink-0">
-            {g && can('plan.write') && <button onClick={() => generate(false)} disabled={!!busy} className={quiet}>
-              {busy === 'generate' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <RefreshCw size={13} aria-hidden />} Regenerate
-            </button>}
-            {canPublish && <button onClick={publish} disabled={!!busy} className={primary === 'publish' ? loud : quiet}>
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+            {g && <ExportMenu id={plan.id} primary={primary === 'export' && headerLoud} />}
+            {canPublish && <button onClick={publish} disabled={!!busy} className={primary === 'publish' && headerLoud ? loud : quiet}>
               {busy === 'publish' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Send size={13} aria-hidden />} {primary === 'publish' ? 'Publish' : 'Publish update'}
             </button>}
-            {g && <ExportMenu id={plan.id} primary={primary === 'export'} />}
+            {g && can('plan.write') && <MoreMenu label="More plan actions" items={[
+              { label: busy === 'generate' ? 'Regenerating…' : 'Regenerate from the interview', icon: <RefreshCw size={15} aria-hidden />, onSelect: () => { if (!busy) void generate(false) } },
+              { label: 'Discard overrides and rebuild', danger: true, onSelect: () => { if (!busy && confirm('Rebuild from the interview and discard all overrides?')) void generate(true) } },
+            ]} />}
             {primary === 'generate' && <button onClick={() => generate(false)} disabled={!!busy} className={loud}>
               {busy === 'generate' ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Play size={13} aria-hidden />} Generate schedule
             </button>}
@@ -310,19 +316,20 @@ export default function PlanPage() {
           <Robot mood={status.mood} size={40} className="flex-shrink-0" />
           <div className="flex-1 min-w-[180px] text-[14px] font-medium text-ink leading-snug py-1">
             {status.onClick
-              ? <button onClick={status.onClick} className="text-left hover:underline underline-offset-2 decoration-warm-400">{status.text} <span aria-hidden className="text-warm-500">→</span></button>
+              ? <button onClick={status.onClick} className="group text-left">{status.text}{' '}<span className="whitespace-nowrap font-semibold text-accent-600 group-hover:underline">{status.action ? <>· {status.action} </> : null}<span aria-hidden>→</span></span></button>
               : <span role="status">{status.text}</span>}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            {g?.cpm && <div className="text-[12px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
+            {/* The finish date is said once: here only when the sentence beside it does not already carry it. */}
+            {g?.cpm && !status.hasFinish && <div className="text-[12px] text-warm-600 whitespace-nowrap">Forecast finish <span className="text-[14px] font-semibold text-ink tabular-nums">{fmtDate(g.cpm.projectFinish)}</span></div>}
             <MoreNumbers rows={numbers} />
           </div>
         </div>
         <div role="tablist" aria-label="Plan sections" className="mt-3 inline-flex max-w-full overflow-x-auto rounded-full bg-warm-200/60 p-1 gap-0.5">
           {(['interview', 'schedule', 'evaluation', 'audit'] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} disabled={t !== 'interview' && t !== 'audit' && !g}
-              className={`pressable px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_3px_rgba(6,20,27,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
-              {t === 'interview' ? 'Interview' : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
+              className={`pressable flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap disabled:opacity-40 ${tab === t ? 'bg-white text-ink shadow-[0_1px_3px_rgba(29,33,37,0.12)]' : 'text-warm-600 hover:text-ink'}`}>
+              {t === 'interview' ? <>Interview{g && !ad.enoughToBuild && ad.remainingThatMatter > 0 ? <span className="ml-1.5 rounded-full bg-warm-200 text-warm-700 px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{ad.remainingThatMatter} open</span> : null}</> : t === 'schedule' ? 'Schedule' : t === 'evaluation' ? <>Evaluation{failing ? <span className="ml-1.5 rounded-full bg-status-attention-bg text-status-attention px-1.5 py-px text-[12px] font-semibold"><span className="sr-only">, </span>{failing} to fix</span> : null}</> : 'Audit trail'}
             </button>
           ))}
         </div>
@@ -348,13 +355,6 @@ export default function PlanPage() {
         </Banner>
       )}
 
-      {g && tab !== 'interview' && tab !== 'audit' && ad.ask.length > 0 && !(lateDays <= 0 && !ad.enoughToBuild && ad.remainingThatMatter > 0) && (
-        <p className="text-[13px] text-warm-600 mb-4">
-          {ad.enoughToBuild ? <>The open questions can&apos;t move your finish materially. Answer them to refine the basis of schedule.</> : <><span className="font-semibold text-ink">{ad.remainingThatMatter} open question{ad.remainingThatMatter === 1 ? '' : 's'}</span> could still move this finish. Answer them, then rebuild; your overrides are kept.</>}{' '}
-          <button onClick={() => goTab('interview')} className="font-medium text-accent-600 hover:underline">Answer remaining questions</button>
-        </p>
-      )}
-
       {tab === 'interview' && (<>
         {llm.cuiWarning && ['cui', 'classified'].includes(String(plan.answers['security.classification']?.value ?? (plan.answers['security.classification']?.status === 'withheld' ? 'classified' : ''))) && (
           <p role="alert" className="mb-3 border-l-2 border-status-at-risk pl-3 text-[13px] text-warm-700"><strong className="font-semibold text-ink">CUI or classified project.</strong> {llm.cuiWarning} RunF9 will not send this plan to a cloud AI model.</p>
@@ -375,8 +375,8 @@ export default function PlanPage() {
           return true
         }
         return false
-      }} onRegenerateFresh={() => generate(true)} busy={busy} recovery={view.recovery} onRecover={recover} onInterview={() => setTab('interview')} focusCodes={focusCodes} onClearFocus={() => setFocusCodes(null)} />}
-      {tab === 'evaluation' && g && ev && <EvaluationTab ev={ev} plan={plan} sra={sra} sraState={sraState} onRunSra={runSra} busy={busy} guidance={view.guidance} recovery={view.recovery} onRecover={recover} onDecide={decide} onShowCodes={showCodes} onInterview={() => setTab('interview')} onReview={async (body) => { const d = await call('review', `/api/plans/${id}/review`, { method: 'POST', body: JSON.stringify(body) }); if (d) setNotice('Review recorded.'); return !!d }} />}
+      }} busy={busy} recovery={view.recovery} onRecover={recover} onInterview={() => setTab('interview')} focusCodes={focusCodes} onClearFocus={() => setFocusCodes(null)} />}
+      {tab === 'evaluation' && g && ev && <EvaluationTab ev={ev} plan={plan} sra={sra} sraState={sraState} onRunSra={runSra} busy={busy} guidance={view.guidance} onRecovery={goRecovery} onDecide={decide} onShowCodes={showCodes} onInterview={() => setTab('interview')} onReview={async (body) => { const d = await call('review', `/api/plans/${id}/review`, { method: 'POST', body: JSON.stringify(body) }); if (d) setNotice('Review recorded.'); return !!d }} />}
       {tab === 'audit' && <AuditTab plan={plan} onDelete={can('plan.write') ? remove : undefined} fullLog={can('audit.read')} />}
     </div>
   )
@@ -430,13 +430,13 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className={primary
-        ? 'pressable flex items-center gap-1.5 rounded-full bg-navy-950 hover:bg-navy-900 text-white px-4 py-2 text-[13px] font-semibold'
-        : 'pressable flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-warm-200/70'}>
+        ? 'pressable flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold'
+        : 'pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3.5 h-9 text-[13px] font-medium text-ink hover:bg-warm-100'}>
         <Download size={13} aria-hidden /> Export <ChevronDown size={12} aria-hidden />
       </button>
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
       {open && (
-        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(6,20,27,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
+        <div className="rise-in absolute left-0 md:left-auto md:right-0 mt-1 w-[min(calc(100vw-2rem),20rem)] bg-white border border-warm-200 rounded-2xl shadow-[0_12px_40px_-12px_rgba(29,33,37,0.25)] z-20 py-1.5 text-[13px] overflow-hidden">
           {group('Scheduling software')}
           {item('xer', 'Primavera P6 (.xer)', 'Native P6 file: WBS, calendars, logic, constraints')}
           {item('xml', 'MS Project (.xml)', 'Opens in MS Project; P6 can import it too')}
@@ -457,8 +457,8 @@ function ExportMenu({ id, primary = false }: { id: string; primary?: boolean }) 
 
 type EditBody = Record<string, unknown>
 
-function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery, onRecover, onInterview, focusCodes, onClearFocus }: {
-  plan: Plan; textEdit: React.ReactNode; onEdit: (e: EditBody) => Promise<boolean>; onRegenerateFresh: () => void; busy: string | null
+function ScheduleTab({ plan, textEdit, onEdit, busy, recovery, onRecover, onInterview, focusCodes, onClearFocus }: {
+  plan: Plan; textEdit: React.ReactNode; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null
   recovery: RecoveryPlan | null; onRecover: (id: string) => void; onInterview: () => void
   focusCodes: string[] | null; onClearFocus: () => void
 }) {
@@ -468,58 +468,68 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
   const t = g.cpm?.times || {}
   const [open, setOpen] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'overridden'>('all')
+  // One editing tool open at a time, and none until it is asked for: the schedule itself comes first.
+  const [tool, setTool] = useState<'text' | 'add' | null>(null)
+  const [openPhases, setOpenPhases] = useState<Set<string>>(new Set())
   const byId = useMemo(() => new Map(g.activities.map(a => [a.id, a])), [g])
   const start = Date.parse(g.projectStart)
   const span = Math.max(1, Date.parse(g.cpm?.projectFinish || g.projectStart) - start)
-  const rows = g.activities
-    .filter(a => !focusCodes || focusCodes.includes(a.code))
-    .filter(a => filter === 'all' || (filter === 'critical' && t[a.id]?.critical) || (filter === 'low' && a.rationale.confidence === 'low') || (filter === 'overridden' && a.overrides?.length))
+  const is = {
+    all: () => true,
+    critical: (a: PlanActivity) => !!t[a.id]?.critical,
+    low: (a: PlanActivity) => a.rationale.confidence === 'low',
+    overridden: (a: PlanActivity) => !!a.overrides?.length,
+  }
+  const scoped = g.activities.filter(a => !focusCodes || focusCodes.includes(a.code))
+  const rows = scoped.filter(is[filter])
     .sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || '') || a.code.localeCompare(b.code))
-  const criticalCount = g.activities.filter(a => t[a.id]?.critical).length
-  const overrides = g.activities.filter(a => a.overrides?.length).length + g.links.filter(l => l.overrides?.length).length + (g.removed?.length || 0)
+  // A long schedule opens as its phases, each a summary row; a short or filtered one is shown in full.
+  const labels = phaseLabelsFor(String(plan.answers['project.type']?.value ?? '') || null, g.activities.map(a => a.category))
+  const narrowed = filter !== 'all' || !!focusCodes || g.activities.length <= 30
+  const groups = PHASES.map(ph => ({ ph, rows: rows.filter(a => a.phase === ph) })).filter(x => x.rows.length)
+  const allOpen = groups.every(x => openPhases.has(x.ph))
+  // When the whole plan is critical (it is late), "critical" on every row says nothing.
+  const allCritical = g.activities.every(a => t[a.id]?.critical)
+  const togglePhase = (ph: string) => setOpenPhases(prev => { const n = new Set(prev); if (n.has(ph)) n.delete(ph); else n.add(ph); return n })
+  const pos = (from?: string, to?: string) => from && to
+    ? { left: `${((Date.parse(from) - start) / span) * 100}%`, width: `${Math.max(0.6, ((Date.parse(to) - Date.parse(from) + 86_400_000) / span) * 100)}%` } : { left: '0%', width: '0%' }
+  const chip = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold border ${on ? 'bg-accent-100 text-accent-700 border-accent-500' : 'bg-white text-ink border-warm-300 hover:border-navy-900'}`
+  const toolButton = (on: boolean) => `pressable inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium ${on ? 'border-accent-500 bg-accent-100 text-accent-700' : 'border-warm-300 bg-white text-ink hover:bg-warm-100'}`
 
   return (
     <div>
-      <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-5 rounded-2xl bg-white/70 border border-warm-200 px-5 py-4">
-        {[['Start', fmtDate(g.projectStart)], ['Finish', fmtDate(g.cpm?.projectFinish)], ['Activities', `${g.activities.length} (${criticalCount} critical)`], ['Your overrides', String(overrides)]].map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-[12px] text-warm-500">{k}</dt>
-            <dd className="text-[16px] font-semibold text-ink tabular-nums mt-0.5">{v}</dd>
-          </div>
-        ))}
-      </dl>
       {recovery && <RecoveryPanel r={recovery} busy={canWrite ? busy : 'read-only'} onRecover={onRecover} onInterview={onInterview} />}
       {focusCodes && (
         <div className="border-l-2 border-accent-500 bg-accent-100 text-[13px] text-warm-700 px-3 py-2 rounded-md mb-3 flex items-center gap-3">
-          <span className="flex-1">Showing the {focusCodes.length} activities flagged by the quality check. Open one to see why it is there and override it.</span>
+          <span className="flex-1">Showing the {focusCodes.length} activities flagged by the quality check.</span>
           <button onClick={onClearFocus} className="text-[12px] font-medium text-ink underline">Show all</button>
         </div>
       )}
       {(g.cpm?.warnings?.length ?? 0) > 0 && <Banner kind="warn">{g.cpm!.warnings.slice(0, 3).join(' · ')}</Banner>}
-      {(g.notes?.length ?? 0) > 0 && (
-        <div className="mb-3">
-          <Disclosure title="Notes about how this schedule was built" meta={g.notes!.length}>
-            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12px] text-warm-600">{fmtDates(n)}</li>)}</ul>
-          </Disclosure>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
+          {(['all', 'critical', 'low', 'overridden'] as const).map(f => {
+            const n = scoped.filter(is[f]).length
+            // A filter with nothing behind it, or with everything behind it, is not offered.
+            return (f === 'all' || filter === f || (n > 0 && n < scoped.length)) && (
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={chip(filter === f)}>
+                {filter === f && <Check size={14} aria-hidden="true" />}{f === 'all' ? 'All' : f === 'critical' ? 'Critical path' : f === 'low' ? 'Low confidence' : 'Overridden'} <span className={`tabular-nums font-medium ${filter === f ? 'text-accent-700' : 'text-warm-600'}`}>{n}</span>
+              </button>
+            )
+          })}
         </div>
-      )}
-
-      {textEdit && <div className="mb-4">{textEdit}</div>}
-      {canWrite && <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} />}
-
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-        {(['all', 'critical', 'low', 'overridden'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors ${filter === f ? 'bg-navy-900 text-white' : 'bg-warm-100 border border-warm-200 text-warm-600'}`}>
-            {f === 'all' ? 'All' : f === 'critical' ? 'Critical path' : f === 'low' ? 'Low confidence' : 'Overridden'}
-          </button>
-        ))}
         <span className="flex-1" />
-        {canWrite && <button onClick={() => { if (confirm('Rebuild from the interview and discard all overrides?')) onRegenerateFresh() }} disabled={!!busy} className="text-[12px] text-warm-500 hover:text-status-at-risk">Discard overrides & rebuild</button>}
+        {!narrowed && <button type="button" onClick={() => setOpenPhases(allOpen ? new Set() : new Set(groups.map(x => x.ph)))} className="text-[13px] font-medium text-accent-600 hover:underline px-1">{allOpen ? 'Collapse all' : 'Expand all'}</button>}
+        {canWrite && textEdit && <button type="button" aria-expanded={tool === 'text'} onClick={() => setTool(v => v === 'text' ? null : 'text')} className={toolButton(tool === 'text')}><MessageSquareText size={14} aria-hidden="true" /> Describe a change</button>}
+        {canWrite && <button type="button" aria-expanded={tool === 'add'} onClick={() => setTool(v => v === 'add' ? null : 'add')} className={toolButton(tool === 'add')}><Plus size={14} aria-hidden="true" /> Add activity</button>}
       </div>
+      {tool === 'text' && textEdit && <div className="mb-4">{textEdit}</div>}
+      {tool === 'add' && canWrite && <AddActivity activities={g.activities.slice().sort((a, b) => (t[a.id]?.earlyStart || '').localeCompare(t[b.id]?.earlyStart || ''))} onEdit={onEdit} busy={busy} onClose={() => setTool(null)} />}
 
-      <p className="text-[12px] text-warm-500 mb-2">Open any activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</p>
-      <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white/70 border border-warm-200 rounded-2xl overflow-x-auto">
-        <table className="w-full text-[12px] min-w-[760px]">
+      <div tabIndex={0} role="region" aria-label="Activities (scrolls sideways on small screens)" className="bg-white border border-warm-200 rounded-[14px] overflow-x-auto">
+        <table className="w-full text-[13px] min-w-[760px]">
+          <caption className="sr-only">Activities by phase. Open a phase to list its activities; open an activity to see why it is there and how it is sequenced{canWrite ? ', or to override it' : ''}.</caption>
           <thead>
             <tr className="text-left text-[12px] font-medium text-warm-500 border-b border-warm-200">
               <th className="px-3 py-2.5 w-6"><span className="sr-only">Open</span></th><th className="px-2 py-2.5 font-medium">ID</th><th className="px-2 py-2.5 font-medium">Activity</th><th className="px-2 py-2.5 font-medium text-right"><abbr title="Duration in work days (cd = calendar days)" className="no-underline">Days</abbr></th>
@@ -527,19 +537,51 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
             </tr>
           </thead>
           <tbody>
-            {rows.map(a => {
-              const tm = t[a.id]
-              const left = tm ? ((Date.parse(tm.earlyStart) - start) / span) * 100 : 0
-              const width = tm ? Math.max(0.6, ((Date.parse(tm.earlyFinish) - Date.parse(tm.earlyStart) + 86_400_000) / span) * 100) : 0
+            {groups.map(({ ph, rows: list }) => {
+              const shown = narrowed || openPhases.has(ph)
+              const from = list.map(a => t[a.id]?.earlyStart).filter(Boolean).sort()[0]
+              const to = list.map(a => t[a.id]?.earlyFinish).filter(Boolean).sort().at(-1)
+              const critical = list.filter(a => t[a.id]?.critical).length
               return (
-                <ActivityRows key={a.id} a={a} tm={tm} left={left} width={width} open={open === a.id} onToggle={() => setOpen(o => o === a.id ? null : a.id)}
-                  links={g.links} byId={byId} onEdit={onEdit} busy={busy} canWrite={canWrite} />
+                <Fragment key={ph}>
+                  <tr onClick={narrowed ? undefined : () => togglePhase(ph)} className={`border-b border-warm-200 bg-warm-50 ${narrowed ? '' : 'cursor-pointer hover:bg-warm-100'}`}>
+                    <th scope="rowgroup" colSpan={4} className="px-3 py-2.5 text-left font-normal">
+                      {narrowed
+                        ? <span className="font-semibold text-ink">{labels[ph] || ph}</span>
+                        : <button type="button" aria-expanded={shown} onClick={e => { e.stopPropagation(); togglePhase(ph) }} className="inline-flex items-center gap-2 font-semibold text-ink">
+                            <ChevronRight size={14} aria-hidden="true" className={`text-warm-600 transition-transform ${shown ? 'rotate-90' : ''}`} />{labels[ph] || ph}
+                          </button>}
+                      <span className="ml-2 text-[12px] text-warm-600">{list.length} {list.length === 1 ? 'activity' : 'activities'}{critical && !allCritical ? ` · ${critical === list.length ? 'all' : critical} critical` : ''}</span>
+                    </th>
+                    <td className="px-2 py-2.5 tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(from)}</td>
+                    <td className="px-2 py-2.5 tabular-nums text-warm-700 whitespace-nowrap">{fmtDate(to)}</td>
+                    <td colSpan={2} />
+                    <td className="px-3 py-2.5">
+                      <div className="relative h-1.5 bg-warm-200/60 rounded-sm"><div className="absolute top-0 h-full rounded-sm bg-warm-500" style={pos(from, to)} /></div>
+                    </td>
+                  </tr>
+                  {shown && list.map(a => {
+                    const tm = t[a.id]
+                    const bar = pos(tm?.earlyStart, tm?.earlyFinish)
+                    return (
+                      <ActivityRows key={a.id} a={a} tm={tm} left={parseFloat(bar.left)} width={parseFloat(bar.width)} open={open === a.id} onToggle={() => setOpen(o => o === a.id ? null : a.id)}
+                        links={g.links} byId={byId} onEdit={onEdit} busy={busy} canWrite={canWrite} />
+                    )
+                  })}
+                </Fragment>
               )
             })}
           </tbody>
         </table>
       </div>
 
+      {(g.notes?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <Disclosure title="Notes about how this schedule was built" meta={g.notes!.length}>
+            <ul className="space-y-1.5">{g.notes!.map((n, i) => <li key={i} className="text-[12px] text-warm-600">{fmtDates(n)}</li>)}</ul>
+          </Disclosure>
+        </div>
+      )}
       {(g.removed?.length ?? 0) > 0 && (
         <div className="mt-4 text-[12px] text-warm-500">
           <div className="font-semibold text-warm-600 mb-1">Removed by scheduler</div>
@@ -550,22 +592,16 @@ function ScheduleTab({ plan, textEdit, onEdit, onRegenerateFresh, busy, recovery
   )
 }
 
-function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[]; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null }) {
-  const [open, setOpen] = useState(false)
+function AddActivity({ activities, onEdit, busy, onClose }: { activities: PlanActivity[]; onEdit: (e: EditBody) => Promise<boolean>; busy: string | null; onClose: () => void }) {
   const [name, setName] = useState('')
   const [dur, setDur] = useState('10')
   const [after, setAfter] = useState('')
   const [before, setBefore] = useState('')
   const [reason, setReason] = useState('')
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="mb-3 text-[13px] font-medium text-accent-600 hover:underline">+ Add an activity the tool doesn&apos;t know about</button>
-    )
-  }
   const opt = (a: PlanActivity) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>
   return (
-    <div className="bg-warm-100 border border-warm-200 rounded-lg p-4 mb-4">
-      <div className="text-[12px] font-semibold uppercase tracking-wider text-warm-400 mb-2">Add an activity</div>
+    <div className="border border-warm-200 rounded-lg p-4 mb-4 bg-white">
+      <div className="text-[14px] font-semibold text-ink mb-2">Add an activity the tool doesn&apos;t know about</div>
       <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
         <input value={name} onChange={e => setName(e.target.value)} aria-label="Activity name" placeholder="Activity name, e.g. Owner kitchen equipment install" maxLength={200} className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
         <div className="md:col-span-2 flex items-center gap-2">
@@ -581,9 +617,9 @@ function AddActivity({ activities, onEdit, busy }: { activities: PlanActivity[];
         <input value={reason} onChange={e => setReason(e.target.value)} aria-label="Reason for adding this activity" placeholder="Reason (required, kept in the audit trail)" className="md:col-span-4 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
         <div className="md:col-span-2 flex gap-2">
           <button disabled={!!busy || !name.trim() || !after || !reason.trim()} onClick={async () => {
-            if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); setOpen(false) }
-     }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-full text-[13px] font-semibold py-1.5">Add</button>
-          <button onClick={() => setOpen(false)} className="px-3 border border-warm-300 rounded-lg text-[13px] text-warm-600">Cancel</button>
+            if (await onEdit({ kind: 'add_activity', name, duration: Number(dur) || 0, after, before: before || undefined, reason })) { setName(''); setReason(''); onClose() }
+     }} className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-[13px] font-semibold py-1.5 disabled:opacity-50">Add</button>
+          <button onClick={onClose} className="px-3 border border-warm-300 rounded-lg text-[13px] text-warm-700">Cancel</button>
         </div>
       </div>
     </div>
@@ -617,17 +653,19 @@ function ActivityRows({ a, tm, left, width, open, onToggle, links, byId, onEdit,
           <div className="flex items-center gap-1.5">
             {a.placeholder && <Lock size={11} className="text-warm-500 flex-shrink-0" />}
             <span className={tm?.critical ? 'font-semibold' : ''}>{a.name}</span>
-            {a.overrides?.length ? <span className="text-[12px] text-accent-600 font-semibold uppercase">edited</span> : null}
+            {a.overrides?.length ? <span className="text-[12px] text-warm-600">· edited</span> : null}
           </div>
         </td>
         <td className="px-2 py-2 text-right tabular-nums">{a.type === 'milestone' ? '◆' : a.duration}{a.calendarId === 'cal-7d' && a.type !== 'milestone' ? <span className="text-warm-400">cd</span> : ''}</td>
         <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyStart)}</td>
         <td className="px-2 py-2 tabular-nums text-warm-600 whitespace-nowrap">{fmtDate(tm?.earlyFinish)}</td>
-        <td className={`px-2 py-2 text-right tabular-nums ${tm && tm.totalFloat < 0 ? 'text-status-at-risk font-semibold' : tm?.critical ? 'text-status-attention font-semibold' : 'text-warm-600'}`}>{tm?.totalFloat}</td>
-        <td className="px-2 py-2"><span className={`text-[12px] font-semibold uppercase border-l-2 pl-1 ${CONF_STYLE[a.rationale.confidence]}`}>{a.rationale.confidence}</span></td>
+        <td className={`px-2 py-2 text-right tabular-nums ${tm?.critical ? 'text-ink font-medium' : 'text-warm-600'}`}>{tm?.totalFloat}</td>
+        <td className="px-2 py-2 whitespace-nowrap">{a.rationale.confidence === 'low'
+          ? <span className="inline-flex items-center gap-1.5 text-ink"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-status-attention" />Low</span>
+          : <span className="text-warm-600">{a.rationale.confidence === 'high' ? 'High' : 'Medium'}</span>}</td>
         <td className="px-3 py-2">
           <div className="relative h-2.5 bg-warm-200/60 rounded-sm">
-            <div className={`absolute top-0 h-full rounded-sm ${tm?.critical ? 'bg-status-attention' : a.placeholder ? 'bg-warm-400' : 'bg-accent-500'}`} style={{ left: `${left}%`, width: `${width}%` }} />
+            <div className={`absolute top-0 h-full rounded-sm ${tm?.critical ? 'bg-accent-600' : 'bg-warm-400'}`} style={{ left: `${left}%`, width: `${width}%` }} />
           </div>
         </td>
       </tr>
@@ -710,14 +748,14 @@ function LinkRow({ l, other, dir, onEdit, busy, canWrite }: { l: PlanLink; other
 
 type Guide = View['guidance'][number]
 
-function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guidance, recovery, onRecover, onDecide, onShowCodes, onInterview }: {
+function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guidance, onRecovery, onDecide, onShowCodes, onInterview }: {
   ev: Evaluation; plan: Plan; sra: Sra | null; sraState: SraState; onRunSra: () => void; busy: string | null; onReview: (b: Record<string, string>) => Promise<boolean>
-  guidance: Guide[]; recovery: RecoveryPlan | null; onRecover: (id: string) => void
+  guidance: Guide[]; onRecovery: () => void
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
   onShowCodes: (codes: string[]) => void; onInterview: () => void
 }) {
   const { can } = useApp()
-  const canWrite = can('plan.write'), canReview = can('plan.review')
+  const canReview = can('plan.review')
   const [verdict, setVerdict] = useState('approve')
   const [comment, setComment] = useState('')
   const [reviewer, setReviewer] = useState('')
@@ -733,37 +771,22 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
           <Stat label={`P50 · ${fc.label}`} value={fmtDate(fc.p50)} sub={`deterministic ${fmtDate(ev.forecast.deterministic)}`} />
           <Stat label={`P80 · ${fc.label}`} value={fmtDate(fc.p80)} sub={fc.required ? `required ${fmtDate(fc.required)}${fc.meets ? ' ✓ meets it' : ' ✗ misses it'}` : 'risk-adjusted'} />
         </dl>
-        <div className="mt-2">
-          <Disclosure title="What these numbers mean">
-            <ul className="text-[13px] text-warm-600 space-y-1.5">
-              <li><span className="font-medium text-ink">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
-              <li><span className="font-medium text-ink">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
-              <li><span className="font-medium text-ink">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-ink">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-ink">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
-              <li>{fc.method === 'monte_carlo'
-                ? 'P50 and P80 come from the Monte Carlo simulation below.'
-                : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis below has run. Basis: {ev.forecast.basis}</>}</li>
-            </ul>
-          </Disclosure>
-        </div>
       </div>
 
       {guidance.length > 0 && (
         <section aria-labelledby="decisions-title">
-          <h3 id="decisions-title" className="text-[14px] font-semibold text-ink mb-1">What needs your decision</h3>
-          <p className="text-[13px] text-warm-500 mb-3">{guidance.filter(g => !g.decision).length} of {guidance.length} open. Fix each one, or accept it with a short reason.</p>
+          <h3 id="decisions-title" className="text-[16px] font-semibold text-ink mb-3">What needs your decision <span className="ml-1 text-[13px] font-normal text-warm-600">{guidance.filter(g => !g.decision).length} of {guidance.length} open</span></h3>
           <div className="space-y-2.5">
-            {guidance.map((g, i) => <GuideCard key={g.id} g={g} startOpen={!g.decision && guidance.findIndex(x => !x.decision) === i} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} />)}
+            {guidance.map((g, i) => <GuideCard key={g.id} g={g} startOpen={!g.decision && guidance.findIndex(x => !x.decision) === i} check={ev.dcma.checks.find(c => c.id === g.id)!} busy={busy} onDecide={onDecide} onShowCodes={onShowCodes} onInterview={onInterview} onRecovery={onRecovery} />)}
           </div>
         </section>
       )}
 
-      {recovery && <RecoveryPanel r={recovery} busy={canWrite ? busy : 'read-only'} onRecover={onRecover} onInterview={onInterview} />}
-
-      <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
-
-      {ev.dateChecks.length > 0 && (
-        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          <h3 className="text-[14px] font-semibold text-ink mb-2">Your dates vs. what the logic can achieve</h3>
+      <div>
+        <h3 className="text-[16px] font-semibold text-ink mb-2">Details</h3>
+        <RiskPanel r={sra} state={sraState} onRun={onRunSra} />
+        {ev.dateChecks.length > 0 && (
+          <Disclosure title="Your dates vs. what the logic can achieve" meta={ev.dateChecks.filter(c => c.severity !== 'info').length ? `${ev.dateChecks.filter(c => c.severity !== 'info').length} to check` : 'all fit'}>
           <ul className="space-y-1.5">
             {ev.dateChecks.map((c, i) => (
               <li key={i} className="text-[13px] text-warm-700 flex gap-2">
@@ -772,25 +795,13 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {ev.findings.length > 0 && (
-        <div className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-          <h3 className="text-[14px] font-semibold text-ink mb-2">Findings</h3>
-          <ul className="space-y-1.5">{ev.findings.slice(0, 3).map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
-          {ev.findings.length > 3 && (
-            <div className="mt-2">
-              <Disclosure title={`${ev.findings.length - 3} more finding${ev.findings.length - 3 === 1 ? '' : 's'}`}>
-                <ul className="space-y-1.5">{ev.findings.slice(3).map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
-              </Disclosure>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div>
-        <h3 className="text-[14px] font-semibold text-ink mb-1">The detail behind the grade</h3>
+          </Disclosure>
+        )}
+        {ev.findings.length > 0 && (
+          <Disclosure title="Findings" meta={ev.findings.length}>
+            <ul className="space-y-1.5">{ev.findings.map((f, i) => <li key={i} className="text-[13px] text-warm-700 flex gap-2"><AlertTriangle size={13} aria-hidden className="text-status-attention flex-shrink-0 mt-0.5" />{fmtDates(f)}</li>)}</ul>
+          </Disclosure>
+        )}
         <Disclosure title="DCMA 14-point assessment" meta={`${ev.dcma.passed}/${ev.dcma.applicable} passing`}>
           <table className="w-full text-[12px]">
             <caption className="sr-only">DCMA 14-point checks with metric, threshold and result</caption>
@@ -839,11 +850,8 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
         <Disclosure id="resources" title="Resources: loading, over-allocation and leveling" meta={plan.generated?.resources?.assignments.length ? `${plan.generated.resources.assignments.length} assignments` : 'no resource data'}>
           <ResourcesPanel kind="plan" id={plan.id} canEdit={false} />
         </Disclosure>
-      </div>
-
-      <section aria-labelledby="review-title" className="bg-white/70 border border-warm-200 rounded-2xl p-5">
-        <h3 id="review-title" className="text-[14px] font-semibold text-ink">Expert review {ev.review.status !== 'none' && <span className="font-normal text-warm-500">— {ev.review.status.replace('_', ' ')}</span>}</h3>
-        <p className="text-[12px] text-warm-500 mt-0.5 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
+        <Disclosure title="Expert review" meta={ev.review.status !== 'none' ? ev.review.status.replace('_', ' ') : 'none recorded'}>
+          <p className="text-[12px] text-warm-600 mb-3">A second pair of eyes on logic, durations and scope. Reviews go into the Basis of Schedule.</p>
         {plan.reviews.map(r => (
           <div key={r.id} className="text-[13px] text-warm-700 border-l-2 border-warm-300 pl-3 mb-2">
             <span className="font-semibold text-ink">{r.reviewer}</span> · {fmtDateTime(r.at)} · <span className="uppercase text-[12px] font-semibold">{r.verdict.replace(/_/g, ' ')}</span>
@@ -856,19 +864,30 @@ function EvaluationTab({ ev, plan, sra, sraState, onRunSra, busy, onReview, guid
             <option value="approve">Approve</option><option value="approve_with_comments">Approve with comments</option><option value="reject">Changes required</option>
           </select>
           <input value={reviewer} onChange={e => setReviewer(e.target.value)} aria-label="Reviewer name (if not you)" placeholder="Reviewer name (if not you)" className="bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
-     <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-[13px] font-semibold py-2">Record review</button>
+          <button disabled={!!busy} onClick={async () => { if (await onReview({ verdict, comment, reviewer })) setComment('') }} className="pressable border border-warm-300 bg-white hover:bg-warm-100 text-ink rounded-lg text-[13px] font-semibold py-2">Record review</button>
           <textarea value={comment} onChange={e => setComment(e.target.value)} aria-label="Review comments" placeholder="Comments — logic, durations, missing scope…" rows={3} className="md:col-span-3 bg-warm-50 border border-warm-300 rounded-lg px-2.5 py-2 text-[13px]" />
         </div>
         )}
-      </section>
+        </Disclosure>
+        <Disclosure title="What these numbers mean">
+            <ul className="text-[13px] text-warm-600 space-y-1.5">
+              <li><span className="font-medium text-ink">Overall quality</span> blends DCMA 35% · readiness 20% · realism 20% · coverage 15% · review 10%.</li>
+              <li><span className="font-medium text-ink">DCMA 14-point</span> is a standard schedule health check (logic, leads and lags, float, constraints…) from the U.S. Defense Contract Management Agency.</li>
+              <li><span className="font-medium text-ink">P50</span> is a coin-flip date: half the likely outcomes finish by then. <span className="font-medium text-ink">P80</span> is the date you can commit to with 80% confidence. <span className="font-medium text-ink">Deterministic</span> is the finish if every activity takes exactly its planned duration.</li>
+              <li>{fc.method === 'monte_carlo'
+                ? 'P50 and P80 come from the Monte Carlo simulation (Schedule risk analysis, above).'
+                : <>P50 and P80 are a quick rule-based estimate, not a simulation, until the Monte Carlo analysis has run. Basis: {ev.forecast.basis}</>}</li>
+            </ul>
+        </Disclosure>
+      </div>
     </div>
   )
 }
 
-function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOpen }: {
+function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, onRecovery, startOpen }: {
   g: Guide; check: Evaluation['dcma']['checks'][number]; busy: string | null
   onDecide: (key: string, decision: 'accept' | 'fix' | null, note: string) => Promise<boolean>
-  onShowCodes: (codes: string[]) => void; onInterview: () => void
+  onShowCodes: (codes: string[]) => void; onInterview: () => void; onRecovery: () => void
   /** Only the first open decision starts expanded, so the list reads as a short to-do list */
   startOpen: boolean
 }) {
@@ -879,7 +898,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
   const [accepting, setAccepting] = useState(false)
   const key = `dcma:${g.id}`
   return (
-    <div className={`border rounded-2xl ${g.decision ? 'bg-warm-50 border-warm-200' : 'bg-white border-status-attention/40'}`}>
+    <div className={`border border-warm-200 rounded-[14px] ${g.decision ? 'bg-warm-50' : 'bg-white'}`}>
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left">
         <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap ${check.result === 'fail' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>#{g.id} {check.result}</span>
         <span className="text-[13px] font-semibold text-ink flex-1">{check.name} <span className="font-normal text-warm-500">— {check.metric} (target {check.threshold})</span></span>
@@ -907,7 +926,7 @@ function GuideCard({ g, check, busy, onDecide, onShowCodes, onInterview, startOp
             {g.actions.map((a, i) => a.kind === 'filter'
               ? <button key={i} onClick={() => onShowCodes(a.codes)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
               : a.kind === 'recovery'
-        ? <button key={i} onClick={() => document.getElementById('recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</button>
+        ? <button key={i} onClick={onRecovery} className="pressable px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold">{a.label}</button>
                 : a.kind === 'interview'
                   ? <button key={i} onClick={onInterview} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}</button>
                   : !g.decision && canWrite && <button key={i} onClick={() => setAccepting(x => !x)} className="pressable px-3.5 py-1.5 rounded-lg border border-warm-300 bg-white text-[13px] text-ink hover:bg-warm-100">{a.label}…</button>)}
@@ -957,22 +976,19 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
   const max = r ? Math.max(...r.histogram.map(h => h.count)) : 1
   const pct = (x: number) => `${Math.round(x * 100)}%`
   return (
-    <section aria-labelledby="sra-title" className="border border-warm-200 rounded-2xl p-5 bg-white/70">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <h3 id="sra-title" className="text-[14px] font-semibold text-ink">Schedule risk analysis (Monte Carlo)</h3>
-        {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-3.5 py-1.5 text-[13px] font-medium">
-          {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
-        </button>}
-      </div>
+    <Disclosure title="Schedule risk analysis (Monte Carlo)" meta={r?.required ? `${pct(r.required.probability)} chance of ${fmtDate(r.required.date)}` : r ? `P80 ${fmtDate(r.percentiles.p80)}` : state === 'running' ? 'running…' : state === 'locked' ? 'Pro and Enterprise' : 'not run yet'}>
+      {state !== 'locked' && <button onClick={run} disabled={state === 'running'} className="pressable mb-3 flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white hover:bg-warm-100 text-ink px-3.5 py-1.5 text-[13px] font-medium">
+        {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
+      </button>}
       {!r && state !== 'running' && <p className="text-[12px] text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
       {state === 'locked' && <p role="status" className="text-[12px] text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
       {state === 'error' && <p role="alert" className="text-[12px] text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">
           {r.required && (
-            <p className="text-[14px] text-warm-700">
-              Chance of finishing by the required {fmtDate(r.required.date)}: <span className={`text-[16px] font-semibold ${r.required.probability >= 0.8 ? 'text-status-on-track' : r.required.probability >= 0.5 ? 'text-status-attention' : 'text-status-at-risk'}`}>{pct(r.required.probability)}</span>
-              {r.required.probability < 0.8 && ' — below the usual 80% confidence target; see the recovery options and the drivers below.'}
+            <p className="text-[13px] text-warm-700">
+              Chance of finishing by the required {fmtDate(r.required.date)}: <span className="font-semibold text-ink">{pct(r.required.probability)}</span>
+              {r.required.probability < 0.8 && ' (the usual target is 80%).'}
             </p>
           )}
           <dl className="grid grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-3">
@@ -1022,7 +1038,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
           </div>
         </div>
       )}
-    </section>
+    </Disclosure>
   )
 }
 

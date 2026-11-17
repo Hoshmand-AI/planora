@@ -21,6 +21,7 @@ export function Workspaces({ members }: { members: Member[] }) {
   const [msg, setMsg] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [draft, setDraft] = useState({ name: '', walled: true })
+  const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState<Record<string, string>>({})
 
   const [loadErr, setLoadErr] = useState(false)
@@ -51,22 +52,28 @@ export function Workspaces({ members }: { members: Member[] }) {
   const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Former member'
   const restricted = new Set(data.restrictedMemberIds)
   const selectClass = 'bg-warm-100 border border-warm-300 rounded px-2 py-1 text-[13px] text-warm-700'
+  const none = !data.workspaces.length
 
   return (
     <Section title="Workspaces" description="Group schedules and plans by client, business unit or project. A restricted workspace is visible only to its members; a member limited to their workspaces sees nothing else. Owners and admins always see everything. Changes take effect on the member's next request and are recorded in the audit log.">
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
 
-      <form className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-start mb-4" onSubmit={async e => {
+      {/* The form opens on request: until then the card is one line and one button. */}
+      {!creating && (
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {none && <p className="flex-1 min-w-[220px] text-[13px] text-warm-600">None yet: every member sees every schedule and plan their role allows.</p>}
+          <Button variant="secondary" onClick={() => setCreating(true)}>New workspace</Button>
+        </div>
+      )}
+      {creating && <form className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-start mb-4" onSubmit={async e => {
         e.preventDefault()
-        if (await act('create', { action: 'create', ...draft }, `Workspace "${draft.name.trim()}" created.`)) setDraft({ name: '', walled: true })
+        if (await act('create', { action: 'create', ...draft }, `Workspace "${draft.name.trim()}" created.`)) { setDraft({ name: '', walled: true }); setCreating(false) }
       }}>
         <Field label="New workspace name" hint="For example the client or the project number.">{p => <input {...p} required maxLength={120} className={inputClass} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
         <label className="flex items-center gap-2 text-[13px] text-warm-700 sm:mt-[26px] sm:min-h-[40px]"><input type="checkbox" className="w-4 h-4 accent-accent-500" checked={draft.walled} onChange={e => setDraft({ ...draft, walled: e.target.checked })} />Restricted to members</label>
         {/* The checkbox and the button sit on the input's line, not under its hint. */}
-        <div className="sm:mt-[26px]"><Button type="submit" className="min-h-[38px]" disabled={busy === 'create'}>Create workspace</Button></div>
-      </form>
-
-      {!data.workspaces.length && <p className="text-[13px] text-warm-600 mb-4">No workspaces yet. Until you create one, every member sees every schedule and plan their role allows.</p>}
+        <div className="sm:mt-[26px] flex gap-2"><Button type="submit" className="min-h-[38px]" disabled={busy === 'create'}>Create workspace</Button><Button type="button" variant="secondary" className="min-h-[38px]" onClick={() => setCreating(false)}>Cancel</Button></div>
+      </form>}
 
       <ul className="space-y-3 mb-5">
         {data.workspaces.map(w => (
@@ -104,6 +111,8 @@ export function Workspaces({ members }: { members: Member[] }) {
         ))}
       </ul>
 
+      {/* Limiting a member means something only once there is a workspace to limit them to. */}
+      {!none && <>
       <h3 className="text-[13px] font-medium text-ink mb-1">Limit members to their workspaces</h3>
       <p className="text-[12px] text-warm-600 mb-2">A limited member sees only the schedules and plans in workspaces they belong to, including on exports, reports, comparisons, the portfolio and firm history.</p>
       <ul className="divide-y divide-warm-200 border border-warm-200 rounded-md mb-5">
@@ -117,6 +126,7 @@ export function Workspaces({ members }: { members: Member[] }) {
           </li>
         ))}
       </ul>
+      </>}
 
       {!!data.workspaces.length && (
         <>

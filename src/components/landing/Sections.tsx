@@ -46,7 +46,7 @@ function TabList({ label, items, prefix, panel, tabs, className = '' }: { label:
 /** A screenshot of the product (public/landing/*.webp, 1600 wide, taken from the built-in sample projects). */
 export function Shot({ name, alt, label, eager = false, height = 1200, className = '' }: { name: string; alt: string; label: string; eager?: boolean; height?: number; className?: string }) {
   return (
-    <figure className={`rounded-[18px] md:rounded-[22px] border border-warm-200 bg-white shadow-[0_40px_80px_-40px_rgba(6,20,27,0.45)] overflow-hidden ${className}`}>
+    <figure className={`rounded-[18px] md:rounded-[22px] border border-warm-200 bg-white shadow-[0_40px_80px_-40px_rgba(29,33,37,0.45)] overflow-hidden ${className}`}>
       <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
         <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
         <span className="ml-3 text-[12.5px] text-navy-200 truncate">{label}</span>
@@ -81,7 +81,7 @@ function LiveBrief() {
   const all = id === 'pm' ? b.audiences.pm : id === 'field' ? b.audiences.field : id === 'client' ? b.audiences.client : null
   const lines = all ? all.filter(t => t !== b.headline.text) : null
   return (
-    <div className="rounded-[18px] md:rounded-[22px] border border-navy-800 bg-white shadow-[0_40px_80px_-40px_rgba(6,20,27,0.6)] overflow-hidden">
+    <div className="rounded-[18px] md:rounded-[22px] border border-navy-800 bg-white shadow-[0_40px_80px_-40px_rgba(29,33,37,0.6)] overflow-hidden">
       <div className="flex items-center gap-2 px-4 h-9 md:h-10 bg-navy-900" aria-hidden="true">
         <span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" /><span className="w-2.5 h-2.5 rounded-full bg-navy-700" />
         <span className="ml-3 text-[12.5px] text-navy-200 truncate">RunF9 · Today</span>

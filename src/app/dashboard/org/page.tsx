@@ -255,8 +255,6 @@ export default function OrgPage() {
         </div>
       </Section>
 
-      {manage && <Workspaces members={data.members} />}
-
       {manage && (
         <Section title="Invite someone" description="Invitations are single-use and expire in 7 days. Send the link yourself (email, Teams, Slack); it only works for the address you enter.">
           {note('invite')}
@@ -288,6 +286,8 @@ export default function OrgPage() {
           )}
         </Section>
       )}
+
+      {manage && <Workspaces members={data.members} />}
       </div>
 
       <div role="tabpanel" id="org-panel-security" aria-labelledby="org-tab-security" hidden={active !== 'security'} className="space-y-5">
