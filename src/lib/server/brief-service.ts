@@ -4,7 +4,7 @@
 
 import { getScheduleSeries } from '@/lib/db'
 import { orderSeries } from '@/lib/analysis/compare'
-import { buildDailyBrief, missingScope, type BriefChange, type BriefWhatIf, type DailyBrief } from '@/lib/analysis/daily-brief'
+import { buildDailyBrief, missingScope, type BriefChange, type BriefWhatIf, type DailyBrief, type SiteObservation } from '@/lib/analysis/daily-brief'
 import { extractSignals, SIGNAL_DOC_TYPES } from '@/lib/analysis/correspondence'
 import { projectWatch, type BriefAlert, type ProjectWatch, type WatchChunk } from '@/lib/analysis/project-watch'
 import { contractTarget, loadScheduleData, networkOf } from '@/lib/planning/service'
@@ -15,6 +15,14 @@ import { scopedChunks } from '@/lib/rag/store'
 import { currentWorkspaceAccess } from '@/lib/server/workspace-scope'
 import { log } from '@/lib/server/log'
 import { listRegister, registerKey } from './register'
+import { listCaptures } from './site-captures'
+import { placeLabel, type SiteCapture } from '@/lib/site/capture'
+
+/** A site capture as the brief reads it: its words, status, activities and place. Never its photo or audio. */
+export const toObservation = (c: SiteCapture): SiteObservation => ({
+  id: c.id, text: c.note, takenAt: c.takenAt, takenBy: c.createdByName || 'A member', activityCodes: c.activityCodes, location: placeLabel(c), status: c.status,
+  photos: c.media.filter(m => m.kind === 'photo').length, voiceNote: c.media.some(m => m.kind === 'audio'),
+})
 
 const us = (d: string | null | undefined) => (d ? `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}` : '—')
 const diff = (a: string, b: string) => Math.round((Date.parse(b.slice(0, 10) + 'T00:00:00Z') - Date.parse(a.slice(0, 10) + 'T00:00:00Z')) / 86_400_000)
@@ -37,6 +45,9 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
   const openTask = (a: (typeof data.activities)[number] | undefined) => !!a && a.activityType === 'task' && a.status !== 'complete' && !a.actualFinish
 
   const register = await listRegister(orgId, registerKey(s)).catch(err => { log('warn', 'register unavailable', { error: (err as Error).message }); return [] })
+  // Site captures of the last two weeks: what people recorded on site, with the status and activities they picked.
+  const observations: SiteObservation[] = await listCaptures(orgId, registerKey(s), { limit: 200, since: new Date(Date.parse(today + 'T00:00:00Z') - 14 * 86_400_000).toISOString() })
+    .then(list => list.map(toObservation)).catch(err => { log('warn', 'site captures unavailable', { error: (err as Error).message }); return [] })
 
   // Signals: unflagged passages of the project's correspondence (never passages that read like instructions).
   let signals: ReturnType<typeof extractSignals> = []
@@ -157,7 +168,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     milestoneForecast: base?.measured ?? data.analysis.forecastFinish,
     drivingPathIds: data.analysis.drivingPath?.ids?.length ? data.analysis.drivingPath.ids : base?.longestPath ?? [],
     register, signals, changes, submittedFinish: data.editsApplied ? data.submittedForecastFinish : null,
-    whatIfs, logic, missingScope: missingScope(data.activities, s.projectType), sinceLastUpdate,
+    whatIfs, logic, missingScope: missingScope(data.activities, s.projectType), sinceLastUpdate, observations,
   })
   // The project's documents read against the schedule: contract clauses, drawings and specifications, field reports.
   const watch = projectWatch(docChunks, data.activities.filter(a => a.activityType === 'task' || a.activityType === 'milestone').map(a => ({ id: a.id, code: a.activityId, name: a.name, wbs: a.wbs, started: !!a.actualStart || a.status === 'in_progress', done: a.status === 'complete' || !!a.actualFinish })), {
@@ -165,7 +176,7 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
     // A delay that has been put in the register has been dealt with as far as the reminder goes.
     delaysReported: signals.filter(x => (x.kind === 'delay' || x.kind === 'change') && !register.some(r => r.sourceQuote === x.quote)).map(x => ({ title: x.title, activity: x.activity ? `${x.activity.code} ${x.activity.name}` : null })),
     openChangeItems: brief.changeItems.filter(c => !register.find(r => r.id === c.id)?.sourceQuote).length,
-  })
+  }, observations)
 
   // What needs someone's attention today, most pressing first.
   const alerts: BriefAlert[] = []
@@ -199,6 +210,11 @@ export async function loadDailyBrief(scheduleId: string, orgId: string, o: Brief
         : undefined
   for (const c of watch.contract.filter(x => x.active)) alerts.push({ level: 'act', section: 'contract', text: c.text, short: contractShort(c) })
   for (const f of watch.field) alerts.push({ level: 'act', section: 'field', text: f.text, short: f.activity.code + ' ' + f.activity.name + ': reported ' + f.reported + ' on site, ' + f.schedule + ' in the schedule.' })
+  // A problem someone recorded on site since the previous working day is for someone to act on.
+  for (const o of brief.site.observations.filter(x => x.status === 'issue').slice(0, 3)) {
+    const what = o.text ? o.text.split('\n')[0].slice(0, 160) : o.photos ? 'see the photo' : 'listen to the voice note'
+    alerts.push({ level: 'act', section: 'site', text: `Problem recorded on site${o.location ? ` in ${o.location}` : ''} by ${o.by}: ${what}`, short: `${o.location ? `${o.location}: ` : ''}${what}` })
+  }
   const overdueItems = register.filter(r => r.status === 'open' && r.dueDate && r.dueDate < today)
   if (overdueItems.length) alerts.push({ level: 'act', section: 'register', text: `${n(overdueItems.length, 'register item')} past due: ${overdueItems.slice(0, 2).map(r => r.title).join('; ')}.` })
   const newDelays = signals.filter(x => x.kind === 'delay')

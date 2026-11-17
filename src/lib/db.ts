@@ -971,7 +971,11 @@ export async function exportOrganization(orgId: string) {
   const retrievalLog = (await query('SELECT id, user_id, schedule_id, purpose, backend, query_sha256, include_unreviewed, delivery, document_ids, chunk_ids, flagged_chunk_ids, invalid_citations, created_at FROM retrieval_log WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
   // The project register (risks, issues, change items).
   const projectRegister = (await query('SELECT * FROM project_items WHERE org_id=$1 ORDER BY created_at', [orgId])).rows
-  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, retrievalLog, auditEvents: audit }
+  // Site captures: who, when, where, what was said and which activities; each photo and voice note is listed with its
+  // size and SHA-256 (the files themselves are downloaded from the project's Site page, not put inside this JSON).
+  const { exportCaptures } = await import('@/lib/server/site-captures')
+  const siteCaptures = await exportCaptures(orgId)
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -992,6 +996,9 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     await q('DELETE FROM document_requirement_reviews WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_documents WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_items WHERE org_id=$1', [orgId])
+    // Site captures: the photos and voice notes first, then the captures (tombstones included).
+    await q('DELETE FROM site_capture_media WHERE org_id=$1', [orgId])
+    await q('DELETE FROM site_captures WHERE org_id=$1', [orgId])
     await q('DELETE FROM brief_subscriptions WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
@@ -1038,6 +1045,7 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q('UPDATE delay_events SET updated_by=$2 WHERE updated_by=$1', [userId, heir])
     await q('UPDATE project_documents SET uploaded_by=$2 WHERE uploaded_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q("UPDATE project_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
+    await q("UPDATE site_captures SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q('DELETE FROM brief_subscriptions WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])

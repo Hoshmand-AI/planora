@@ -72,6 +72,32 @@ export interface BriefSignal {
   docType: string
 }
 
+/**
+ * What someone recorded on site with a phone (a site capture), reduced to what the brief reads: its words, its
+ * status and the activities it names. Never its photo or its audio.
+ */
+export interface SiteObservation {
+  id: string
+  /** The note's words ('' when the capture is a photo or a voice note only) */
+  text: string
+  /** When it was taken (ISO time) and by whom */
+  takenAt: string
+  takenBy: string
+  /** Activity IDs as the schedule writes them (codes), not RunF9 ids: a capture belongs to the project across uploads */
+  activityCodes: string[]
+  /** "Level 2 · Data Hall 1", or '' when no place was given */
+  location: string
+  status: 'progress' | 'complete' | 'not_started' | 'issue'
+  photos: number
+  voiceNote: boolean
+}
+
+/** A site capture as the brief lists it, with the activities it names resolved against today's schedule. */
+export interface BriefObservation {
+  id: string; text: string; at: string; by: string; location: string; status: SiteObservation['status']
+  activities: { id: string; code: string; name: string }[]; photos: number; voiceNote: boolean
+}
+
 export interface BriefWhatIf {
   title: string
   text: string
@@ -103,6 +129,8 @@ export interface DailyBriefInput {
   missingScope: string[]
   /** Since the previous update of the same project */
   sinceLastUpdate?: { version: string; finishMovedDays: number | null; added: number; deleted: number; logicChanges: number; durationChanges: number } | null
+  /** Site captures of the project, any order (the brief keeps those since the previous working day) */
+  observations?: SiteObservation[]
 }
 
 export interface DailyBrief {
@@ -125,6 +153,8 @@ export interface DailyBrief {
   logic: { text: string; reason: string }[]
   whatIfs: BriefWhatIf[]
   signals: BriefSignal[]
+  /** What was recorded on site since the previous working day, newest first; `problems` counts the captures marked as a problem */
+  site: { since: string; count: number; problems: number; observations: BriefObservation[] }
   audiences: { pm: string[]; field: string[]; client: string[] }
 }
 
@@ -248,12 +278,24 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   if (becomingCritical.length) pm.push(`Watch: ${label(becomingCritical[0])} has ${becomingCritical[0].note}.`)
   if (i.changes.length) pm.push(`${plural(i.changes.length, 'change')} made to the schedule in RunF9 in the last 7 days${finishMovedDays ? `; with all RunF9 edits the finish is ${plural(Math.abs(finishMovedDays), 'day')} ${finishMovedDays > 0 ? 'later' : 'earlier'} than as submitted` : ''}.`)
 
+  // What was recorded on site since the previous working day (site captures), newest first.
+  const byCode = new Map(acts.map(a => [a.activityId.toLowerCase(), a]))
+  const seenOnSite = (i.observations ?? []).filter(o => { const d = day(o.takenAt); return !!d && d >= yesterday && d <= today }).sort((x, y) => y.takenAt.localeCompare(x.takenAt))
+  const site: DailyBrief['site'] = {
+    since: yesterday, count: seenOnSite.length, problems: seenOnSite.filter(o => o.status === 'issue').length,
+    observations: top(seenOnSite).map(o => ({
+      id: o.id, text: o.text, at: o.takenAt, by: o.takenBy, location: o.location, status: o.status, photos: o.photos, voiceNote: o.voiceNote,
+      activities: o.activityCodes.map(c => byCode.get(c.toLowerCase())).filter((a): a is Activity => !!a).map(a => ({ id: a.id, code: a.activityId, name: a.name })),
+    })),
+  }
+
   const field: string[] = []
   field.push(starting.length ? `Starting today: ${starting.slice(0, 6).map(label).join('; ')}${starting.length > 6 ? `; and ${starting.length - 6} more` : ''}.` : 'Nothing new is scheduled to start today.')
   field.push(finishing.length ? `Must finish today: ${finishing.slice(0, 6).map(label).join('; ')}${finishing.length > 6 ? `; and ${finishing.length - 6} more` : ''}.` : 'Nothing is scheduled to finish today.')
   if (inProgressAll.length) field.push(`Under way: ${inProgressAll.slice(0, 5).map(r => `${label(r)}${r.date ? ` (finish ${us(r.date)})` : ''}`).join('; ')}${inProgressAll.length > 5 ? `; and ${inProgressAll.length - 5} more` : ''}.`)
   if (drivingToday) field.push(`Do not let this slip: ${label(drivingToday)}. It is driving the project finish, so every day lost here is a day lost at the end.`)
   if (lateStart.length) field.push(`Should already be started: ${lateStart.slice(0, 4).map(label).join('; ')}${lateStart.length > 4 ? `; and ${lateStart.length - 4} more` : ''}. Report actual start dates.`)
+  if (site.count) field.push(`Recorded on site since ${us(yesterday)}: ${plural(site.count, 'capture')}${site.problems ? `, ${plural(site.problems, 'problem')} reported` : ''}.`)
   const tomorrow = open.filter(a => !a.actualStart && within(day(a.earlyStart), today, 3)).map(a => row(a, day(a.earlyStart))).sort((x, y) => (x.date ?? '').localeCompare(y.date ?? ''))
   if (tomorrow.length) field.push(`Coming in the next 3 days: ${tomorrow.slice(0, 5).map(r => `${label(r)} (${us(r.date)})`).join('; ')}${tomorrow.length > 5 ? `; and ${tomorrow.length - 5} more` : ''}. Confirm crews, materials and access.`)
 
@@ -280,6 +322,7 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
     logic: i.logic.outOfSequence.slice(0, 6),
     whatIfs: i.whatIfs,
     signals: i.signals,
+    site,
     audiences: { pm, field, client },
   }
 }

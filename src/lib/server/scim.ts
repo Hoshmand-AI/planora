@@ -8,7 +8,7 @@
 // Users: the SCIM User's userName is the member's email (RunF9's sign-in identity). New members
 // get an unusable random password and sign in through SSO. Their email must be in one of the
 // organization's verified SSO domains, so a token cannot create accounts for arbitrary addresses.
-// Roles come from the User's "roles" attribute (admin, scheduler, reviewer, viewer; never owner),
+// Roles come from the User's "roles" attribute (admin, scheduler, reviewer, field, viewer; never owner),
 // else the SSO default role. Owners are managed in RunF9: SCIM cannot deactivate them or change
 // their role or email.
 //
@@ -189,7 +189,7 @@ function roleFrom(v: unknown): Role | null {
   const pick = (list.find(x => x && typeof x === 'object' && (x as Row).primary === true) ?? list[0]) as unknown
   const raw = typeof pick === 'string' ? pick : pick && typeof pick === 'object' ? (pick as Row).value ?? (pick as Row).display : undefined
   const role = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
-  if (!isRole(role)) throw new ScimError(400, `Unknown role "${String(raw)}". Use admin, scheduler, reviewer or viewer.`, 'invalidValue')
+  if (!isRole(role)) throw new ScimError(400, `Unknown role "${String(raw)}". Use admin, scheduler, reviewer, field or viewer.`, 'invalidValue')
   if (role === 'owner') throw new ScimError(400, 'The owner role cannot be assigned through SCIM.', 'invalidValue')
   return role
 }
@@ -415,7 +415,7 @@ export function userSchema(origin: string) {
       attr('displayName'),
       attr('active', { type: 'boolean', description: 'false disables the member and ends all their sessions.' }),
       { ...attr('emails', { type: 'complex', multiValued: true }), subAttributes: [attr('value'), attr('type'), attr('primary', { type: 'boolean' })] },
-      { ...attr('roles', { type: 'complex', multiValued: true, description: 'admin, scheduler, reviewer or viewer' }), subAttributes: [attr('value', { canonicalValues: ['admin', 'scheduler', 'reviewer', 'viewer'] }), attr('primary', { type: 'boolean' })] },
+      { ...attr('roles', { type: 'complex', multiValued: true, description: 'admin, scheduler, reviewer, field or viewer' }), subAttributes: [attr('value', { canonicalValues: ['admin', 'scheduler', 'reviewer', 'field', 'viewer'] }), attr('primary', { type: 'boolean' })] },
     ],
     meta: { resourceType: 'Schema', location: `${scimBase(origin)}/Schemas/${SCHEMA.user}` },
   }

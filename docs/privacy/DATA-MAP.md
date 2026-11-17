@@ -17,6 +17,7 @@
 | SSO configuration | issuer, client id, encrypted client secret, domains | Customer confidential / secret | Federation | `organizations.sso`, `sso_domains` | Customer org | Until changed or org deleted | Neon |
 | API keys | name, role, key prefix, SHA-256 of the key, creator, last use | Secret (hash only) | Integrations | `api_keys` | Customer org | Until revoked and the org is deleted | Neon |
 | Cloud storage connections | provider, bucket/container, region, folder; encrypted access key, SAS token or sign-in refresh token (Microsoft, Google), or the AWS role ARN and this organization's external ID; what RunF9 may do (import, keep originals) | Customer confidential / secret | Importing files from, and keeping original files in, the firm's own Amazon S3, Azure Blob, Google Cloud Storage or S3-compatible storage | `storage_connections` (secret encrypted, wiped on disconnect) | Customer org | Until disconnected (row kept without the secret so kept files still say where they are) | Neon; files go only to the firm's own storage |
+| Site captures | photos (resized on the phone to 1600 px; the camera's embedded data is dropped), a voice note, a typed note, status, activity IDs, level and room, the phone's position with its stated accuracy when the member chose to add it, who and when | Customer confidential; photos and voice notes may show or record people (personal) | A dated record of what was seen on site, read by the Daily Brief | `site_captures`, `site_capture_media` (bytes in the database; deleted with the capture, by project retention, and with the organization; the organization export lists each file's size and SHA-256) |
 | Project mailbox connections | Microsoft 365 mailbox address, the id and name of the one mail folder RunF9 reads, encrypted sign-in refresh token, last read time and outcome | Personal – business contact / secret | Copying a project's emails into its documents | `project_mailboxes` (the copied emails are project documents, above) | Customer org | Until disconnected (the refresh token is erased at once) and the org is deleted | Neon; Microsoft (Graph, to read the named folder) |
 | Webhooks | endpoint URL, events, encrypted signing secret, delivery status | Customer confidential / secret | Integrations | `webhooks` | Customer org | Until removed or org deleted | Neon; event payloads go to the customer's own endpoint |
 | Email tokens | SHA-256 of single-use confirmation tokens | Secret (hash only) | Email verification | `email_tokens` | Hoshmand AI | 48 hours (single use) | Neon |
@@ -26,7 +27,7 @@
 | Backups | full database | As above (highest class) | Recovery | Neon PITR; optional encrypted GitHub artifact | Hoshmand AI | Neon window; artifacts 35 days | Neon, GitHub (encrypted) |
 
 **Minimization:**
-- Original uploaded files are discarded after parsing (schedules and project documents alike).
+- Original uploaded files are discarded after parsing (schedules and project documents alike). Site captures are the exception: their photos and voice notes are the record, so they are stored until the capture is deleted.
 - The retrieval log keeps ids and a query hash, never query or document text.
 - "Can't share" answers are stored without a value and are never sent to a model.
 - AI calls are logged without their content.

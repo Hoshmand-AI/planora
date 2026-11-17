@@ -83,6 +83,17 @@ the caller's workspaces; another firm's schedule or document is `404`.
 | POST | `/api/schedules/{id}/documents/search` | read | `{ "query", "includeUnreviewed" }` → ranked passages with citations and flags |
 | GET / POST | `/api/schedules/{id}/documents/requirements` | read / scheduler | Candidate scheduling requirements with citations; POST `{ documentId, key, status: confirmed \| dismissed }` |
 
+### Site captures (session only)
+
+A photo, a voice note and a few words taken on site, filed under the project (they carry across its updates).
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/schedules/{id}/captures` | read | Captures, newest first (`before`, `limit`); `activities=1` adds the activity pick list |
+| POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note) |
+| GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported) |
+| DELETE | `/api/schedules/{id}/captures/{captureId}` | site.capture; your own capture, or any with scheduler rights | Erases the files and the words; audited as `site.capture_deleted` |
+
 `POST /api/ask` and `POST /api/reports` accept `useDocuments: true` (and `includeUnreviewed`) and
 return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restricted`, `no_match`),
 `sources`, `cited`, `removedCitations` and `flagged`. Details: [privacy/PROJECT-DOCUMENTS.md](privacy/PROJECT-DOCUMENTS.md).

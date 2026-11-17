@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Device journeys: the same user path on iPhone, iPad and desktop profiles (screen size, pixel density, touch,
 // mobile mode). Sign in, open the data-location chip, tap search (16px text, so Safari doesn't zoom), check the
-// status tiles fit, open a project by tapping its card, tap through all five project tabs and their views, zoom the schedule,
+// status tiles fit, open a project by tapping its card, tap through all six project tabs and their views, zoom the schedule,
 // and use the bottom navigation (phones) or the sidebar collapse button (tablets, desktop). Every page must fit
 // the screen width. Needs a server with RUNF9_SIGNUP=open:   BASE_URL=http://localhost:3000 node scripts/e2e-devices.mjs
 // SCREENSHOTS=dir saves a few screenshots per device.
@@ -61,7 +61,7 @@ for (const name of DEVICES) {
   await fits('Overview')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-overview.png` })
   // Every project tab
-  for (const tab of ['Gantt chart', 'Health', 'Project records', 'Reports', 'Overview']) {
+  for (const tab of ['Gantt chart', 'Health', 'Site', 'Project records', 'Reports', 'Overview']) {
     const link = page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: tab, exact: true })
     await link.scrollIntoViewIfNeeded(); await tap(link)
     await page.waitForLoadState('networkidle'); await page.waitForTimeout(300)
@@ -107,7 +107,7 @@ for (const name of DEVICES) {
     await fits(`${tab} / ${view}`)
   }
   console.log('   ✓ the second view of Gantt chart, Health and Reports opens and keeps its tab current')
-  console.log('   ✓ all 5 project tabs open by tap and fit the screen')
+  console.log('   ✓ all 6 project tabs open by tap and fit the screen')
   // Sidebar collapse on tablets and desktops
   if (desc.viewport.width >= 768) {
     const w = () => page.evaluate(() => Math.round(document.querySelector('aside').getBoundingClientRect().width))
