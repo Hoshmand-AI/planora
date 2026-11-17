@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X, Folder, TriangleAlert, ShieldAlert, Clock, TrendingUp, MessageCircleQuestion, GitBranch, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useApp } from '@/app/dashboard/layout'
-import { fmtDate, fmtDay } from '@/lib/format'
+import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
 import { EmptyState } from '@/components/EmptyState'
 import { DataCenterSampleButton } from '@/components/DataCenterSample'
@@ -308,6 +308,8 @@ export function ProjectsDashboard() {
       ) : (
         <Grid rows={shown} onOpen={open} pins={pins} onPin={togglePin} wide={rows.length < 4} />
       )}
+      {/* Everything that needs someone, across every project, in one list under the projects. */}
+      <OpenItems rows={rows} onOpen={open} />
     </div>
   )
 }
@@ -329,6 +331,44 @@ function Group({ title, note, rows, ...p }: { title: string; note?: string; rows
 
 function Grid({ rows, ...p }: { rows: PortfolioRow[] } & CardProps) {
   return <ul className={p.wide ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-1' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3'}>{rows.map((r, i) => <ProjectCard key={key(r)} r={r} i={i} {...p} />)}</ul>
+}
+
+/** A project's mark: its initials on one of the palette's dark tints, chosen from its name so it stays the same. */
+const MONO_TINTS = ['bg-navy-950', 'bg-accent-700', 'bg-navy-800', 'bg-accent-600', 'bg-navy-700']
+function Monogram({ title }: { title: string }) {
+  const words = title.trim().split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w))
+  const letters = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[1][0] : words[0]?.[1] ?? '')).toUpperCase() || 'P'
+  const tint = MONO_TINTS[[...title].reduce((n, c) => n + c.charCodeAt(0), 0) % MONO_TINTS.length]
+  return <span aria-hidden="true" className={`flex-shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[14px] font-bold tracking-[0.02em] text-white ${tint}`}>{letters}</span>
+}
+
+/** The open items of every project in one list: what is late, at risk or stale, most serious first, each opening its project. */
+function OpenItems({ rows, onOpen }: { rows: PortfolioRow[]; onOpen: (r: PortfolioRow) => void }) {
+  const [all, setAll] = useState(false)
+  const items = rows.flatMap(r => r.alerts.filter(a => a.severity !== 'info').map(a => ({ r, a })))
+    .sort((x, y) => SEVERITY[x.a.severity] - SEVERITY[y.a.severity])
+  if (!items.length) return null
+  const shown = all ? items : items.slice(0, 6)
+  return (
+    <section aria-labelledby="open-items-h" className="rounded-[14px] border border-warm-200 bg-white p-5 md:p-6">
+      <div className="flex items-baseline gap-2">
+        <h2 id="open-items-h" className="text-[15px] font-semibold text-navy-950">Open items</h2>
+        <span className="rounded-full border border-warm-300 px-2 text-[12px] font-semibold tabular-nums text-warm-700">{shown.length} of {items.length}</span>
+      </div>
+      <ul className="mt-2 divide-y divide-warm-200">
+        {shown.map(({ r, a }, i) => (
+          <li key={`${key(r)}-${a.code}-${i}`} className="flex items-start gap-3 py-3">
+            <span className={`mt-0.5 flex-shrink-0 w-[62px] rounded-full px-2 py-0.5 text-center text-[12px] font-semibold ${a.severity === 'error' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{a.severity === 'error' ? 'Act' : 'Watch'}</span>
+            <div className="min-w-0 flex-1">
+              <button type="button" onClick={() => onOpen(r)} className="text-left text-[14px] font-semibold text-accent-700 hover:underline">{r.title}</button>
+              <p className="text-[13.5px] leading-snug text-warm-700">{fmtDates(a.text)}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {items.length > 6 && <button type="button" aria-expanded={all} onClick={() => setAll(v => !v)} className="mt-2 text-[13px] font-semibold text-accent-600 hover:underline">{all ? 'Show fewer' : `Show all ${items.length}`}</button>}
+    </section>
+  )
 }
 
 function PinButton({ r, pinned, onPin }: { r: PortfolioRow; pinned: boolean; onPin: (r: PortfolioRow) => void }) {
@@ -357,12 +397,15 @@ function ProjectCard({ r, i, onOpen, pins, onPin, wide }: { r: PortfolioRow; i: 
     <li className="rise-in" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
       <div className={`card-lift group relative h-full rounded-[14px] border border-warm-200 bg-white p-5 flex flex-col hover:border-warm-300 ${wide ? 'lg:flex-row lg:items-center lg:gap-10 lg:px-7 lg:py-6' : ''}`}>
         <div className={`flex items-start justify-between gap-3 ${wide ? 'lg:w-[26%] lg:flex-shrink-0' : ''}`}>
+          <div className="flex items-start gap-3.5 min-w-0">
+          <Monogram title={r.title} />
           <div className="min-w-0">
             {/* The whole card opens the project; the link's box covers it */}
             <button type="button" onClick={() => onOpen(r)} className="text-left text-[16px] font-semibold tracking-[-0.01em] text-navy-950 leading-snug after:absolute after:inset-0 after:rounded-[14px] after:content-['']">
               {r.title}
             </button>
             <div className="text-[12.5px] text-warm-600 mt-0.5 truncate">{sourceLine(r)}</div>
+          </div>
           </div>
           <PinButton r={r} pinned={pins.includes(key(r))} onPin={onPin} />
         </div>
