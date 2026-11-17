@@ -14,6 +14,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
+import postgres from 'pg'
 import { typeProblems } from './type-audit.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
@@ -30,21 +31,13 @@ function ok(cond, msg, extra) {
   console.log(`✓ ${msg}`)
 }
 
-// Inviting a member needs a confirmed email address: follow the link RunF9 wrote to the test outbox (as in ci.yml).
-const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
-async function confirmEmail(client, address) {
-  if (!OUTBOX) { console.error('✗ Set RUNF9_EMAIL_OUTBOX to the server\'s outbox folder for this suite (see ci.yml).'); process.exit(1) }
-  for (let i = 0; i < 50; i++) {
-    for (const f of fs.readdirSync(OUTBOX).filter(x => x.endsWith('.json')).sort().reverse()) {
-      const m = JSON.parse(fs.readFileSync(path.join(OUTBOX, f), 'utf8'))
-      // Only the token is taken from the message, and only if it looks like one: the request always goes to the
-      // server under test, at the one path that confirms an address.
-      const token = m.to === address && /\/api\/auth\/verify\?token=([A-Za-z0-9._~-]{16,200})(?![A-Za-z0-9._~-])/.exec(m.text)?.[1]
-      if (token) { await client.raw('GET', `/api/auth/verify?token=${encodeURIComponent(token)}`); return }
-    }
-    await new Promise(r => setTimeout(r, 100))
-  }
-  throw new Error(`no confirmation email to ${address}`)
+// Inviting a member needs a confirmed email address. The confirmation link itself is covered by
+// scripts/e2e-security.mjs; here the address is marked confirmed in the test database directly.
+async function confirmEmail(address) {
+  if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
+  const db = new postgres.Client({ connectionString: process.env.DATABASE_URL })
+  await db.connect()
+  try { await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address]) } finally { await db.end() }
 }
 
 class Client {
@@ -302,7 +295,7 @@ await sheet.getByRole('textbox', { name: 'Note' }).fill('Kept on the phone for i
 await context.setOffline(true)
 await sheet.getByRole('button', { name: 'Save capture' }).click()
 await pg.getByText(/1 capture is saved on this phone and not sent yet/).waitFor()
-await confirmEmail(a, `site-a-${stamp}@example.com`)
+await confirmEmail(`site-a-${stamp}@example.com`)
 const invite = await a.post('/api/org', { action: 'invite', email: `site-second-${stamp}@example.com`, role: 'scheduler' })
 const second = new Client()
 ok((await second.post('/api/auth', { action: 'signup', email: `site-second-${stamp}@example.com`, password: 'correct horse battery staple', name: 'Sam Second', invite: new URL(invite.data.link).searchParams.get('invite') })).status === 200, 'a second member joins firm A')

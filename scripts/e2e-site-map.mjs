@@ -13,11 +13,14 @@
 // Exits non-zero on the first failure.
 
 import fs from 'node:fs'
-import http from 'node:http'
+import os from 'node:os'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
-import zlib from 'node:zlib'
+import postgres from 'pg'
 import { chromium } from 'playwright'
+import QRCode from 'qrcode'
 import { typeProblems } from './type-audit.mjs'
+import { png, TILE } from './mock-tiles.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
 const TILE_PORT = Number(process.env.TILE_PORT || 4599)
@@ -33,43 +36,24 @@ function ok(cond, msg, extra) {
   console.log(`✓ ${msg}`)
 }
 
-/** A real PNG of one colour (the server reads its size from the header; the browser draws it). */
-function png(width, height, [r, g, b]) {
-  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0 })
-  const crc = buf => { let c = 0xffffffff; for (const x of buf) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0 }
-  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const body = Buffer.concat([Buffer.from(type), data]); const sum = Buffer.alloc(4); sum.writeUInt32BE(crc(body)); return Buffer.concat([len, body, sum]) }
-  const head = Buffer.alloc(13); head.writeUInt32BE(width, 0); head.writeUInt32BE(height, 4); head[8] = 8; head[9] = 2
-  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: width }, () => [r, g, b]).flat())])
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', zlib.deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))), chunk('IEND', Buffer.alloc(0))])
-}
-const SHEET = png(1000, 500, [245, 245, 240]), TILE = png(256, 256, [90, 110, 80])
+const SHEET = png(1000, 500, [245, 245, 240])
 const JPEG = Buffer.from('/9j/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAA//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKgHA//Z', 'base64')
 
-// The stand-in aerial picture source: a picture for most squares, a web page for zoom 5, nothing for zoom 6.
-const asked = []
-const tiles = http.createServer((req, res) => {
-  asked.push({ url: req.url, headers: req.headers })
-  if (req.url.startsWith('/5/')) { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end('<!doctype html><html><script>alert(1)</script></html>'); return }
-  if (req.url.startsWith('/6/')) { res.writeHead(404); res.end(); return }
-  res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(TILE)
-})
-await new Promise((resolve, reject) => { tiles.once('error', reject); tiles.listen(TILE_PORT, '127.0.0.1', resolve) })
+// The stand-in aerial picture source runs as its own process and writes what it was asked to a file.
+const TILE_LOG = path.join(os.tmpdir(), `runf9-tiles-${process.pid}.jsonl`)
+fs.writeFileSync(TILE_LOG, '')
+const tiles = spawn(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), 'mock-tiles.mjs')], { env: { ...process.env, PORT: String(TILE_PORT), LOG: TILE_LOG }, stdio: 'inherit' })
+process.on('exit', () => { tiles.kill(); try { fs.unlinkSync(TILE_LOG) } catch { /* already gone */ } })
+await new Promise(r => setTimeout(r, 600))
+const asked = () => fs.readFileSync(TILE_LOG, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
 
-// Inviting a member needs a confirmed email address: follow the link RunF9 wrote to the test outbox (as in ci.yml).
-const OUTBOX = process.env.RUNF9_EMAIL_OUTBOX
-async function confirmEmail(client, address) {
-  if (!OUTBOX) { console.error('✗ Set RUNF9_EMAIL_OUTBOX to the server\'s outbox folder for this suite (see ci.yml).'); process.exit(1) }
-  for (let i = 0; i < 50; i++) {
-    for (const f of fs.readdirSync(OUTBOX).filter(x => x.endsWith('.json')).sort().reverse()) {
-      const m = JSON.parse(fs.readFileSync(path.join(OUTBOX, f), 'utf8'))
-      // Only the token is taken from the message, and only if it looks like one: the request always goes to the
-      // server under test, at the one path that confirms an address.
-      const token = m.to === address && /\/api\/auth\/verify\?token=([A-Za-z0-9._~-]{16,200})(?![A-Za-z0-9._~-])/.exec(m.text)?.[1]
-      if (token) { await client.raw('GET', `/api/auth/verify?token=${encodeURIComponent(token)}`); return }
-    }
-    await new Promise(r => setTimeout(r, 100))
-  }
-  throw new Error(`no confirmation email to ${address}`)
+// Inviting a member needs a confirmed email address. The confirmation link itself is covered by
+// scripts/e2e-security.mjs; here the address is marked confirmed in the test database directly.
+async function confirmEmail(address) {
+  if (!process.env.DATABASE_URL) { console.error('✗ Set DATABASE_URL to the test database for this suite (see ci.yml).'); process.exit(1) }
+  const db = new postgres.Client({ connectionString: process.env.DATABASE_URL })
+  await db.connect()
+  try { await db.query('UPDATE users SET email_verified_at = NOW() WHERE LOWER(email) = LOWER($1)', [address]) } finally { await db.end() }
 }
 
 class Client {
@@ -140,7 +124,7 @@ ok(placed.status === 200 && placed.data.placed === true && placed.data.plan.cont
 
 // Who may set drawings up
 const fieldEmail = `map-field-${stamp}@example.com`
-await confirmEmail(a, `map-a-${stamp}@example.com`)
+await confirmEmail(`map-a-${stamp}@example.com`)
 const inv = await a.post('/api/org', { action: 'invite', email: fieldEmail, role: 'field' })
 ok(inv.status === 200 && inv.data.link?.includes('/auth?invite='), 'the owner invites a field member', inv.data)
 const fieldC = new Client()
@@ -178,12 +162,12 @@ ok(codes.status === 200 && codes.headers.get('content-type') === 'application/pd
 ok(/attachment/.test(codes.headers.get('content-disposition') || ''), 'the PDF is downloaded, never opened inside RunF9')
 
 // The aerial picture
-asked.length = 0
+const before = asked().length
 const tile = await a.raw('GET', '/api/site/tiles/16/18000/26000')
 ok(tile.status === 200 && tile.headers.get('content-type') === 'image/png' && Buffer.from(await tile.arrayBuffer()).equals(TILE), 'an aerial square is fetched by the server and passed on')
-ok(asked.length === 1 && asked[0].url === '/16/18000/26000.png', 'the source is asked for that square and nothing else', asked.map(x => x.url))
-const sent = asked[0].headers
-ok(!sent.cookie && !sent.authorization && !sent.referer && !sent['x-forwarded-for'] && !JSON.stringify(sent).includes('map-a-'), 'the source is told nothing about the member: no cookie, no address, no referrer', sent)
+const sent = asked().slice(before)
+ok(sent.length === 1 && sent[0].square === '16/18000/26000', 'the source is asked for that square and nothing else')
+ok(sent[0].cookie === false && sent[0].authorization === false && sent[0].referer === false && sent[0].forwarded === false && sent[0].headerCount <= 8, 'the source is told nothing about the member: no cookie, no address, no referrer')
 ok(/sandbox/.test(tile.headers.get('content-security-policy') || '') && tile.headers.get('x-content-type-options') === 'nosniff', 'the square is served as a file only')
 ok((await a.raw('GET', '/api/site/tiles/5/3/7')).status === 502, 'a web page sent by the source in place of a picture is not passed on')
 ok((await a.raw('GET', '/api/site/tiles/6/3/7')).status === 404, 'a square the source does not have is a plain 404')
@@ -277,6 +261,24 @@ await pg.getByText('Capture saved.').waitFor()
 const saved = (await a.get(caps)).data.captures.find(c => c.note === 'Counter not delivered yet.')
 ok(saved && saved.level === 'Level 3' && saved.room === 'Unit 302 kitchen' && saved.pin?.planId === l3.id && Math.abs(saved.pin.x - 0.79) < 0.02 && saved.position, 'the capture is stored with its level, room, pin and position', saved)
 
+// A room code in the frame of the photo sets the place: the picture itself says where it was taken.
+const codePhoto = text => QRCode.toBuffer(text, { width: 420, margin: 6 })
+await pg.evaluate(() => { try { localStorage.clear() } catch { /* nothing kept */ } })
+await pg.goto(`${BASE}/dashboard/site?schedule=${sid}&new=1`, { waitUntil: 'networkidle' })
+await sheet.waitFor()
+await sheet.locator('input[type=file]').setInputFiles({ name: 'IMG_0002.png', mimeType: 'image/png', buffer: await codePhoto(`https://elsewhere.example/dashboard/site?schedule=not-ours&level=${encodeURIComponent('Level 9')}&room=${encodeURIComponent('Vault')}&new=1`) })
+await sheet.getByRole('img', { name: 'Photo 1' }).waitFor()
+await pg.waitForTimeout(400)
+ok(await sheet.getByLabel('Room or area').inputValue() === '' && await sheet.getByText('Place read from the room code in your photo.').count() === 0, 'a code from another project in the photo is ignored')
+await sheet.locator('input[type=file]').setInputFiles({ name: 'IMG_0003.png', mimeType: 'image/png', buffer: await codePhoto(`${BASE}/dashboard/site?schedule=an-older-upload&level=${encodeURIComponent('Level 3')}&room=${encodeURIComponent('Unit 301 kitchen')}&new=1`) })
+await sheet.getByText('Place read from the room code in your photo.').waitFor()
+ok(await sheet.getByLabel('Level', { exact: true }).inputValue() === 'Level 3' && await sheet.getByLabel('Room or area').inputValue() === 'Unit 301 kitchen', 'a room code in the photo fills in the level and the room, even one printed before a schedule update')
+await sheet.getByRole('button', { name: 'Done', exact: true }).click()
+await sheet.getByRole('button', { name: 'Save capture' }).click()
+await pg.getByText('Capture saved.').waitFor()
+const coded = (await a.get(caps)).data.captures[0]
+ok(coded.placeSource === 'code' && coded.level === 'Level 3' && coded.room === 'Unit 301 kitchen' && coded.media.length === 2, 'the capture records that its place came from a room code', coded)
+
 // Setting up: mark a room by tapping the drawing.
 await pg.getByRole('button', { name: 'Map', exact: true }).click()
 await pg.getByRole('button', { name: 'Drawings', exact: true }).click()
@@ -307,5 +309,5 @@ ok(after && after.pin === null && after.level === 'Level 2' && after.room === 'U
 ok((await a.raw('GET', `${base}/${plan.id}/image`)).status === 404, 'the deleted drawing is gone')
 ok(((await a.get('/api/audit?limit=200')).data.events ?? []).some(e => e.action === 'site.plan_deleted' && e.detail?.planId === plan.id), 'the deletion is audited')
 
-tiles.close()
+tiles.kill()
 console.log(`\n${passed} site map checks passed`)

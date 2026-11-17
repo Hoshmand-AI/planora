@@ -243,3 +243,35 @@ export function watchPosition(onFix: (p: CapturePosition | null, why?: 'denied' 
   )
   return () => navigator.geolocation.clearWatch(id)
 }
+
+/**
+ * Looks for a printed code in a photo and gives its text (null when there is none, or it cannot be read).
+ * Done on the phone, from the photo already taken: nothing is sent anywhere. The browser's own reader is used
+ * where it has one (Chrome on Android); otherwise a reader shipped with RunF9 (iPhone, desktop).
+ */
+export async function readCodeInPhoto(photo: Blob): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(photo)
+    try {
+      const Detector = (globalThis as { BarcodeDetector?: new (o: { formats: string[] }) => { detect(i: ImageBitmap): Promise<{ rawValue: string }[]> } }).BarcodeDetector
+      if (Detector) {
+        try { const found = await new Detector({ formats: ['qr_code'] }).detect(bitmap); if (found[0]?.rawValue) return found[0].rawValue } catch { /* fall through to the shipped reader */ }
+      }
+      // A code a few centimetres wide in a photo of a room is small: look at the photo at full size first, then smaller.
+      const { default: jsQR } = await import('jsqr')
+      for (const side of [1600, 1000, 600]) {
+        const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height))
+        const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        if (!ctx) return null
+        ctx.drawImage(bitmap, 0, 0, w, h)
+        const hit = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })
+        if (hit?.data) return hit.data
+        if (scale === 1 && side !== 1600) break
+      }
+      return null
+    } finally { bitmap.close() }
+  } catch { return null }
+}

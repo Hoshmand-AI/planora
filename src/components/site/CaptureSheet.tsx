@@ -15,7 +15,8 @@ import {
 } from '@/lib/site/capture'
 import { PlanView } from './PlanCanvas'
 import { fitPlan, locate as locatePlace, onSheet, roomAt, sameLevel, type SitePlan } from '@/lib/site/plan'
-import { accuracyLabel, canRecordAudio, currentPosition, outboxAdd, resizePhoto, sendCapture, startRecording, type PendingCapture, type Recording } from '@/lib/site/client'
+import { parseRoomCode, roomCodeIsOurs } from '@/lib/site/room-code'
+import { accuracyLabel, canRecordAudio, currentPosition, outboxAdd, readCodeInPhoto, resizePhoto, sendCapture, startRecording, type PendingCapture, type Recording } from '@/lib/site/client'
 
 interface Photo { blob: Blob; url: string }
 interface Voice { blob: Blob; url: string; seconds: number }
@@ -62,6 +63,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
   const [error, setError] = useState('')
   const [pin, setPin] = useState<{ planId: string; x: number; y: number } | null>(null)
   const [pinning, setPinning] = useState(false)
+  const [codeInPhoto, setCodeInPhoto] = useState(false)
   const takenAt = useRef<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const closeBtn = useRef<HTMLButtonElement>(null)
@@ -115,9 +117,17 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
     try {
       const room = MAX_PHOTOS_PER_CAPTURE - photos.length
       const added: Photo[] = []
+      let code: ReturnType<typeof parseRoomCode> = null
       for (const f of [...files].slice(0, room)) {
         const { blob } = await resizePhoto(f)
         added.push({ blob, url: URL.createObjectURL(blob) })
+        // A room code in the frame says where the photo was taken: the surest evidence there is.
+        if (!code) { const text = await readCodeInPhoto(blob); const read = text ? parseRoomCode(text) : null; if (read && roomCodeIsOurs(read, scheduleId, plans)) code = read }
+      }
+      if (code && alive.current) {
+        if (code.level) setLevel(code.level)
+        if (code.room) setRoom(code.room)
+        setPlaceSource('code'); setCodeInPhoto(true)
       }
       if (!takenAt.current) takenAt.current = new Date().toISOString()
       setPhotos(p => [...p, ...added])
@@ -329,6 +339,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
                   {levelsHere.map(l => <button key={l} type="button" onClick={() => { setLevel(l); setPlaceSource('picked') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{l}</button>)}
                 </div>
               )}
+              {placeSource === 'code' && codeInPhoto && <p className="mt-2 text-caption text-warm-600">Place read from the room code in your photo.</p>}
               {placeSource === 'position' && room.trim() && <p className="mt-2 text-caption text-warm-600">Room suggested from your position. Change it if it is wrong; a phone cannot tell one floor from another.</p>}
               {near?.onSite && placeSource !== 'position' && !room.trim() && level.trim() && near.rooms.length > 0 && (
                 <div role="group" aria-label="Rooms near you" className="mt-2 flex flex-wrap items-center gap-1.5">
