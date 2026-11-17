@@ -966,6 +966,38 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS site_capture_media_capture_idx ON site_capture_media(org_id, capture_id);
     `,
   },
+  {
+    id: 28, name: 'site_plans',
+    sql: `
+    -- Site plans: a drawing of each level of a project, the rooms marked on it, and two or three points that
+    -- place the drawing on the ground. Filed under the project like its captures. A capture can carry a pin
+    -- on a drawing (where the person tapped). Additive: older code ignores the table and the three columns.
+    CREATE TABLE IF NOT EXISTS site_plans (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      level TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      width INTEGER NOT NULL,
+      height INTEGER NOT NULL,
+      content BYTEA NOT NULL,
+      controls JSONB NOT NULL DEFAULT '[]'::jsonb,
+      rooms JSONB NOT NULL DEFAULT '[]'::jsonb,
+      sort INTEGER NOT NULL DEFAULT 0,
+      classification TEXT,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS site_plans_project_idx ON site_plans(org_id, project_key, sort, created_at);
+    ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS plan_id TEXT;
+    ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS plan_x REAL;
+    ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS plan_y REAL;
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {

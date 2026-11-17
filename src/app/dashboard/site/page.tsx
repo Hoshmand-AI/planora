@@ -11,10 +11,13 @@ import { EmptyState } from '@/components/EmptyState'
 import { MoreMenu } from '@/components/MoreMenu'
 import { Alert } from '@/components/ui'
 import { CaptureSheet } from '@/components/site/CaptureSheet'
+import { PlanSetup, type SiteImagery } from '@/components/site/PlanSetup'
+import { SiteMap } from '@/components/site/SiteMap'
 import { useApp } from '../layout'
 import { fmtDate, fmtDateTime } from '@/lib/format'
 import { CAPTURE_STATUS_LABELS, placeLabel, type CaptureActivity, type CaptureStatus, type SiteCapture } from '@/lib/site/capture'
 import { accuracyLabel, outboxFlush, outboxList, outboxRemove } from '@/lib/site/client'
+import type { SitePlan } from '@/lib/site/plan'
 
 interface Listing {
   captures: SiteCapture[]
@@ -50,6 +53,10 @@ export default function SitePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [done, setDone] = useState(false)
   const [open, setOpen] = useState<{ capture: SiteCapture; index: number } | null>(null)
+  // The drawings of the project's levels: shown on the map, and used by the capture screen to suggest a room.
+  const [site, setSite] = useState<{ plans: SitePlan[]; canEdit: boolean; imagery: SiteImagery | null } | null>(null)
+  const [view, setView] = useState<'list' | 'map'>('list')
+  const [setup, setSetup] = useState<{ planId?: string } | null>(null)
   const sid = selectedSchedule?.id ?? null
   const base = sid ? `/api/schedules/${encodeURIComponent(sid)}/captures` : ''
 
@@ -67,6 +74,15 @@ export default function SitePage() {
     } catch { if (mine === seq.current) setError('The site captures could not be loaded. Check your connection and try again.') }
   }, [base])
   useEffect(() => { setData(null); setFilter('all'); setPlace(''); setNotice(null); load() }, [load])
+  useEffect(() => {
+    setSite(null); setSetup(null); setView('list')
+    if (!sid) return
+    let live = true
+    fetch(`/api/schedules/${encodeURIComponent(sid)}/site-plans`).then(r => (r.ok ? r.json() : null)).then(d => {
+      if (live && d) setSite({ plans: d.plans ?? [], canEdit: !!d.canEdit, imagery: d.imagery ?? null })
+    }).catch(() => { /* the list still works without the drawings */ })
+    return () => { live = false }
+  }, [sid])
 
   // A capture taken with no signal waits on this phone for the person who took it, and is sent when the connection
   // returns. One RunF9 refuses for good is shown with its reason, to send again or discard.
@@ -163,9 +179,19 @@ export default function SitePage() {
           <h2 className="text-heading font-semibold text-ink">Site captures{data && data.overview.count > 0 && <span className="ml-1.5 text-body font-normal text-warm-600 tabular-nums">{data.overview.count.toLocaleString('en-US')}</span>}</h2>
           <p className="text-body text-warm-600 max-w-[720px]">What was seen on site: a photo, a note, who took it, when and where. A capture is a record, not a measurement.</p>
         </div>
-        {canCapture && captures.length > 0 && (
-          <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold px-4 h-9"><Camera size={14} aria-hidden="true" /> New capture</button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {data && site && (site.plans.length > 0 || site.canEdit) && (
+            <div role="group" aria-label="Show the captures as" className="inline-flex rounded-lg border border-warm-300 bg-white p-0.5">
+              {(['list', 'map'] as const).map(v => (
+                <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}
+                  className={`rounded-md px-3 h-8 text-body font-semibold ${view === v ? 'bg-accent-100 text-accent-700' : 'text-ink hover:bg-warm-100'}`}>{v === 'list' ? 'List' : 'Map'}</button>
+              ))}
+            </div>
+          )}
+          {canCapture && captures.length > 0 && (
+            <button type="button" onClick={() => setAdding(true)} className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-body font-semibold px-4 h-9"><Camera size={14} aria-hidden="true" /> New capture</button>
+          )}
+        </div>
       </div>
 
       {data && !data.enabled && <Alert tone="info">Site captures are turned off on this deployment, so the camera, microphone and location stay blocked. Captures made before are listed below.</Alert>}
@@ -190,6 +216,9 @@ export default function SitePage() {
 
       {!data && !error ? (
         <p className="text-body text-warm-600 flex items-center gap-2" role="status"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading site captures…</p>
+      ) : data && site && view === 'map' && sid ? (
+        <SiteMap scheduleId={sid} plans={site.plans} imagery={site.imagery} captures={captures} canEdit={site.canEdit}
+          onSetup={planId => setSetup({ planId })} onOpen={c => { if (c.media.some(m => m.kind === 'photo')) setOpen({ capture: c, index: 0 }) }} />
       ) : data && captures.length === 0 ? (
         <EmptyState heading="h3" title="No captures yet" {...(canCapture ? { action: { label: 'New capture', onClick: () => setAdding(true) } } : {})}>
           {canCapture ? 'Take a photo on site and say what it shows. It is filed with the place, the time and the activity.' : 'Captures made on site by your team will be listed here.'}
@@ -283,13 +312,17 @@ export default function SitePage() {
       )}
 
       {adding && data && canCapture && sid && uid && (
-        <CaptureSheet scheduleId={sid} userId={uid} projectName={selectedSchedule.name} levels={data.overview.levels} rooms={data.overview.rooms} activities={activities} preset={preset}
+        <CaptureSheet scheduleId={sid} userId={uid} projectName={selectedSchedule.name} levels={data.overview.levels} rooms={data.overview.rooms} activities={activities} preset={preset} plans={site?.plans ?? []}
           onClose={() => setAdding(false)}
           onSaved={r => {
             setAdding(false); setPreset(null)
             if (r.queued) { setNotice({ tone: 'warning', text: 'No connection: the capture is saved on this phone and will be sent when you are back online.' }); recount() }
             else { setNotice({ tone: 'success', text: 'Capture saved.' }); load() }
           }} />
+      )}
+      {setup && site && sid && (
+        <PlanSetup scheduleId={sid} plans={site.plans} imagery={site.imagery} initialPlanId={setup.planId ?? null}
+          onChanged={plans => setSite(s => (s ? { ...s, plans } : s))} onClose={() => setSetup(null)} />
       )}
       {open && <PhotoViewer capture={open.capture} index={open.index} url={id => mediaUrl(open.capture, id)} onIndex={i => setOpen({ capture: open.capture, index: i })} onClose={() => setOpen(null)} />}
     </div>

@@ -13,6 +13,8 @@ import {
   CAPTURE_STATUSES, CAPTURE_STATUS_LABELS, MAX_AUDIO_SECONDS, MAX_NOTE_CHARS, MAX_PHOTOS_PER_CAPTURE, MAX_PLACE_CHARS,
   type CaptureActivity, type CapturePosition, type CaptureStatus, type PlaceSource, type SiteCapture,
 } from '@/lib/site/capture'
+import { PlanView } from './PlanCanvas'
+import { fitPlan, locate as locatePlace, onSheet, roomAt, sameLevel, type SitePlan } from '@/lib/site/plan'
 import { accuracyLabel, canRecordAudio, currentPosition, outboxAdd, resizePhoto, sendCapture, startRecording, type PendingCapture, type Recording } from '@/lib/site/client'
 
 interface Photo { blob: Blob; url: string }
@@ -24,7 +26,7 @@ const placeKey = (scheduleId: string) => `runf9.site.place.${scheduleId}`
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private browsing */ } }
 const recall = (k: string): string | null => { try { return localStorage.getItem(k) } catch { return null } }
 
-export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, activities, preset, onClose, onSaved }: {
+export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, activities, preset, plans = [], onClose, onSaved }: {
   scheduleId: string
   /** The signed-in member: a capture kept on the phone waits for this person */
   userId: string
@@ -35,6 +37,8 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
   activities: CaptureActivity[]
   /** A place read from a posted room code (the link the code opens), when there is one */
   preset?: { level?: string; room?: string } | null
+  /** The drawings of the project's levels: used to suggest a room from the phone's position and to pin the capture */
+  plans?: SitePlan[]
   onClose: () => void
   /** `queued` is true when the capture could not be sent and is kept on this phone */
   onSaved: (r: { capture: SiteCapture | null; queued: boolean }) => void
@@ -56,6 +60,8 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
   const [busy, setBusy] = useState(false)
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
+  const [pin, setPin] = useState<{ planId: string; x: number; y: number } | null>(null)
+  const [pinning, setPinning] = useState(false)
   const takenAt = useRef<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const closeBtn = useRef<HTMLButtonElement>(null)
@@ -166,6 +172,27 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
     if (!q) return pool.filter(a => a.state === 'in_progress').slice(0, 5)
     return pool.filter(a => a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 8)
   }, [find, activities, codes])
+  // What the phone's position says about the place. It can point to a room; it can never choose the floor.
+  const near = useMemo(() => (usePosition && position && plans.length ? locatePlace(plans, position, level.trim() || null) : null), [usePosition, position, plans, level])
+  const levelsHere = useMemo(() => [...new Set((near?.points ?? []).map(p => p.level))], [near])
+  useEffect(() => {
+    if (!near?.best || room.trim() || placeSource === 'code') return
+    setRoom(near.best.room); setPlaceSource('position')
+  }, [near]) // eslint-disable-line react-hooks/exhaustive-deps
+  const levelPlan = useMemo(() => plans.find(p => sameLevel(p.level, level)) ?? null, [plans, level])
+  const levelFit = useMemo(() => (levelPlan ? fitPlan(levelPlan) : null), [levelPlan])
+  useEffect(() => { if (pin && pin.planId !== levelPlan?.id) setPin(null) }, [levelPlan, pin])
+  const hereOnPlan = useMemo(() => {
+    if (!levelPlan || !levelFit || !usePosition || !position) return null
+    const p = levelFit.toPlan(position)
+    return onSheet(p, 0) ? { ...p, rx: (position.accuracyM ?? 0) / levelFit.widthM, ry: (position.accuracyM ?? 0) / (levelFit.widthM * levelPlan.height / levelPlan.width) } : null
+  }, [levelPlan, levelFit, usePosition, position])
+  function pinAt(p: { x: number; y: number }) {
+    if (!levelPlan) return
+    setPin({ planId: levelPlan.id, x: p.x, y: p.y })
+    const r = roomAt(levelPlan, p)
+    if (r && (!room.trim() || placeSource === 'position')) { setRoom(r.name); setPlaceSource('picked') }
+  }
   const roomsHere = useMemo(() => [...new Set(rooms.filter(r => !level || !r.level || r.level === level).map(r => r.room))], [rooms, level])
   const nameOf = (code: string) => activities.find(a => a.code === code)?.name ?? ''
 
@@ -180,6 +207,7 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
       placeSource: level.trim() || room.trim() ? (placeSource === 'none' ? 'picked' : placeSource) : 'none',
       takenAt: takenAt.current ?? new Date().toISOString(),
     }
+    if (pin) { fields.planId = pin.planId; fields.planX = String(pin.x); fields.planY = String(pin.y) }
     if (usePosition && position) {
       fields.lat = String(position.lat); fields.lng = String(position.lng)
       if (position.accuracyM != null) fields.accuracyM = String(position.accuracyM)
@@ -294,6 +322,36 @@ export function CaptureSheet({ scheduleId, userId, projectName, levels, rooms, a
                 </span>
               </span>
             </label>
+            <div aria-live="polite" className="space-y-2">
+              {near?.onSite && !level.trim() && levelsHere.length > 0 && (
+                <div role="group" aria-label="Which level are you on?" className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-body text-warm-700">Which level are you on?</span>
+                  {levelsHere.map(l => <button key={l} type="button" onClick={() => { setLevel(l); setPlaceSource('picked') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{l}</button>)}
+                </div>
+              )}
+              {placeSource === 'position' && room.trim() && <p className="mt-2 text-caption text-warm-600">Room suggested from your position. Change it if it is wrong; a phone cannot tell one floor from another.</p>}
+              {near?.onSite && placeSource !== 'position' && !room.trim() && level.trim() && near.rooms.length > 0 && (
+                <div role="group" aria-label="Rooms near you" className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-body text-warm-700">Near you:</span>
+                  {near.rooms.slice(0, 4).map(r => <button key={`${r.level}-${r.room}`} type="button" onClick={() => { setRoom(r.room); setPlaceSource('position') }} className="pressable rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">{r.room}</button>)}
+                </div>
+              )}
+            </div>
+            {levelPlan && (
+              <div className="mt-2 space-y-2">
+                <button type="button" aria-expanded={pinning} onClick={() => setPinning(v => !v)} className="pressable inline-flex items-center gap-1.5 rounded-lg border border-warm-300 bg-white px-3 h-9 text-body font-semibold text-ink hover:bg-warm-100">
+                  <MapPin size={14} aria-hidden="true" /> {pin ? 'Pinned on the drawing' : 'Pin it on the drawing'}
+                </button>
+                {pinning && (
+                  <>
+                    <PlanView src={`/api/schedules/${encodeURIComponent(scheduleId)}/site-plans/${encodeURIComponent(levelPlan.id)}/image`} alt={`Drawing of ${levelPlan.level}`}
+                      marks={[...levelPlan.rooms.slice(0, 60).map(r => ({ id: r.id, tone: 'room' as const, x: r.x, y: r.y, label: `Room ${r.name}`, text: r.name })), ...(pin ? [{ id: 'pin', tone: 'pick' as const, x: pin.x, y: pin.y, label: 'Where this capture is pinned' }] : [])]}
+                      here={hereOnPlan} onTap={pinAt} tapLabel="Pin this capture on the drawing" />
+                    {pin && <button type="button" onClick={() => setPin(null)} className="text-body font-medium text-accent-600 hover:underline">Remove the pin</button>}
+                  </>
+                )}
+              </div>
+            )}
           </fieldset>
 
           {activities.length > 0 && (

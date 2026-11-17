@@ -200,3 +200,46 @@ export function outboxFlush(userId: string, retryRefused = false): Promise<Flush
   })().finally(() => { flushing = null })
   return flushing
 }
+
+/* ─── Drawings and the live position ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Prepares a picture of a drawing: no larger than `maxSide` on its long side, on white (a transparent sheet
+ * would turn black), as a JPEG good enough to read dimensions and room names.
+ */
+export async function resizePlanImage(file: Blob, maxSide: number): Promise<{ blob: Blob; width: number; height: number }> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  try {
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale)), height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width; canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('This browser cannot prepare the drawing.')
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height)
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    if (!blob) throw new Error('This browser cannot prepare the drawing.')
+    return { blob, width, height }
+  } finally { bitmap.close() }
+}
+
+/**
+ * Follows the phone's position until the returned function is called. `onFix` gets each new fix, or null when
+ * the person says no or the phone cannot tell. The browser shows its own location indicator while this runs.
+ */
+export function watchPosition(onFix: (p: CapturePosition | null, why?: 'denied' | 'unavailable') => void): () => void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) { onFix(null, 'denied'); return () => {} }
+  const id = navigator.geolocation.watchPosition(
+    p => onFix({
+      lat: p.coords.latitude, lng: p.coords.longitude,
+      accuracyM: Number.isFinite(p.coords.accuracy) ? p.coords.accuracy : null,
+      altitudeM: p.coords.altitude ?? null,
+      headingDeg: p.coords.heading != null && Number.isFinite(p.coords.heading) ? p.coords.heading : null,
+    }),
+    // 1 = the person (or the browser's settings) said no; anything else is a fix that did not come in time.
+    e => onFix(null, e.code === 1 ? 'denied' : 'unavailable'),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20_000 },
+  )
+  return () => navigator.geolocation.clearWatch(id)
+}

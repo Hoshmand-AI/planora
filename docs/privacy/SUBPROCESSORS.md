@@ -9,6 +9,8 @@
 | Resend, Inc. **or** Wildbit LLC (Postmark) | Transactional email (confirmation links, invitations) | Recipient email address, message text | United States | Only if `RESEND_API_KEY` or `POSTMARK_TOKEN` is configured |
 | GitHub, Inc. | Encrypted off-provider backup artifacts | Encrypted database dump | United States | Only if the nightly backup workflow is enabled |
 
+| U.S. Geological Survey (The National Map) | Aerial picture shown under a site plan | The numbers of the map squares RunF9's server asks for (which show roughly where a site is). Nothing about the member, the organization or the project; never for a project marked CUI or classified | United States | Only when a member opens the aerial picture on a project's Site map. Off with `RUNF9_SITE_IMAGERY=off`; a deployment can name another tile service instead |
+
 Only one cloud AI provider is active at a time (shown in the AI status in Settings). Training and data-retention terms must be verified against the provider agreement in force; RunF9 does not assert them here.
 
 On-premises / air-gapped deployments use none of these. Customers are notified 30 days before a new subprocessor that processes customer data is added.

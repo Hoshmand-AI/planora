@@ -37,8 +37,10 @@ async function confirmEmail(client, address) {
   for (let i = 0; i < 50; i++) {
     for (const f of fs.readdirSync(OUTBOX).filter(x => x.endsWith('.json')).sort().reverse()) {
       const m = JSON.parse(fs.readFileSync(path.join(OUTBOX, f), 'utf8'))
-      const hit = m.to === address && /https?:\/\/\S+\/api\/auth\/verify\?token=\S+/.exec(m.text)
-      if (hit) { const u = new URL(hit[0]); await client.raw('GET', u.pathname + u.search); return }
+      // Only the token is taken from the message, and only if it looks like one: the request always goes to the
+      // server under test, at the one path that confirms an address.
+      const token = m.to === address && /\/api\/auth\/verify\?token=([A-Za-z0-9._~-]{16,200})(?![A-Za-z0-9._~-])/.exec(m.text)?.[1]
+      if (token) { await client.raw('GET', `/api/auth/verify?token=${encodeURIComponent(token)}`); return }
     }
     await new Promise(r => setTimeout(r, 100))
   }

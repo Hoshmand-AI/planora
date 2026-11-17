@@ -44,6 +44,8 @@ styles and fonts only from RunF9 itself and connect only back to RunF9 (`connect
 
 **Site captures** (photos, voice notes and the phone's position) go from the member's phone to RunF9 and nowhere else. They are not sent to an AI model, a map service or a speech service: a voice note is stored as audio, and words are typed or dictated with the phone's own keyboard. The camera, microphone and location are used only when a member starts a capture, and a deployment can keep them blocked entirely (`RUNF9_SITE_CAPTURE=off`).
 
+**Site plans** (a drawing of each level, its rooms, the points that place it on the ground) stay in RunF9. The **aerial picture** under a plan is the one thing on the Site map that comes from outside: RunF9's own server fetches each map square and passes it on, so the member's browser talks only to RunF9. The source (by default the U.S. Geological Survey's National Map) is sent the square's numbers and nothing else: no cookie, no address of the member, no project or organization name. Those numbers do show roughly where a site is, so the aerial picture is never offered on a project marked CUI or classified, is always off on an air-gapped deployment, and can be turned off everywhere with `RUNF9_SITE_IMAGERY=off`. `RUNF9_SITE_IMAGERY=https://…/{z}/{x}/{y}…` names another tile service (with `RUNF9_SITE_IMAGERY_ATTRIBUTION` for its credit line and `RUNF9_SITE_IMAGERY_MAX_ZOOM`). A room code printed from RunF9 holds a link to this RunF9 with the project, level and room name; opening it needs a sign-in.
+
 ## Proof: the no-egress check
 
 `scripts/e2e-no-egress.mjs` runs on every change in CI. It:

@@ -94,6 +94,22 @@ A photo, a voice note and a few words taken on site, filed under the project (th
 | GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported; `ETag`, and the browser must ask before reusing its copy) |
 | DELETE | `/api/schedules/{id}/captures/{captureId}` | site.capture; your own capture, or any with scheduler rights | Erases the files and the words; audited as `site.capture_deleted` |
 
+### Site plans (session only)
+
+A drawing of each level, the rooms marked on it, and the points that place it on the ground.
+
+| Method | Path | Permission | What it does |
+|---|---|---|---|
+| GET | `/api/schedules/{id}/site-plans` | read | The drawings (never their bytes), `canEdit`, and `imagery` (null when the aerial picture is off or the project is marked CUI or classified) |
+| POST | `/api/schedules/{id}/site-plans` | schedule.write | Multipart: `level`, `image` (one JPEG, PNG or WebP, typed from its bytes). Audited as `site.plan_added` |
+| PATCH | `/api/schedules/{id}/site-plans/{planId}` | schedule.write | `level`, `rooms` (`[{ name, x, y }]`, x and y as fractions of the sheet), `controls` (none, or two or three `{ x, y, lat, lng }`), `sort`. Points that cannot place a drawing are refused. Audited as `site.plan_updated` |
+| DELETE | `/api/schedules/{id}/site-plans/{planId}` | schedule.write | Captures pinned on it keep their level and room. Audited as `site.plan_deleted` |
+| GET | `/api/schedules/{id}/site-plans/{planId}/image` | read | The drawing |
+| GET | `/api/schedules/{id}/site-plans/{planId}/codes` | read | A PDF of room codes to print: each opens a new capture with the level and room filled in. Audited as `site.room_codes_printed` |
+| GET | `/api/site/tiles/{z}/{x}/{y}` | read | One square of the aerial picture, fetched by RunF9's server from the configured source and passed on only if it is a picture |
+
+A capture takes `planId`, `planX`, `planY` (a pin on a drawing of the same project; dropped otherwise).
+
 `POST /api/ask` and `POST /api/reports` accept `useDocuments: true` (and `includeUnreviewed`) and
 return a `documents` object: `mode` (`model`, `passages_only`, `withheld_restricted`, `no_match`),
 `sources`, `cited`, `removedCitations` and `flagged`. Details: [privacy/PROJECT-DOCUMENTS.md](privacy/PROJECT-DOCUMENTS.md).
