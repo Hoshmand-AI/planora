@@ -10,7 +10,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X, Folder, TriangleAlert, ShieldAlert, Clock, TrendingUp, MessageCircleQuestion, GitBranch, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { Check, Search, Star, LayoutGrid, Rows3, Plus, Cloud, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, X, Folder, TriangleAlert, ShieldAlert, Clock, TrendingUp, type LucideIcon } from 'lucide-react'
 import { useApp } from '@/app/dashboard/layout'
 import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { Portfolio as PortfolioData, PortfolioRow } from '@/lib/planning/portfolio'
@@ -157,9 +157,12 @@ export function ProjectsDashboard() {
         <h1 className="page-title">Projects</h1>
         {org?.dataLocation && <DataLocationPicker loc={org.dataLocation} />}
       </div>
-      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 text-[13px] font-semibold shadow-sm">
+      {/* With no project yet, the page itself offers the ways to start: a second filled button up here would repeat one of them. */}
+      {rows.length > 0 && (
+      <Link href="/dashboard/plan" className="pressable inline-flex items-center gap-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white px-4 h-9 text-[13px] font-semibold">
         <Plus size={15} aria-hidden /> New project
       </Link>
+      )}
     </div>
   )
 
@@ -180,28 +183,11 @@ export function ProjectsDashboard() {
         secondary={can('schedule.write') ? { label: 'Or upload a P6 or MS Project schedule', onClick: openUpload } : undefined}>
         Every project you upload or build shows up here, with its status and forecast finish.
       </EmptyState>
-      {can('schedule.write') && <div className="-mt-10 pb-12 text-center">
+      {can('schedule.write') && <div className="-mt-8 pb-12 text-center">
         <p className="text-[13px] text-warm-600 mb-2">Or see a live project first: a data center in construction, with late switchgear, meeting minutes and a risk register.</p>
         <DataCenterSampleButton />
       </div>}
       </>
-      {/* First run (design package step 7): how RunF9 works, in three steps that match the real flow. */}
-      <section aria-labelledby="first-run-h" className="max-w-4xl mx-auto">
-        <h2 id="first-run-h" className="text-[16px] font-semibold text-ink text-center">Better schedules start with better questions</h2>
-        <ol className="mt-4 grid gap-3 md:grid-cols-3">
-          {([
-            [MessageCircleQuestion, 'Ask what matters', 'The interview asks about your facility, permits, calendars and long-lead items. "Don\u2019t know" and "Can\u2019t share" are real answers; each becomes a visible assumption.'],
-            [GitBranch, 'Build reliable logic', 'RunF9 builds the CPM schedule with a written reason for every duration and link, from your answers, regional data and your firm\u2019s own past projects.'],
-            [ShieldCheck, 'Verify before publishing', 'Check the draft against the DCMA 14-point assessment, answer RunF9\u2019s questions about the data, and record a reviewer\u2019s verdict (your organization can require one) before you publish the baseline.'],
-          ] as const).map(([Icon, title, text], i) => (
-            <li key={title} className="rounded-[14px] border border-warm-200 bg-white p-4">
-              <span aria-hidden className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-accent-100 text-accent-600"><Icon size={16} /></span>
-              <h3 className="mt-2 text-[14px] font-semibold text-ink"><span className="sr-only">Step {i + 1}: </span>{title}</h3>
-              <p className="mt-1 text-[13px] leading-relaxed text-warm-600">{text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
     </div>
   )
 
