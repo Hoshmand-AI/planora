@@ -229,7 +229,7 @@ export default function QualityPage() {
             {data.dcma.checks.filter(c => showAllChecks || needWork.includes(c) || c.id === selected).map((c, i) => (
               <button key={c.id} type="button" onClick={() => openCheck(c.id)} aria-pressed={selected === c.id} aria-controls={selectedCheck ? 'dcma-detail' : undefined}
                 style={{ animationDelay: `${i * 25}ms` }}
-                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}border border-warm-200 ${c.result === 'fail' ? 'border-t-[3px] border-t-status-at-risk' : c.result === 'warn' ? 'border-t-[3px] border-t-status-attention' : ''}`}>
+                className={`rise-in card-lift text-left flex flex-col gap-1 rounded-2xl bg-white p-3.5 ${selected === c.id ? 'ring-2 ring-accent-600 ' : ''}border border-warm-200`}>
                 <span className="text-[12px] font-semibold text-warm-500 tabular-nums">{c.id}</span>
                 <span className="text-[13px] font-semibold text-ink leading-tight min-h-[2.4em]">{c.name}</span>
                 <span className={`${String(c.metric).length > 12 && c.result !== 'n/a' ? 'text-[13px] leading-snug' : 'text-[18px] tracking-[-0.02em]'} font-semibold tabular-nums inline-flex items-center gap-2 ${c.result === 'n/a' ? 'text-warm-400' : 'text-ink'}`}>{c.result !== 'n/a' && <span aria-hidden="true" className={`h-2 w-2 flex-shrink-0 rounded-full ${c.result === 'pass' ? 'bg-status-on-track' : c.result === 'fail' ? 'bg-status-at-risk' : 'bg-status-attention'}`} />}{c.result === 'n/a' ? 'n/a' : c.metric}</span>

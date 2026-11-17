@@ -10,6 +10,7 @@ below in code; never hard-code the hex values.
   `runf9-icon.svg`, `runf9-favicon.svg` are byte-for-byte the package's files. `src/components/Logo.tsx` is the in-app lockup.
 - **Typeface:** DM Sans through `next/font` (`src/app/layout.tsx`), Tailwind `font-sans` / `font-display`.
 - **The pattern (11/2026):** greys carry no hue and step evenly from `ink` to `warm-400`; color appears only where it means something (one filled blue button per view, status dots and badges, the navy bar). Text sizes in the app come from one scale: 12, 13, 14 for text; 16, 18, 20 for headings; 24, 28 for titles; 36, 48 for figures. Weights are regular, medium and semibold only; no half-pixel sizes and no bold or heavier.
+- **Surfaces:** the app canvas is white; panels are separated by a `warm-200` hairline and carry no shadow.
 - **Color tokens:** every value in the package's `runf9.tokens.css` equals `tailwind.config.js`:
 
 | Package token | Tailwind | Value | Use |
