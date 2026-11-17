@@ -28,6 +28,18 @@ export function Section({ title, description, children, tone = 'default', id }: 
   )
 }
 
+/**
+ * The white band at the top of an app page that holds its title (and its tabs, when it has them), matching the
+ * project header. It reaches both edges of the working area whatever the content width.
+ */
+export function PageHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative bg-white [box-shadow:0_0_0_100vmax_#fff] [clip-path:inset(0_-100vmax)] after:absolute after:inset-x-[-100vmax] after:bottom-0 after:h-px after:bg-warm-200 after:content-['']">
+      <div className="max-w-6xl mx-auto px-5 md:px-8 pt-5 md:pt-6">{children}</div>
+    </div>
+  )
+}
+
 export function Field({ label, hint, children }: { label: string; hint?: string; children: (props: { id: string; 'aria-describedby'?: string }) => React.ReactNode }) {
   const id = useId()
   const hintId = `${id}-hint`
