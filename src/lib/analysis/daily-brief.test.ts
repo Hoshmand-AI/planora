@@ -9,6 +9,7 @@ import { extractSignals } from './correspondence'
 import { parseRegisterFields } from '@/lib/server/register'
 import { exportXerFromOriginal, xerEditsFrom } from '@/lib/export/xer'
 import { projectWatch } from './project-watch'
+import { schedulePercentComplete } from './progress'
 
 const xer = fs.readFileSync(path.join(__dirname, '../parsers/__fixtures__/sample.xer'), 'latin1')
 const p = parseXER(xer, 's1')
@@ -87,6 +88,17 @@ describe('daily brief', () => {
     expect(b.audiences.field.length).toBeGreaterThan(0)
     expect(b.audiences.client.length).toBeGreaterThan(0)
     expect(b.audiences.client.join(' ')).not.toContain('Sub may default')
+  })
+
+  it('carries percent complete by duration and the count of finished activities, the same numbers the client version quotes', () => {
+    const b = buildDailyBrief(input())
+    const work = acts.filter(a => a.activityType === 'task' || a.activityType === 'milestone')
+    expect(b.progress.percentComplete).toBe(schedulePercentComplete(acts))
+    expect(b.progress.total).toBe(work.length)
+    expect(b.progress.finished).toBe(work.filter(a => a.status === 'complete' || !!a.actualFinish).length)
+    expect(b.audiences.client.join(' ')).toContain(`The work is ${b.progress.percentComplete}% complete by duration (${b.progress.finished} of ${b.progress.total} activities finished).`)
+    // A schedule with no activities has no percentage: the figure is absent, not 0.
+    expect(buildDailyBrief(input({ activities: [], drivingPathIds: [] })).progress).toEqual({ percentComplete: null, finished: 0, total: 0 })
   })
 
   it('missing scope: flags data-center systems that no activity names, and stays quiet on small schedules', () => {
