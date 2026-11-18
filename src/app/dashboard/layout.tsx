@@ -19,6 +19,7 @@ import {
   Activity,
   FolderOpen,
   Camera,
+  Layers,
 } from 'lucide-react'
 import { fmtDate } from '@/lib/format'
 import { siteCaptureEnabled } from '@/lib/site/capture'
@@ -78,6 +79,7 @@ export const useApp = () => useContext(AppContext)
 const NAV = [
   { href: '/dashboard',         icon: LayoutGrid,    label: 'Projects' },
   { href: '/dashboard/plan',    icon: Plus,          label: 'New project' },
+  { href: '/dashboard/programs', icon: Layers,       label: 'Master schedule' },
   { href: '/dashboard/history', icon: BarChart3,     label: 'Firm insights' },
   { href: '/dashboard/org',     icon: Building2,     label: 'Organization' },
 ]
@@ -116,6 +118,7 @@ const pageLabel = (pathname: string) => {
   if (pathname.startsWith('/dashboard/account')) return 'Account and security'
   if (/^\/dashboard\/plan\/[^/]+/.test(pathname)) return 'Plan'
   if (pathname.startsWith('/dashboard/plan')) return 'New project'
+  if (pathname.startsWith('/dashboard/programs')) return 'Master schedule'
   if (pathname.startsWith('/dashboard/history')) return 'Firm insights'
   if (pathname.startsWith('/dashboard/org')) return 'Organization'
   if (pathname.startsWith('/dashboard/platform')) return 'Platform'
@@ -494,7 +497,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <a href="#main" className="skip-link">Skip to content</a>
 
         {/* ── Sidebar (desktop) ─────────────────────────────── */}
-        <aside className={`hidden md:flex md:flex-col flex-shrink-0 bg-white text-ink border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
+        <aside className={`hidden md:flex md:flex-col print:!hidden flex-shrink-0 bg-white text-ink border-r border-warm-200 sticky top-0 h-screen py-4 z-30 transition-[width] duration-300 ${sidebarOpen ? 'w-[240px] px-3' : 'w-[72px] px-2.5'}`}>
           <div className={`flex items-center pb-6 flex-shrink-0 ${sidebarOpen ? 'justify-between pl-2.5' : 'flex-col gap-3'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects">
               <Logo variant="dark" size="h-[30px]" mark={!sidebarOpen} />
@@ -597,14 +600,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className={`flex-1 min-w-0 flex flex-col min-h-screen ${fillScreen ? '[@media(min-height:640px)]:min-h-0 [@media(min-height:640px)]:h-[100dvh]' : ''}`}>
           {/* ── Top bar (phones) ─────────────────────────────── */}
           {/* Inside a project the project's own header is the app bar, so the page starts one bar higher: the name is the headline and the account is in its menu. */}
-          <header className={`md:hidden glass-bar sticky top-0 z-40 h-14 items-center justify-between px-4 border-b border-white/5 ${inProject && selectedSchedule ? 'hidden' : 'flex'}`}>
+          <header className={`md:hidden print:!hidden glass-bar sticky top-0 z-40 h-14 items-center justify-between px-4 border-b border-white/5 ${inProject && selectedSchedule ? 'hidden' : 'flex'}`}>
             <Link href="/dashboard" aria-label="RunF9 projects"><Logo variant="light" size="h-[30px]" /></Link>
             <button type="button" onClick={() => setShowSettings(true)} aria-label={`Account menu for ${user.name}`}
               className="w-8 h-8 rounded-full bg-navy-800 border border-white/15 flex items-center justify-center text-caption font-semibold text-white">{user.name?.[0]?.toUpperCase() || 'U'}</button>
           </header>
 
           {/* ── Top bar (desktop): a thin navy bar that says where you are ── */}
-          <div className="hidden md:flex sticky top-0 z-30 h-12 flex-shrink-0 items-center gap-4 bg-navy-950 px-5 lg:px-8 text-body text-navy-200">
+          <div className="hidden md:flex print:!hidden sticky top-0 z-30 h-12 flex-shrink-0 items-center gap-4 bg-navy-950 px-5 lg:px-8 text-body text-navy-200">
             <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2">
               <Link href="/dashboard" aria-label="All projects" className="flex-shrink-0 rounded p-1 hover:text-white"><Home size={15} aria-hidden="true" /></Link>
               <span aria-hidden="true">/</span>
@@ -732,7 +735,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* pb-20 on phones = space for the bottom bar */}
           <main id="main" tabIndex={-1} className={`app-canvas flex-1 min-w-0 overflow-x-clip pb-20 md:pb-0 focus:outline-none ${fillScreen ? 'flex flex-col [@media(min-height:640px)]:min-h-0' : ''}`}>
             {emailUnconfirmed && pathname !== '/dashboard/account' && (
-              <div role="region" aria-label="Email confirmation" className="bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-body text-warm-700">
+              <div role="region" aria-label="Email confirmation" className="print:hidden bg-warm-100 border-b border-warm-200 px-4 md:px-8 py-2 text-body text-warm-700">
                 <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
                   <MailCheck size={14} aria-hidden="true" className="text-accent-600 flex-shrink-0" />
                   <span>Please confirm your email. We sent you a link.</span>
@@ -758,7 +761,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* ── Bottom bar (phones) ──────────────────────────────── */}
-        <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-950 border-t border-navy-800 safe-area-bottom">
+        <nav aria-label="Main (mobile)" className="md:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-950 border-t border-navy-800 safe-area-bottom">
           <div className="flex">
             {NAV.map(n => {
               const active = navActive(pathname, n.href)
@@ -766,7 +769,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
                   className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 transition-colors ${active ? 'text-white' : 'text-warm-200'}`}>
                   <n.icon size={19} strokeWidth={active ? 2.2 : 1.7} aria-hidden="true" />
-                  <span className={`text-caption ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
+                  <span className={`text-caption ${active ? 'font-semibold' : 'font-medium'}`}>{n.label === 'New project' ? 'New' : n.label === 'Master schedule' ? 'Master' : n.label === 'Firm insights' ? 'Insights' : n.label === 'Organization' ? 'Org' : n.label}</span>
                 </Link>
               )
             })}

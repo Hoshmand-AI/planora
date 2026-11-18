@@ -47,7 +47,7 @@ const PAGES = [
   ['Home', '/'], ['Sign in', '/auth'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Deploy in your cloud', '/deploy'], ['Sample report', '/sample-report'], ['Password reset', '/auth/reset'], ['Not found', '/no-such-page'],
   ['Plans', '/dashboard/plan'], ['Plan interview', `/dashboard/plan/${plan.id}`],
   ['Account & security', '/dashboard/account'], ['Organization', '/dashboard/org'], ['Organization: plan and data', '/dashboard/org?tab=plan'], ['Organization: security', '/dashboard/org?tab=security'], ['Organization: integrations', '/dashboard/org?tab=integrations'], ['Organization: audit log', '/dashboard/org?tab=audit'],
-  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm insights', '/dashboard/history'],
+  ['Home (projects)', '/dashboard'], ['Quality', '/dashboard/quality'], ['Firm insights', '/dashboard/history'], ['Master schedule', '/dashboard/programs'],
   ['Time impact', '/dashboard/time-impact'],
   ['Sample schedule & recovery', `/dashboard/plan/${sample.id}`, async () => { await page.getByText('days late').first().click(); await page.waitForSelector('#recovery') }],
   // Last, so the pages above keep their no-upload state: an uploaded schedule with a project document,
@@ -73,6 +73,28 @@ const PAGES = [
   ['Old Today link (lands on Overview)', '/dashboard/today', async () => { await page.locator('#finish-h').waitFor() }],
   ['Project schedule', '/dashboard/timeline', async () => { await page.waitForSelector('[aria-label="Show"]'); await page.getByRole('button', { name: /Spread Footings/ }).first().click(); await page.waitForSelector('aside[aria-label^="Activity"]'); await page.waitForTimeout(600) }],
   ['Project quality', '/dashboard/quality', async () => { await page.waitForSelector('#dcma-h'); await page.getByRole('button', { name: /All \d+ DCMA checks/ }).click(); await page.getByRole('button', { name: /Logic/ }).first().click(); await page.waitForSelector('#dcma-detail'); await page.waitForTimeout(1100) }],
+  // The master schedule with a program in it: the uploaded project, two milestones read from its schedule, an owner
+  // forecast and an item another party owes. Set up once; the tablet and phone passes find it there.
+  ['Master schedule with a program', '/dashboard/programs', async () => {
+    const list = await (await page.request.get(`${BASE}/api/programs`)).json()
+    if (!list.programs.length) {
+      const program = (await (await post('/api/programs', { name: 'Island Rebuild' })).json()).program
+      const view = await (await page.request.get(`${BASE}/api/programs/${program.id}`)).json()
+      const project = (await (await post(`/api/programs/${program.id}/projects`, { scheduleId: view.available[0].scheduleId, sector: 'Education', contractor: 'North Builders' })).json()).project
+      const acts = (await (await page.request.get(`${BASE}/api/programs/${program.id}/projects/${project.id}/activities`)).json()).activities
+      const [m1, m2, m3] = view.program.dictionary
+      await page.request.patch(`${BASE}/api/programs/${program.id}/projects/${project.id}`, { headers: { origin }, data: {
+        mapping: { [m1.key]: { code: acts[0].code, use: 'start' }, [m2.key]: { code: acts[acts.length - 1].code, use: 'finish' } }, ownerForecasts: { [m3.key]: { date: '2027-03-01', note: 'progress meeting' } } } })
+      await post(`/api/programs/${program.id}/items`, { party: 'Utility', title: 'Permanent power energized', projectId: project.id, milestoneKey: m2.key, needDate: '2026-01-15', forecastDate: '2026-02-20' })
+    }
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.waitForSelector('table')
+  }],
+  ['Master schedule: phases', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Phases' }).click(); await page.waitForSelector('#master-panel-phases'); await page.waitForTimeout(300) }],
+  ['Master schedule: sectors', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Sectors' }).click(); await page.waitForSelector('#master-panel-sectors table') }],
+  ['Master schedule: other parties', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Other parties' }).click(); await page.getByRole('button', { name: 'Add an item' }).click(); await page.getByLabel('Who owes it').waitFor() }],
+  ['Master schedule: a milestone', '/dashboard/programs', async () => { await page.waitForSelector('table'); await page.locator('tbody td button').first().click(); await page.getByRole('dialog').waitFor(); await page.getByLabel('Activities in the newest upload').locator('button').first().waitFor() }],
+  ['Master schedule: set up', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Set up' }).click(); await page.getByRole('heading', { name: 'Standard milestones' }).waitFor() }],
 ]
 
 let failed = 0

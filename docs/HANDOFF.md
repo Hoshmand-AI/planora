@@ -95,7 +95,7 @@ Checked on this head: `npx tsc --noEmit` is clean, and `npx vitest run` passes (
 ## Rules that must hold (from CLAUDE.md and the owner)
 
 - **Branch:** work on `claude/eloquent-tesla-6gzy4k` only, then PR to `main`. Never merge a red PR, and never skip or disable a test to get green. Never push an empty commit or close and reopen a PR to kick CI.
-- **Migrations:** additive, numbered migrations only, in `src/lib/migrations.ts`. 29 is the latest shipped; the next is 30. Never edit a shipped one.
+- **Migrations:** additive, numbered migrations only, in `src/lib/migrations.ts`. 30 (`programs`, the master schedule) is the latest; the next is 31. Never edit a shipped one.
 - **API and audit:** every API handler uses `api({ permission })`, `publicApi()` or `scimApi()`; `audit()` records material actions; never log secrets or prompt content.
 - **Data:** all firm data is scoped by `org_id`; raw SQL via `pg`.
 - **Styling:**

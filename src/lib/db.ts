@@ -998,7 +998,10 @@ export async function exportOrganization(orgId: string) {
   const siteCaptures = await exportCaptures(orgId)
   const { exportPlans } = await import('@/lib/server/site-plans')
   const sitePlans = await exportPlans(orgId)
-  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, sitePlans, retrievalLog, auditEvents: audit }
+  // Program master schedules: the programs, their projects (milestone mapping and owner forecasts) and what other parties owe.
+  const { exportPrograms } = await import('@/lib/server/programs')
+  const programs = await exportPrograms(orgId)
+  return { format: 'runf9-org-export', formatVersion: 1, exportedAt: new Date().toISOString(), organization: exportableOrg(org), members, plans, schedules: scheduleData, standardsRuns, projectDocuments, projectRegister, siteCaptures, sitePlans, programs, retrievalLog, auditEvents: audit }
 }
 
 /**
@@ -1024,6 +1027,9 @@ export async function deleteOrganization(orgId: string, actor: { id: string; ema
     await q('DELETE FROM site_captures WHERE org_id=$1', [orgId])
     await q('DELETE FROM site_plans WHERE org_id=$1', [orgId])
     await q('DELETE FROM project_schedule_roles WHERE org_id=$1', [orgId])
+    await q('DELETE FROM program_items WHERE org_id=$1', [orgId])
+    await q('DELETE FROM program_projects WHERE org_id=$1', [orgId])
+    await q('DELETE FROM programs WHERE org_id=$1', [orgId])
     await q('DELETE FROM brief_subscriptions WHERE org_id=$1', [orgId])
     await q('DELETE FROM retrieval_log WHERE org_id=$1', [orgId])
     await q('DELETE FROM schedules WHERE org_id=$1', [orgId])
@@ -1072,6 +1078,8 @@ export async function deleteAccountData(userId: string, orgId: string): Promise<
     await q("UPDATE project_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q("UPDATE site_captures SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q("UPDATE site_plans SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
+    await q("UPDATE programs SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
+    await q("UPDATE program_items SET created_by=$2, created_by_name='Former member' WHERE created_by=$1 AND org_id=$3", [userId, heir, orgId])
     await q('DELETE FROM brief_subscriptions WHERE user_id=$1 AND org_id=$2', [userId, orgId])
     await q('UPDATE project_documents SET reviewed_by=$2 WHERE reviewed_by=$1 AND org_id=$3', [userId, heir, orgId])
     await q('UPDATE document_requirement_reviews SET user_id=$2 WHERE user_id=$1 AND org_id=$3', [userId, heir, orgId])

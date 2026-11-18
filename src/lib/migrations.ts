@@ -1015,6 +1015,63 @@ export const MIGRATIONS: Migration[] = [
     );
     `,
   },
+  {
+    id: 30, name: 'programs',
+    sql: `
+    -- Program master schedules. A program groups several projects; its dictionary (milestones) is the short list
+    -- of standard milestones every project is read against. A program project maps each dictionary milestone to
+    -- one activity ID of the contractor's schedule (mapping), so the master reads its dates from the project's
+    -- newest upload and never stores a contractor date. What the owner believes instead is kept beside it
+    -- (owner_forecasts). Program items are what other parties owe: funding, permits, utilities, move-in.
+    -- Projects are named by their register key (the update series inside its workspace), like the register.
+    -- Additive: older code ignores the three tables.
+    CREATE TABLE IF NOT EXISTS programs (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      milestones JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS programs_org_idx ON programs(org_id, created_at);
+    CREATE TABLE IF NOT EXISTS program_projects (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      program_id TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+      project_key TEXT NOT NULL,
+      sector TEXT,
+      location TEXT,
+      contractor TEXT,
+      mapping JSONB NOT NULL DEFAULT '{}'::jsonb,
+      owner_forecasts JSONB NOT NULL DEFAULT '{}'::jsonb,
+      sort INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (org_id, program_id, project_key)
+    );
+    CREATE INDEX IF NOT EXISTS program_projects_program_idx ON program_projects(org_id, program_id, sort, created_at);
+    CREATE TABLE IF NOT EXISTS program_items (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      program_id TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+      program_project_id TEXT,
+      party TEXT NOT NULL,
+      title TEXT NOT NULL,
+      need_date TEXT,
+      forecast_date TEXT,
+      actual_date TEXT,
+      note TEXT,
+      milestone_key TEXT,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS program_items_program_idx ON program_items(org_id, program_id, created_at);
+    `,
+  },
 ]
 
 export function checksum(m: Migration): string {
