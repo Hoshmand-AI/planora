@@ -1,19 +1,23 @@
 'use client'
 
-// The daily brief for one project, shown on the Overview under the finish answer: what needs attention,
-// then folded cards for today on site, what moves the finish, what the project records say, the register and
-// recent changes, and the brief to send. A card with nothing in it is not shown. Everything is calculated from
-// the schedule and the project's own records.
+// The daily brief for one project, shown on the Overview under the finish answer. It is laid out like the picture
+// of it on the public page (src/components/landing/Sections.tsx, LiveBrief): a header with the RunF9 logo, the
+// project and the date; four figures; then five tabs. Three tabs are the brief written for one reader (project
+// manager, field, client) with the detail that reader works from in folded cards; one holds what the project
+// records say; one holds the day's what-if runs. A card with nothing in it is not shown. Everything is calculated
+// from the schedule and the project's own records.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Camera, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ChevronDown, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert, Sparkles } from 'lucide-react'
+import { AlertTriangle, Camera, FileText, HardHat, CalendarCheck, CalendarClock, CheckCircle2, ChevronDown, ClipboardCopy, Flag, GitBranch, Loader2, Mail, PlayCircle, Route, ShieldAlert } from 'lucide-react'
 import { Disclosure } from '@/components/Disclosure'
+import { Logo } from '@/components/Logo'
 import { Alert, postJson, buttonClass } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import { fmtDate, fmtDay, fmtDates } from '@/lib/format'
 import type { BriefRow, DailyBrief, RegisterItem, RegisterKind } from '@/lib/analysis/daily-brief'
 import type { BriefAlert, ProjectWatch } from '@/lib/analysis/project-watch'
+import { briefFigures } from '@/lib/analysis/brief-figures'
 import { useApp } from '@/app/dashboard/layout'
 
 
@@ -26,7 +30,17 @@ const AUDIENCES: { id: Audience; label: string; hint: string }[] = [
 ]
 // The card behind each kind of attention item.
 const ALERT_CARD: Record<string, string> = { deadline: 'driving', overdue: 'overdue', contract: 'contract', field: 'field', register: 'register', signals: 'signals', today: 'today', lookahead: 'lookahead', documents: 'field', site: 'site' }
-// Today is five short parts, not one long page: what to act on now, then the detail behind it, each a tab.
+// The brief has the same five tabs as the picture of it on the public page: three readers, then what it read and what it ran.
+type TabId = Audience | 'records' | 'whatif'
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'pm', label: 'Project manager' },
+  { id: 'field', label: 'Field' },
+  { id: 'client', label: 'Client' },
+  { id: 'records', label: 'Email and meetings' },
+  { id: 'whatif', label: 'What-ifs' },
+]
+// The tab each folded card sits in, so "Details" in the attention list can open it.
+const CARD_TAB: Record<string, TabId> = { driving: 'pm', register: 'pm', today: 'field', overdue: 'field', lookahead: 'field', site: 'field', signals: 'records', contract: 'records', field: 'records' }
 // A two-word subject in front of each attention item, so the list can be scanned before it is read.
 const ALERT_SUBJECT: Record<string, string> = { deadline: 'Deadline', overdue: 'Overdue', contract: 'Contract', field: 'Field report', register: 'Register', signals: 'Reported delays', documents: 'Scope', today: 'Today', lookahead: 'Coming up', site: 'Site' }
 const KIND_LABEL: Record<RegisterKind, string> = { risk: 'Risk', issue: 'Issue', pco: 'PCO', change_request: 'Change request', change_order: 'Change order', amendment: 'Amendment' }
@@ -44,7 +58,8 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
   const [err, setErr] = useState('')
   const [showWatch, setShowWatch] = useState(false)
   const [asOf, setAsOf] = useState(todayIso)
-  const [audience, setAudience] = useState<Audience>('pm')
+  // The open tab. Not kept in storage: every visit starts on the project manager's version.
+  const [tab, setTab] = useState<TabId>('pm')
   const [whatIf, setWhatIf] = useState<{ activity: string; days: string }>({ activity: '', days: '5' })
   const [ranWhatIf, setRanWhatIf] = useState<{ activity: string; days: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -81,7 +96,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     } catch { if (mine === seq.current) setErr('Network error. Check your connection and try again.') }
   }, [sid, asOf, ranWhatIf])
   // A new project starts clean; a new date or what-if keeps the page on screen while it recalculates.
-  useEffect(() => { setData(null); setItems([]); setImpact(null); setRanWhatIf(null); setWhatIf({ activity: '', days: '5' }); setMailed(''); setErr(''); setOpenCards({}) }, [sid])
+  useEffect(() => { setData(null); setItems([]); setImpact(null); setRanWhatIf(null); setWhatIf({ activity: '', days: '5' }); setMailed(''); setErr(''); setOpenCards({}); setTab('pm') }, [sid])
   useEffect(() => { load() }, [load])
   useEffect(() => { onHeadline?.(data ? data.brief.headline : err ? null : undefined) }, [data, err, onHeadline])
 
@@ -96,12 +111,14 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     await Promise.all([load(), refreshMetrics().catch(() => {}), refreshSchedules().catch(() => {})])
   }
 
-  const text = useMemo(() => {
+  // The four figures under the header: the same ones, from the same function, as the email.
+  const figures = useMemo(() => (data ? briefFigures(data.brief, data.alerts) : []), [data])
+  /** One reader's version as plain text, for "Copy to send". */
+  const versionText = (audience: Audience) => {
     if (!data) return ''
-    const b = data.brief
     const title = AUDIENCES.find(a => a.id === audience)!.label
-    return [`${data.schedule.name}: daily brief for ${fmtDate(b.asOf)} (${title})`, '', ...b.audiences[audience].map(l => `• ${fmtDates(l)}`)].join('\n')
-  }, [data, audience])
+    return [`${data.schedule.name}: daily brief for ${fmtDate(data.brief.asOf)} (${title})`, '', ...data.brief.audiences[audience].map(l => `• ${fmtDates(l)}`)].join('\n')
+  }
 
   if (!selectedSchedule) return null
   if (!data) return (
@@ -118,6 +135,7 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
   const toggle = (id: string) => setOpenCards(o => ({ ...o, [id]: !(o[id] ?? !!defaultOpen[id]) }))
   // From the attention list: open the card behind an item and bring it into view.
   const show = (id: string) => {
+    setTab(CARD_TAB[id] ?? 'pm')
     setOpenCards(o => ({ ...o, [id]: true }))
     requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`card-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })))
   }
@@ -134,19 +152,14 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
     changed: b.changed.edits.length > 0 || !!b.changed.sinceLastUpdate,
     missing: b.missing.scope.length + b.missing.proposals.length + (b.missing.looseEnds ? 1 : 0) > 0, logic: b.logic.length > 0,
   }
-  const audienceLabel = AUDIENCES.find(a => a.id === audience)!.label
 
-  return (
-    <div className="space-y-5">
-      {err && <Alert tone="error">{err}</Alert>}
-
-      {data.alerts.length > 0 && (() => {
+      const attention = data.alerts.length > 0 && (() => {
         // What to act on is listed; what only needs watching is one press away, unless there is nothing to act on.
         const act = data.alerts.filter(a => a.level === 'act'), watch = data.alerts.filter(a => a.level !== 'act')
         const listed = act.length && !showWatch ? act : [...act, ...watch]
         return (
-        <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-5">
-          <h2 id="alerts-h" className="text-heading font-semibold text-ink">Needs attention today <span className="ml-1 text-body font-normal text-warm-600">{act.length ? `${act.length} to act on` : `${watch.length} to watch`}</span></h2>
+        <section aria-labelledby="alerts-h" className="rounded-[14px] border border-warm-200 bg-white p-4 md:p-5">
+          <h3 id="alerts-h" className="text-subhead font-semibold text-ink">Needs attention today <span className="ml-1 text-body font-normal text-warm-600">{act.length ? `${act.length} to act on` : `${watch.length} to watch`}</span></h3>
           <ul className="mt-2 divide-y divide-warm-200 [&>li]:py-2 [&>li]:text-body">
             {listed.map((a, i) => (
               <li key={i} className="flex items-start gap-2.5 text-body text-warm-700">
@@ -161,11 +174,11 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {act.length > 0 && watch.length > 0 && <button type="button" aria-expanded={showWatch} onClick={() => setShowWatch(v => !v)} className="mt-2 text-body font-semibold text-accent-600 hover:underline">{showWatch ? 'Show only what to act on' : `Show ${watch.length} more to watch`}</button>}
         </section>
         )
-      })()}
+      })()
 
-      {(has.today || has.overdue || has.since || has.site || has.lookahead) && (
+      const siteGroup = (has.today || has.overdue || has.since || has.site || has.lookahead) && (
         <section aria-label="Today on site" className="space-y-3">
-        <h2 className="text-heading font-semibold text-ink pt-1">Today on site</h2>
+        <h3 className="text-subhead font-semibold text-ink pt-1">Today on site</h3>
         <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           {has.today && <Card id="today" open={isOpen('today')} onToggle={() => toggle('today')} meta={`${b.today.starting.length} to start · ${b.today.finishing.length} to finish · ${b.today.inProgressCount} under way`} icon={<CalendarCheck size={15} />} title="Today" sub="What the schedule says happens today">
           <List title="Starts today" rows={b.today.starting} empty="Nothing is scheduled to start." action={canWrite ? r => <RowBtn busy={busy === r.id + 'start'} disabled={!!busy} onClick={() => progress(r, 'start')} label="Mark started" /> : undefined} />
@@ -200,17 +213,32 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
         </Card>}
         </div>
       </section>
-      )}
+      )
 
+      const finishGroup = (
       <section aria-label="What moves the finish" className="space-y-3">
-        <h2 className="text-heading font-semibold text-ink pt-1">What moves the finish</h2>
+        <h3 className="text-subhead font-semibold text-ink pt-1">What moves the finish</h3>
         <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           <Card id="driving" open={isOpen('driving')} onToggle={() => toggle('driving')} meta={b.driving.today ? b.driving.today.code : 'No driving path'} icon={<Route size={15} />} title="What is driving the project" sub="The open activities that set the finish date, in order">
           {b.driving.today ? <p className="text-body text-ink"><strong>Driving today:</strong> {b.driving.today.code} {b.driving.today.name}{b.driving.today.date ? `, finish ${fmtDate(b.driving.today.date)}` : ''}</p> : <p className="text-body text-warm-600">No driving path: the schedule has no logic RunF9 can calculate.</p>}
           {b.driving.path.length > 1 && <ol className="list-decimal pl-5 text-body text-warm-700 space-y-0.5">{b.driving.path.map(r => <li key={r.id}>{r.code} {r.name}{r.date ? ` · ${fmtDate(r.date)}` : ''}</li>)}</ol>}
           <Link href="/dashboard/timeline" className="text-body font-medium text-accent-600 hover:underline">Open the schedule</Link>
         </Card>
-          <Card id="whatif" open={isOpen('whatif')} onToggle={() => toggle('whatif')} meta={count(b.whatIfs.length, 'what-if', 'what-ifs')} icon={<Sparkles size={15} />} title="What-if, run today" sub="Recalculated on the real network; nothing is saved">
+          {has.risks && <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Risks the schedule shows" sub="Calculated from the schedule: what could move the finish">
+          {b.risks.length === 0 ? <p className="text-body text-warm-600">No schedule risk today.</p> : <ul className="space-y-2">{b.risks.map((r, i) => (
+            <li key={i} className="text-body text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-caption font-semibold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-caption text-warm-600">({r.source})</span></li>
+          ))}</ul>}
+        </Card>}
+          {has.issues && <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Issues the schedule shows" sub="Calculated from the schedule: what is already wrong">
+          {b.issues.length === 0 ? <p className="text-body text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-body text-warm-700">{fmtDates(r.text)} <span className="text-caption text-warm-600">({r.source})</span></li>)}</ul>}
+        </Card>}
+        </div>
+      </section>
+      )
+
+      const whatIfBody = (
+        <div className="space-y-3">
+          <p className="text-body text-warm-600">Recalculated on the real network; nothing is saved.</p>
           {b.whatIfs.length === 0 ? <p className="text-body text-warm-600">No what-if could be calculated (the schedule has no logic).</p> : <ul className="space-y-2.5">{b.whatIfs.filter(w => !w.title.startsWith('Your what-if')).map((w, i) => (
             <li key={i} className="text-body text-warm-700"><span className="block text-caption font-semibold text-ink">{w.title}</span>{fmtDates(w.text)}</li>
           ))}</ul>}
@@ -226,21 +254,12 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
               <p key={i} ref={el => { if (el && shownWhatIf.current !== w.text) { shownWhatIf.current = w.text; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } }} className="rounded-lg border border-accent-600/40 bg-white p-3 text-body text-warm-700"><span className="block text-caption font-semibold text-ink">{w.title}</span>{fmtDates(w.text)}</p>
             ))}
           </div>
-        </Card>
-          {has.risks && <Card id="risks" open={isOpen('risks')} onToggle={() => toggle('risks')} meta={count(b.risks.length, 'risk')} icon={<ShieldAlert size={15} />} title="Risks the schedule shows" sub="Calculated from the schedule: what could move the finish">
-          {b.risks.length === 0 ? <p className="text-body text-warm-600">No schedule risk today.</p> : <ul className="space-y-2">{b.risks.map((r, i) => (
-            <li key={i} className="text-body text-warm-700"><span className={`mr-1.5 inline-block px-1.5 py-0.5 rounded text-caption font-semibold ${r.severity === 'high' ? 'bg-status-at-risk-bg text-status-at-risk' : 'bg-status-attention-bg text-status-attention'}`}>{r.severity === 'high' ? 'High' : 'Watch'}</span>{fmtDates(r.text)} <span className="text-caption text-warm-600">({r.source})</span></li>
-          ))}</ul>}
-        </Card>}
-          {has.issues && <Card id="issues" open={isOpen('issues')} onToggle={() => toggle('issues')} meta={count(b.issues.length, 'issue')} icon={<Flag size={15} />} title="Issues the schedule shows" sub="Calculated from the schedule: what is already wrong">
-          {b.issues.length === 0 ? <p className="text-body text-warm-600">No open issues.</p> : <ul className="space-y-2">{b.issues.map((r, i) => <li key={i} className="text-body text-warm-700">{fmtDates(r.text)} <span className="text-caption text-warm-600">({r.source})</span></li>)}</ul>}
-        </Card>}
         </div>
-      </section>
+      )
 
-      {(has.signals || has.contract || has.field) ? (
+      const recordsGroup = (has.signals || has.contract || has.field) ? (
       <section aria-label="From the project records" className="space-y-3">
-        <h2 className="text-heading font-semibold text-ink pt-1">From the project records</h2>
+        <h3 className="text-subhead font-semibold text-ink pt-1">From the project records</h3>
         <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           {has.signals && <Card id="signals" open={isOpen('signals')} onToggle={() => toggle('signals')} meta={count(b.signals.length, 'sentence')} icon={<Mail size={15} />} title="From emails, meetings and field reports" sub="Sentences in this project’s correspondence that affect the schedule, quoted with their source">
         {b.signals.length === 0 ? (
@@ -300,17 +319,18 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
       </section>
       ) : (
         <section aria-label="From the project records" className="space-y-3">
-          <h2 className="text-heading font-semibold text-ink pt-1">From the project records</h2>
+          <h3 className="text-subhead font-semibold text-ink pt-1">From the project records</h3>
           <Link href="/dashboard/documents?add=1" className="flex items-center gap-3 rounded-[14px] border border-warm-200 bg-white px-4 md:px-5 py-2.5 min-h-[48px] hover:bg-warm-50">
             <span aria-hidden className="inline-flex flex-shrink-0 items-center justify-center w-5 text-warm-600"><Mail size={15} /></span>
             <span className="flex-1 min-w-0 text-subhead font-medium text-ink">No records yet</span>
             <span className="text-body font-semibold text-accent-600">Add emails, minutes or the contract</span>
           </Link>
         </section>
-      )}
+      )
 
+      const registerGroup = (
       <section aria-label="Register and changes" className="space-y-3">
-        <h2 className="text-heading font-semibold text-ink pt-1">Register and changes</h2>
+        <h3 className="text-subhead font-semibold text-ink pt-1">Register and changes</h3>
         <div className="rounded-[14px] border border-warm-200 bg-white divide-y divide-warm-200">
           <Card id="register" open={isOpen('register')} onToggle={() => toggle('register')} meta={`${openItems.length} open`} icon={<Flag size={15} />} title="Register: risks, issues and changes">
             <Register sid={sid!} items={items} canWrite={canWrite} activities={data.activities} onChanged={load} today={b.asOf} />
@@ -346,50 +366,110 @@ export function ProjectBrief({ onHeadline }: { /** The deadline position, for th
           {has.logic && <Card id="logic" open={isOpen('logic')} onToggle={() => toggle('logic')} meta={count(b.logic.length, 'link')} icon={<GitBranch size={15} />} title="Logic that does not make sense" sub="Links that run against the usual order of work">
           {b.logic.length === 0 ? <p className="text-body text-warm-600">No link runs against the usual order of work.</p> : <ul className="space-y-1.5">{b.logic.map((p, i) => <li key={i} className="text-body text-warm-700"><span className="font-medium text-ink">{p.text}</span><span className="block text-caption text-warm-600">{p.reason}</span></li>)}</ul>}
         </Card>}
-          <Card id="brief" open={isOpen('brief')} onToggle={() => toggle('brief')} meta={`${audienceLabel} version`} icon={<Mail size={15} />} title="Daily brief to send" sub="The same facts, written for the reader you choose. Calculated from the schedule, the register and the records of this project; no AI model writes it, so every line traces to an activity, an item or a quoted passage.">
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-              <label className="text-caption text-warm-600"><span>Written for</span>
-                <select value={audience} onChange={e => setAudience(e.target.value as Audience)} className={`${input} block mt-0.5 min-h-[36px]`}>
-                  {AUDIENCES.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
-                </select>
-              </label>
-              <label className="text-caption text-warm-600"><span>As of</span>
-                <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px]`} />
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-          <button type="button" className={btn} onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch { setErr('Copy is not available in this browser; select the text instead.') } }}>
-            <ClipboardCopy size={13} className="inline mr-1 -mt-0.5" aria-hidden />{copied ? 'Copied' : 'Copy to send'}
-          </button>
-          <button type="button" className={btn} disabled={busy === 'mail'} onClick={async () => {
-            setBusy('mail'); setMailed('')
-            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf, tz: new Date().getTimezoneOffset() })
-            setBusy(''); setMailed(r.ok ? 'Sent to your email.' : r.data.error || 'The email could not be sent.')
-          }}><Mail size={13} className="inline mr-1 -mt-0.5" aria-hidden />{busy === 'mail' ? 'Sending…' : 'Email it to me'}</button>
-            </div>
-        {mailed && <p role="status" className="mt-2 text-body text-warm-700">{mailed}</p>}
-        {data.email?.available && (
-          <label className="mt-2 flex items-start gap-2 text-body text-warm-700">
-            <input type="checkbox" className="mt-0.5" checked={!!data.email.everyMorning} disabled={busy === 'sub'} onChange={async e => {
-              setBusy('sub'); setMailed('')
-              const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience }, e.target.checked ? 'PUT' : 'DELETE')
-              setBusy('')
-              if (!r.ok) setMailed(r.data.error || 'The setting was not saved.'); else await load()
-            }} />
-            <span>Email me this brief every working morning{data.email.everyMorning ? ` (${AUDIENCES.find(a => a.id === data.email!.everyMorning)!.label} version)` : ` (${AUDIENCES.find(a => a.id === audience)!.label} version)`}</span>
-          </label>
-        )}
-        <div className="mt-3">
-          <p className="text-caption text-warm-600 mb-2">{AUDIENCES.find(a => a.id === audience)!.hint}</p>
-          <ul className="space-y-2">
-            {b.audiences[audience].map((l, i) => <li key={i} className="flex gap-2 text-body text-warm-700"><span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-600 flex-shrink-0" /><span>{fmtDates(l)}</span></li>)}
-          </ul>
-        </div>
-          </Card>
         </div>
       </section>
+      )
 
+  // One reader's version of the brief, with the ways to send it. The tab chooses the reader.
+  const version = (audience: Audience) => (
+    <div className="space-y-3">
+      <p className="text-caption text-warm-600">{AUDIENCES.find(a => a.id === audience)!.hint}. Calculated from the schedule, the register and the records of this project; no AI model writes it, so every line traces to an activity, an item or a quoted passage.</p>
+      <ul className="divide-y divide-warm-200 border-y border-warm-200">
+        {b.audiences[audience].map((l, i) => <li key={i} className="py-2.5 text-body text-warm-700">{fmtDates(l)}</li>)}
+      </ul>
+      <div className="flex flex-wrap gap-2 print:hidden">
+        <button type="button" className={btn} onClick={async () => { try { await navigator.clipboard.writeText(versionText(audience)); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch { setErr('Copy is not available in this browser; select the text instead.') } }}>
+          <ClipboardCopy size={13} className="inline mr-1 -mt-0.5" aria-hidden />{copied ? 'Copied' : 'Copy to send'}
+        </button>
+        <button type="button" className={btn} disabled={busy === 'mail'} onClick={async () => {
+          setBusy('mail'); setMailed('')
+          const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience, asOf, tz: new Date().getTimezoneOffset() })
+          setBusy(''); setMailed(r.ok ? 'Sent to your email.' : r.data.error || 'The email could not be sent.')
+        }}><Mail size={13} className="inline mr-1 -mt-0.5" aria-hidden />{busy === 'mail' ? 'Sending…' : 'Email it to me'}</button>
+      </div>
+      {mailed && <p role="status" className="text-body text-warm-700">{mailed}</p>}
+      {data.email?.available && (
+        <label className="flex items-start gap-2 text-body text-warm-700 print:hidden">
+          <input type="checkbox" className="mt-0.5" checked={!!data.email.everyMorning} disabled={busy === 'sub'} onChange={async e => {
+            setBusy('sub'); setMailed('')
+            const r = await postJson(`/api/schedules/${encodeURIComponent(sid!)}/brief`, { audience }, e.target.checked ? 'PUT' : 'DELETE')
+            setBusy('')
+            if (!r.ok) setMailed(r.data.error || 'The setting was not saved.'); else await load()
+          }} />
+          <span>Email me this brief every working morning ({AUDIENCES.find(a => a.id === (data.email!.everyMorning ?? audience))!.label} version)</span>
+        </label>
+      )}
     </div>
+  )
+
+  // Arrow keys, Home and End move between the tabs and take the focus with them (WAI-ARIA tabs pattern).
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = TABS.findIndex(t => t.id === tab)
+    const n = e.key === 'ArrowRight' ? (i + 1) % TABS.length : e.key === 'ArrowLeft' ? (i + TABS.length - 1) % TABS.length : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : -1
+    if (n < 0) return
+    e.preventDefault()
+    setTab(TABS[n].id)
+    document.getElementById(`brief-tab-${TABS[n].id}`)?.focus()
+  }
+  const panels: Record<TabId, React.ReactNode> = {
+    pm: <>{version('pm')}{attention}{finishGroup}{registerGroup}</>,
+    field: <>{version('field')}{siteGroup}</>,
+    client: version('client'),
+    records: recordsGroup,
+    whatif: whatIfBody,
+  }
+
+  return (
+    <section aria-labelledby="brief-h" className="rounded-[14px] border border-warm-200 bg-white">
+      {/* The header: the logo, what this is, and the day it is for. The band keeps its colour on paper. */}
+      <div className="flex items-center justify-between gap-4 rounded-t-[13px] bg-navy-950 px-4 md:px-5 py-3 [print-color-adjust:exact] [-webkit-print-color-adjust:exact]">
+        <Logo variant="light" size="h-[22px]" />
+        <div className="min-w-0 text-right leading-tight">
+          <h2 id="brief-h" className="text-heading font-semibold text-white">Daily Brief</h2>
+          <p className="text-caption text-navy-200 tabular-nums">{fmtDate(b.asOf)}</p>
+        </div>
+      </div>
+      <div className="p-4 md:p-5 space-y-4">
+        {err && <Alert tone="error">{err}</Alert>}
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <p className="text-subhead font-medium text-ink break-words">{data.schedule.name}</p>
+            <p className="text-caption text-warm-600">{b.dataDate ? `Data date ${fmtDate(b.dataDate)}` : 'No data date in the schedule'}{data.schedule.editsApplied ? ` · with ${data.schedule.editsApplied} ${data.schedule.editsApplied === 1 ? 'edit' : 'edits'} made in RunF9` : ''}</p>
+          </div>
+          <label className="text-caption text-warm-600 print:hidden"><span>Brief for</span>
+            <input type="date" value={asOf} onChange={e => e.target.value && setAsOf(e.target.value)} className={`${input} block mt-0.5 min-h-[36px]`} />
+          </label>
+        </div>
+
+        {/* The four figures a reader looks for first, value over caption. A figure that does not exist says so. */}
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-lg border border-warm-200 bg-warm-200">
+          {figures.map(f => (
+            <div key={f.id} className="flex flex-col-reverse justify-end bg-white px-3.5 py-3">
+              <dt className="mt-0.5 text-caption text-warm-600">{f.label}{f.note ? <span className="block">{f.note}</span> : null}</dt>
+              <dd className={`text-heading font-semibold tabular-nums ${f.missing ? 'text-warm-600' : 'text-ink'}`}>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* The row scrolls sideways inside itself on a narrow screen, so the page never does. */}
+        <div role="tablist" aria-label="Who the brief is for, and what it read" onKeyDown={onTabKey} className="-m-1 flex gap-1.5 overflow-x-auto whitespace-nowrap p-1 [&>button]:flex-shrink-0 print:hidden">
+          {TABS.map(t => (
+            <button key={t.id} id={`brief-tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`brief-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
+              onClick={() => setTab(t.id)}
+              className={`pressable rounded-lg px-3 min-h-[36px] text-body font-semibold border ${tab === t.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-warm-300 bg-white text-warm-700 hover:text-ink'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {/* Every panel stays in the page, so what was typed or opened in one is kept; on paper all five print, each under its name. */}
+        {TABS.map(t => (
+          <div key={t.id} id={`brief-panel-${t.id}`} role="tabpanel" aria-labelledby={`brief-tab-${t.id}`} className={`space-y-4 ${tab === t.id ? '' : 'hidden print:block'}`}>
+            <h3 className="hidden print:block text-subhead font-semibold text-ink">{t.label}</h3>
+            {panels[t.id]}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

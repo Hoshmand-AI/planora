@@ -63,11 +63,11 @@ function summarize(e: AuditEvent): string {
 
 type OrgTab = 'people' | 'plan' | 'security' | 'integrations' | 'audit'
 const ORG_TABS: { id: OrgTab; label: string }[] = [
-  { id: 'people', label: 'People' }, { id: 'plan', label: 'Plan and data' }, { id: 'security', label: 'Security' },
+  { id: 'people', label: 'People' }, { id: 'plan', label: 'License and data' }, { id: 'security', label: 'Security' },
   { id: 'integrations', label: 'Integrations' }, { id: 'audit', label: 'Audit log' },
 ]
 
-const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
+const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point'], ['USACE_UFGS', 'USACE UFGS 01 32 01.00 10 (Project Schedule)'], ['PMI_SCHEDULING', 'PMI Practice Standard for Scheduling']] as const
 
 export default function OrgPage() {
   const router = useRouter()
@@ -161,13 +161,13 @@ export default function OrgPage() {
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-6 space-y-5">
 
       <div role="tabpanel" id="org-panel-plan" aria-labelledby="org-tab-plan" hidden={active !== 'plan'} className="space-y-5">
-      <Section title={`Plan: ${data.plan.label}`} description="What your organization's plan includes. To change plans, contact support@hoshmand.ai; the change takes effect at once.">
+      <Section title="Your license" description="What your organization's license includes. To change it, contact support@hoshmand.ai; the change takes effect at once.">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-body">
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Uploaded schedules</dt><dd className="text-ink font-medium">{data.plan.uploadedSchedules}{data.plan.maxUploadedSchedules != null ? ` of ${data.plan.maxUploadedSchedules}` : ' (unlimited)'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">AI requests per day</dt><dd className="text-ink font-medium">up to {data.plan.aiPerDay.toLocaleString()}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Reports</dt><dd className="text-ink font-medium">{data.plan.reports.length === 4 ? 'All four' : 'Executive summary'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Exports</dt><dd className="text-ink font-medium">{data.plan.exports.includes('pdf') ? 'P6, MS Project, PDF, Excel, CSV' : 'P6, MS Project, CSV'}</dd></div>
-          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Single sign-on</dt><dd className="text-ink font-medium">{data.plan.sso ? 'Included' : 'Enterprise plan'}</dd></div>
+          <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Single sign-on</dt><dd className="text-ink font-medium">{data.plan.sso ? 'Included' : 'Not included'}</dd></div>
           <div className="flex justify-between border-b border-warm-200 py-1"><dt className="text-warm-600">Roles, 2-step, audit log</dt><dd className="text-ink font-medium">Included</dd></div>
         </dl>
       </Section>
@@ -387,12 +387,12 @@ export default function OrgPage() {
       )}
 
       {manage && !data.plan.sso && (
-        <Section title="Single sign-on and provisioning" description="Sign-in with your identity provider (OpenID Connect or SAML 2.0) and automatic member provisioning (SCIM 2.0) are part of the Enterprise plan. To change plans, contact support@hoshmand.ai.">{null}</Section>
+        <Section title="Single sign-on and provisioning" description="Sign-in with your identity provider (OpenID Connect or SAML 2.0) and automatic member provisioning (SCIM 2.0) are not included in your organization's license. To add them, contact support@hoshmand.ai.">{null}</Section>
       )}
       {manage && data.plan.sso && (
         <Section title="Single sign-on (SSO)" description="Members sign in with your identity provider (Microsoft Entra ID, Okta, Google Workspace, or any OpenID Connect provider; for SAML 2.0 see below). People with an allowed email domain are added on first sign-in with the default role.">
           {note('sso')}
-          {!data.plan.sso ? <p className="text-body text-warm-600">Single sign-on is part of the Enterprise plan.</p> : (
+          {!data.plan.sso ? <p className="text-body text-warm-600">Single sign-on is not included in your organization's license.</p> : (
             <form className="space-y-3" onSubmit={async e => {
               e.preventDefault(); setSsoHelp(null); setBusy('sso'); setMsg(null)
               const r = await postJson('/api/org', { action: 'update_sso', sso: { ...sso, domains: sso.domains.split(/[\s,]+/).filter(Boolean) } })

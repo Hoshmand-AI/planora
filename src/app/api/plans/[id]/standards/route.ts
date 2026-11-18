@@ -9,7 +9,8 @@ import { loadPlanContext } from '../context'
 
 /**
  * Standards rules engine on a generated plan's current schedule.
- *   GET ?frameworks=… (default: the organization's) → { result, runs, defaults, available }
+ *   GET ?frameworks=… (any of RUNNABLE_FRAMEWORKS, e.g. USACE_UFGS,PMI_SCHEDULING; default: the organization's; an unknown id is a 400)
+ *       → { result, runs, defaults, available }
  *   GET ?run=<id> → { run } — a stored run exactly as recorded
  *   POST { frameworks? } → runs and records the assessment (plan.write); audited
  */

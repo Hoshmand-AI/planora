@@ -14,7 +14,7 @@ import { prefersReducedMotion } from './motion'
 import { SAMPLE_SCHEDULE as SCH } from '@/lib/marketing/sample-schedule'
 
 const SPAN = SCH.spanDays
-const ROWS = SCH.rows.map(r => ({ name: r.name, es: r.start, dur: r.days, crit: r.critical > 0 }))
+const ROWS = SCH.rows.map(r => ({ name: r.name, es: r.start, dur: r.days, crit: r.critical > 0, done: r.activities > 0 ? r.finished / r.activities : 0 }))
 const STATUS = ['Recalculating…', 'Forward pass: early dates…', 'Backward pass: critical path found', `${SCH.critical} of ${SCH.activities} activities are critical. Finish ${SCH.finish}.`]
 const ease = 'cubic-bezier(0.22,1,0.36,1)'
 
@@ -74,7 +74,7 @@ export default function HeroSchedule() {
               <div className="text-fine text-warm-600">Sample data center · {SCH.activities} activities in {SCH.rows.length} work areas</div>
             </div>
             <div className="text-fine text-warm-700 flex items-center gap-4" aria-hidden="true">
-              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-done align-middle" /> actual</span>
+              <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-done align-middle" /> completed</span>
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-todo align-middle" /> remaining</span>
               <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-bar-critical align-middle" /> critical</span>
               <span><span className="inline-block w-0 h-3.5 border-l border-dashed border-navy-700 align-middle" /> data date</span>
@@ -104,7 +104,7 @@ export default function HeroSchedule() {
                         transition: shown ? `width 700ms ${ease} ${i * 110}ms, background-color 500ms ease ${a.crit ? i * 70 : 0}ms` : 'none',
                       }}
                     >
-                      <div className="h-full bg-bar-done" style={{ width: `${Math.max(0, Math.min(1, (SCH.dataDay - a.es) / a.dur)) * 100}%` }} />
+                      <div className="h-full bg-bar-done" style={{ width: `${a.done * 100}%` }} />
                     </div>
                   </div>
                 </div>

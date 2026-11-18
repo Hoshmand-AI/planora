@@ -141,6 +141,8 @@ export interface DailyBrief {
   /** Calendar days between the data date and the brief date; progress after the data date is not in the file */
   staleDays: number | null
   headline: { status: 'on_track' | 'behind' | 'ahead' | 'unknown'; daysBehind: number | null; forecast: string | null; required: string | null; requiredSource: string | null; milestone: string | null; text: string }
+  /** Percent complete weighted by duration (the Overview tile's measure; null when the schedule has no activities), and the plain count of finished activities beside it */
+  progress: { percentComplete: number | null; finished: number; total: number }
   yesterday: { date: string; completed: BriefRow[]; started: BriefRow[] }
   today: { finishing: BriefRow[]; starting: BriefRow[]; inProgress: BriefRow[]; inProgressCount: number }
   overdue: { shouldHaveFinished: BriefRow[]; shouldHaveStarted: BriefRow[]; finishCount: number; startCount: number }
@@ -315,6 +317,7 @@ export function buildDailyBrief(i: DailyBriefInput): DailyBrief {
   return {
     asOf: today, dataDate: day(i.dataDate), staleDays,
     headline: { status, daysBehind, forecast: fc, required: req?.date ?? null, requiredSource: req?.source ?? null, milestone: req?.milestone ? target : null, text: headlineText },
+    progress: { percentComplete: acts.length ? pct : null, finished: acts.filter(done).length, total: acts.length },
     yesterday: { date: yesterday, completed: top(completed), started: top(started) },
     today: { finishing: top(finishing), starting: top(starting), inProgress: top(inProgressAll), inProgressCount: inProgressAll.length },
     overdue: { shouldHaveFinished: top(lateFinish), shouldHaveStarted: top(lateStart), finishCount: lateFinish.length, startCount: lateStart.length },

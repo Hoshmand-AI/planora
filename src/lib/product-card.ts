@@ -27,6 +27,8 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-18', title: 'Two more check sets in the Standards view, drawn from USACE UFGS 01 32 01.00 10 and the PMI Practice Standard for Scheduling' },
+  { date: '2026-11-18', title: 'A new Daily Brief: the forecast, the required date, progress and alerts at the top, then a tab for each reader' },
   { date: '2026-11-17', title: 'Keep a baseline and a comparison schedule for each project: every new update is measured against both' },
   { date: '2026-11-17', title: 'Upload a schedule kept in Word or PowerPoint, as well as P6, MS Project, Excel and PDF' },
   { date: '2026-11-17', title: 'Timelines in the three colours of Primavera P6: blue completed, green remaining, red critical' },

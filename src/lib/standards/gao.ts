@@ -8,11 +8,10 @@
 
 import { fmtDate } from '@/lib/format'
 import { isValidDate, toDayNumber } from '@/lib/planning/calendar'
-import type { AnalyzableActivity } from '@/lib/planning/types'
-import { DEFAULT_GAO_THRESHOLDS, type GaoThresholds } from './config'
 import { plural, shareText, sharePct, uniq } from './network'
-import { notAssessable, threshold, type EngineConfig, type RuleDef } from './rule'
-import type { Characteristic, RuleMeta, ThresholdSpec } from './types'
+import { notAssessable, threshold, type RuleDef } from './rule'
+import { codes, danglingEnds, hasProgress, linkText, linksIntoOpen, openEnds, openFloats, outOfSequence, screeningThreshold as gt, summaryLinks } from './shared'
+import type { Characteristic, RuleMeta } from './types'
 
 export const GAO_VERSION = 'GAO-16-89G'
 export const GAO_DISCLAIMER = 'This is an automated screen of schedule data against practices described in the GAO Schedule Assessment Guide (GAO-16-89G). It is not a GAO assessment and not a determination of compliance with the guide: GAO assessments rely on documents, interviews and professional judgment that an automated scan cannot replace. Thresholds are RunF9 screening defaults unless your organization changed them.'
@@ -54,14 +53,6 @@ function gao(meta: Meta, rest: Pick<RuleDef, 'evaluate'> & Partial<Pick<RuleDef,
   }
 }
 
-/** A GAO screening threshold: 'runf9_default' unless the organization changed it. */
-function gt(cfg: EngineConfig, key: keyof GaoThresholds, metricKey: string, unit: ThresholdSpec['unit'], direction: ThresholdSpec['direction']): ThresholdSpec {
-  const v = cfg.gao[key]
-  return threshold(metricKey, v, unit, direction, v === DEFAULT_GAO_THRESHOLDS[key] ? 'runf9_default' : 'org_configured')
-}
-
-const codes = (xs: AnalyzableActivity[]) => uniq(xs.map(a => a.code))
-const hasProgress = (a: AnalyzableActivity) => !!a.actualStart || !!a.actualFinish || (a.percentComplete ?? 0) > 0 || a.status === 'in_progress' || a.status === 'complete'
 const LOE_NAME = /\b(project management|project manager|supervision|superintend\w*|general conditions|general requirements|site management|level of effort|loe|overhead|project controls|administration|site security)\b/i
 
 export const GAO_RULES: RuleDef[] = [
@@ -133,7 +124,7 @@ export const GAO_RULES: RuleDef[] = [
     threshold: cfg => gt(cfg, 'openEndsMaxPct', 'logic.open_ends_pct', '%', 'max'),
     evaluate: ({ net }, t) => {
       if (!net.open.length) return notAssessable('There are no open activities to test.')
-      const off = net.open.filter(a => (!net.preds.has(a.id) && a.id !== net.startId) || (!net.succs.has(a.id) && a.id !== net.finishId))
+      const off = openEnds(net)
       const ok = sharePct(off.length, net.open.length) <= t!.value
       return {
         result: off.length === 0 ? 'pass' : ok ? 'warning' : 'fail',
@@ -151,15 +142,7 @@ export const GAO_RULES: RuleDef[] = [
   }, {
     evaluate: ({ net }) => {
       if (!net.links.length) return notAssessable('The schedule has no relationships between activities.')
-      const off: string[] = []
-      for (const a of net.open) {
-        if (a.type === 'milestone') continue
-        const p = net.preds.get(a.id) ?? [], s = net.succs.get(a.id) ?? []
-        const startDangles = !a.actualStart && p.length > 0 && !p.some(l => l.type === 'FS' || l.type === 'SS')
-        const finishDangles = s.length > 0 && !s.some(l => l.type === 'FS' || l.type === 'FF')
-        if (startDangles) off.push(`${a.code} (start)`)
-        if (finishDangles) off.push(`${a.code} (finish)`)
-      }
+      const off = danglingEnds(net)
       return {
         result: off.length ? 'fail' : 'pass',
         metric: `${plural(off.length, 'dangling end')}`,
@@ -176,13 +159,13 @@ export const GAO_RULES: RuleDef[] = [
   }, {
     threshold: () => threshold('logic.leads_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
-      const into = net.links.filter(l => net.openIds.has(l.to))
+      const into = linksIntoOpen(net)
       if (!into.length) return notAssessable('There are no relationships into open activities.')
       const leads = into.filter(l => l.lag < 0)
       return {
         result: leads.length ? 'fail' : 'pass',
         metric: `${plural(leads.length, 'lead')} on ${plural(into.length, 'relationship')}`,
-        evidence: uniq(leads.map(l => `${net.code(l.from)} → ${net.code(l.to)} (${l.lag}d)`)),
+        evidence: uniq(leads.map(l => linkText(net, l, `${l.lag}d`))),
         recommendation: leads.length ? 'Replace each lead with SS or FF logic (with a positive lag if needed) or split the work so the overlap is explicit.' : 'No action needed.',
       }
     },
@@ -195,14 +178,14 @@ export const GAO_RULES: RuleDef[] = [
   }, {
     threshold: cfg => gt(cfg, 'lagsMaxPct', 'logic.lags_share_pct', '%', 'max'),
     evaluate: ({ net }, t) => {
-      const into = net.links.filter(l => net.openIds.has(l.to))
+      const into = linksIntoOpen(net)
       if (!into.length) return notAssessable('There are no relationships into open activities.')
       const lags = into.filter(l => l.lag > 0)
       const over = sharePct(lags.length, into.length) > t!.value
       return {
         result: over ? 'warning' : 'pass',
         metric: `${shareText(lags.length, into.length)} relationships carry a positive lag`,
-        evidence: uniq(lags.map(l => `${net.code(l.from)} → ${net.code(l.to)} (+${l.lag}d)`)),
+        evidence: uniq(lags.map(l => linkText(net, l, `+${l.lag}d`))),
         recommendation: over ? 'Record a reason for each lag (cure, review period) or replace it with an activity that can be statused.' : 'No action needed.',
       }
     },
@@ -215,7 +198,7 @@ export const GAO_RULES: RuleDef[] = [
   }, {
     threshold: cfg => gt(cfg, 'minFsPct', 'logic.fs_share_pct', '%', 'min'),
     evaluate: ({ net }, t) => {
-      const into = net.links.filter(l => net.openIds.has(l.to))
+      const into = linksIntoOpen(net)
       if (!into.length) return notAssessable('There are no relationships into open activities.')
       const fs = into.filter(l => l.type === 'FS').length
       const sf = into.filter(l => l.type === 'SF')
@@ -224,7 +207,7 @@ export const GAO_RULES: RuleDef[] = [
       return {
         result: bad ? 'warning' : 'pass',
         metric: `${fsPct.toFixed(1)}% finish-to-start; ${plural(sf.length, 'start-to-finish link')}`,
-        evidence: uniq(into.filter(l => l.type !== 'FS').map(l => `${net.code(l.from)} → ${net.code(l.to)} (${l.type})`)),
+        evidence: uniq(into.filter(l => l.type !== 'FS').map(l => linkText(net, l, l.type))),
         recommendation: bad ? 'Review SS/FF links for a matching pair (SS with FF) and replace start-to-finish links unless the work truly requires them.' : 'No action needed.',
       }
     },
@@ -337,12 +320,11 @@ export const GAO_RULES: RuleDef[] = [
     message: 'Relationships to or from WBS summary activities break the link between summary and detail dates.',
   }, {
     evaluate: ({ net }) => {
-      const summaries = new Set(net.every.filter(a => a.type === 'summary').map(a => a.id))
-      const bad = net.rawLinks.filter(l => summaries.has(l.from) || summaries.has(l.to))
+      const { summaries, links: bad } = summaryLinks(net)
       return {
         result: bad.length ? 'warning' : 'pass',
         metric: summaries.size ? `${plural(bad.length, 'relationship')} on ${plural(summaries.size, 'summary activity', 'summary activities')}` : 'no WBS summary activities in the network',
-        evidence: uniq(bad.map(l => `${net.code(l.from)} → ${net.code(l.to)}`)),
+        evidence: uniq(bad.map(l => linkText(net, l))),
         recommendation: bad.length ? 'Move each listed relationship down to the detailed activities it really connects.' : 'No action needed.',
       }
     },
@@ -434,7 +416,7 @@ export const GAO_RULES: RuleDef[] = [
     threshold: cfg => gt(cfg, 'highFloatMaxPct', 'float.high_share_pct', '%', 'max'),
     parameters: cfg => [gt(cfg, 'highFloatDays', 'float.high_days', 'days', 'max')],
     evaluate: ({ net, cfg }, t) => {
-      const withTf = net.open.map(a => ({ a, tf: net.totalFloat(a) })).filter((x): x is { a: AnalyzableActivity; tf: number } => x.tf !== null)
+      const withTf = openFloats(net)
       if (!withTf.length) return notAssessable('Total float is not available.')
       const high = withTf.filter(x => x.tf > cfg.gao.highFloatDays)
       const over = sharePct(high.length, withTf.length) > t!.value
@@ -454,7 +436,7 @@ export const GAO_RULES: RuleDef[] = [
   }, {
     threshold: () => threshold('float.negative_count', 0, 'count', 'max', 'runf9_default'),
     evaluate: ({ net }) => {
-      const withTf = net.open.map(a => ({ a, tf: net.totalFloat(a) })).filter((x): x is { a: AnalyzableActivity; tf: number } => x.tf !== null)
+      const withTf = openFloats(net)
       if (!withTf.length) return notAssessable('Total float is not available.')
       const neg = withTf.filter(x => x.tf < 0)
       return {
@@ -534,14 +516,7 @@ export const GAO_RULES: RuleDef[] = [
     evaluate: ({ net }) => {
       if (!net.all.some(hasProgress)) return notAssessable('No progress has been recorded yet.')
       if (!net.links.length) return notAssessable('The schedule has no logic.')
-      const off: string[] = []
-      for (const l of net.links) {
-        const p = net.byId.get(l.from), s = net.byId.get(l.to)
-        if (!p || !s || !isValidDate(s.actualStart)) continue
-        const sStart = toDayNumber(s.actualStart)
-        if (l.type === 'FS' && (!isValidDate(p.actualFinish) ? !net.isComplete(p) : toDayNumber(p.actualFinish) > sStart)) off.push(`${p.code} → ${s.code}`)
-        else if (l.type === 'SS' && (!isValidDate(p.actualStart) || toDayNumber(p.actualStart) > sStart)) off.push(`${p.code} → ${s.code} (SS)`)
-      }
+      const off = outOfSequence(net)
       return {
         result: off.length ? 'warning' : 'pass',
         metric: `${plural(off.length, 'relationship')} progressed out of sequence`,

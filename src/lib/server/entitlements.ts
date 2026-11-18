@@ -38,5 +38,5 @@ export const entitlementsFor = (plan: string | null | undefined): Entitlements =
 export const defaultPlan = (): PlanId => isPlanId(process.env.RUNF9_DEFAULT_PLAN) ? process.env.RUNF9_DEFAULT_PLAN as PlanId : 'free'
 
 export function requireFeature(plan: string, ok: boolean, what: string): void {
-  if (!ok) throw new ApiError(402, `${what} isn't included in the ${entitlementsFor(plan).label} plan. Upgrade to use it (Organization → Plan).`, 'plan_limit', { plan })
+  if (!ok) throw new ApiError(402, `${what} isn't included in your organization's license. To add it, contact support@hoshmand.ai.`, 'plan_limit', { plan })
 }

@@ -986,7 +986,7 @@ function RiskPanel({ r, state, onRun: run }: { r: Sra | null; state: SraState; o
         {state === 'running' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}{r ? 'Run again' : 'Run simulation'}
       </button>}
       {!r && state !== 'running' && <p className="text-caption text-warm-600">Simulates the whole network hundreds of times with realistic ranges for every activity, to show how likely each finish date is and which activities drive the risk.</p>}
-      {state === 'locked' && <p role="status" className="text-body text-warm-700">Monte Carlo risk analysis is included in the Pro and Enterprise plans. An admin can change the plan under Organization → Plan.</p>}
+      {state === 'locked' && <p role="status" className="text-body text-warm-700">Monte Carlo risk analysis is not included in your organization's license. To add it, contact support@hoshmand.ai.</p>}
       {state === 'error' && <p role="alert" className="text-body text-status-at-risk">The simulation could not run. Try again.</p>}
       {r && (
         <div className="space-y-4">

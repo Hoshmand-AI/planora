@@ -9,7 +9,9 @@ import { DEFAULT_GAO_THRESHOLDS, normalizeGaoThresholds, type GaoThresholds } fr
 import { DCMA_DISCLAIMER, DCMA_RULES, DCMA_VERSION } from './dcma-pack'
 import { GAO_DISCLAIMER, GAO_RULES, GAO_VERSION } from './gao'
 import { buildNetwork, type Network } from './network'
+import { PMI_DISCLAIMER, PMI_RULES, PMI_VERSION } from './pmi'
 import type { EngineConfig, RuleDef } from './rule'
+import { USACE_DISCLAIMER, USACE_RULES, USACE_VERSION } from './usace'
 import {
   CHARACTERISTICS, CHARACTERISTIC_LABELS, EVIDENCE_LIMIT, FRAMEWORK_LABELS,
   type Framework, type FrameworkResult, type GroupResult, type RuleResult, type RuleResultStatus,
@@ -20,8 +22,13 @@ export const ENGINE_VERSION = '1.0.0'
 export const COMPOSITE_VERSION = 'RunF9 Composite 1.0'
 export const COMPOSITE_DISCLAIMER = 'RunF9 Composite applies the GAO screening checks and the DCMA 14-point checks side by side. Each finding keeps the framework, edition and threshold it came from; where two sources set different thresholds for the same measure, both results are shown and the difference is listed as a conflict rather than blended. This automated scan is not a GAO assessment, a DCMA review or a compliance determination.'
 export const RUN_DISCLAIMER = 'Automated scan of schedule data. Results come only from deterministic rules; nothing here is decided by an AI model. It is not a GAO compliance determination or a substitute for a scheduler\'s or auditor\'s review.'
+// RUN_DISCLAIMER is stored with every run and is the same for every framework; each framework's own
+// limits (what it is drawn from, who it is not endorsed by) are in its FrameworkResult.disclaimer.
 
-export const RULE_PACKS: Record<'GAO_SCHEDULE_GUIDE' | 'DCMA_14', RuleDef[]> = { GAO_SCHEDULE_GUIDE: GAO_RULES, DCMA_14: DCMA_RULES }
+/** The rule packs, one per source. RunF9 Composite is GAO + DCMA only; the other packs run on their own. */
+export const RULE_PACKS: Record<'GAO_SCHEDULE_GUIDE' | 'DCMA_14' | 'USACE_UFGS' | 'PMI_SCHEDULING', RuleDef[]> = {
+  GAO_SCHEDULE_GUIDE: GAO_RULES, DCMA_14: DCMA_RULES, USACE_UFGS: USACE_RULES, PMI_SCHEDULING: PMI_RULES,
+}
 
 export function engineConfig(o: { gao?: Partial<GaoThresholds> | null; dcma?: Partial<DcmaRules> | null } = {}): EngineConfig {
   return { gao: normalizeGaoThresholds({ ...DEFAULT_GAO_THRESHOLDS, ...(o.gao || {}) }), dcma: normalizeDcmaRules({ ...DEFAULT_DCMA_RULES, ...(o.dcma || {}) }) }
@@ -29,10 +36,11 @@ export function engineConfig(o: { gao?: Partial<GaoThresholds> | null; dcma?: Pa
 
 /** Rules a framework applies, in order. */
 export function rulesOf(fw: Framework): RuleDef[] {
-  if (fw === 'GAO_SCHEDULE_GUIDE') return GAO_RULES
-  if (fw === 'DCMA_14') return DCMA_RULES
+  // The composite stays GAO + DCMA: adding a pack to it would change its rules version and make
+  // stored composite runs incomparable with new ones.
   if (fw === 'RUNF9_COMPOSITE') return [...GAO_RULES, ...DCMA_RULES]
-  return []
+  if (fw === 'CUSTOMER') return []
+  return RULE_PACKS[fw]
 }
 
 const emptyCounts = (): Record<RuleResultStatus, number> => ({ pass: 0, fail: 0, warning: 0, not_assessable: 0 })
@@ -137,23 +145,33 @@ export function rulesVersionOf(frameworks: Framework[], cfg: EngineConfig): stri
   return stableHash(canonical({ engine: ENGINE_VERSION, frameworks: [...frameworks].sort(), rules: body }))
 }
 
-function frameworkVersionOf(fw: Framework): string {
-  return fw === 'GAO_SCHEDULE_GUIDE' ? GAO_VERSION : fw === 'DCMA_14' ? DCMA_VERSION : fw === 'RUNF9_COMPOSITE' ? COMPOSITE_VERSION : 'n/a'
+const FRAMEWORK_INFO: Record<Framework, { version: string; disclaimer: string; groupBy: FrameworkResult['groupBy'] }> = {
+  RUNF9_COMPOSITE: { version: COMPOSITE_VERSION, disclaimer: COMPOSITE_DISCLAIMER, groupBy: 'characteristic' },
+  GAO_SCHEDULE_GUIDE: { version: GAO_VERSION, disclaimer: GAO_DISCLAIMER, groupBy: 'characteristic' },
+  DCMA_14: { version: DCMA_VERSION, disclaimer: DCMA_DISCLAIMER, groupBy: 'category' },
+  USACE_UFGS: { version: USACE_VERSION, disclaimer: USACE_DISCLAIMER, groupBy: 'category' },
+  PMI_SCHEDULING: { version: PMI_VERSION, disclaimer: PMI_DISCLAIMER, groupBy: 'category' },
+  CUSTOMER: { version: 'n/a', disclaimer: COMPOSITE_DISCLAIMER, groupBy: 'characteristic' },
+}
+
+export function frameworkVersionOf(fw: Framework): string {
+  return FRAMEWORK_INFO[fw].version
 }
 
 export function runFramework(fw: Framework, net: Network, cfg: EngineConfig): FrameworkResult {
   const results = rulesOf(fw).map(r => evaluateRule(r, net, cfg))
   const counts = countsOf(results)
+  const info = FRAMEWORK_INFO[fw]
   return {
     framework: fw,
     frameworkVersion: frameworkVersionOf(fw),
     label: FRAMEWORK_LABELS[fw],
-    groupBy: fw === 'DCMA_14' ? 'category' : 'characteristic',
-    groups: fw === 'DCMA_14' ? byCategory(results) : byCharacteristic(results),
+    groupBy: info.groupBy,
+    groups: info.groupBy === 'category' ? byCategory(results) : byCharacteristic(results),
     counts,
     score: scoreOf(counts),
     conflicts: fw === 'RUNF9_COMPOSITE' ? detectConflicts(results) : [],
-    disclaimer: fw === 'GAO_SCHEDULE_GUIDE' ? GAO_DISCLAIMER : fw === 'DCMA_14' ? DCMA_DISCLAIMER : COMPOSITE_DISCLAIMER,
+    disclaimer: info.disclaimer,
   }
 }
 

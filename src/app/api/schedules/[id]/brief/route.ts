@@ -6,7 +6,7 @@ import { hit } from '@/lib/server/rate-limit'
 import { isRestrictedClassification, scheduleClassification } from '@/lib/server/classification'
 import { getScheduleById } from '@/lib/db'
 import { registerKey } from '@/lib/server/register'
-import { BRIEF_AUDIENCES, briefEmailSubject, briefEmailText, getSubscription, subscribe, unsubscribe } from '@/lib/server/brief-digest'
+import { BRIEF_AUDIENCES, briefEmail, briefEmailSubject, getSubscription, subscribe, unsubscribe } from '@/lib/server/brief-digest'
 import { loadDailyBrief } from '@/lib/server/brief-service'
 
 /**
@@ -43,7 +43,7 @@ export const POST = api<{ id: string }>({ permission: 'read' }, async (req, { pa
   if (!rl.ok) throw new ApiError(429, 'Too many briefs emailed this hour. Try again later.', 'rate_limited', { retryAfterSec: rl.retryAfterSec })
   const out = await loadDailyBrief(params.id, auth.orgId, { asOf: typeof b.asOf === 'string' ? b.asOf : null, tzOffsetMinutes: tzOffset(b.tz) })
   if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const r = await sendEmail({ to: auth.email, subject: briefEmailSubject(out), text: briefEmailText(out, audience, appOrigin(req)) })
+  const r = await sendEmail({ to: auth.email, subject: briefEmailSubject(out), ...briefEmail(out, audience, appOrigin(req)) })
   if (!r.sent) return NextResponse.json({ error: 'The email could not be sent. Try again, or use "Copy to send".', code: 'email_failed' }, { status: 502 })
   await audit({ action: 'brief.emailed', targetType: 'schedule', targetId: out.schedule.id, detail: { schedule: out.schedule.name, audience, asOf: out.brief.asOf } })
   return NextResponse.json({ sent: true })

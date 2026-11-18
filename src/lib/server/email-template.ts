@@ -19,7 +19,8 @@ export interface EmailContent {
   footnote?: string
 }
 
-const T = {
+/** The colours every RunF9 email is drawn in (the app's tokens, as values a mail client can read). */
+export const T = {
   page: '#F4F5F6',
   card: '#FFFFFF',
   line: '#E2E6E6',
@@ -28,12 +29,15 @@ const T = {
   muted: '#4B5056',
   accent: '#2B63C1',
   accentHover: '#1F4E9E',
+  /** The dark band behind the wordmark (navy-950) and the quiet text on it (navy-200) */
+  band: '#0C2340',
+  onBand: '#D3D6D9',
 }
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-const SANS = `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'DM Sans', Helvetica, Arial, sans-serif`
-const DISPLAY = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'DM Sans', Helvetica, Arial, sans-serif`
+export const SANS = `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'DM Sans', Helvetica, Arial, sans-serif`
+export const DISPLAY = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'DM Sans', Helvetica, Arial, sans-serif`
 
 export function renderEmail(c: EmailContent, origin: string): { html: string; text: string } {
   const base = origin.replace(/\/$/, '')
