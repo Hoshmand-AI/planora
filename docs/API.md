@@ -40,6 +40,9 @@ curl -H "Authorization: Bearer pk_live_…" https://runf9.ai/api/portfolio
 | GET | `/api/schedules/compare?id=…&base=…[&format=csv\|xlsx]` | read-only | Update-to-update comparison; without `base`, the project's stored comparison schedule, else the latest upload with an earlier data date; `base=baseline` compares with the stored baseline. The response's `kept` names both. `format=csv` downloads the activity-level differences, `format=xlsx` a workbook with a sheet per change category. Comparing a schedule with itself (same id or identical file) is `400` (`same_schedule`) |
 | GET | `/api/schedules/{id}/roles` | read | The uploads the project keeps to compare against: `baseline`, `comparison`, and the `series` to choose from |
 | PUT | `/api/schedules/{id}/roles` | schedule.write | `{ baselineScheduleId?, comparisonScheduleId? }` (an upload of this project, or null to clear). The baseline is applied to every upload dated on or after it and to each new upload. Audited as `schedule.project_baseline` and `schedule.project_comparison` |
+| GET | `/api/programs` | read | Programs (master schedules): `id`, `name`, number of `projects` |
+| GET | `/api/programs/{id}` | read | One program's master schedule. `master.rows` has one row per project with a cell per standard milestone: the contractor's `date` (read from the project's newest upload by activity ID, never stored), `actual`, `baseline`, `previous`, `varianceDays`, `movedDays` and the separate `ownerForecast`. Each row carries its source upload and a data `status` (`current`, `provisional`, `stale`, `expired`, `none`). Also `master.sectors`, `master.parties` (what other parties owe) and `lookAhead` (next 90 days). `?asOf=YYYY-MM-DD` sets the day data age is counted to |
+| GET | `/api/programs/{id}/export` | read | A printout as CSV: `?report=milestones` (default), `phases`, `sectors`, `lookahead`, `parties` or `updates`. Audited as `program.exported` |
 | GET | `/api/schedules/windows?id=…[&format=csv\|xlsx]` | read-only | Windows analysis of the update series `id` belongs to: per consecutive pair, data dates, finish-milestone movement, driving-path start/end and the movement split into progress, added/deleted activities and revisions (logic, durations, constraints, calendars) by half-step recalculation; plus the finish-float / BEI trend |
 | GET | `/api/schedules/{id}/evm[?format=xlsx]` | read-only | Earned value (BAC, PV, EV, AC, SV, CV, SPI, CPI, EAC by the CPI and CPI×SPI methods, ETC, VAC, TCPI, earned schedule SPI(t)/SV(t)) per update and WBS node, against the upload's resolved baseline, with the costs read from the stored original file (P6 resource assignments and expenses, MS Project cost fields, cost columns) and integrity checks oriented to ANSI/EIA-748 principles. Only real cost data is used: `status` is `not_available` with the missing inputs listed, or `partial` (no actual costs: PV/EV/SPI only, CPI never computed) |
 | GET | `/api/schedules/evm?id=…` | read-only | Earned value trend of the update series `id` belongs to, one point per data date (a same-date reissue supersedes the earlier upload) |
@@ -95,6 +98,23 @@ A photo, a voice note and a few words taken on site, filed under the project (th
 | POST | `/api/schedules/{id}/captures` | site.capture (every role but viewer) | Multipart: `status` (`progress`, `complete`, `not_started`, `issue`), `note`, `activityCodes` (JSON list), `level`, `room`, `lat`, `lng`, `accuracyM`, `takenAt`, up to 4 `photo` files (JPEG, PNG, WebP) and one `audio` file. Files are typed from their bytes; anything else is refused. Audited as `site.capture_created` (sizes and place, never the note). `authorId` (optional): the member who took it; 403 `capture_author` if that is not the signed-in member. Send `clientId` (8 to 64 letters, digits or hyphens, made on the device) to make a retry safe: the same `clientId` again returns the stored capture with `alreadySent: true`, or 410 if it was deleted since. 409 `classified_on_commercial_cloud` on a project marked classified |
 | GET | `/api/schedules/{id}/captures/{captureId}/media/{mediaId}` | read | The photo or voice note (byte ranges supported; `ETag`, and the browser must ask before reusing its copy) |
 | DELETE | `/api/schedules/{id}/captures/{captureId}` | site.capture; your own capture, or any with scheduler rights | Erases the files and the words; audited as `site.capture_deleted` |
+
+### Program master schedule: changes (session only)
+
+Reading a program accepts an API key (see the table above). Changing one needs a signed-in member with `schedule.write`; every change is audited (`program.*`).
+
+| Method | Path | Body |
+|---|---|---|
+| POST | `/api/programs` | `{ name }`. The program starts with a standard milestone list to edit |
+| PATCH | `/api/programs/{id}` | `{ name?, milestones?: [{ key?, name, phase }] }`. Keys are kept when sent and made for new milestones |
+| DELETE | `/api/programs/{id}` | The projects' schedules are untouched |
+| POST | `/api/programs/{id}/projects` | `{ scheduleId, sector?, location?, contractor? }`. Any upload of the project; the program follows the project, so later uploads are read without anyone adding them |
+| GET | `/api/programs/{id}/projects/{projectId}` | `{ suggestions }`: for unmapped milestones, the milestone activity of the newest upload with the closest name. Nothing is mapped until accepted |
+| PATCH | `/api/programs/{id}/projects/{projectId}` | `{ sector?, location?, contractor?, mapping?: { [milestoneKey]: { code, use: 'start' \| 'finish' } \| null }, ownerForecasts?: { [milestoneKey]: { date, note? } \| null } }`. A mapping names the contractor activity a milestone reads; a date sent with it is ignored |
+| DELETE | `/api/programs/{id}/projects/{projectId}` | Takes the project out of the program, with the items filed under it |
+| GET | `/api/programs/{id}/projects/{projectId}/activities?q=` | Activities of the newest upload to choose from, milestones first |
+| POST | `/api/programs/{id}/items` | `{ party, title, projectId?, milestoneKey?, needDate?, forecastDate?, actualDate?, note? }`: what a party other than the contractor owes |
+| PATCH, DELETE | `/api/programs/{id}/items?itemId=` | Change or delete one item |
 
 ### Site plans (session only)
 

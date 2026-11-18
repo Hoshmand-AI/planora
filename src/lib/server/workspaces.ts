@@ -165,6 +165,9 @@ export async function assignToWorkspace(orgId: string, item: { type: 'schedule' 
           await q('DELETE FROM project_schedule_roles d WHERE d.org_id=$1 AND d.project_key=$3 AND EXISTS (SELECT 1 FROM project_schedule_roles s WHERE s.org_id=$1 AND s.project_key=$2)', [orgId, from, to])
           await q('UPDATE project_schedule_roles SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
           await q('UPDATE project_mailboxes SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
+          // A program names the project by the same key; where the program already holds the destination, the moved row gives way.
+          await q('DELETE FROM program_projects d WHERE d.org_id=$1 AND d.project_key=$2 AND EXISTS (SELECT 1 FROM program_projects x WHERE x.org_id=$1 AND x.project_key=$3 AND x.program_id=d.program_id)', [orgId, from, to])
+          await q('UPDATE program_projects SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
           await q('DELETE FROM brief_subscriptions b WHERE b.org_id=$1 AND b.project_key=$2 AND EXISTS (SELECT 1 FROM brief_subscriptions x WHERE x.org_id=$1 AND x.project_key=$3 AND x.user_id=b.user_id)', [orgId, from, to])
           await q('UPDATE brief_subscriptions SET project_key=$3 WHERE org_id=$1 AND project_key=$2', [orgId, from, to])
         }
