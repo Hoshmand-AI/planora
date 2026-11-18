@@ -8,7 +8,7 @@ export const STANDARDS_AI_INSTRUCTIONS = [
   'The results below were computed by RunF9\'s deterministic rules engine and are authoritative.',
   'Explain them; do not re-judge, re-score, upgrade or downgrade any result, and do not add findings of your own.',
   'Cite the ruleId (for example GAO-BP2-01 or DCMA-06) for every statement about a result.',
-  'Do not describe the scan as a GAO assessment or a compliance determination.',
+  'Do not describe the scan as a GAO assessment or a compliance determination, and do not say a schedule complies with, conforms to or is endorsed under any framework.',
 ].join(' ')
 
 /** Plain-text summary of a run for a model prompt: one line per rule, with its ruleId and result. */
@@ -32,6 +32,6 @@ export function standardsPromptContext(run: StandardsRunOutput, opts: { maxEvide
 /** ruleIds a model's text cites that are not in the run (an explanation must not invent rules). */
 export function unknownRuleCitations(text: string, run: StandardsRunOutput): string[] {
   const known = new Set(run.frameworks.flatMap(f => f.groups.flatMap(g => g.rules.map(r => r.ruleId))))
-  const cited = text.match(/\b(?:GAO-BP\d{1,2}-\d{2}|DCMA-\d{2}|CUST-[A-Z0-9-]+)\b/g) ?? []
+  const cited = text.match(/\b(?:GAO-BP\d{1,2}-\d{2}|DCMA-\d{2}|USACE-\d{2}|PMI-\d{2}|CUST-[A-Z0-9-]+)\b/g) ?? []
   return Array.from(new Set(cited.filter(c => !known.has(c))))
 }

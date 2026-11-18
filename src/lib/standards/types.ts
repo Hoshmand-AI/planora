@@ -10,15 +10,17 @@
 //   assessment_metric     a published numeric test used to assess schedules (e.g. the DCMA 14-point)
 //   recommended_practice  a practice RunF9 recommends that no cited source prescribes numerically
 //   contract_requirement  a requirement from the customer's contract or specification
+//   guide_specification   a rule from a published guide specification (e.g. UFGS 01 32 01.00 10) that
+//                         binds a project only when it is written into that project's contract
 // Professional credentials (PSP, PMI-SP and the like) are certifications of people, never standards,
 // and are never used as a rule's framework or kind.
 
 import type { AnalyzableSchedule, CpmResult } from '@/lib/planning/types'
 
-export const FRAMEWORKS = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'CUSTOMER'] as const
+export const FRAMEWORKS = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'USACE_UFGS', 'PMI_SCHEDULING', 'CUSTOMER'] as const
 export type Framework = typeof FRAMEWORKS[number]
 /** Frameworks a user can run today (CUSTOMER packs are reserved for contract-specific rules). */
-export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
+export const RUNNABLE_FRAMEWORKS: readonly Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'USACE_UFGS', 'PMI_SCHEDULING']
 export const isFramework = (v: unknown): v is Framework => typeof v === 'string' && (FRAMEWORKS as readonly string[]).includes(v)
 export const isRunnableFramework = (v: unknown): v is Framework => typeof v === 'string' && (RUNNABLE_FRAMEWORKS as readonly string[]).includes(v)
 
@@ -26,15 +28,18 @@ export const FRAMEWORK_LABELS: Record<Framework, string> = {
   RUNF9_COMPOSITE: 'RunF9 Composite',
   GAO_SCHEDULE_GUIDE: 'GAO Schedule Assessment Guide',
   DCMA_14: 'DCMA 14-point assessment',
+  USACE_UFGS: 'USACE UFGS 01 32 01.00 10 (Project Schedule)',
+  PMI_SCHEDULING: 'PMI Practice Standard for Scheduling',
   CUSTOMER: 'Customer contract requirements',
 }
 
-export type RuleKind = 'standard_guidance' | 'assessment_metric' | 'recommended_practice' | 'contract_requirement'
+export type RuleKind = 'standard_guidance' | 'assessment_metric' | 'recommended_practice' | 'contract_requirement' | 'guide_specification'
 export const RULE_KIND_LABELS: Record<RuleKind, string> = {
   standard_guidance: 'Standard guidance',
   assessment_metric: 'Assessment metric',
   recommended_practice: 'Recommended practice',
   contract_requirement: 'Contract requirement',
+  guide_specification: 'Guide specification',
 }
 
 /** The four characteristics the GAO guide groups its ten best practices under. */
@@ -83,7 +88,7 @@ export interface RuleMeta {
   frameworkVersion: string
   kind: RuleKind
   category: string
-  /** GAO characteristic (for DCMA rules: the characteristic the composite profile files them under) */
+  /** GAO characteristic (for DCMA rules: the characteristic the composite profile files them under; packs grouped by category leave it out) */
   characteristic?: Characteristic
   /** GAO best practice number 1–10 */
   bestPractice?: number

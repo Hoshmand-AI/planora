@@ -10,14 +10,18 @@ import {
 } from '@/lib/standards/types'
 import type { StoredRun, StoredRunSummary } from '@/lib/standards/store'
 
-type Choice = 'RUNF9_COMPOSITE' | 'GAO_SCHEDULE_GUIDE' | 'DCMA_14' | 'multiple'
+type Choice = 'RUNF9_COMPOSITE' | 'GAO_SCHEDULE_GUIDE' | 'DCMA_14' | 'USACE_UFGS' | 'PMI_SCHEDULING' | 'multiple'
 const CHOICES: { value: Choice; label: string; hint: string }[] = [
   { value: 'RUNF9_COMPOSITE', label: 'RunF9 Composite (recommended)', hint: 'GAO screening checks and DCMA 14-point side by side, with any threshold conflicts listed.' },
   { value: 'GAO_SCHEDULE_GUIDE', label: 'GAO Schedule Assessment Guide', hint: 'The ten best practices, grouped under the four characteristics.' },
   { value: 'DCMA_14', label: 'DCMA 14-point', hint: 'The 14 DCMA assessment metrics.' },
+  { value: 'USACE_UFGS', label: FRAMEWORK_LABELS.USACE_UFGS, hint: 'Checks drawn from the Army Corps guide specification for project schedules. Your contract\'s edited specification governs.' },
+  { value: 'PMI_SCHEDULING', label: FRAMEWORK_LABELS.PMI_SCHEDULING, hint: 'Checks drawn from the schedule analysis items in section 3.4. Every numeric limit is a RunF9 default.' },
   { value: 'multiple', label: 'Several frameworks', hint: 'Choose two or more to run separately.' },
 ]
-const SINGLE: Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14']
+const SINGLE: Framework[] = ['RUNF9_COMPOSITE', 'GAO_SCHEDULE_GUIDE', 'DCMA_14', 'USACE_UFGS', 'PMI_SCHEDULING']
+/** Frameworks whose limits (what the checks are drawn from, who governs) are shown open, above the results. */
+const DISCLAIMER_OPEN: Framework[] = ['USACE_UFGS', 'PMI_SCHEDULING']
 
 const RESULT_UI: Record<RuleResultStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
   pass: { label: 'Pass', cls: 'text-status-on-track', Icon: CheckCircle2 },
@@ -36,6 +40,9 @@ const METRIC_LABEL: Record<string, string> = {
   'duration.long_share_pct': 'Activities with a long duration',
   'duration.long_days': 'Long-duration limit',
   'constraints.hard_share_pct': 'Activities with a hard constraint',
+  'constraints.mandatory_count': 'Activities with a mandatory or zero-float constraint',
+  'logic.open_ends_count': 'Activities missing a predecessor or successor',
+  'logic.sf_count': 'Start-to-finish relationships',
   'resources.loaded_pct': 'Activities with resources or cost',
   'wbs.coverage_pct': 'Activities assigned to the WBS',
   'trace.unlinked_to_finish_pct': 'Activities with no path to the finish',
@@ -203,6 +210,10 @@ function FrameworkView({ f }: { f: FrameworkResult }) {
         </div>
       </div>
 
+      {DISCLAIMER_OPEN.includes(f.framework) && (
+        <p role="note" className="mt-3 text-caption text-warm-700 border-l-2 border-warm-300 pl-3 max-w-3xl">{f.disclaimer}</p>
+      )}
+
       <div className="mt-4 space-y-5">
         {f.groups.map(g => {
           const open = g.rules.filter(r => r.result !== 'pass')
@@ -239,9 +250,11 @@ function FrameworkView({ f }: { f: FrameworkResult }) {
             <p className="text-caption text-warm-700 mt-1.5">{f.conflicts[0].resolution}</p>
           </Disclosure>
         )}
-        <Disclosure title="About this framework">
-          <p className="text-caption text-warm-700 max-w-3xl">{f.disclaimer}</p>
-        </Disclosure>
+        {!DISCLAIMER_OPEN.includes(f.framework) && (
+          <Disclosure title="About this framework">
+            <p className="text-caption text-warm-700 max-w-3xl">{f.disclaimer}</p>
+          </Disclosure>
+        )}
       </div>
     </section>
   )

@@ -67,7 +67,7 @@ const ORG_TABS: { id: OrgTab; label: string }[] = [
   { id: 'integrations', label: 'Integrations' }, { id: 'audit', label: 'Audit log' },
 ]
 
-const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point']] as const
+const STANDARD_FRAMEWORK_OPTIONS = [['RUNF9_COMPOSITE', 'RunF9 Composite (recommended)'], ['GAO_SCHEDULE_GUIDE', 'GAO Schedule Assessment Guide'], ['DCMA_14', 'DCMA 14-point'], ['USACE_UFGS', 'USACE UFGS 01 32 01.00 10 (Project Schedule)'], ['PMI_SCHEDULING', 'PMI Practice Standard for Scheduling']] as const
 
 export default function OrgPage() {
   const router = useRouter()
