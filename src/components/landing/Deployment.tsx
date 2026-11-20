@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { Cloud, Server, Database, Sparkles, ShieldCheck } from 'lucide-react'
 import { Reveal } from './motion'
+import { ANCHOR, Cta, PAD, primaryBtn, SectionHead, WRAP } from './Sections'
 
 interface Option {
   id: string
@@ -92,47 +93,45 @@ export default function Deployment({ primaryHref, primaryLabel }: { primaryHref:
     else if (e.key === 'Home') { e.preventDefault(); select(0) }
     else if (e.key === 'End') { e.preventDefault(); select(OPTIONS.length - 1) }
   }
-  const btn = 'pressable inline-flex items-center justify-center rounded-full bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors px-6 py-3 text-small'
-
   return (
-    <section id="deployment" aria-labelledby="deployment-h" className="max-w-[1240px] mx-auto px-6 pb-24 md:pb-36 scroll-mt-24">
-      <Reveal className="text-center mb-10 md:mb-12">
-        <h2 id="deployment-h" className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Run it where your data lives.</h2>
-        <p className="text-lead text-warm-600 mt-4 max-w-[640px] mx-auto">One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers.</p>
-      </Reveal>
-      <Reveal className="max-w-[880px] mx-auto">
-        <div role="tablist" aria-label="Where RunF9 runs" onKeyDown={onKey} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-warm-100 border border-warm-200 w-fit max-w-full mx-auto">
-          {OPTIONS.map((x, i) => (
-            <button
-              key={x.id} ref={el => { tabs.current[i] = el }} type="button" role="tab" id={`dep-tab-${x.id}`}
-              aria-selected={i === active} aria-controls="dep-panel" tabIndex={i === active ? 0 : -1}
-              onClick={() => setActive(i)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-small font-medium transition-colors ${i === active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
-            >{x.tab}</button>
-          ))}
-        </div>
-        <div id="dep-panel" role="tabpanel" aria-labelledby={`dep-tab-${o.id}`} className="mt-6 rounded-[28px] bg-white border border-warm-200 p-7 md:p-10">
-          <div key={o.id} className="rise-in">
-            <div className="flex flex-wrap items-center gap-3">
-              {o.id === 'onprem' ? <Server size={22} className="text-accent-600" aria-hidden /> : <Cloud size={22} className="text-accent-600" aria-hidden />}
-              <h3 className="text-h3 font-semibold tracking-[-0.01em] text-ink leading-tight">{o.title}</h3>
-              <span className={`text-caption font-semibold rounded-full px-2.5 py-1 ${o.status === 'Available now' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-accent-100 text-accent-700'}`}>{o.status}</span>
-            </div>
-            <dl className="mt-6 grid gap-5 md:grid-cols-3">
-              {ROW.map(r => (
-                <div key={r.key}>
-                  <dt className="flex items-center gap-2 text-fine font-semibold text-warm-600"><r.icon size={14} aria-hidden />{r.label}</dt>
-                  <dd className="mt-1.5 text-small leading-relaxed text-warm-700">{o[r.key]}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link href={primaryHref} className={btn}>{primaryLabel}</Link>
-              <p className="text-fine text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : <>Connect storage after you sign up, under Organization &gt; Cloud storage, or <Link href={`/deploy${o.id === 'mixed' ? '' : `#${o.id}`}`} className="text-accent-600 underline">run RunF9 in your own cloud</Link>.</>}</p>
+    <section id="deployment" aria-labelledby="deployment-h" className={`bg-white border-t border-warm-200 ${ANCHOR}`}>
+      <div className={`${WRAP} ${PAD}`}>
+        <SectionHead id="deployment-h" eyebrow="Your cloud" title="Run it where your data lives."
+          lead="One RunF9, the same features everywhere. Use our cloud, connect your own AWS, Azure or Google Cloud storage (a different one for each client if you need), or run it on your own servers." />
+        <Reveal className="mt-12 md:mt-16">
+          <div role="tablist" aria-label="Where RunF9 runs" onKeyDown={onKey} className="flex gap-1 overflow-x-auto p-1 rounded-full bg-warm-100 border border-warm-200 w-fit max-w-full">
+            {OPTIONS.map((x, i) => (
+              <button
+                key={x.id} ref={el => { tabs.current[i] = el }} type="button" role="tab" id={`dep-tab-${x.id}`}
+                aria-selected={i === active} aria-controls="dep-panel" tabIndex={i === active ? 0 : -1}
+                onClick={() => setActive(i)}
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-small font-medium transition-colors ${i === active ? 'bg-white text-ink shadow-sm' : 'text-warm-600 hover:text-ink'}`}
+              >{x.tab}</button>
+            ))}
+          </div>
+          <div id="dep-panel" role="tabpanel" aria-labelledby={`dep-tab-${o.id}`} className="mt-6 rounded-[28px] bg-warm-50 border border-warm-200 p-7 md:p-12">
+            <div key={o.id} className="rise-in">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                {o.id === 'onprem' ? <Server size={26} strokeWidth={1.6} className="text-accent-600" aria-hidden /> : <Cloud size={26} strokeWidth={1.6} className="text-accent-600" aria-hidden />}
+                <h3 className="text-h3 md:text-h2 font-semibold tracking-[-0.01em] md:tracking-[-0.02em] text-ink leading-tight">{o.title}</h3>
+                <span className={`text-caption font-semibold rounded-full px-2.5 py-1 ${o.status === 'Available now' ? 'bg-status-on-track-bg text-status-on-track' : 'bg-accent-100 text-accent-700'}`}>{o.status}</span>
+              </div>
+              <dl className="mt-8 grid gap-x-12 gap-y-8 md:grid-cols-3">
+                {ROW.map(r => (
+                  <div key={r.key} className="border-t border-warm-200 pt-5">
+                    <dt className="flex items-center gap-2 text-small font-semibold text-ink"><r.icon size={16} className="text-accent-600" aria-hidden />{r.label}</dt>
+                    <dd className="mt-2.5 text-copy leading-relaxed text-warm-700">{o[r.key]}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-4">
+                <Cta href={primaryHref} className={`${primaryBtn} px-6 py-3 text-small`}>{primaryLabel}</Cta>
+                <p className="text-small text-warm-600">{o.id === 'cloud' ? 'Hosted, updated and backed up by RunF9.' : o.id === 'onprem' ? 'Installed from the same container we run.' : <>Connect storage after you sign up, under Organization &gt; Cloud storage, or <Link href={`/deploy${o.id === 'mixed' ? '' : `#${o.id}`}`} className="font-semibold text-accent-700 underline underline-offset-4">run RunF9 in your own cloud</Link>.</>}</p>
+              </div>
             </div>
           </div>
-        </div>
-      </Reveal>
+        </Reveal>
+      </div>
     </section>
   )
 }
