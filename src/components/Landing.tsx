@@ -92,7 +92,8 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
             ))}
           </div>
           <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
-            <Link href="/auth" className={`${secondaryBtn} px-4 py-2.5 text-small`}>Sign in</Link>
+            {/* By invitation: the top bar does not advertise a sign-in to people who have no account. Invited members reach it from their invitation and from the foot of the page. */}
+            {!inviteOnly && <Link href="/auth" className={`${secondaryBtn} px-4 py-2.5 text-small`}>Sign in</Link>}
             <Cta href={primaryHref} className={`${primaryBtn} gap-1.5 px-5 py-2.5 text-small`}>{primaryLabel}<ArrowRight size={16} aria-hidden /></Cta>
           </div>
           <button className="lg:hidden text-ink p-2 -mr-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
@@ -107,7 +108,7 @@ export default function Landing({ inviteOnly, accessRequestEmail }: { inviteOnly
                 <span aria-hidden className={`h-5 w-[3px] rounded-full ${current === id ? 'bg-accent-600' : 'bg-transparent'}`} />{label}
               </a>
             ))}
-            <Link href="/auth" className="flex items-center gap-3 py-3 text-copy text-ink border-b border-warm-200"><span aria-hidden className="h-5 w-[3px]" />Sign in</Link>
+            {!inviteOnly && <Link href="/auth" className="flex items-center gap-3 py-3 text-copy text-ink border-b border-warm-200"><span aria-hidden className="h-5 w-[3px]" />Sign in</Link>}
             <Cta href={primaryHref} className={`${primaryBtn} w-full mt-5 py-3 text-copy`}>{primaryLabel}</Cta>
           </div>
         )}

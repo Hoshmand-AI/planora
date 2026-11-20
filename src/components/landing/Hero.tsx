@@ -110,7 +110,7 @@ export default function Hero() {
                 {/* The verb keeps its comma or full stop on its own line */}
                 <span className="whitespace-nowrap"><button
                   type="button" data-compact aria-controls="hero-windows" aria-current={at === i ? 'true' : undefined} onClick={() => goTo(i)}
-                  className={`relative inline pb-1.5 transition-colors duration-300 ${at === i ? 'text-accent-600' : 'text-ink hover:text-accent-700'}`}
+                  className={`relative inline pb-1.5 uppercase tracking-[0.01em] transition-colors duration-300 ${at === i ? 'text-accent-600' : 'text-ink hover:text-accent-700'}`}
                 >
                   {w.verb}
                   <span aria-hidden className={`absolute inset-x-0 bottom-0 h-[3px] rounded-full overflow-hidden ${at === i ? 'bg-accent-400' : 'bg-warm-300'}`}>
