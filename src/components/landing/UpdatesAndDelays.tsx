@@ -1,9 +1,11 @@
 // "Every update. Every delay.": the monthly-update comparison and the Time Impact Analysis, which a
 // scheduler uses every month after the baseline. Every line here is backed by a test listed in
 // docs/marketing/CLAIMS-REGISTER.md (compare.test.ts, windows.test.ts, tia.test.ts).
+// Two columns divided by a hairline, not two boxed cards.
 
 import { GitCompareArrows, Timer } from 'lucide-react'
 import { Reveal } from './motion'
+import { ANCHOR, PAD, SectionHead, WRAP } from './Sections'
 
 const CARDS = [
   {
@@ -36,31 +38,23 @@ const CARDS = [
 
 export function UpdatesAndDelays() {
   return (
-    <section id="updates" className="bg-accent-100 border-y border-warm-200 scroll-mt-12">
-      <div className="max-w-[1240px] mx-auto px-6 py-16 md:py-24">
-      <Reveal className="max-w-[760px]">
-        <h2 className="text-h2 md:text-h1 font-bold tracking-[-0.02em] md:tracking-[-0.03em] text-ink leading-[1.1]">Every update. Every delay.</h2>
-        <p className="text-lead text-warm-600 mt-4 leading-snug">The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates.</p>
-      </Reveal>
-      <div className="grid md:grid-cols-2 gap-5 mt-12">
-        {CARDS.map(({ id, icon: Icon, title, lead, points, foot }, i) => (
-          <Reveal key={id} delay={i * 90} className="rounded-[22px] border border-warm-200 bg-white p-6 md:p-8 shadow-[0_1px_2px_rgb(29_33_37/0.06),0_14px_32px_-24px_rgb(29_33_37/0.16)]">
-            <div id={`updates-${id}`} className="flex items-center gap-3">
-              <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent-100 text-accent-700"><Icon size={20} aria-hidden /></span>
-              <h3 className="text-h3 font-semibold text-ink tracking-[-0.01em]">{title}</h3>
-            </div>
-            <p className="text-copy text-warm-700 leading-relaxed mt-4">{lead}</p>
-            <ul className="mt-4 space-y-2.5">
-              {points.map(p => (
-                <li key={p} className="flex gap-2.5 text-copy text-warm-700 leading-snug">
-                  <span aria-hidden className="mt-[7px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-600" />{p}
-                </li>
-              ))}
-            </ul>
-            <p className="text-small text-warm-700 mt-5 pt-4 border-t border-warm-200">{foot}</p>
-          </Reveal>
-        ))}
-      </div>
+    <section id="updates" aria-labelledby="updates-h" className={`bg-white border-y border-warm-200 ${ANCHOR}`}>
+      <div className={`${WRAP} ${PAD}`}>
+        <SectionHead id="updates-h" eyebrow="Updates and delays" title="Every update. Every delay."
+          lead="The baseline is the first week. RunF9 keeps working every month after it: what changed, why the finish moved, and what a delay does to the dates." />
+        <div className="mt-14 md:mt-20 grid md:grid-cols-2 gap-y-14 md:divide-x md:divide-warm-200">
+          {CARDS.map(({ id, icon: Icon, title, lead, points, foot }, i) => (
+            <Reveal key={id} delay={i * 110} className={i === 0 ? 'md:pr-12 lg:pr-16' : 'md:pl-12 lg:pl-16'}>
+              <span className="grid place-items-center w-11 h-11 rounded-xl bg-accent-100 text-accent-700"><Icon size={21} aria-hidden /></span>
+              <h3 id={`updates-${id}`} className="text-h3 md:text-h2 font-semibold text-ink tracking-[-0.01em] md:tracking-[-0.02em] mt-6">{title}</h3>
+              <p className="text-copy text-warm-700 leading-relaxed mt-3 max-w-[480px]">{lead}</p>
+              <ul className="mt-7 border-t border-warm-200">
+                {points.map(p => <li key={p} className="border-b border-warm-200 py-3.5 text-copy text-warm-700 leading-snug">{p}</li>)}
+              </ul>
+              <p className="text-small text-warm-600 mt-5 leading-relaxed">{foot}</p>
+            </Reveal>
+          ))}
+        </div>
       </div>
     </section>
   )

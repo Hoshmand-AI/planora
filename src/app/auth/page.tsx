@@ -145,7 +145,7 @@ function AuthForm() {
       <aside className="hidden lg:flex flex-col justify-between bg-navy-950 text-white p-12 xl:p-16">
         <Link href="/" aria-label="RunF9 home"><Logo variant="light" size="h-[36px]" /></Link>
         <div>
-          <p className="text-h1 font-semibold tracking-[-0.03em] leading-[1.1]">Construction schedules, analyzed and explained.</p>
+          <p className="text-h1 font-semibold tracking-[-0.03em] leading-[1.1]">Construction schedules, built, analyzed, compared, maintained and explained.</p>
           <span aria-hidden className="block h-[3px] w-24 rounded-full bg-accent-500 mt-8 mb-6" />
           <ul className="space-y-3 text-copy text-navy-200">
             <li>All 14 DCMA checks on every schedule, plus GAO checks.</li>
