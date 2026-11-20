@@ -95,4 +95,22 @@ describe('portfolio', () => {
     expect(p.totals).toMatchObject({ projects: 3, atRisk: 1, onTrack: 1, attention: 0 })
     expect(p.totals.alerts).toBe(1)
   })
+  it('gives every project an ID, who added it and when, from its first upload', () => {
+    const names = { u: 'Pat Program', u2: 'Bo Other' }
+    const series = [
+      sched({ id: 'aa11bb22-x', projectKey: 'ns-2026', name: 'North School', version: 'Baseline', uploadedAt: '2026-06-01T10:00:00Z', dataDate: '2026-06-01', userId: 'u2' }),
+      sched({ id: 'u2', projectKey: 'ns-2026', name: 'North School', version: 'Update 1', uploadedAt: '2026-09-01T10:00:00Z', dataDate: '2026-09-01', analysis: analysis({ mustFinishBy: '2027-08-01' }) }),
+      sched({ id: 'cc33dd44-y', projectKey: 'east clinic', name: 'East Clinic', userId: 'gone' }),
+    ]
+    const rows = buildPortfolio([plan({ id: 'ee55ff66-z', scheduleId: 'pub1' }), plan({ id: 'p2' })], series, TODAY, names).rows
+    const by = (t: string) => rows.find(r => r.title === t)!
+    // The file's own project ID, the first uploader and the first upload day; the latest update is what the row shows.
+    expect(by('North School')).toMatchObject({ id: 'u2', projectId: 'NS-2026', addedBy: 'Bo Other', addedAt: '2026-06-01T10:00:00.000Z', scheduleId: 'u2', required: '2027-08-01' })
+    // A series keyed by its name has no ID of its own: RunF9 assigns one. A member who left is not named.
+    expect(by('East Clinic')).toMatchObject({ projectId: 'RF-CC33DD', addedBy: null, scheduleId: 'cc33dd44-y' })
+    const plans = rows.filter(r => r.kind === 'plan')
+    expect(plans.find(r => r.id === 'ee55ff66-z')).toMatchObject({ projectId: 'RF-EE55FF', addedBy: 'Pat Program', addedAt: '2026-10-01T00:00:00.000Z', scheduleId: 'pub1' })
+    // A plan with no published schedule cannot be put on a master schedule.
+    expect(plans.find(r => r.id === 'p2')!.scheduleId).toBeNull()
+  })
 })

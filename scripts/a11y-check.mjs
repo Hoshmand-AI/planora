@@ -64,9 +64,10 @@ const PAGES = [
     await page.getByRole('button', { name: 'Search' }).click()
     await page.waitForSelector('text=Caution:')
   }],
-  // With an uploaded schedule: Home lists both projects (cards, then the table view) and the project page opens.
-  ['Home with projects', '/dashboard', async () => { await page.waitForSelector('ul li h2, ul li button'); await page.waitForTimeout(400) }],
-  ['Home table view', '/dashboard', async () => { await page.getByRole('button', { name: 'Table' }).click(); await page.waitForSelector('table'); await page.waitForTimeout(500) }],
+  // With an uploaded schedule: Home lists both projects in its table, the column order opens, a project is ticked for a master schedule, and the project page opens.
+  ['Home with projects', '/dashboard', async () => { await page.waitForSelector('table'); await page.waitForTimeout(400) }],
+  ['Home: column order', '/dashboard', async () => { await page.waitForSelector('table'); await page.getByRole('button', { name: 'Columns' }).click(); await page.getByRole('group', { name: 'Column order' }).waitFor() }],
+  ['Home: build a master schedule', '/dashboard', async () => { await page.waitForSelector('table'); await page.locator('tbody input[type=checkbox]:not([disabled])').first().check(); await page.getByRole('button', { name: 'Build a master schedule' }).click(); await page.getByRole('dialog').waitFor() }],
   ['Project site captures', '/dashboard/site', async () => { await page.getByRole('heading', { name: /Site captures/ }).waitFor() }],
   ['Project site map (no drawings yet)', '/dashboard/site', async () => { await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.getByRole('heading', { name: 'No drawings yet' }).waitFor() }],
   ['Project overview', '/dashboard/project', async () => { await page.waitForSelector('nav[aria-label="Project"]:visible'); await page.waitForSelector('text=What is driving the project') }],
@@ -94,7 +95,7 @@ const PAGES = [
   ['Master schedule: sectors', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Sectors' }).click(); await page.waitForSelector('#master-panel-sectors table') }],
   ['Master schedule: other parties', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Other parties' }).click(); await page.getByRole('button', { name: 'Add an item' }).click(); await page.getByLabel('Who owes it').waitFor() }],
   ['Master schedule: a milestone', '/dashboard/programs', async () => { await page.waitForSelector('table'); await page.locator('tbody td button').first().click(); await page.getByRole('dialog').waitFor(); await page.getByLabel('Activities in the newest upload').locator('button').first().waitFor() }],
-  ['Master schedule: set up', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Set up' }).click(); await page.getByRole('heading', { name: 'Standard milestones' }).waitFor() }],
+  ['Master schedule: settings', '/dashboard/programs', async () => { await page.getByRole('tab', { name: 'Settings' }).click(); await page.getByRole('heading', { name: 'Standard milestones' }).waitFor() }],
 ]
 
 let failed = 0

@@ -10,7 +10,7 @@ import { orderSeries } from '@/lib/analysis/compare'
 import { registerKey } from './register'
 import { currentWorkspaceAccess } from './workspace-scope'
 import {
-  buildMaster, DEFAULT_DICTIONARY, MAX_PARTY_ITEMS, MAX_PROGRAM_PROJECTS,
+  buildMaster, DEFAULT_DICTIONARY, dictionaryFromSchedules, MAX_PARTY_ITEMS, MAX_PROGRAM_PROJECTS, suggestMapping,
   type ActivityDates, type DictMilestone, type MappedRef, type MasterSchedule, type OwnerForecast, type PartyFields, type PartyItem, type ProjectInput, type UploadRef,
 } from '@/lib/analysis/master-schedule'
 
@@ -279,6 +279,51 @@ export async function milestoneActivities(orgId: string, scheduleId: string): Pr
   const res = await query(`SELECT ${ACT_COLS} FROM activities a JOIN schedules s ON s.id = a.schedule_id
     WHERE s.org_id=$1 AND a.schedule_id=$2 AND a.activity_id IS NOT NULL AND a.activity_type = 'milestone' ORDER BY a.early_finish NULLS LAST LIMIT 2000`, [orgId, scheduleId])
   return res.rows.map(toDates)
+}
+
+/**
+ * Adds the project of one schedule to a program and points the program's milestones at the activities of its
+ * newest upload whose names match (the same suggestions a person can accept one by one). Returns what happened.
+ */
+export async function addProjectWithMapping(orgId: string, program: Program, scheduleId: string, meta: { sector: string | null; location: string | null; contractor: string | null }): Promise<{ project: ProgramProject; name: string; mapped: number } | 'exists' | 'full' | 'unknown'> {
+  const schedules = await getSchedules(orgId)
+  const schedule = schedules.find(x => x.id === scheduleId)
+  if (!schedule) return 'unknown'
+  const added = await addProgramProject(orgId, program.id, { projectKey: registerKey(schedule), ...meta })
+  if (added === 'exists' || added === 'full') return added
+  const latest = await latestUploadOf(orgId, added)
+  const found = latest ? suggestMapping(program.dictionary, await milestoneActivities(orgId, latest.id)) : {}
+  const mapping = Object.fromEntries(Object.entries(found).map(([k, v]) => [k, { code: v.code, use: v.use }]))
+  const project = Object.keys(mapping).length ? (await updateProgramProject(orgId, program.id, added.id, { mapping })) ?? added : added
+  return { project, name: (latest ?? schedule).name, mapped: Object.keys(mapping).length }
+}
+
+/**
+ * A master schedule built from a group of schedules the reader picked: its standard milestones come from the
+ * schedules themselves (dictionaryFromSchedules), each project is added and every milestone that matches by name
+ * is pointed at its activity. Null at the limit of programs; schedules the reader cannot see are skipped, and
+ * 'none' when that leaves nothing.
+ */
+export async function buildProgramFromSchedules(orgId: string, name: string, scheduleIds: string[], by: { userId: string; name: string }): Promise<{ program: Program; projects: { name: string; mapped: number }[] } | 'none' | null> {
+  await initSchema()
+  const series = await visibleSeries(orgId)
+  const all = await getSchedules(orgId)
+  // One entry per project, whichever of its uploads was picked.
+  const keys = [...new Set(scheduleIds.map(id => all.find(x => x.id === id)).filter((x): x is Schedule => !!x).map(registerKey))]
+  const latest = keys.map(k => { const s = series.get(k) ?? []; return s[s.length - 1] }).filter((x): x is Schedule => !!x)
+  // Nothing the reader can see was picked: no empty master schedule is left behind.
+  if (!latest.length) return 'none'
+  const made = await createProgram(orgId, name, by)
+  if (!made) return null
+  const perProject = await Promise.all(latest.map(s => milestoneActivities(orgId, s.id)))
+  const dictionary = dictionaryFromSchedules(perProject, made.dictionary, () => `m_${randomUUID().slice(0, 8)}`)
+  const program = (await updateProgram(orgId, made.id, { dictionary })) ?? made
+  const projects: { name: string; mapped: number }[] = []
+  for (const s of latest) {
+    const r = await addProjectWithMapping(orgId, program, s.id, { sector: null, location: null, contractor: null })
+    if (typeof r !== 'string') projects.push({ name: r.name, mapped: r.mapped })
+  }
+  return { program, projects }
 }
 
 /** Everything about programs, for the organization's data export. */
