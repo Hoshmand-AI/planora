@@ -429,6 +429,46 @@ export function suggestMapping(dictionary: DictMilestone[], activities: Pick<Act
   return out
 }
 
+/** The most standard milestones a master built from the schedules themselves starts with. */
+export const MAX_AUTO_MILESTONES = 12
+export const OTHER_PHASE = 'Milestones'
+
+/**
+ * The standard milestones for a master built from a group of schedules. It keeps the standard list's milestones
+ * that at least one schedule has, in their order, then adds the milestones the schedules themselves share: a
+ * milestone activity name found in at least half of them (in the only one, when there is one), most shared and
+ * earliest first. With no milestone activity anywhere, the standard list is returned as it is.
+ */
+export function dictionaryFromSchedules(perProject: Pick<ActivityDates, 'code' | 'name' | 'type' | 'milestoneKind' | 'earlyFinish' | 'earlyStart' | 'actualFinish' | 'actualStart'>[][], standard: DictMilestone[], newKey: () => string): DictMilestone[] {
+  const projects = perProject.filter(p => p.length)
+  if (!projects.length) return standard
+  const suggested = projects.map(acts => suggestMapping(standard, acts))
+  const kept = standard.filter(m => suggested.some(sg => sg[m.key]))
+  const norm = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ')
+  const seen = new Map<string, { name: string; count: number; first: string }>()
+  projects.forEach((acts, i) => {
+    const taken = new Set(Object.values(suggested[i]).map(v => v.code))
+    const mine = new Set<string>()
+    for (const a of acts) {
+      if (a.type !== 'milestone' || taken.has(a.code) || !a.name.trim()) continue
+      const k = norm(a.name)
+      if (mine.has(k)) continue
+      mine.add(k)
+      const when = (a.actualFinish ?? a.earlyFinish ?? a.actualStart ?? a.earlyStart ?? '9999').slice(0, 10)
+      const e = seen.get(k)
+      if (e) { e.count++; if (when < e.first) e.first = when } else seen.set(k, { name: a.name.trim().replace(/\s+/g, ' ').slice(0, 80), count: 1, first: when })
+    }
+  })
+  const need = Math.max(1, Math.ceil(projects.length / 2))
+  const names = new Set(kept.map(m => m.name.toLowerCase()))
+  const extra = [...seen.values()].filter(e => e.count >= need && !names.has(e.name.toLowerCase()))
+    .sort((x, y) => y.count - x.count || x.first.localeCompare(y.first))
+    .slice(0, Math.max(0, MAX_AUTO_MILESTONES - kept.length))
+    .sort((x, y) => x.first.localeCompare(y.first))
+  const out = [...kept, ...extra.map(e => ({ key: newKey(), name: e.name, phase: OTHER_PHASE }))]
+  return out.length ? out : standard
+}
+
 /* ─── Printouts as tables (for the CSV download) ───────────────── */
 
 export type MasterReport = 'milestones' | 'phases' | 'sectors' | 'lookahead' | 'parties' | 'updates'

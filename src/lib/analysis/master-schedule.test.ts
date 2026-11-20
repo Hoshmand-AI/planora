@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildMaster, dataStatus, lookAhead, parseDictionary, parseMapping, parseOwnerForecasts, parsePartyFields, partyStatus, readDate, reportTable, suggestMapping,
-  EXPIRED_AFTER_DAYS, STALE_AFTER_DAYS, type ActivityDates, type DictMilestone, type PartyItem, type ProjectInput,
+  buildMaster, dataStatus, dictionaryFromSchedules, lookAhead, parseDictionary, parseMapping, parseOwnerForecasts, parsePartyFields, partyStatus, readDate, reportTable, suggestMapping,
+  DEFAULT_DICTIONARY, EXPIRED_AFTER_DAYS, MAX_AUTO_MILESTONES, STALE_AFTER_DAYS, type ActivityDates, type DictMilestone, type PartyItem, type ProjectInput,
 } from './master-schedule'
 
 const DICT: DictMilestone[] = [
@@ -273,5 +273,33 @@ describe('validating what a person typed', () => {
     expect(parsePartyFields({ party: 'Permitting', title: 'Permit', needDate: '2027-01-05', forecastDate: '', milestoneKey: 'ntp' }, true, DICT))
       .toEqual({ fields: { party: 'Permitting', title: 'Permit', needDate: '2027-01-05', forecastDate: null, milestoneKey: 'ntp' } })
     expect(parsePartyFields({ actualDate: '2027-01-05' }, false, DICT)).toEqual({ fields: { actualDate: '2027-01-05' } })
+  })
+})
+
+describe('a master built from the schedules themselves', () => {
+  let n = 0
+  const key = () => `auto${++n}`
+  const ms = (code: string, name: string, when: string) => act(code, { name, earlyFinish: when })
+  const a = [ms('M1', 'NTP Issued', '2027-01-04'), ms('M2', 'Roof Dry-In', '2027-06-01'), ms('M3', 'Substantial Completion', '2027-11-01'), ms('M4', 'Elevator Inspection', '2027-09-01'), act('T1', { type: 'task', name: 'Pour slab', earlyFinish: '2027-03-01' })]
+  const b = [ms('X1', 'Notice to Proceed', '2027-02-01'), ms('X2', 'Substantial completion', '2027-12-01'), ms('X3', 'elevator  inspection', '2027-10-01'), ms('X4', 'Owner Move-In', '2028-01-10')]
+  it('keeps the standard milestones a schedule has, in their order, then adds the ones the schedules share', () => {
+    const d = dictionaryFromSchedules([a, b], DEFAULT_DICTIONARY, key)
+    expect(d.map(m => m.name)).toEqual(['Notice to proceed', 'Building enclosed', 'Substantial completion', 'Elevator Inspection', 'Owner Move-In'])
+    expect(d.slice(0, 3).map(m => m.key)).toEqual(['ntp', 'enclosed', 'substantial'])
+    expect(d[3]).toMatchObject({ phase: 'Milestones' })
+    // Every milestone of the result can be pointed at an activity in at least one of the schedules.
+    expect(Object.keys(suggestMapping(d, a))).toEqual(expect.arrayContaining(['ntp', 'enclosed', 'substantial', d[3].key]))
+    expect(Object.keys(suggestMapping(d, b))).toEqual(expect.arrayContaining(['ntp', 'substantial', d[3].key, d[4].key]))
+  })
+  it('with three schedules, a milestone only one of them has is left out', () => {
+    const c = [ms('Y1', 'Substantial Completion', '2027-10-01')]
+    const d = dictionaryFromSchedules([a, b, c], DEFAULT_DICTIONARY, key)
+    expect(d.map(m => m.name)).toEqual(['Notice to proceed', 'Building enclosed', 'Substantial completion', 'Elevator Inspection'])
+  })
+  it('never grows past the limit, and falls back to the standard list when no schedule has a milestone', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ms(`Z${i}`, `Area ${i} handover`, `2027-${String((i % 12) + 1).padStart(2, '0')}-01`))
+    expect(dictionaryFromSchedules([many], DEFAULT_DICTIONARY, key)).toHaveLength(MAX_AUTO_MILESTONES)
+    expect(dictionaryFromSchedules([[], []], DEFAULT_DICTIONARY, key)).toBe(DEFAULT_DICTIONARY)
+    expect(dictionaryFromSchedules([[act('T', { type: 'task', name: 'Pour slab' })]], DEFAULT_DICTIONARY, key)).toBe(DEFAULT_DICTIONARY)
   })
 })

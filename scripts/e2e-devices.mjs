@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Device journeys: the same user path on iPhone, iPad and desktop profiles (screen size, pixel density, touch,
 // mobile mode). Sign in, open the data-location chip, tap search (16px text, so Safari doesn't zoom), check the
-// status tiles fit, open a project by tapping its card, tap through all six project tabs and their views, zoom the schedule,
+// status tiles fit, open a project by tapping its name in the table, tap through all six project tabs and their views, zoom the schedule,
 // and use the bottom navigation (phones) or the sidebar collapse button (tablets, desktop). Every page must fit
 // the screen width. Needs a server with RUNF9_SIGNUP=open:   BASE_URL=http://localhost:3000 node scripts/e2e-devices.mjs
 // SCREENSHOTS=dir saves a few screenshots per device.
@@ -55,8 +55,8 @@ for (const name of DEVICES) {
   const tilesOk = await page.evaluate(() => [...document.querySelectorAll('[aria-label="Filter projects by status"] button')].every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= document.documentElement.clientWidth }))
   if (!tilesOk) fail(name, 'a status tile is off screen'); else console.log('   ✓ status tiles all on screen')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-projects.png` })
-  // 2. Open the project from its card
-  await tap(page.getByRole('button', { name: /Riverside Warehouse/ }).first())
+  // 2. Open the project from its row in the table (its name; the pin button beside it also carries the name)
+  await tap(page.getByRole('button', { name: /^Riverside Warehouse/ }).first())
   await page.waitForURL(/dashboard\/project/); await page.waitForLoadState('networkidle')
   await fits('Overview')
   if (out) await page.screenshot({ path: `${out}/${name.replace(/\W+/g, '-')}-overview.png` })

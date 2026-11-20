@@ -41,6 +41,23 @@ export interface PortfolioRow {
   percentComplete: number | null
   activities: number | null
   critical: number | null
+  /** The project's ID: the one in the contractor's file (P6 project ID) when it has one, else an ID RunF9 assigns */
+  projectId: string
+  /** Who added the project (uploaded its first file or started the plan); null when that member has left */
+  addedBy: string | null
+  /** When the project was added: its first upload, or when the plan was started */
+  addedAt: string | null
+  /** The schedule a master schedule would read for this project; null for a plan with no published schedule */
+  scheduleId: string | null
+}
+
+/** An ID RunF9 assigns to a project that brought none: stable, short, and not a secret (it is not the record's id). */
+export const assignedProjectId = (id: string) => `RF-${id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase()}`
+/** The project ID from the contractor's file, when the upload's series key is one and not just the project's name. */
+function fileProjectId(s: Schedule): string | null {
+  const k = (s.projectKey || '').trim()
+  if (!k || k === s.name.trim().toLowerCase() || k.length > 40) return null
+  return k.toUpperCase()
 }
 
 export interface Portfolio {
@@ -63,7 +80,7 @@ function statusOf(alerts: PortfolioAlert[], started: boolean): PortfolioRow['sta
   return 'on_track'
 }
 
-export function planRow(p: Plan, today: string): PortfolioRow {
+export function planRow(p: Plan, today: string, names: Record<string, string> = {}): PortfolioRow {
   const alerts: PortfolioAlert[] = []
   const g = p.generated
   const elic = elicit({ answers: p.answers }, { extraQuestions: p.extraQuestions, today })
@@ -95,6 +112,7 @@ export function planRow(p: Plan, today: string): PortfolioRow {
     updatedAt: isNaN(updated.getTime()) ? p.updatedAt : updated.toISOString(), status: statusOf(alerts, !!g), alerts,
     title: p.name, source: 'built', version: null, start: g?.projectStart ?? null, percentComplete: g ? 0 : null,
     activities: g ? g.activities.length : null, critical: g?.cpm ? Object.values(g.cpm.times).filter(t => t.critical).length : null,
+    projectId: assignedProjectId(p.id), addedBy: names[p.userId] ?? null, addedAt: isNaN(Date.parse(p.createdAt)) ? null : new Date(p.createdAt).toISOString(), scheduleId: p.scheduleId,
   }
 }
 
@@ -103,7 +121,7 @@ export function planRow(p: Plan, today: string): PortfolioRow {
  * (src/lib/analysis/schedule-analysis.ts) — the same numbers the dashboard overview shows — never
  * from a separate computation here. Uploads without a stored analysis show no status until opened.
  */
-export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioRow {
+export function scheduleRow(s: Schedule, today: string, updates = 1, first: Schedule = s, names: Record<string, string> = {}): PortfolioRow {
   const alerts: PortfolioAlert[] = []
   const an = s.analysis ?? null
   const v = an ? an.varianceDays : null
@@ -126,6 +144,8 @@ export function scheduleRow(s: Schedule, today: string, updates = 1): PortfolioR
     updates, dataDate: s.dataDate, varianceBasis: an ? fmtDates([an.baseline?.header ? `${an.baseline.header}.` : '', an.varianceBasis].filter(Boolean).join(' ')) || null : null,
     title: s.name, source: 'uploaded', version: s.version || null, start: s.projectStart, percentComplete: Number.isFinite(s.percentComplete) ? s.percentComplete : null,
     activities: s.activityCount, critical: s.criticalCount,
+    projectId: fileProjectId(s) ?? assignedProjectId(first.id), addedBy: names[first.userId] ?? null,
+    addedAt: isNaN(Date.parse(first.uploadedAt)) ? null : new Date(first.uploadedAt).toISOString(), scheduleId: s.id,
   }
 }
 
@@ -148,27 +168,28 @@ const newer = (a: Schedule, b: Schedule) =>
  * Uploads of one project (same project_key) form an update series; the portfolio shows only the
  * latest update of each, with the count. Uploads without a project key stay separate.
  */
-export function latestUpdates(schedules: Schedule[]): { schedule: Schedule; updates: number }[] {
+export function latestUpdates(schedules: Schedule[]): { schedule: Schedule; updates: number; first: Schedule }[] {
   const series = new Map<string, Schedule[]>()
-  const out: { schedule: Schedule; updates: number }[] = []
+  const out: { schedule: Schedule; updates: number; first: Schedule }[] = []
+  const added = (x: Schedule) => Date.parse(x.uploadedAt) || 0
   for (const s of schedules) {
     if (s.sourceType === 'generated') continue
-    if (!s.projectKey) { out.push({ schedule: s, updates: 1 }); continue }
+    if (!s.projectKey) { out.push({ schedule: s, updates: 1, first: s }); continue }
     const list = series.get(s.projectKey) ?? []
     list.push(s)
     series.set(s.projectKey, list)
   }
-  for (const list of series.values()) out.push({ schedule: [...list].sort(newer)[0], updates: list.length })
+  for (const list of series.values()) out.push({ schedule: [...list].sort(newer)[0], updates: list.length, first: [...list].sort((x, y) => added(x) - added(y))[0] })
   return out
 }
 
 const RANK: Record<PortfolioRow['status'], number> = { at_risk: 0, attention: 1, on_track: 2, no_baseline: 3, not_started: 4, complete: 5 }
 
-export function buildPortfolio(plans: Plan[], schedules: Schedule[], today = new Date().toISOString().slice(0, 10)): Portfolio {
+export function buildPortfolio(plans: Plan[], schedules: Schedule[], today = new Date().toISOString().slice(0, 10), names: Record<string, string> = {}): Portfolio {
   // A published plan's generated schedule is represented by the plan row.
   const rows = [
-    ...plans.map(p => planRow(p, today)),
-    ...latestUpdates(schedules).map(({ schedule, updates }) => scheduleRow(schedule, today, updates)),
+    ...plans.map(p => planRow(p, today, names)),
+    ...latestUpdates(schedules).map(({ schedule, updates, first }) => scheduleRow(schedule, today, updates, first, names)),
   ].sort((a, b) => RANK[a.status] - RANK[b.status] || b.alerts.length - a.alerts.length || b.updatedAt.localeCompare(a.updatedAt))
   return {
     rows,

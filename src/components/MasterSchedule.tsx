@@ -33,7 +33,7 @@ interface PickActivity { code: string; name: string; type: string; milestoneKind
 
 const TABS: { id: MasterReport | 'setup'; label: string }[] = [
   { id: 'milestones', label: 'Milestones' }, { id: 'phases', label: 'Phases' }, { id: 'sectors', label: 'Sectors' },
-  { id: 'lookahead', label: 'Look-ahead' }, { id: 'parties', label: 'Other parties' }, { id: 'updates', label: 'Contractor updates' }, { id: 'setup', label: 'Set up' },
+  { id: 'lookahead', label: 'Look-ahead' }, { id: 'parties', label: 'Other parties' }, { id: 'updates', label: 'Contractor updates' }, { id: 'setup', label: 'Settings' },
 ]
 type TabId = (typeof TABS)[number]['id']
 
@@ -80,8 +80,6 @@ export function MasterSchedule() {
   const [tab, setTab] = useState<TabId>('milestones')
   const [sector, setSector] = useState('')
   const [cell, setCell] = useState<{ row: MasterRow; index: number } | null>(null)
-  const [newName, setNewName] = useState('')
-  const [busy, setBusy] = useState(false)
 
   const loadList = useCallback(async () => {
     const res = await fetch('/api/programs').catch(() => null)
@@ -108,42 +106,21 @@ export function MasterSchedule() {
 
   const reload = useCallback(async () => { if (programId) await loadView(programId) }, [programId, loadView])
 
-  const create = async () => {
-    setBusy(true)
-    const r = await send('/api/programs', 'POST', { name: newName })
-    setBusy(false)
-    if (!r.ok) { setError(r.data.error || 'The program was not created. Try again.'); return }
-    setNewName(''); setError('')
-    const p = r.data.program as { id: string }
-    await loadList()
-    setTab('setup')
-    router.push(`/dashboard/programs?program=${p.id}`)
-  }
-
   const master = view?.master ?? null
   const sectorNames = useMemo(() => (master ? master.sectors.map(s => s.sector) : []), [master])
   const rows = useMemo(() => (master ? master.rows.filter(r => !sector || (r.sector ?? NO_SECTOR) === sector) : []), [master, sector])
 
   if (!programs) return <div className="px-6 py-10 text-body text-warm-600 flex items-center gap-2">{error || <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading…</>}</div>
 
-  const createForm = canCreate && (
-    <form onSubmit={e => { e.preventDefault(); if (newName.trim()) create() }} className="flex flex-wrap items-end gap-2 print:hidden">
-      <label className="text-caption font-semibold text-warm-600">New program
-        <input value={newName} onChange={e => setNewName(e.target.value)} maxLength={120} placeholder="Program name" className={`${inputClass} mt-1 block w-64 max-w-full`} />
-      </label>
-      <Button type="submit" variant="secondary" disabled={busy || newName.trim().length < 2}><Plus size={15} aria-hidden="true" />Create</Button>
-    </form>
-  )
-
   if (!programs.length) {
     return (
       <div className="max-w-3xl mx-auto px-5 md:px-8 py-6 md:py-8 space-y-5">
         {error ? <Alert tone="error">{error}</Alert> : null}
-        <EmptyState title="Master schedule">
-          A program reads several projects together. Each project&apos;s dates come from its contractor&apos;s own schedule, so the master and the contractor&apos;s schedule always show the same dates.
-          {!canCreate && ' Ask a scheduler or an admin of your organization to create the first program.'}
+        <EmptyState title="Master schedule" action={{ label: 'Go to Projects', href: '/dashboard' }}>
+          {canCreate
+            ? 'In Projects, tick the schedules you want and choose "Build a master schedule". RunF9 reads the milestones they share and keeps the master up to date with every new upload.'
+            : 'A scheduler or an admin builds a master schedule from the Projects list. It will show here once there is one.'}
         </EmptyState>
-        {createForm && <div className="flex justify-center">{createForm}</div>}
       </div>
     )
   }
@@ -164,7 +141,7 @@ export function MasterSchedule() {
         </div>
         <div className="flex flex-wrap items-end gap-2 print:hidden">
           {programs.length > 1 && (
-            <label className="text-caption font-semibold text-warm-600">Program
+            <label className="text-caption font-semibold text-warm-600">Master schedule
               <select value={programId ?? ''} onChange={e => { setSector(''); router.push(`/dashboard/programs?program=${e.target.value}`) }} className={`${inputClass} mt-1 block w-56`}>
                 {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -195,8 +172,8 @@ export function MasterSchedule() {
       {!view || !master ? <div className="py-10 text-body text-warm-600 flex items-center gap-2"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Reading the contractors&apos; schedules…</div> : (
         <div role="tabpanel" id={`master-panel-${tab}`} aria-labelledby={`master-tab-${tab}`} className="space-y-4">
           {tab !== 'setup' && master.rows.length === 0 && (
-            <EmptyState heading="h2" title="No projects in this program yet" action={view.canEdit ? { label: 'Add projects', onClick: () => setTab('setup') } : undefined}>
-              Add the program&apos;s projects, then point each standard milestone at the matching activity in the contractor&apos;s schedule.
+            <EmptyState heading="h2" title="No projects in this master schedule yet" action={view.canEdit ? { label: 'Go to Projects', href: '/dashboard' } : undefined}>
+              In Projects, tick the schedules you want and choose &quot;Build a master schedule&quot;, then add them to this one.
             </EmptyState>
           )}
           {tab === 'milestones' && master.rows.length > 0 && <Milestones master={master} rows={rows} view={view} onCell={(row, index) => setCell({ row, index })} />}
@@ -206,8 +183,7 @@ export function MasterSchedule() {
           {tab === 'parties' && <Parties view={view} sector={sector} onChanged={reload} onError={setError} />}
           {tab === 'updates' && master.rows.length > 0 && <Updates master={master} rows={rows} view={view} />}
           {tab === 'setup' && <Setup view={view} onChanged={async msg => { setNotice(msg); await reload(); await loadList() }} onError={setError}
-            onDeleted={async () => { setView(null); const left = await loadList(); router.replace(left.length ? `/dashboard/programs?program=${left[0].id}` : '/dashboard/programs') }} />}
-          {tab === 'setup' && createForm && <Section title="Another program" description="Each program has its own projects and its own standard milestones.">{createForm}</Section>}
+            onDeleted={async () => { setView(null); const left = await loadList(); window.dispatchEvent(new Event('runf9:programs-changed')); router.replace(left.length ? `/dashboard/programs?program=${left[0].id}` : '/dashboard/programs') }} />}
         </div>
       )}
 
@@ -699,14 +675,14 @@ function Setup({ view, onChanged, onError, onDeleted }: { view: View; onChanged:
   const dirty = JSON.stringify(dict) !== JSON.stringify(program.dictionary)
   const sectors = [...new Set(master.rows.map(r => r.sector).filter((s): s is string => !!s))]
 
-  if (!view.canEdit) return <p className="text-body text-warm-600">Your role can read this program. A scheduler or an admin can change its projects and milestones.</p>
+  if (!view.canEdit) return <p className="text-body text-warm-600">Your role can read this master schedule. A scheduler or an admin can change its projects and milestones.</p>
   return (
     <div className="space-y-5">
-      <Section title="Projects in this program" description="The program follows each project, so every new upload of a project is read as soon as it arrives.">
+      <Section title="Projects in this master schedule" description="The master follows each project, so every new upload of a project is read as soon as it arrives. Milestones whose names match an activity are pointed at it when a project is added; check them in the Milestones view.">
         {master.rows.length > 0 && (
-          <div className={card} tabIndex={0} role="region" aria-label="Projects in this program">
+          <div className={card} tabIndex={0} role="region" aria-label="Projects in this master schedule">
             <table className="w-full">
-              <caption className="sr-only">Projects in this program.</caption>
+              <caption className="sr-only">Projects in this master schedule.</caption>
               <thead><tr className="border-b border-warm-200"><th scope="col" className={th}>Project</th><th scope="col" className={th}>Sector</th><th scope="col" className={th}>Location</th><th scope="col" className={th}>Contractor</th><th scope="col" className={th}>Milestones mapped</th><th scope="col" className={th}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {master.rows.map(r => {
@@ -732,8 +708,8 @@ function Setup({ view, onChanged, onError, onDeleted }: { view: View; onChanged:
                             if (!res?.ok) { onError(data.error || 'Could not read the schedule.'); return }
                             setSuggest({ id: r.id, found: data.suggestions })
                           }}>Suggest milestones</Button>}
-                          <button type="button" aria-label={`Take ${r.name} out of the program`} disabled={busy} className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-status-at-risk align-middle"
-                            onClick={() => { if (window.confirm(`Take "${r.name}" out of this program? Its schedules stay; its milestone mapping, owner forecasts and items filed under it here are removed.`)) run(() => send(`${base}/projects/${r.id}`, 'DELETE'), 'Removed from the program.') }}><Trash2 size={15} aria-hidden="true" /></button>
+                          <button type="button" aria-label={`Take ${r.name} out of the master schedule`} disabled={busy} className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-warm-600 hover:bg-warm-100 hover:text-status-at-risk align-middle"
+                            onClick={() => { if (window.confirm(`Take "${r.name}" out of this master schedule? Its schedules stay; its milestone mapping, owner forecasts and items filed under it here are removed.`)) run(() => send(`${base}/projects/${r.id}`, 'DELETE'), 'Removed from the master schedule.') }}><Trash2 size={15} aria-hidden="true" /></button>
                         </>)}
                       </td>
                     </tr>
@@ -759,8 +735,8 @@ function Setup({ view, onChanged, onError, onDeleted }: { view: View; onChanged:
             </div>
           )
         })()}
-        {view.available.length === 0 ? <p className="text-body text-warm-600">{master.rows.length ? 'Every project you can see is in this program.' : 'Upload a schedule first; each uploaded project can then be added here.'}</p> : (
-          <form onSubmit={e => { e.preventDefault(); run(() => send(`${base}/projects`, 'POST', add), 'Added to the program.').then(ok => { if (ok) setAdd(a => ({ ...a, scheduleId: '', location: '' })) }) }} className="grid gap-3 md:grid-cols-5 items-end">
+        {view.available.length === 0 ? <p className="text-body text-warm-600">{master.rows.length ? 'Every project you can see is in this master schedule.' : 'Upload a schedule first; each uploaded project can then be added here.'}</p> : (
+          <form onSubmit={e => { e.preventDefault(); run(() => send(`${base}/projects`, 'POST', add), 'Added. Milestones with matching names were pointed at their activities; check them in the Milestones view.').then(ok => { if (ok) setAdd(a => ({ ...a, scheduleId: '', location: '' })) }) }} className="grid gap-3 md:grid-cols-5 items-end">
             <div className="md:col-span-2"><Field label="Add a project">{p => <select {...p} required value={add.scheduleId} onChange={e => setAdd({ ...add, scheduleId: e.target.value })} className={inputClass}><option value="">Choose a project</option>{view.available.map(a => <option key={a.key} value={a.scheduleId}>{a.name} ({a.version})</option>)}</select>}</Field></div>
             <Field label="Sector">{p => <input {...p} list={sectorList} value={add.sector} onChange={e => setAdd({ ...add, sector: e.target.value })} maxLength={60} placeholder="For example: Education" className={inputClass} />}</Field>
             <Field label="Contractor">{p => <input {...p} value={add.contractor} onChange={e => setAdd({ ...add, contractor: e.target.value })} maxLength={120} className={inputClass} />}</Field>
@@ -791,20 +767,20 @@ function Setup({ view, onChanged, onError, onDeleted }: { view: View; onChanged:
         <Hint>Left column is the milestone, right column is its phase. Milestones that share a phase name form that phase, in the order listed. Removing a milestone hides its mapping in every project.</Hint>
       </Section>
 
-      <Section title="Program name">
+      <Section title="Name">
         <form onSubmit={e => { e.preventDefault(); run(() => send(base, 'PATCH', { name }), 'Renamed.') }} className="flex flex-wrap items-end gap-2">
           <Field label="Name">{p => <input {...p} value={name} onChange={e => setName(e.target.value)} maxLength={120} className={`${inputClass} w-80 max-w-full`} />}</Field>
           <Button type="submit" variant="secondary" disabled={busy || name.trim() === program.name || name.trim().length < 2}>Rename</Button>
         </form>
       </Section>
 
-      <Section title="Delete this program" tone="danger" description="Removes the program, its milestone mapping, owner forecasts and other parties' items. The projects and their schedules are not touched.">
+      <Section title="Delete this master schedule" tone="danger" description="Removes the master schedule, its milestone mapping, owner forecasts and other parties' items. The projects and their schedules are not touched.">
         <Button variant="danger" disabled={busy} onClick={async () => {
-          if (!window.confirm(`Delete the program "${program.name}"? This cannot be undone.`)) return
+          if (!window.confirm(`Delete the master schedule "${program.name}"? This cannot be undone.`)) return
           const r = await send(base, 'DELETE')
-          if (!r.ok) { onError(r.data.error || 'The program was not deleted. Try again.'); return }
+          if (!r.ok) { onError(r.data.error || 'The master schedule was not deleted. Try again.'); return }
           await onDeleted()
-        }}>Delete program</Button>
+        }}>Delete master schedule</Button>
       </Section>
     </div>
   )

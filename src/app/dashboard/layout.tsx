@@ -251,6 +251,15 @@ function Dialog({ labelledBy, onClose, className, closing = false, children }: {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
   const pathname = usePathname()
+  // The Master schedule entry appears once there is one: it is built from the Projects list, not from the menu.
+  const [hasPrograms, setHasPrograms] = useState(false)
+  useEffect(() => {
+    const check = () => fetch('/api/programs').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setHasPrograms((d.programs ?? []).length > 0) }).catch(() => {})
+    check()
+    window.addEventListener('runf9:programs-changed', check)
+    return () => window.removeEventListener('runf9:programs-changed', check)
+  }, [])
+  const nav = NAV.filter(n => n.href !== '/dashboard/programs' || hasPrograms || pathname.startsWith('/dashboard/programs'))
 
   const [user,             setUser]             = useState<User | null>(null)
   const [schedules,        setSchedules]        = useState<Schedule[]>([])
@@ -509,7 +518,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
           <nav aria-label="Main" className="flex flex-col gap-1 min-h-0">
-            {NAV.map(n => {
+            {nav.map(n => {
               const active = navActive(pathname, n.href)
               return (
                 <div key={n.href}>
@@ -763,7 +772,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* ── Bottom bar (phones) ──────────────────────────────── */}
         <nav aria-label="Main (mobile)" className="md:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-950 border-t border-navy-800 safe-area-bottom">
           <div className="flex">
-            {NAV.map(n => {
+            {nav.map(n => {
               const active = navActive(pathname, n.href)
               return (
                 <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}

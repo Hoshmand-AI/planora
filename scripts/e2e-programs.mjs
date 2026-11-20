@@ -86,14 +86,19 @@ ok(empty.status === 200 && empty.data.master.rows.length === 0 && empty.data.ava
 const addA = await a.post(`${url}/projects`, { scheduleId: a0, sector: 'Education', contractor: 'North Builders' })
 const addB = await a.post(`${url}/projects`, { scheduleId: b0, sector: 'Public health', contractor: 'East Contracting', location: 'St. Croix' })
 ok(addA.status === 200 && addB.status === 200, 'both projects are added, each with its sector and contractor', [addA.data, addB.data])
+ok(addA.data.mapped === 3 && addB.data.mapped === 3, 'adding a project points the milestones whose names match at their activities (3 of 4 here)', [addA.data.mapped, addB.data.mapped])
 ok((await a.post(`${url}/projects`, { scheduleId: a1, sector: 'Education' })).status === 409, 'a project is in a program once, whichever of its uploads is named')
 ok((await a.post(`${url}/projects`, { scheduleId: 'nope' })).status === 400, 'an unknown schedule is refused')
 const projA = addA.data.project.id, projB = addB.data.project.id
 
 /* ─── Mapping: a milestone reads an activity; the date is never typed ─── */
+const auto = (await a.get(url)).data.master.rows.find(r => r.id === projA)
+ok(auto.cells.filter(c => c.mapped).map(c => c.mapped.code).join() === 'M100,M400,M900' && auto.cells[3].mapped === null, 'the matches are the milestone activities with those names, and nothing is invented for Occupancy', auto.cells.map(c => c.mapped))
+// Taking the mappings off again, to check the suggestions a person accepts one by one.
+ok((await a.patch(`${url}/projects/${projA}`, { mapping: { [kNtp]: null, [kEnc]: null, [kSc]: null } })).status === 200 && (await a.patch(`${url}/projects/${projB}`, { mapping: { [kNtp]: null, [kEnc]: null, [kSc]: null } })).status === 200, 'a mapping can be removed')
 const sug = await a.get(`${url}/projects/${projA}`)
-ok(sug.status === 200 && sug.data.suggestions[kSc]?.code === 'M900' && sug.data.suggestions[kNtp]?.code === 'M100' && sug.data.suggestions[kEnc]?.code === 'M400' && !sug.data.suggestions[kOcc], 'milestone activities with matching names are suggested, and nothing is invented for Occupancy', sug.data.suggestions)
-ok((await a.get(url)).data.master.rows.every(r => r.mappedCount === 0), 'a suggestion maps nothing until it is accepted')
+ok(sug.status === 200 && sug.data.suggestions[kSc]?.code === 'M900' && sug.data.suggestions[kNtp]?.code === 'M100' && sug.data.suggestions[kEnc]?.code === 'M400' && !sug.data.suggestions[kOcc], 'the same matches are offered as suggestions for the milestones not mapped', sug.data.suggestions)
+ok((await a.get(url)).data.master.rows.every(r => r.mappedCount === 0), 'reading the suggestions maps nothing')
 const pick = await a.get(`${url}/projects/${projA}/activities?q=substantial`)
 ok(pick.status === 200 && pick.data.activities.length === 1 && pick.data.activities[0].code === 'M900' && pick.data.upload.version === 'Update 1', 'the activity picker searches the newest upload', pick.data)
 const mapAll = p => a.patch(`${url}/projects/${p}`, { mapping: { [kNtp]: { code: 'M100', use: 'start' }, [kEnc]: { code: 'M400', use: 'finish' }, [kSc]: { code: 'M900', use: 'finish' } } })
@@ -158,8 +163,20 @@ ok(file.text.includes('11/19/2027') && file.text.includes('M900 Substantial Comp
 for (const r of ['phases', 'sectors', 'lookahead', 'parties', 'updates']) ok((await a.get(`${url}/export?report=${r}`)).status === 200, `the ${r} printout downloads`)
 ok((await a.get(`${url}/export?report=everything`)).status === 400, 'an unknown printout is refused')
 
+/* ─── A master schedule built from picked schedules ─── */
+ok((await a.post('/api/programs', { name: 'Built', scheduleIds: [] })).status === 400, 'building needs at least one schedule')
+const built = await a.post('/api/programs', { name: 'Schools and clinic', scheduleIds: [a0, a1, b0, 'not-a-schedule'] })
+ok(built.status === 200 && built.data.projects.length === 2, 'picking three uploads of two projects builds one master schedule with two projects; an unknown id is skipped', built.data)
+const bv = (await a.get(`/api/programs/${built.data.program.id}`)).data
+const names = bv.master.dictionary.map(m => m.name)
+ok(names.includes('Notice to proceed') && names.includes('Substantial completion') && !names.includes('Funds obligated'), 'its milestones are the ones the schedules have: standard ones they carry, none they do not', names)
+const bSc = bv.master.dictionary.findIndex(m => m.name === 'Substantial completion')
+ok(bv.master.rows.every(r => r.cells[bSc].mapped?.code === 'M900') && bv.master.rows.map(r => r.cells[bSc].date).sort().join() === '2027-11-19,2027-12-17', 'every project is already reading its own substantial completion date', bv.master.rows.map(r => r.cells[bSc]))
+ok((await b.post('/api/programs', { name: 'Theirs', scheduleIds: [a0] })).status === 400, "firm B cannot build a master schedule from firm A's schedule")
+ok((await a.del(`/api/programs/${built.data.program.id}`)).status === 200, 'the built master schedule is deleted')
+
 /* ─── Another firm, and no sign-in ─── */
-ok((await b.get('/api/programs')).data.programs.length === 0, "firm B does not see firm A's program")
+ok((await b.get('/api/programs')).data.programs.length === 0, "firm B does not see firm A's program, and its refused build left nothing behind")
 for (const [what, res] of [
   ['read the master', await b.get(url)], ['rename it', await b.patch(url, { name: 'Mine' })], ['add a project', await b.post(`${url}/projects`, { scheduleId: a0 })],
   ['change a mapping', await b.patch(`${url}/projects/${projA}`, { mapping: { [kSc]: null } })], ['search its activities', await b.get(`${url}/projects/${projA}/activities`)],

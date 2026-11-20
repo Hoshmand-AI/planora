@@ -23,7 +23,7 @@ curl -H "Authorization: Bearer pk_live_…" https://runf9.ai/api/portfolio
 
 | Method | Path | Access | Returns |
 |---|---|---|---|
-| GET | `/api/portfolio` | read-only | Every plan and uploaded schedule with status, forecast vs required dates and alerts |
+| GET | `/api/portfolio` | read-only | Every plan and uploaded schedule with status, forecast vs required dates and alerts, plus `projectId` (the ID in the contractor's file, else one RunF9 assigns), `addedBy`, `addedAt` and `scheduleId` |
 | GET | `/api/plans` | read-only | Plans with readiness, finish and activity count |
 | GET | `/api/plans/{id}` | read-only | Full plan: answers, generated schedule (activities, logic, CPM dates and float), evaluation, recovery options |
 | GET | `/api/plans/{id}/risk` | read-only | Monte Carlo schedule risk analysis (P50/P80, criticality, sensitivity) |
@@ -105,10 +105,10 @@ Reading a program accepts an API key (see the table above). Changing one needs a
 
 | Method | Path | Body |
 |---|---|---|
-| POST | `/api/programs` | `{ name }`. The program starts with a standard milestone list to edit |
+| POST | `/api/programs` | `{ name, scheduleIds? }`. With `scheduleIds` (any upload of each project) the master schedule is built from those schedules: its standard milestones are the ones the schedules share, each project is added, and every milestone that matches an activity by name is pointed at it. Without them it starts empty with a standard list |
 | PATCH | `/api/programs/{id}` | `{ name?, milestones?: [{ key?, name, phase }] }`. Keys are kept when sent and made for new milestones |
 | DELETE | `/api/programs/{id}` | The projects' schedules are untouched |
-| POST | `/api/programs/{id}/projects` | `{ scheduleId, sector?, location?, contractor? }`. Any upload of the project; the program follows the project, so later uploads are read without anyone adding them |
+| POST | `/api/programs/{id}/projects` | `{ scheduleId, sector?, location?, contractor? }`. Any upload of the project; the program follows the project, so later uploads are read without anyone adding them. Milestones whose names match an activity of the newest upload are pointed at it (`mapped` in the answer says how many) |
 | GET | `/api/programs/{id}/projects/{projectId}` | `{ suggestions }`: for unmapped milestones, the milestone activity of the newest upload with the closest name. Nothing is mapped until accepted |
 | PATCH | `/api/programs/{id}/projects/{projectId}` | `{ sector?, location?, contractor?, mapping?: { [milestoneKey]: { code, use: 'start' \| 'finish' } \| null }, ownerForecasts?: { [milestoneKey]: { date, note? } \| null } }`. A mapping names the contractor activity a milestone reads; a date sent with it is ignored |
 | DELETE | `/api/programs/{id}/projects/{projectId}` | Takes the project out of the program, with the items filed under it |
