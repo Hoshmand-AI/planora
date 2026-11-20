@@ -27,6 +27,7 @@ export interface ProductUpdate {
 
 /** Newest first. Shown on hoshmand.ai under "What's new"; the latest few are enough. */
 export const UPDATES: ProductUpdate[] = [
+  { date: '2026-11-20', title: 'Projects in one table: move the columns where you want them, see open items per project, and tick projects to build a master schedule from them' },
   { date: '2026-11-20', title: 'A new landing page: five moving windows show a schedule being built, analyzed, compared, maintained and explained' },
   { date: '2026-11-18', title: 'Master schedule: read several projects as one program, with every date taken from each contractor\'s own schedule, plus milestone, phase and sector printouts' },
   { date: '2026-11-18', title: 'Two more check sets in the Standards view, drawn from USACE UFGS 01 32 01.00 10 and the PMI Practice Standard for Scheduling' },
